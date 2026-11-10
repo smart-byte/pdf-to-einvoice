@@ -33,6 +33,21 @@ in their format. This one starts from the PDF you already produce with Word, you
 e-invoice. Reading works without any AI by pattern matching; optionally a small language model that runs in your
 browser (WebGPU) fills in what the patterns did not find. The page is available in English and German.
 
+### Compared with online converters
+
+Many services convert PDF invoices too. The main difference is where your invoice is processed.
+
+|                                         | typical online converter                                                                               | pdf-to-einvoice                                                                       |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
+| Where is your invoice processed?        | On the provider's servers: the file is uploaded.                                                       | On your device, in the browser. Nothing is uploaded.                                  |
+| Who reads the data?                     | Depending on the provider, an AI service in the cloud, also outside the EU, or you type everything in. | Rules on your device; on request also a language model that runs in your browser too. |
+| Where does each value come from?        | You get a form to correct.                                                                             | Each value is marked on the PDF, and the XML is compared with the PDF.                |
+| Account, ads, tracking                  | Depending on the provider, sign-up, ads or a subscription.                                             | No sign-up, no ads, no cookies.                                                       |
+| Source code                             | Mostly closed.                                                                                         | Open (MIT licence): anyone can check what the page does.                              |
+| For software and AI assistants          | Mostly an API that invoices are sent to.                                                               | Library, command line tool and MCP server, all on your own machine.                   |
+| Formats                                 | ZUGFeRD, often XRechnung and more.                                                                     | ZUGFeRD / Factur-X and XRechnung, following EN 16931.                                 |
+| Checking against the official rule sets | Some offer their own validator.                                                                        | Its own plausibility check; not a complete check against the official rule sets.      |
+
 ## As a library
 
 ```bash
@@ -95,6 +110,45 @@ npx pdf-to-einvoice xrechnung invoice.json -o invoice.xml   # the data as an XRe
 ```
 
 `create` and `xrechnung` never overwrite a file unless you pass `--force`, and never write over their input.
+
+## Many invoices at once
+
+An invoicing program that issues many invoices already has what this tool needs: the PDF it renders and the data it
+renders it from. Pass that data on instead of reading it back from the PDF. Reading by pattern matching or with a
+language model is a first draft for a person to check, not something to run unattended over a batch.
+
+```ts
+import { readFile, writeFile } from 'node:fs/promises';
+import { createEInvoice, InvoiceError } from 'pdf-to-einvoice';
+
+// From your invoicing system: the path of each rendered PDF and the data it was rendered from.
+for (const { pdfPath, invoice } of invoicesToConvert) {
+  try {
+    const { pdf, findings } = await createEInvoice({ pdf: await readFile(pdfPath), invoice });
+    await writeFile(pdfPath.replace(/\.pdf$/i, '.einvoice.pdf'), pdf);
+    for (const finding of findings) console.warn(pdfPath, finding.path, finding.message); // warnings only
+  } catch (error) {
+    if (!(error instanceof InvoiceError)) throw error;
+    // The data has errors: nothing was written. Fix them where the data comes from and run this invoice again.
+    console.error(
+      pdfPath,
+      error.findings.map((finding) => `${finding.path}: ${finding.message}`),
+    );
+  }
+}
+```
+
+The same works with `createXRechnung({ invoice })` for invoices to public bodies. On the command line, with a data file
+next to each PDF (`RE-1.pdf` and `RE-1.json`):
+
+```bash
+for pdf in invoices/*.pdf; do
+  npx pdf-to-einvoice create "$pdf" "${pdf%.pdf}.json" || echo "not created: $pdf"
+done
+```
+
+Everything runs where you run it, on a laptop as on your own server; no invoice is sent anywhere. The MCP server, in
+contrast, is made for one invoice at a time, with the user confirming the data.
 
 ## For AI assistants
 
