@@ -3,6 +3,8 @@
 Thanks for helping out. The project stays small on purpose: established libraries do the heavy lifting (XML,
 PDF, text extraction), and this repository adds the data model, the checks and the front ends.
 
+Everyone who takes part is expected to follow the [code of conduct](CODE_OF_CONDUCT.md).
+
 ## Setup
 
 ```bash
