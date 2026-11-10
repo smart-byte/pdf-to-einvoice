@@ -1,0 +1,225 @@
+<!doctype html>
+<!-- Source of public/og.png, the link preview image. Not part of the built site: open it at 1200×630 and take a screenshot at 2× to regenerate. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>pdf-to-einvoice link preview</title>
+    <link rel="stylesheet" href="../node_modules/@fontsource-variable/schibsted-grotesk/index.css" />
+    <link rel="stylesheet" href="../node_modules/@fontsource-variable/jetbrains-mono/index.css" />
+    <style>
+      :root {
+        --desk: #e4e8f0;
+        --ink: #141823;
+        --text: #394050;
+        --muted: #5c6678;
+        --line: #d3d9e2;
+        --blue: #2440b3;
+        --page: #fdfdfb;
+        --marker: #ffe45c;
+        --copy: #fbf3c0;
+        --copy-ink: #22338c;
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+      }
+      body {
+        width: 1200px;
+        height: 630px;
+        overflow: hidden;
+        display: grid;
+        grid-template-columns: 1fr 470px;
+        align-items: center;
+        padding: 0 0 0 76px;
+        background: var(--desk);
+        color: var(--text);
+        font-family: 'Schibsted Grotesk Variable', sans-serif;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        color: var(--ink);
+        font-size: 30px;
+        font-weight: 730;
+        letter-spacing: -0.02em;
+      }
+      .brand svg {
+        width: 46px;
+        height: 46px;
+        fill: none;
+        stroke: var(--ink);
+        stroke-width: 1.5;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      h1 {
+        margin-top: 44px;
+        color: var(--ink);
+        font-size: 76px;
+        font-weight: 760;
+        line-height: 1.04;
+        letter-spacing: -0.03em;
+      }
+      h1 span {
+        position: relative;
+        z-index: 0;
+        white-space: nowrap;
+      }
+      h1 span::before {
+        content: '';
+        position: absolute;
+        z-index: -1;
+        inset: 0.1em -0.07em -0.02em -0.14em;
+        background: var(--marker);
+        border-radius: 0.32em 0.12em 0.36em 0.14em / 0.24em 0.36em 0.2em 0.38em;
+        rotate: -1.2deg;
+      }
+      p {
+        margin-top: 34px;
+        max-width: 560px;
+        font-size: 29px;
+        line-height: 1.4;
+      }
+      .stack {
+        position: relative;
+        width: 330px;
+        height: 428px;
+      }
+      .sheet {
+        position: absolute;
+        inset: 0;
+        border-radius: 3px;
+        box-shadow:
+          0 1px 1px #1b25400f,
+          0 26px 50px -24px #1b254073;
+      }
+      .copy {
+        background: var(--copy);
+        color: var(--copy-ink);
+        transform: translate(112px, -22px) rotate(4.5deg);
+        overflow: hidden;
+        font:
+          500 12px/1.75 'JetBrains Mono Variable',
+          monospace;
+      }
+      .copy pre {
+        font: inherit;
+        padding: 40px 0 0 232px;
+      }
+      .copy b {
+        font-weight: 800;
+      }
+      .copy small {
+        position: absolute;
+        top: 12px;
+        right: 14px;
+        font-size: 11px;
+        font-weight: 600;
+        opacity: 0.7;
+      }
+      .page {
+        padding: 30px;
+        background: var(--page);
+        color: var(--muted);
+        font-size: 10.5px;
+        line-height: 1.5;
+        display: grid;
+        grid-template-columns: 1fr auto;
+        align-content: start;
+        gap: 4px 14px;
+      }
+      .name {
+        grid-column: 1 / -1;
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        margin-bottom: 16px;
+        color: var(--ink);
+        font-size: 13px;
+        font-weight: 730;
+      }
+      .name i {
+        width: 12px;
+        height: 12px;
+        border-radius: 1px;
+        background: var(--blue);
+      }
+      .right {
+        text-align: right;
+      }
+      .rows,
+      .sum {
+        grid-column: 1 / -1;
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 4px 14px;
+      }
+      .rows {
+        margin-top: 16px;
+        padding: 8px 0;
+        border-block: 1px solid var(--line);
+      }
+      .sum {
+        justify-self: end;
+        grid-template-columns: auto auto;
+        text-align: right;
+      }
+      .sum b {
+        color: var(--ink);
+      }
+      mark {
+        background: var(--marker);
+        color: var(--ink);
+        padding: 0.06em 0.22em;
+        margin: 0 -0.1em;
+        border-radius: 0.5em 0.2em 0.55em 0.25em / 0.4em 0.6em 0.35em 0.55em;
+      }
+    </style>
+  </head>
+  <body>
+    <div>
+      <div class="brand">
+        <svg viewBox="0 0 32 32">
+          <rect x="10.5" y="3" width="16.5" height="21.5" rx="1.5" transform="rotate(9 18.7 13.7)" fill="#ffe45c" />
+          <rect x="5" y="7.5" width="16.5" height="21.5" rx="1.5" fill="#fdfdfb" />
+          <path d="M9 13.5h5.5M9 18h8.5M9 22.5h4.5" />
+        </svg>
+        pdf-to-einvoice
+      </div>
+      <h1>Your invoice PDF becomes an <span>e-invoice</span>.</h1>
+      <p>Your layout stays. The data is added as XML, following EN 16931. Nothing is uploaded.</p>
+    </div>
+    <div class="stack">
+      <div class="sheet copy">
+        <small>factur-x.xml</small>
+        <!-- prettier-ignore -->
+        <pre>&lt;ram:ID&gt;
+  <b>RE-2026-0042</b>
+&lt;/ram:ID&gt;
+&lt;ram:IssueDateTime&gt;
+  <b>20261103</b>
+&lt;/ram:IssueDateTime&gt;
+&lt;ram:SellerTradeParty&gt;
+  &lt;ram:Name&gt;
+    <b>Muster Software</b>
+&lt;ram:TaxTotalAmount&gt;
+  <b>284.81</b>
+&lt;/ram:TaxTotalAmount&gt;
+&lt;ram:GrandTotalAmount&gt;
+  <b>1783.81</b>
+&lt;/ram:GrandTotalAmount&gt;</pre>
+      </div>
+      <div class="sheet page">
+        <div class="name"><i></i>Muster Software GmbH</div>
+        <div>Beispiel AG<br />Hauptstraße 5<br />54321 Beispielstadt</div>
+        <div class="right">Rechnung Nr. <mark>RE-2026-0042</mark><br />Datum <mark>03.11.2026</mark></div>
+        <div class="rows"><span>Beratung E-Rechnung</span><span>1.000,00 €</span><span>Softwarelizenz (Jahr)</span><span>499,00 €</span></div>
+        <div class="sum">
+          <span>Umsatzsteuer 19 %</span><span><mark>284,81 €</mark></span
+          ><b>Gesamtbetrag</b><b><mark>1.783,81 €</mark></b>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
