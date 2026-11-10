@@ -59,18 +59,19 @@ await writeFile('invoice.einvoice.pdf', pdf);
 
 It works the same in a browser: `pdf` is a `Uint8Array` in and out.
 
-| function                           | what it does                                                                                           |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `createEInvoice({ pdf, invoice })` | checks the data, then returns `{ pdf, xml, findings, totals }`; throws `InvoiceError` if data is wrong |
-| `check(invoice, { pdfText? })`     | returns `{ findings, totals, invoice? }` without creating anything; never throws on incomplete data    |
-| `extractText(pdf)`                 | the text of a PDF, row by row                                                                          |
-| `guessFromText(text)`              | reads an invoice by pattern matching: labelled values, seller and buyer, table rows that add up        |
-| `keepWhatThePdfShows(draft, text)` | drops every value the PDF does not show: a guard for data read by a small language model               |
-| `languageOf(text)`                 | `'de'` or `'en'`: the language an invoice is written in                                                |
-| `validateEInvoice(pdf)`            | looks at an existing e-invoice: profile, embedded data, and whether the XML matches the visible page   |
-| `readEmbeddedXml(pdf)`             | the XML of an existing e-invoice, or `null`                                                            |
-| `calculate(invoice)`               | the totals, following the EN 16931 rounding rules                                                      |
-| `invoiceJsonSchema`                | JSON Schema of the invoice data, for forms, validation and language models                             |
+| function                           | what it does                                                                                                       |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `createEInvoice({ pdf, invoice })` | checks the data, then returns `{ pdf, xml, findings, totals }`; throws `InvoiceError` if data is wrong             |
+| `check(invoice, { pdfText? })`     | returns `{ findings, totals, invoice? }` without creating anything; never throws on incomplete data                |
+| `extractText(pdf)`                 | the text of a PDF, row by row                                                                                      |
+| `extractLayout(pdf)`               | the text plus its geometry: `blocks` (text that stands together), `pieces` with their position, `pages`            |
+| `guessFromText(text, { blocks })`  | reads an invoice without a model: totals that add up, items that add up to them, seller and buyer, labelled values |
+| `keepWhatThePdfShows(draft, text)` | drops every value the PDF does not show: a guard for data read by a small language model                           |
+| `languageOf(text)`                 | `'de'` or `'en'`: the language an invoice is written in                                                            |
+| `validateEInvoice(pdf)`            | looks at an existing e-invoice: profile, embedded data, and whether the XML matches the visible page               |
+| `readEmbeddedXml(pdf)`             | the XML of an existing e-invoice, or `null`                                                                        |
+| `calculate(invoice)`               | the totals, following the EN 16931 rounding rules                                                                  |
+| `invoiceJsonSchema`                | JSON Schema of the invoice data, for forms, validation and language models                                         |
 
 A finding is `{ path, severity, code, message }`. An `error` blocks the e-invoice; a `warning` asks for a second
 look.
@@ -175,6 +176,9 @@ npm run site             # the web app on http://localhost:4350
 
 `npm run test:reference` validates generated invoices with Mustang; it needs Java and the Mustang CLI, see
 [CONTRIBUTING.md](CONTRIBUTING.md).
+
+`npm run eval:reader -- <folder>` measures how much the reader gets right on e-invoices that carry their own answer
+(their XML); CONTRIBUTING.md says where to get such files.
 
 ## Licence
 
