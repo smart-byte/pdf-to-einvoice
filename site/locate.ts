@@ -162,3 +162,13 @@ export function locate(pieces: Piece[], value: unknown, options: LocateOptions =
   const find = (needle: string) => rows.flatMap((row) => hitsIn(row, needle, 'text', widthOf));
   return wrapped(spellings[0]!.trim().split(/\s+/).map(fold), find).flat();
 }
+
+/**
+ * The page to show for a value, counted from 0: the one already shown if the value stands there, otherwise the first
+ * page that has it. `has` says whether a page has the value. A value that is printed nowhere names no page.
+ */
+export function pageToShow<Page>(pages: Page[], shown: number, has: (page: Page) => boolean): number | undefined {
+  if (pages[shown] !== undefined && has(pages[shown])) return shown;
+  const first = pages.findIndex(has);
+  return first < 0 ? undefined : first;
+}

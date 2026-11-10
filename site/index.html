@@ -6,7 +6,7 @@
     <title>pdf-to-einvoice: turn an invoice PDF into an e-invoice (ZUGFeRD / Factur-X)</title>
     <meta
       name="description"
-      content="Turn the invoice PDF you already have into a valid EN 16931 e-invoice (ZUGFeRD / Factur-X, E-Rechnung). Your layout stays; the data is added as XML. Free, open source, and everything happens in your browser."
+      content="Turn the invoice PDF you already have into an EN 16931 e-invoice (ZUGFeRD / Factur-X, E-Rechnung). Your layout stays; the data is added as XML. Free, open source, and everything happens in your browser."
     />
     <meta name="color-scheme" content="light dark" />
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#e4e8f0" />
@@ -53,6 +53,7 @@
           />
         </symbol>
         <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.2 4.2L19 7" /></symbol>
+        <symbol id="i-next" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7" /></symbol>
         <symbol id="i-copy" viewBox="0 0 24 24">
           <rect x="8.5" y="8.5" width="11.5" height="11.5" rx="2" />
           <path d="M15.5 8.5V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7.5a2 2 0 0 0 2 2h2.5" />
@@ -171,13 +172,24 @@
         <div class="work__grid">
           <aside class="work__pdf">
             <div class="page">
-              <canvas id="preview" role="img" data-i18n-label="work.preview" aria-label="Preview of your invoice, page 1"></canvas>
+              <canvas id="preview" role="img" aria-label="Preview of your invoice"></canvas>
               <!-- A band of light while the page is being read, and marks where the values of the form are printed.
                    Both are aids for the eye: the form itself says everything to a screen reader. -->
               <div class="scan" id="scan" aria-hidden="true" hidden></div>
               <div class="marks" id="marks" aria-hidden="true"></div>
               <div class="stamp" id="work-stamp" aria-hidden="true" hidden>EN 16931<small data-i18n="stamp.note">plausibility checked</small></div>
             </div>
+            <!-- Shown for a PDF with more than one page. -->
+            <div class="pager" id="pager" hidden>
+              <button type="button" class="tool tool--icon" id="page-prev" data-i18n-label="page.prev" aria-label="Previous page">
+                <svg class="i i--back" aria-hidden="true"><use href="#i-next" /></svg>
+              </button>
+              <span id="page-now"></span>
+              <button type="button" class="tool tool--icon" id="page-next" data-i18n-label="page.next" aria-label="Next page">
+                <svg class="i" aria-hidden="true"><use href="#i-next" /></svg>
+              </button>
+            </div>
+            <p class="hidden-visually" id="page-live" role="status"></p>
             <p class="muted" id="file-name"></p>
             <p class="muted" id="marks-note" data-i18n="mark.note" hidden>Marked in yellow: where each value is printed. Click a mark to go to its field.</p>
           </aside>
