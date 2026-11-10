@@ -1,12 +1,12 @@
 # Response headers for the site (Cloudflare Workers static assets). The Content-Security-Policy for scripts, styles
 # and connections is a meta tag in the pages, written at build time; what a meta tag cannot say is said here.
+# While the site is being tested, search engines leave it out: remove the X-Robots-Tag line at the launch.
 /*
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   Content-Security-Policy: frame-ancestors 'none'
   X-Frame-Options: DENY
   Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
-  # While the site is being tested: search engines leave it out. Remove this line at the launch.
   X-Robots-Tag: noindex
 
 # The bundler puts a hash of the content into every file name under assets/: such a file never changes.
