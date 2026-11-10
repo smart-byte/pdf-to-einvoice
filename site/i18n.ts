@@ -27,7 +27,10 @@ export const STRINGS: Record<string, Entry> = {
     de: 'Das XML ist der rechtlich maßgebliche Teil der E-Rechnung. Vergleichen Sie jede Angabe mit Ihrem PDF.',
     en: 'The XML is the legally binding part of an e-invoice. Compare every value with your PDF.',
   },
-  'valid.title': { de: 'Dieses PDF ist bereits eine E-Rechnung', en: 'This PDF already is an e-invoice' },
+  'valid.title': { de: 'E-Rechnung geprüft', en: 'E-invoice checked' },
+  'valid.profile': { de: 'Dieses PDF ist bereits eine E-Rechnung. Profil: {p}', en: 'This PDF already is an e-invoice. Profile: {p}' },
+  'valid.errors': { de: 'Geprüft: {n} Auffälligkeiten', en: 'Checked: {n} problems' },
+  'valid.errors.one': { de: 'Geprüft: 1 Auffälligkeit', en: 'Checked: 1 problem' },
   'valid.lead': {
     de: 'Das steht in ihrem XML. Vergleichen Sie es mit der Seite: Es zählt das XML, nicht das Bild. Dies ist eine Plausibilitätsprüfung und ersetzt keinen vollständigen Validator.',
     en: 'This is what its XML says. Compare it with the page: the XML counts, not the picture. This is a plausibility check and does not replace a full validator.',
@@ -81,9 +84,9 @@ export const STRINGS: Record<string, Entry> = {
 
   'f.number': { de: 'Rechnungsnummer', en: 'Invoice number' },
   'f.issueDate': { de: 'Rechnungsdatum', en: 'Invoice date' },
-  'f.deliveryDate': { de: 'Leistungs- oder Lieferdatum', en: 'Date of supply' },
-  'f.periodStart': { de: 'Leistungszeitraum von', en: 'Service period from' },
-  'f.periodEnd': { de: 'Leistungszeitraum bis', en: 'Service period to' },
+  'f.deliveryDate': { de: 'Leistungs- oder Lieferdatum (ein Tag)', en: 'Date of supply (one day)' },
+  'f.periodStart': { de: 'oder Leistungszeitraum von', en: 'or service period from' },
+  'f.periodEnd': { de: 'bis', en: 'to' },
   'f.dueDate': { de: 'Fällig am', en: 'Due date' },
   'f.currency': { de: 'Währung', en: 'Currency' },
   'f.typeCode': { de: 'Art des Dokuments', en: 'Document type' },
@@ -145,8 +148,14 @@ export const STRINGS: Record<string, Entry> = {
 
   'sum.ok': { de: 'Alle Pflichtangaben sind vorhanden.', en: 'All required data is there.' },
   'sum.valid': {
-    de: 'Keine Auffälligkeiten: Das XML ist vollständig und passt zur Seite.',
-    en: 'Nothing stands out: the XML is complete and matches the page.',
+    de: 'Geprüft: passt. Das XML ist vollständig, rechnerisch stimmig und stimmt mit der Seite überein.',
+    en: 'Checked: looks right. The XML is complete, adds up and matches the page.',
+  },
+  'sum.errors.one': { de: '1 Angabe fehlt oder ist fehlerhaft', en: '1 value is missing or wrong' },
+  'sum.warnings.one': { de: '1 Hinweis', en: '1 thing to check' },
+  'hint.suggested': {
+    de: 'Auf Ihrem PDF steht keine Zahlungsfrist, die E-Rechnung braucht aber eine. Dies ist ein Vorschlag: Bitte prüfen oder ändern.',
+    en: 'Your PDF states no payment term, but an e-invoice needs one. This is a suggestion: please check or change it.',
   },
   'sum.errors': { de: '{n} Angaben fehlen oder sind fehlerhaft', en: '{n} values are missing or wrong' },
   'sum.warnings': { de: '{n} Hinweise', en: '{n} things to check' },

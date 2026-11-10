@@ -355,8 +355,18 @@ body[data-view='done'] .done {
 body:not([data-view='start']) .hero {
   display: none;
 }
+/* Looking at an existing e-invoice: the verdict comes first. */
+body[data-mode='validate'] .work__data {
+  display: flex;
+  flex-direction: column;
+}
+body[data-mode='validate'] .finish {
+  order: -1;
+  padding: 0 0 0.5rem;
+}
 /* Looking at an existing e-invoice: nothing to read or create. */
 body[data-mode='validate'] .reader details,
+body[data-mode='validate'] #form button,
 body[data-mode='validate'] #create {
   display: none;
 }
@@ -387,7 +397,7 @@ select:disabled {
   position: sticky;
   top: 1rem;
 }
-.work__pdf canvas {
+.page canvas {
   display: block;
   width: 100%;
   height: auto;
@@ -585,25 +595,39 @@ select.warned {
 }
 
 /* Done: the stamp is the one moment of celebration ------------------------------------------------------------- */
-.done > * + * {
-  margin-top: 1rem;
+/* The stamp is pressed onto the preview of the invoice. It is an effect of this page: the PDF itself stays as it is. */
+.page {
+  position: relative;
 }
 .stamp {
-  display: inline-block;
-  font: 700 1.05rem var(--mono);
+  position: absolute;
+  top: 56%;
+  right: 10%;
+  font: 700 clamp(1rem, 2.3vw, 1.6rem) var(--mono);
   letter-spacing: 0.08em;
-  color: var(--green);
-  border: 3px solid var(--green);
-  border-radius: 4px;
-  padding: 0.35rem 0.8rem;
-  transform: rotate(-4deg);
-  animation: stamp 0.45s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+  /* Stamp ink on white paper, whatever the theme of the page. */
+  color: #1d7347;
+  border: 4px solid #1d7347;
+  border-radius: 5px;
+  padding: 0.3em 0.7em;
+  rotate: -9deg;
+  mix-blend-mode: multiply;
+  animation: stamp 0.5s cubic-bezier(0.2, 1.5, 0.4, 1) both;
 }
 @keyframes stamp {
   from {
     opacity: 0;
-    transform: rotate(-11deg) scale(1.7);
+    scale: 2.2;
   }
+}
+.done__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  gap: clamp(1.5rem, 3.5vw, 3.5rem);
+  align-items: start;
+}
+.done__text > * + * {
+  margin-top: 1rem;
 }
 .actions {
   display: flex;
@@ -691,8 +715,12 @@ select.warned {
 
 @media (max-width: 60rem) {
   .hero,
-  .work__grid {
+  .work__grid,
+  .done__grid {
     grid-template-columns: minmax(0, 1fr);
+  }
+  .done .page {
+    max-width: 26rem;
   }
   .work__pdf {
     position: static;

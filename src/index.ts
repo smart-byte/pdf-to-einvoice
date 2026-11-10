@@ -2,7 +2,7 @@ export { calculate, type Totals, type VatGroup } from './calculate.js';
 export { check, type CheckOptions, type CheckResult, type Finding } from './check.js';
 export { createEInvoice, InvoiceError, type CreateOptions, type CreateResult, type InvoiceErrorCode } from './create.js';
 export { keepWhatThePdfShows } from './ground.js';
-export { guessFromText } from './guess.js';
+export { guessFromText, languageOf } from './guess.js';
 export {
   INVOICE_TYPES,
   VAT_CATEGORIES,

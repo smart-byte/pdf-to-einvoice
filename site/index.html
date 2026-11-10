@@ -72,7 +72,10 @@
 
         <div class="work__grid">
           <aside class="work__pdf">
-            <canvas id="preview" role="img" data-i18n-label="work.preview" aria-label="Preview of your invoice, page 1"></canvas>
+            <div class="page">
+              <canvas id="preview" role="img" data-i18n-label="work.preview" aria-label="Preview of your invoice, page 1"></canvas>
+              <div class="stamp" id="work-stamp" aria-hidden="true" hidden>EN 16931</div>
+            </div>
             <p class="muted" id="file-name"></p>
           </aside>
 
@@ -131,16 +134,24 @@
       </section>
 
       <section class="done" id="done" aria-labelledby="done-title">
-        <div class="stamp" aria-hidden="true">EN 16931</div>
-        <h2 id="done-title" data-i18n="done.title">Your e-invoice is ready.</h2>
-        <p data-i18n="done.lead">The same invoice as before, now a PDF/A-3 that carries its data as XML (ZUGFeRD / Factur-X, profile EN 16931).</p>
-        <ul class="notes" id="done-notes" hidden></ul>
-        <p class="actions">
-          <a class="primary" id="download-pdf" data-i18n="done.pdf">Download e-invoice</a>
-          <a class="quiet" id="download-xml" data-i18n="done.xml">Download the XML only</a>
-          <button type="button" class="link" id="again" data-i18n="done.again">Change the data again</button>
-        </p>
-        <p class="muted">SHA-256 <code id="checksum"></code></p>
+        <div class="done__grid">
+          <!-- The stamp lands on the preview only; the file itself is not marked. -->
+          <div class="page">
+            <canvas id="done-preview" aria-hidden="true"></canvas>
+            <div class="stamp" aria-hidden="true">EN 16931</div>
+          </div>
+          <div class="done__text">
+            <h2 id="done-title" data-i18n="done.title">Your e-invoice is ready.</h2>
+            <p data-i18n="done.lead">The same invoice as before, now a PDF/A-3 that carries its data as XML (ZUGFeRD / Factur-X, profile EN 16931).</p>
+            <ul class="notes" id="done-notes" hidden></ul>
+            <p class="actions">
+              <a class="primary" id="download-pdf" data-i18n="done.pdf">Download e-invoice</a>
+              <a class="quiet" id="download-xml" data-i18n="done.xml">Download the XML only</a>
+              <button type="button" class="link" id="again" data-i18n="done.again">Change the data again</button>
+            </p>
+            <p class="muted">SHA-256 <code id="checksum"></code></p>
+          </div>
+        </div>
       </section>
 
       <section class="info" id="how">

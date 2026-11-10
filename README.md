@@ -28,7 +28,7 @@ in their format. This one starts from the PDF you already produce with Word, you
 
 `npm run site` starts the web app locally. Drop a PDF, check the data that was read from it, download the
 e-invoice. Reading works without any AI by pattern matching; optionally a small language model that runs in your
-browser (WebGPU) fills in names, addresses and line items. The page is available in English and German.
+browser (WebGPU) fills in what the patterns did not find. The page is available in English and German.
 
 ## As a library
 
@@ -64,8 +64,9 @@ It works the same in a browser: `pdf` is a `Uint8Array` in and out.
 | `createEInvoice({ pdf, invoice })` | checks the data, then returns `{ pdf, xml, findings, totals }`; throws `InvoiceError` if data is wrong |
 | `check(invoice, { pdfText? })`     | returns `{ findings, totals, invoice? }` without creating anything; never throws on incomplete data    |
 | `extractText(pdf)`                 | the text of a PDF, row by row                                                                          |
-| `guessFromText(text)`              | labelled values found by pattern matching: number, dates, IBAN, tax IDs, totals                        |
+| `guessFromText(text)`              | reads an invoice by pattern matching: labelled values, seller and buyer, table rows that add up        |
 | `keepWhatThePdfShows(draft, text)` | drops every value the PDF does not show: a guard for data read by a small language model               |
+| `languageOf(text)`                 | `'de'` or `'en'`: the language an invoice is written in                                                |
 | `validateEInvoice(pdf)`            | looks at an existing e-invoice: profile, embedded data, and whether the XML matches the visible page   |
 | `readEmbeddedXml(pdf)`             | the XML of an existing e-invoice, or `null`                                                            |
 | `calculate(invoice)`               | the totals, following the EN 16931 rounding rules                                                      |
