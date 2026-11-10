@@ -451,6 +451,7 @@ function placesOf(path: string, on: Piece[]): Rect[] {
 function renderMarks(): void {
   marks.replaceChildren();
   const taken = new Set<string>();
+  const placed: { mark: HTMLElement; rect: Rect }[] = [];
   const place = (path: string, label: string, rects: Rect[]) => {
     for (const rect of rects) {
       const box = { left: `${rect.x}%`, top: `${rect.y}%`, width: `${rect.width}%`, height: `${rect.height}%` };
@@ -461,6 +462,7 @@ function renderMarks(): void {
       // How far down the page the mark is: the band of light uncovers it when it gets there.
       mark.style.setProperty('--y', String(rect.y / 100));
       marks.append(mark);
+      placed.push({ mark, rect });
     }
   };
   const on = pagePieces[shown] ?? [];
@@ -470,6 +472,13 @@ function renderMarks(): void {
     place(path, fieldLabel(path), placesOf(path, on));
   }
   for (const key of ['net', 'vat', 'gross'] as const) place(`totals.${key}`, t(`t.${key}`), placesOf(`totals.${key}`, on));
+  // A value printed inside another one, such as the due date in the sentence of the payment terms, lies on top of it:
+  // both marks can be pointed at.
+  const inside = (inner: Rect, outer: Rect) =>
+    inner.width * inner.height < outer.width * outer.height &&
+    Math.abs(inner.x + inner.width / 2 - outer.x - outer.width / 2) < outer.width / 2 &&
+    Math.abs(inner.y + inner.height / 2 - outer.y - outer.height / 2) < outer.height / 2;
+  for (const { mark, rect } of placed) if (placed.some((other) => inside(rect, other.rect))) mark.style.zIndex = '1';
   $('#marks-note').hidden = marks.children.length === 0;
   renderPager();
   highlight(pointed ?? focusedPath());
