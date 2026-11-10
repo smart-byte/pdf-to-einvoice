@@ -1,6 +1,7 @@
 // The legal notice and the privacy policy share the language switch and the footer texts with the main page.
 import { lang, setLang, type Lang } from './i18n.js';
 import './styles.css';
+import './theme-switch.js';
 
 function apply(next: Lang): void {
   setLang(next);

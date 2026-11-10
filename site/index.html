@@ -9,49 +9,147 @@
       content="Turn the invoice PDF you already have into a valid EN 16931 e-invoice (ZUGFeRD / Factur-X, E-Rechnung). Your layout stays; the data is added as XML. Free, open source, and everything happens in your browser."
     />
     <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#e4e8f0" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0f1218" />
+    <link rel="canonical" href="https://smart-byte.github.io/pdf-to-einvoice/" />
+    <link rel="alternate" hreflang="de" href="https://smart-byte.github.io/pdf-to-einvoice/?lang=de" />
+    <link rel="alternate" hreflang="en" href="https://smart-byte.github.io/pdf-to-einvoice/?lang=en" />
+    <link rel="alternate" hreflang="x-default" href="https://smart-byte.github.io/pdf-to-einvoice/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://smart-byte.github.io/pdf-to-einvoice/" />
+    <meta property="og:title" content="pdf-to-einvoice: your invoice PDF becomes an e-invoice" />
+    <meta
+      property="og:description"
+      content="Your layout stays; the invoice data is added as XML, following EN 16931 (ZUGFeRD / Factur-X). Free, open source, and nothing is uploaded."
+    />
+    <meta property="og:image" content="https://smart-byte.github.io/pdf-to-einvoice/og.png" />
+    <meta property="og:image:width" content="2400" />
+    <meta property="og:image:height" content="1260" />
+    <meta
+      property="og:image:alt"
+      content="pdf-to-einvoice: an invoice with its values marked in yellow, and behind it the copy for machines, the XML of the e-invoice."
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="pdf-to-einvoice: your invoice PDF becomes an e-invoice" />
+    <meta name="twitter:image" content="https://smart-byte.github.io/pdf-to-einvoice/og.png" />
     <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+    <link rel="alternate" type="text/plain" href="./llms.txt" title="llms.txt" />
+    <!-- Sets the theme before first paint. -->
+    <script src="./theme.js"></script>
     <script type="module" src="./main.ts"></script>
   </head>
   <body data-view="start">
+    <a class="skip" href="#main" data-i18n="nav.skip">Skip to content</a>
+    <svg class="defs" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.2A8.2 8.2 0 0 1 9.8 4a8.2 8.2 0 1 0 10.2 10.2z" /></symbol>
+        <symbol id="i-sun" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="4" />
+          <path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4" />
+        </symbol>
+        <symbol id="i-github" viewBox="0 0 24 24">
+          <path
+            d="M9 19c-4.3 1.3-4.3-2.2-6-2.7m12 5v-3.3a2.9 2.9 0 0 0-.8-2.2c2.7-.3 5.6-1.3 5.6-6A4.7 4.7 0 0 0 18.5 6a4.3 4.3 0 0 0-.1-3.2s-1-.3-3.4 1.2a12 12 0 0 0-6 0C6.6 2.5 5.6 2.8 5.6 2.8A4.3 4.3 0 0 0 5.5 6a4.7 4.7 0 0 0-1.3 3.3c0 4.6 2.9 5.6 5.6 6a2.9 2.9 0 0 0-.8 2.2V21"
+          />
+        </symbol>
+        <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.2 4.2L19 7" /></symbol>
+        <symbol id="i-copy" viewBox="0 0 24 24">
+          <rect x="8.5" y="8.5" width="11.5" height="11.5" rx="2" />
+          <path d="M15.5 8.5V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7.5a2 2 0 0 0 2 2h2.5" />
+        </symbol>
+      </defs>
+    </svg>
     <header class="nav">
-      <a class="wordmark" href="./">pdf-to-einvoice</a>
-      <nav>
-        <a href="#how" data-i18n="nav.how">How it works</a>
-        <a href="#limits" data-i18n="nav.limits">Limits</a>
-        <a href="#dev" data-i18n="nav.dev">For developers</a>
-        <a href="https://github.com/smart-byte/pdf-to-einvoice">GitHub</a>
-      </nav>
-      <div class="langs" role="group" aria-label="Language">
-        <button type="button" data-lang="de">DE</button>
-        <button type="button" data-lang="en">EN</button>
+      <div class="nav__in">
+        <a class="brand" href="./">
+          <svg class="brand__mark" viewBox="0 0 32 32" aria-hidden="true">
+            <rect class="brand__copy" x="10.5" y="3" width="16.5" height="21.5" rx="1.5" transform="rotate(9 18.7 13.7)" />
+            <rect class="brand__page" x="5" y="7.5" width="16.5" height="21.5" rx="1.5" />
+            <path d="M9 13.5h5.5M9 18h8.5M9 22.5h4.5" />
+          </svg>
+          pdf-to-einvoice
+        </a>
+        <nav data-i18n-label="nav.label" aria-label="Sections">
+          <a href="#how" data-i18n="nav.how">What is added</a>
+          <a href="#limits" data-i18n="nav.limits">Questions</a>
+          <a href="#dev" data-i18n="nav.dev">For developers</a>
+        </nav>
+        <div class="nav__tools">
+          <div class="langs" role="group" data-i18n-label="nav.lang" aria-label="Language">
+            <button type="button" data-lang="de">DE</button>
+            <button type="button" data-lang="en">EN</button>
+          </div>
+          <button type="button" class="tool tool--icon" id="theme" data-i18n-label="nav.theme" aria-label="Dark theme" aria-pressed="false">
+            <svg class="i i--moon" aria-hidden="true"><use href="#i-moon" /></svg><svg class="i i--sun" aria-hidden="true"><use href="#i-sun" /></svg>
+          </button>
+          <a class="tool" href="https://github.com/smart-byte/pdf-to-einvoice"
+            ><svg class="i" aria-hidden="true"><use href="#i-github" /></svg><span>GitHub</span></a
+          >
+        </div>
       </div>
     </header>
 
-    <main>
+    <main id="main">
+      <noscript>
+        <p class="noscript" lang="de">Dieses Werkzeug läuft vollständig in Ihrem Browser und braucht dafür JavaScript.</p>
+        <p class="noscript" lang="en">This tool runs entirely in your browser and needs JavaScript for that.</p>
+      </noscript>
       <section class="hero" id="start">
         <div class="hero__text">
-          <h1 data-i18n="hero.title">Turn the invoice PDF you already have into an e-invoice.</h1>
+          <h1>
+            <span data-i18n="hero.a">Turn the invoice PDF you already have into an</span> <mark data-i18n="hero.mark">e-invoice</mark
+            ><span data-i18n="hero.z">.</span>
+          </h1>
           <p class="lead" data-i18n="hero.lead">
             Your layout stays exactly as it is. The invoice data is added as XML, following EN 16931 (ZUGFeRD / Factur-X).
           </p>
           <p class="private" data-i18n="hero.private">Nothing is uploaded. Everything happens in your browser.</p>
+          <ul class="facts">
+            <li>
+              <svg class="i" aria-hidden="true"><use href="#i-check" /></svg><span data-i18n="fact.free">Free</span>
+            </li>
+            <li>
+              <svg class="i" aria-hidden="true"><use href="#i-check" /></svg><span data-i18n="fact.open">Open source (MIT)</span>
+            </li>
+            <li>
+              <svg class="i" aria-hidden="true"><use href="#i-check" /></svg><span data-i18n="fact.account">No sign-up</span>
+            </li>
+          </ul>
         </div>
 
         <div class="stack" id="drop">
+          <!-- The copy for machines that travels behind the page. Its values are the ones marked on the sheet in front. -->
           <div class="sheet sheet--xml" aria-hidden="true">
+            <span class="sheet__name">factur-x.xml</span>
             <pre>
-&lt;rsm:CrossIndustryInvoice&gt;
-  &lt;rsm:ExchangedDocument&gt;
-    &lt;ram:ID&gt;RE-2026-0042&lt;/ram:ID&gt;
-    &lt;ram:TypeCode&gt;380&lt;/ram:TypeCode&gt;
-  &lt;/rsm:ExchangedDocument&gt;
-  &lt;ram:SellerTradeParty&gt;
-    &lt;ram:Name&gt;Muster Software GmbH
-  &lt;ram:GrandTotalAmount&gt;1783.81
-&lt;/rsm:CrossIndustryInvoice&gt;</pre>
+&lt;ram:ID&gt;
+  <b>RE-2026-0042</b>
+&lt;/ram:ID&gt;
+&lt;ram:IssueDateTime&gt;
+  <b>20261103</b>
+&lt;/ram:IssueDateTime&gt;
+&lt;ram:SellerTradeParty&gt;
+  &lt;ram:Name&gt;
+    <b>Muster Software</b>
+&lt;ram:TaxTotalAmount&gt;
+  <b>284.81</b>
+&lt;/ram:TaxTotalAmount&gt;
+&lt;ram:GrandTotalAmount&gt;
+  <b>1783.81</b>
+&lt;/ram:GrandTotalAmount&gt;</pre>
           </div>
           <label class="sheet sheet--pdf" for="file">
-            <span class="sheet__lines" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span>
+            <!-- A small invoice: the sample one, so it stays German in both languages. -->
+            <span class="mini" aria-hidden="true">
+              <span class="mini__name"><i></i>Muster Software GmbH</span>
+              <span class="mini__to">Beispiel AG<br />Hauptstraße 5<br />54321 Beispielstadt</span>
+              <span class="mini__meta">Rechnung Nr. <mark>RE-2026-0042</mark><br />Datum <mark>03.11.2026</mark></span>
+              <span class="mini__rows"><span>Beratung E-Rechnung</span><span>1.000,00 €</span><span>Softwarelizenz (Jahr)</span><span>499,00 €</span></span>
+              <span class="mini__sum"
+                ><span>Umsatzsteuer 19 %</span><span><mark>284,81 €</mark></span
+                ><b>Gesamtbetrag</b><b><mark>1.783,81 €</mark></b></span
+              >
+            </span>
             <strong data-i18n="drop.title">Drop your PDF here</strong>
             <span data-i18n="drop.or">or choose a file</span>
             <input id="file" type="file" accept="application/pdf,.pdf" />
@@ -78,10 +176,10 @@
                    Both are aids for the eye: the form itself says everything to a screen reader. -->
               <div class="scan" id="scan" aria-hidden="true" hidden></div>
               <div class="marks" id="marks" aria-hidden="true"></div>
-              <div class="stamp" id="work-stamp" aria-hidden="true" hidden>EN 16931</div>
+              <div class="stamp" id="work-stamp" aria-hidden="true" hidden>EN 16931<small data-i18n="stamp.note">plausibility checked</small></div>
             </div>
             <p class="muted" id="file-name"></p>
-            <p class="muted" id="marks-note" data-i18n="mark.note" hidden>Marked in blue: where each value is printed. Click a mark to go to its field.</p>
+            <p class="muted" id="marks-note" data-i18n="mark.note" hidden>Marked in yellow: where each value is printed. Click a mark to go to its field.</p>
           </aside>
 
           <div class="work__data">
@@ -97,7 +195,9 @@
                   <div class="field field--wide">
                     <label for="ai-model" data-i18n="ai.model">Model</label>
                     <select id="ai-model"></select>
-                    <p class="hint" data-i18n="ai.download">The model is downloaded from huggingface.co on first use and kept in the browser.</p>
+                    <p class="hint" data-i18n="ai.download">
+                      The model is downloaded from huggingface.co and raw.githubusercontent.com on first use and kept in the browser.
+                    </p>
                   </div>
                 </div>
                 <div class="fields" id="ai-endpoint" hidden>
@@ -126,7 +226,7 @@
               </details>
             </div>
 
-            <form id="form" novalidate onsubmit="return false;"></form>
+            <form id="form" novalidate></form>
 
             <section class="group">
               <h3 data-i18n="s.totals">Totals</h3>
@@ -168,7 +268,7 @@
           <!-- The stamp lands on the preview only; the file itself is not marked. -->
           <div class="page">
             <canvas id="done-preview" aria-hidden="true"></canvas>
-            <div class="stamp" aria-hidden="true">EN 16931</div>
+            <div class="stamp" aria-hidden="true">EN 16931<small data-i18n="stamp.note">plausibility checked</small></div>
           </div>
           <div class="done__text">
             <h2 id="done-title" data-i18n="done.title">Your e-invoice is ready.</h2>
@@ -184,8 +284,11 @@
         </div>
       </section>
 
-      <section class="info" id="how">
-        <h2 data-i18n="pair.title">What is added to your file</h2>
+      <section class="info" id="how" aria-labelledby="how-title">
+        <div class="info__head">
+          <h2 id="how-title" data-i18n="pair.title">What is added to your file</h2>
+          <p data-i18n="pair.note">People read the left side, software the right one. Both have to say the same, so every value is compared with your PDF.</p>
+        </div>
         <!-- The printed text is that of the sample invoice, so it stays German in both languages. -->
         <table class="pair">
           <thead>
@@ -196,83 +299,162 @@
           </thead>
           <tbody>
             <tr>
-              <td>Rechnung Nr. RE-2026-0042</td>
-              <td><code>&lt;ram:ID&gt;RE-2026-0042&lt;/ram:ID&gt;</code></td>
+              <td>Rechnung Nr. <mark>RE-2026-0042</mark></td>
+              <td>
+                <code>&lt;ram:ID&gt;<wbr /><b>RE-2026-0042</b><wbr />&lt;/ram:ID&gt;</code>
+              </td>
             </tr>
             <tr>
-              <td>Rechnungsdatum 03.11.2026</td>
-              <td><code>&lt;udt:DateTimeString format="102"&gt;20261103&lt;/udt:DateTimeString&gt;</code></td>
+              <td>Rechnungsdatum <mark>03.11.2026</mark></td>
+              <td>
+                <code>&lt;udt:DateTimeString format="102"&gt;<wbr /><b>20261103</b><wbr />&lt;/udt:DateTimeString&gt;</code>
+              </td>
             </tr>
             <tr>
-              <td>Umsatzsteuer 19 % 284,81 €</td>
-              <td><code>&lt;ram:CalculatedAmount&gt;284.81&lt;/ram:CalculatedAmount&gt;</code></td>
+              <td>Umsatzsteuer 19 % <mark>284,81 €</mark></td>
+              <td>
+                <code>&lt;ram:CalculatedAmount&gt;<wbr /><b>284.81</b><wbr />&lt;/ram:CalculatedAmount&gt;</code>
+              </td>
             </tr>
             <tr>
-              <td>Gesamtbetrag 1.783,81 €</td>
-              <td><code>&lt;ram:GrandTotalAmount&gt;1783.81&lt;/ram:GrandTotalAmount&gt;</code></td>
+              <td>Gesamtbetrag <mark>1.783,81 €</mark></td>
+              <td>
+                <code>&lt;ram:GrandTotalAmount&gt;<wbr /><b>1783.81</b><wbr />&lt;/ram:GrandTotalAmount&gt;</code>
+              </td>
             </tr>
           </tbody>
         </table>
-        <p data-i18n="pair.note">People read the left side, software the right one. Both have to say the same, so every value is compared with your PDF.</p>
       </section>
 
-      <section class="info" id="limits">
-        <h2 data-i18n="limits.title">What you should know</h2>
-        <ul>
-          <li data-i18n="limits.1">Only the issuer can turn an invoice into an e-invoice. A PDF you received does not become valid by converting it.</li>
-          <li data-i18n="limits.2">In an e-invoice the XML counts, not the picture. Check the data before you create the file.</li>
-          <li data-i18n="limits.3">Your invoice does not leave the browser: no server, no cookies, no tracking.</li>
-          <li data-i18n="limits.5">
-            Automatic reading does not get everything from every invoice yet. We are working on reading invoices of every kind; the form shows what is missing.
-          </li>
-          <li data-i18n="limits.4">This page is a tool, not tax advice.</li>
-        </ul>
-        <details>
-          <summary data-i18n="kinds.title">Which kinds of invoices work</summary>
-          <table class="kinds">
-            <tbody>
-              <tr>
-                <td data-i18n="kind.1">.</td>
-                <td data-i18n="kind.1.xml">.</td>
-              </tr>
-              <tr>
-                <td data-i18n="kind.2">.</td>
-                <td data-i18n="kind.2.xml">.</td>
-              </tr>
-              <tr>
-                <td data-i18n="kind.3">.</td>
-                <td data-i18n="kind.3.xml">.</td>
-              </tr>
-              <tr>
-                <td data-i18n="kind.4">.</td>
-                <td data-i18n="kind.4.xml">.</td>
-              </tr>
-              <tr>
-                <td data-i18n="kind.5">.</td>
-                <td data-i18n="kind.5.xml">.</td>
-              </tr>
-              <tr>
-                <td data-i18n="kind.6">.</td>
-                <td data-i18n="kind.6.xml">.</td>
-              </tr>
-              <tr>
-                <td data-i18n="kind.7">.</td>
-                <td data-i18n="kind.7.xml">.</td>
-              </tr>
-            </tbody>
-          </table>
-        </details>
+      <section class="info" id="limits" aria-labelledby="limits-title">
+        <div class="info__head">
+          <h2 id="limits-title" data-i18n="limits.title">What you should know</h2>
+        </div>
+        <div class="asks">
+          <details open>
+            <summary data-i18n="ask.1">.</summary>
+            <p data-i18n="limits.1">.</p>
+          </details>
+          <details>
+            <summary data-i18n="ask.2">.</summary>
+            <p data-i18n="limits.2">.</p>
+          </details>
+          <details>
+            <summary data-i18n="ask.3">.</summary>
+            <p data-i18n="limits.3">.</p>
+          </details>
+          <details>
+            <summary data-i18n="ask.5">.</summary>
+            <p data-i18n="limits.5">.</p>
+          </details>
+          <details>
+            <summary data-i18n="ask.4">.</summary>
+            <p data-i18n="limits.4">.</p>
+          </details>
+          <details>
+            <summary data-i18n="kinds.title">Which kinds of invoices work?</summary>
+            <table class="kinds">
+              <tbody>
+                <tr>
+                  <td data-i18n="kind.1">.</td>
+                  <td data-i18n="kind.1.xml">.</td>
+                </tr>
+                <tr>
+                  <td data-i18n="kind.2">.</td>
+                  <td data-i18n="kind.2.xml">.</td>
+                </tr>
+                <tr>
+                  <td data-i18n="kind.3">.</td>
+                  <td data-i18n="kind.3.xml">.</td>
+                </tr>
+                <tr>
+                  <td data-i18n="kind.4">.</td>
+                  <td data-i18n="kind.4.xml">.</td>
+                </tr>
+                <tr>
+                  <td data-i18n="kind.5">.</td>
+                  <td data-i18n="kind.5.xml">.</td>
+                </tr>
+                <tr>
+                  <td data-i18n="kind.6">.</td>
+                  <td data-i18n="kind.6.xml">.</td>
+                </tr>
+                <tr>
+                  <td data-i18n="kind.7">.</td>
+                  <td data-i18n="kind.7.xml">.</td>
+                </tr>
+              </tbody>
+            </table>
+          </details>
+        </div>
       </section>
 
-      <section class="info" id="dev">
-        <h2 data-i18n="dev.title">For developers and AI assistants</h2>
-        <p data-i18n="dev.text">The same core runs as a library, as a command line tool and as an MCP server that lets AI assistants convert invoices.</p>
-        <pre><code>npm install pdf-to-einvoice</code></pre>
-        <pre><code>import { createEInvoice } from 'pdf-to-einvoice';
+      <section class="info" id="dev" aria-labelledby="dev-title">
+        <div class="info__head">
+          <h2 id="dev-title" data-i18n="dev.title">For developers and AI assistants</h2>
+          <p data-i18n="dev.text">The same core runs as a library, as a command line tool and as an MCP server that lets AI assistants convert invoices.</p>
+          <dl class="links">
+            <div>
+              <dt><a href="https://www.npmjs.com/package/pdf-to-einvoice">npm</a></dt>
+              <dd data-i18n="dev.npm">The package: library, command line tool, MCP server</dd>
+            </div>
+            <div>
+              <dt><a href="https://github.com/smart-byte/pdf-to-einvoice">GitHub</a></dt>
+              <dd data-i18n="dev.github">Source, documentation, issues</dd>
+            </div>
+            <div>
+              <dt><a href="./llms.txt">llms.txt</a></dt>
+              <dd data-i18n="dev.llms">The short version for language models</dd>
+            </div>
+            <div>
+              <dt><code>npx pdf-to-einvoice schema</code></dt>
+              <dd data-i18n="dev.schema">Every field of the invoice data, as JSON Schema</dd>
+            </div>
+          </dl>
+        </div>
+        <div class="code">
+          <div class="code__bar">
+            <div class="tabs" role="tablist" data-i18n-label="dev.tabs" aria-label="Ways to use it">
+              <button type="button" role="tab" id="tab-lib" aria-controls="code-lib" aria-selected="true" data-i18n="dev.tab.lib">Library</button>
+              <button type="button" role="tab" id="tab-cli" aria-controls="code-cli" aria-selected="false" tabindex="-1" data-i18n="dev.tab.cli">
+                Command line
+              </button>
+              <button type="button" role="tab" id="tab-mcp" aria-controls="code-mcp" aria-selected="false" tabindex="-1" data-i18n="dev.tab.mcp">
+                MCP server
+              </button>
+              <button type="button" role="tab" id="tab-skill" aria-controls="code-skill" aria-selected="false" tabindex="-1">Skill</button>
+            </div>
+            <button type="button" class="tool" id="code-copy">
+              <svg class="i" aria-hidden="true"><use href="#i-copy" /></svg><span data-i18n="xml.copy">Copy</span>
+            </button>
+          </div>
+          <!-- prettier-ignore -->
+          <pre role="tabpanel" id="code-lib" aria-labelledby="tab-lib" tabindex="0"><code><span class="c">// npm install pdf-to-einvoice</span>
+<span class="k">import</span> { check, createEInvoice, extractLayout, guessFromText } <span class="k">from</span> <span class="s">'pdf-to-einvoice'</span>;
 
-const { pdf, xml, findings } = await createEInvoice({ pdf: bytes, invoice });</code></pre>
-        <pre><code>npx pdf-to-einvoice create invoice.pdf invoice.json
-npx pdf-to-einvoice mcp        # MCP server on stdio</code></pre>
+<span class="k">const</span> { text, blocks } = <span class="k">await</span> extractLayout(pdfBytes);
+<span class="k">const</span> invoice = guessFromText(text, { blocks }); <span class="c">// what the page says</span>
+<span class="k">const</span> { findings } = check(invoice, { pdfText: text }); <span class="c">// what is missing or wrong</span>
+<span class="k">const</span> { pdf, xml } = <span class="k">await</span> createEInvoice({ pdf: pdfBytes, invoice });</code></pre>
+          <!-- prettier-ignore -->
+          <pre role="tabpanel" id="code-cli" aria-labelledby="tab-cli" tabindex="0" hidden><code><span class="k">npx</span> pdf-to-einvoice read invoice.pdf --json <span class="c"># text, guessed values, facts about the file</span>
+<span class="k">npx</span> pdf-to-einvoice check data.json --pdf invoice.pdf <span class="c"># missing, wrong, not on the PDF</span>
+<span class="k">npx</span> pdf-to-einvoice create invoice.pdf data.json <span class="c"># writes invoice.einvoice.pdf</span>
+<span class="k">npx</span> pdf-to-einvoice validate invoice.einvoice.pdf <span class="c"># checks an existing e-invoice</span></code></pre>
+          <!-- prettier-ignore -->
+          <pre role="tabpanel" id="code-mcp" aria-labelledby="tab-mcp" tabindex="0" hidden><code>{
+  <span class="s">"mcpServers"</span>: {
+    <span class="s">"pdf-to-einvoice"</span>: { <span class="s">"command"</span>: <span class="s">"npx"</span>, <span class="s">"args"</span>: [<span class="s">"-y"</span>, <span class="s">"pdf-to-einvoice"</span>, <span class="s">"mcp"</span>] }
+  }
+}</code></pre>
+          <!-- prettier-ignore -->
+          <pre role="tabpanel" id="code-skill" aria-labelledby="tab-skill" tabindex="0" hidden><code><span class="c"># skills/pdf-to-einvoice/SKILL.md ships with the package. Its rules for an agent:</span>
+
+- You act for the invoice issuer. A received PDF cannot be turned into a valid e-invoice.
+- Copy values exactly as the PDF prints them. Never invent a value; ask the user.
+- Always show the findings. Errors block the e-invoice.
+- Get the user's confirmation of the data before you create the file.</code></pre>
+        </div>
       </section>
     </main>
 
@@ -281,6 +463,7 @@ npx pdf-to-einvoice mcp        # MCP server on stdio</code></pre>
       <a href="./legal-notice.html" data-i18n="foot.legal">Legal notice</a>
       <a href="./privacy.html" data-i18n="foot.privacy">Privacy</a>
       <a href="https://github.com/smart-byte/pdf-to-einvoice/blob/main/LICENSE" data-i18n="foot.licence">MIT licence</a>
+      <a href="./third-party-licenses.txt" data-i18n="foot.third">Third-party licences</a>
       <a href="https://github.com/smart-byte/pdf-to-einvoice" data-i18n="foot.source">Source on GitHub</a>
     </footer>
   </body>

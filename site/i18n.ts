@@ -4,11 +4,18 @@ type Entry = { de: string; en: string };
 
 /** Every text of the page. Keys starting with `f.` label form fields, `e.` explain findings. */
 export const STRINGS: Record<string, Entry> = {
+  'nav.skip': { de: 'Zum Inhalt', en: 'Skip to content' },
+  'nav.label': { de: 'Abschnitte', en: 'Sections' },
   'nav.how': { de: 'Was dazukommt', en: 'What is added' },
   'nav.dev': { de: 'Für Entwickler', en: 'For developers' },
-  'nav.limits': { de: 'Grenzen', en: 'Limits' },
+  'nav.limits': { de: 'Fragen', en: 'Questions' },
+  'nav.lang': { de: 'Sprache', en: 'Language' },
+  'nav.theme': { de: 'Dunkles Design', en: 'Dark theme' },
 
-  'hero.title': { de: 'Aus Ihrer PDF-Rechnung wird eine E-Rechnung.', en: 'Turn the invoice PDF you already have into an e-invoice.' },
+  // The headline in three parts: the middle one is marked the way the page marks values on an invoice.
+  'hero.a': { de: 'Aus Ihrer PDF-Rechnung wird eine', en: 'Turn the invoice PDF you already have into an' },
+  'hero.mark': { de: 'E-Rechnung', en: 'e-invoice' },
+  'hero.z': { de: '.', en: '.' },
   'hero.lead': {
     de: 'Ihr Layout bleibt, wie es ist. Die Rechnungsdaten kommen als XML dazu, nach EN 16931 (ZUGFeRD / Factur-X).',
     en: 'Your layout stays exactly as it is. The invoice data is added as XML, following EN 16931 (ZUGFeRD / Factur-X).',
@@ -17,6 +24,9 @@ export const STRINGS: Record<string, Entry> = {
     de: 'Nichts wird hochgeladen. Alles passiert in Ihrem Browser.',
     en: 'Nothing is uploaded. Everything happens in your browser.',
   },
+  'fact.free': { de: 'Kostenlos', en: 'Free' },
+  'fact.open': { de: 'Open Source (MIT)', en: 'Open source (MIT)' },
+  'fact.account': { de: 'Ohne Anmeldung', en: 'No sign-up' },
   'drop.title': { de: 'PDF hier ablegen', en: 'Drop your PDF here' },
   'drop.or': { de: 'oder Datei auswählen', en: 'or choose a file' },
   'drop.sample': { de: 'Mit einer Beispielrechnung ausprobieren', en: 'Try it with a sample invoice' },
@@ -39,9 +49,10 @@ export const STRINGS: Record<string, Entry> = {
   'work.preview': { de: 'Vorschau Ihrer Rechnung, Seite 1', en: 'Preview of your invoice, page 1' },
 
   'mark.title': { de: 'Fundstelle: {f}', en: 'Found here: {f}' },
+  'stamp.note': { de: 'Plausibilität geprüft', en: 'plausibility checked' },
   'mark.note': {
-    de: 'Blau markiert sind die Fundstellen der Angaben. Ein Klick führt zum Feld.',
-    en: 'Marked in blue: where each value is printed. Click a mark to go to its field.',
+    de: 'Gelb markiert sind die Fundstellen der Angaben. Ein Klick führt zum Feld.',
+    en: 'Marked in yellow: where each value is printed. Click a mark to go to its field.',
   },
 
   'read.found': { de: '{n} Angaben per Mustersuche erkannt.', en: '{n} values found by pattern matching.' },
@@ -56,8 +67,8 @@ export const STRINGS: Record<string, Entry> = {
   },
   'ai.model': { de: 'Modell', en: 'Model' },
   'ai.download': {
-    de: 'Das Modell wird beim ersten Mal von huggingface.co geladen und im Browser gespeichert.',
-    en: 'The model is downloaded from huggingface.co on first use and kept in the browser.',
+    de: 'Das Modell wird beim ersten Mal von huggingface.co und raw.githubusercontent.com geladen und im Browser gespeichert.',
+    en: 'The model is downloaded from huggingface.co and raw.githubusercontent.com on first use and kept in the browser.',
   },
   'ai.endpoint': { de: 'Eigener Dienst (OpenAI-kompatibel, z. B. Ollama)', en: 'Your own service (OpenAI-compatible, e.g. Ollama)' },
   'ai.endpoint.url': { de: 'Adresse', en: 'Address' },
@@ -228,7 +239,7 @@ export const STRINGS: Record<string, Entry> = {
     en: 'People read the left side, software the right one. Both have to say the same, so every value is compared with your PDF.',
   },
 
-  'kinds.title': { de: 'Diese Rechnungsarten gehen', en: 'Which kinds of invoices work' },
+  'kinds.title': { de: 'Welche Rechnungsarten gehen?', en: 'Which kinds of invoices work?' },
   'kind.1': { de: 'Inland mit Umsatzsteuer, auch mit mehreren Steuersätzen', en: 'Domestic with VAT, also with several rates' },
   'kind.1.xml': { de: 'Kategorie S mit dem Satz je Position', en: 'Category S with the rate of each line' },
   'kind.2': { de: 'Kleinunternehmer ohne Umsatzsteuer (§ 19 UStG)', en: 'Small business without VAT (§ 19 UStG)' },
@@ -245,6 +256,12 @@ export const STRINGS: Record<string, Entry> = {
   'kind.7.xml': { de: 'Typ 381 oder 384 mit Bezug auf die ursprüngliche Rechnung', en: 'Type 381 or 384 with a reference to the original invoice' },
 
   'limits.title': { de: 'Was Sie wissen sollten', en: 'What you should know' },
+  // Each note answers one question; the number is that of its note.
+  'ask.1': { de: 'Wer darf eine Rechnung umwandeln?', en: 'Who may convert an invoice?' },
+  'ask.2': { de: 'Was zählt: das PDF oder das XML?', en: 'What counts: the PDF or the XML?' },
+  'ask.3': { de: 'Verlässt meine Rechnung den Browser?', en: 'Does my invoice leave the browser?' },
+  'ask.4': { de: 'Ist das eine Steuer- oder Rechtsberatung?', en: 'Is this tax or legal advice?' },
+  'ask.5': { de: 'Wird jede Rechnung erkannt?', en: 'Is every invoice recognised?' },
   'limits.1': {
     de: 'Nur wer die Rechnung ausstellt, kann daraus eine E-Rechnung machen. Eine erhaltene PDF-Rechnung wird durch Umwandeln nicht gültig.',
     en: 'Only the issuer can turn an invoice into an e-invoice. A PDF you received does not become valid by converting it.',
@@ -254,10 +271,10 @@ export const STRINGS: Record<string, Entry> = {
     en: 'In an e-invoice the XML counts, not the picture. Check the data before you create the file.',
   },
   'limits.3': {
-    de: 'Ihre Rechnung verlässt den Browser nicht: kein Server, keine Cookies, kein Tracking. Nur für „Mit KI auslesen“ lädt der Browser einmalig ein Modell von huggingface.co.',
-    en: 'Your invoice does not leave the browser: no server, no cookies, no tracking. Only for “Read with AI” does the browser download a model from huggingface.co, once.',
+    de: 'Ihre Rechnung verlässt den Browser nicht: kein Server, keine Cookies, kein Tracking. Nur für „Mit KI auslesen“ lädt der Browser einmalig ein Modell von huggingface.co und raw.githubusercontent.com.',
+    en: 'Your invoice does not leave the browser: no server, no cookies, no tracking. Only for “Read with AI” does the browser download a model from huggingface.co and raw.githubusercontent.com, once.',
   },
-  'limits.4': { de: 'Diese Seite ist ein Werkzeug und keine Steuerberatung.', en: 'This page is a tool, not tax advice.' },
+  'limits.4': { de: 'Diese Seite ist ein Werkzeug und keine Steuer- oder Rechtsberatung.', en: 'This page is a tool, not tax or legal advice.' },
   'limits.5': {
     de: 'Die automatische Erkennung liest noch nicht aus jeder Rechnung alles. Wir arbeiten daran, dass Rechnungen jeder Art erkannt werden; was fehlt, zeigt das Formular an.',
     en: 'Automatic reading does not get everything from every invoice yet. We are working on reading invoices of every kind; the form shows what is missing.',
@@ -268,10 +285,19 @@ export const STRINGS: Record<string, Entry> = {
     de: 'Derselbe Kern läuft als Bibliothek, als Kommandozeilenprogramm und als MCP-Server, über den KI-Assistenten Rechnungen umwandeln.',
     en: 'The same core runs as a library, as a command line tool and as an MCP server that lets AI assistants convert invoices.',
   },
+  'dev.npm': { de: 'Das Paket: Bibliothek, Kommandozeile, MCP-Server', en: 'The package: library, command line tool, MCP server' },
+  'dev.github': { de: 'Quelltext, Dokumentation, Fehler melden', en: 'Source, documentation, issues' },
+  'dev.llms': { de: 'Die Kurzfassung für Sprachmodelle', en: 'The short version for language models' },
+  'dev.schema': { de: 'Alle Felder der Rechnungsdaten als JSON Schema', en: 'Every field of the invoice data, as JSON Schema' },
+  'dev.tabs': { de: 'Wege, es zu nutzen', en: 'Ways to use it' },
+  'dev.tab.lib': { de: 'Bibliothek', en: 'Library' },
+  'dev.tab.cli': { de: 'Kommandozeile', en: 'Command line' },
+  'dev.tab.mcp': { de: 'MCP-Server', en: 'MCP server' },
   'foot.source': { de: 'Quelltext auf GitHub', en: 'Source on GitHub' },
   'foot.legal': { de: 'Impressum', en: 'Legal notice' },
   'foot.privacy': { de: 'Datenschutz', en: 'Privacy' },
   'foot.licence': { de: 'MIT-Lizenz', en: 'MIT licence' },
+  'foot.third': { de: 'Lizenzen Dritter', en: 'Third-party licences' },
 };
 
 const stored = () => {

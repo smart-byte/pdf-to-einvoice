@@ -14,7 +14,7 @@ export interface Endpoint {
   key?: string;
 }
 
-// ponytail: the invoice text is cut to fit the 4096-token context the prebuilt models ship with. Long invoices
+// Known limit: the invoice text is cut to fit the 4096-token context the prebuilt models ship with. Long invoices
 // lose their tail; raise `context_window_size` (more graphics memory) or read page by page if that matters.
 const MAX_TEXT = 7000;
 
