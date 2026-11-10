@@ -90,7 +90,7 @@ npx pdf-to-einvoice xml invoice.einvoice.pdf     # prints the embedded XML
 
 ## For AI assistants
 
-The MCP server lets an assistant such as Claude do the whole job on your machine: read the PDF, fill in the data,
+The MCP server lets an AI assistant do the whole job on your machine: read the PDF, fill in the data,
 show you what is missing, and create the file after you confirm.
 
 ```json

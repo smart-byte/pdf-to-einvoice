@@ -265,8 +265,8 @@ export const STRINGS: Record<string, Entry> = {
 
   'dev.title': { de: 'Für Entwickler und KI-Assistenten', en: 'For developers and AI assistants' },
   'dev.text': {
-    de: 'Derselbe Kern läuft als Bibliothek, als Kommandozeilenprogramm und als MCP-Server, über den Assistenten wie Claude Rechnungen umwandeln.',
-    en: 'The same core runs as a library, as a command line tool and as an MCP server that lets assistants like Claude convert invoices.',
+    de: 'Derselbe Kern läuft als Bibliothek, als Kommandozeilenprogramm und als MCP-Server, über den KI-Assistenten Rechnungen umwandeln.',
+    en: 'The same core runs as a library, as a command line tool and as an MCP server that lets AI assistants convert invoices.',
   },
   'foot.source': { de: 'Quelltext auf GitHub', en: 'Source on GitHub' },
   'foot.legal': { de: 'Impressum', en: 'Legal notice' },
