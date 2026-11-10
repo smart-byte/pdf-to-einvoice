@@ -1,0 +1,29 @@
+name: Something does not work
+description: The web app, the CLI, the library or the MCP server does something wrong.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Do not attach a real invoice and do not paste data from one.** Issues are public. Replace names, addresses, tax and bank numbers with invented ones, or describe the layout in words.
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where
+      options: [Web app, Command line, Library, MCP server]
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The package version (`npx pdf-to-einvoice --version`), or the browser and its version for the web app.
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect
+      description: The steps that lead there. For a file that a validator rejects, its messages.
+    validations:
+      required: true
