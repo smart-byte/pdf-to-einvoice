@@ -289,3 +289,106 @@ describe('check against the PDF text', () => {
     expect(check(sample(), { pdfText: '  ' }).findings.map((f) => f.code)).toEqual(['no-pdf-text']);
   });
 });
+
+describe('check with the XRechnung rules', () => {
+  /** The sample with what XRechnung asks for on top, and one change applied. */
+  const xrechnung = (change: (draft: any) => void = () => {}) =>
+    withChange((d) => {
+      d.buyerReference = '99000000-BEISPIEL-00';
+      Object.assign(d.seller, { contactName: 'Erika Muster', phone: '+49 30 1234567' });
+      d.buyer.email = 'einkauf@beispiel.example';
+      change(d);
+    });
+  const found = (draft: InvoiceDraft) => check(draft, { rules: 'xrechnung' }).findings.map((f) => `${f.severity} ${f.path}: ${f.code}`);
+  const remove = (path: string) => (d: any) => {
+    const keys = path.split('.');
+    const last = keys.pop()!;
+    delete keys.reduce((o, k) => o[k], d)[last];
+  };
+
+  it('accepts an invoice that has what XRechnung asks for', () => {
+    const result = check(xrechnung(), { rules: 'xrechnung' });
+    expect(result.findings).toEqual([]);
+    expect(result.invoice).toBeDefined();
+  });
+
+  it('asks for none of it unless the rules are named', () => {
+    expect(check(sample()).findings).toEqual([]);
+    expect(check(sample(), { rules: 'xrechnung' }).invoice).toBeUndefined();
+  });
+
+  it.each([
+    ['buyerReference', 'xrechnung-buyer-reference'],
+    ['seller.contactName', 'xrechnung-seller-contact'],
+    ['seller.phone', 'xrechnung-seller-phone'],
+    ['seller.email', 'xrechnung-seller-email'],
+    ['buyer.email', 'xrechnung-buyer-email'],
+    ['seller.city', 'xrechnung-address'],
+    ['seller.postalCode', 'xrechnung-address'],
+    ['buyer.city', 'xrechnung-address'],
+    ['buyer.postalCode', 'xrechnung-address'],
+  ])('requires %s', (path, code) => {
+    expect(found(xrechnung(remove(path)))).toContain(`error ${path}: ${code}`);
+  });
+
+  it('says in plain words what is missing, without rule numbers', () => {
+    const { findings } = check(sample(), { rules: 'xrechnung' });
+    expect(findings.length).toBeGreaterThan(3);
+    for (const finding of findings) {
+      expect(finding.message).toContain('XRechnung');
+      expect(finding.message).not.toMatch(/BR-|BT-\d|PEPPOL/);
+    }
+  });
+
+  it('wants a line total to be quantity times price, two cents apart at most', () => {
+    const lineTotal = (netAmount: number, currency = 'EUR') =>
+      found(
+        xrechnung((d) => {
+          Object.assign(d, { currency });
+          d.lines[1].netAmount = netAmount;
+          delete d.totals;
+        }),
+      );
+    expect(lineTotal(499.03)).toEqual(['error lines.1.netAmount: xrechnung-line-net']);
+    expect(lineTotal(499.02)).toEqual([]);
+    expect(lineTotal(498.98)).toEqual([]);
+    expect(lineTotal(498.97)).toEqual(['error lines.1.netAmount: xrechnung-line-net']);
+    // Forint has no cents in practice: there the rule allows half a forint.
+    expect(lineTotal(499.5, 'HUF')).toEqual([]);
+    expect(lineTotal(499.51, 'HUF')).toEqual(['error lines.1.netAmount: xrechnung-line-net']);
+  });
+
+  it('reads a payment terms line that starts with # as a cash discount in the fixed form', () => {
+    const terms = (paymentTerms: string) => found(xrechnung((d) => (d.paymentTerms = paymentTerms)));
+    expect(terms('#Rabatt nach Vereinbarung')).toEqual(['error paymentTerms: xrechnung-payment-terms']);
+    expect(terms('Zahlbar in 30 Tagen.\n#SKONTO#TAGE=14#PROZENT=2#')).toEqual(['error paymentTerms: xrechnung-payment-terms']);
+    expect(terms('Zahlbar in 30 Tagen.\n#SKONTO#TAGE=14#PROZENT=2.00#')).toEqual([]);
+    expect(terms('#SKONTO#TAGE=14#PROZENT=2.00#BASISBETRAG=1000.00#\nSonst 30 Tage netto.')).toEqual([]);
+    expect(terms('Rechnung #42 zahlbar in 14 Tagen')).toEqual([]);
+    // After the last #...# of the text the validator wants a line break, whatever that line is.
+    expect(terms('#SKONTO#TAGE=14#PROZENT=2.00#\nRechnungen #42 und #43 zahlbar in 30 Tagen')).toEqual(['error paymentTerms: xrechnung-payment-terms']);
+    expect(terms('Rechnungen #42 und #43 zahlbar in 30 Tagen\n  #SKONTO#TAGE=14#PROZENT=2.00#')).toEqual([]);
+  });
+
+  it('refuses an intra-community supply, which needs a delivery address the data cannot hold', () => {
+    const draft = xrechnung((d) => {
+      for (const line of d.lines) Object.assign(line, { vatCategory: 'K', vatRate: 0 });
+      Object.assign(d.buyer, { country: 'AT', vatId: 'ATU12345678' });
+      d.vatExemptionReason = 'Tax-free intra-community supply.';
+      delete d.totals;
+    });
+    expect(found(draft)).toEqual(['error lines.0.vatCategory: xrechnung-delivery-address']);
+  });
+
+  it('warns about what XRechnung only recommends', () => {
+    expect(found(xrechnung((d) => (d.typeCode = '386')))).toEqual(['warning typeCode: xrechnung-type-code']);
+    expect(found(xrechnung((d) => (d.seller.phone = 'auf Anfrage')))).toEqual(['warning seller.phone: xrechnung-phone']);
+    expect(found(xrechnung((d) => (d.seller.email = 'rechnung@muster')))).toEqual(['warning seller.email: xrechnung-email']);
+    expect(
+      check(
+        xrechnung((d) => (d.typeCode = '386')),
+        { rules: 'xrechnung' },
+      ).invoice,
+    ).toBeDefined();
+  });
+});
