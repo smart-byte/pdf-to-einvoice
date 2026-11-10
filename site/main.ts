@@ -774,7 +774,7 @@ async function renderXml(): Promise<void> {
   try {
     const invoice = structuredClone(state.draft);
     const { createEInvoice } = await import('../src/create.js');
-    const { xml, totals } = await createEInvoice({ pdf: state.pdf, invoice, lang });
+    const { xml, totals } = await createEInvoice({ pdf: state.pdf, invoice });
     // The data has changed again in the meantime: the newer run shows its XML.
     if (run !== xmlRun) return;
     const date = (iso: unknown) => new Intl.DateTimeFormat(lang, { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(`${iso}T00:00:00Z`));
@@ -840,7 +840,9 @@ $('#create').onclick = async () => {
   try {
     // Loaded on demand: the XML writer is the heaviest part of the page.
     const { createEInvoice } = await import('../src/create.js');
-    const result = await createEInvoice({ pdf: state.pdf!, invoice: state.draft, lang });
+    // No language is passed on: for any other than English the library asks the server for a catalogue of
+    // translations that it does not ship. It would only word the document properties of the PDF.
+    const result = await createEInvoice({ pdf: state.pdf!, invoice: state.draft });
     downloads.forEach((url) => URL.revokeObjectURL(url));
     downloads = [];
     const base = state.fileName.replace(/\.pdf$/i, '');
