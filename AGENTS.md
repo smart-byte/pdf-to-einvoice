@@ -24,18 +24,18 @@ A change is done when `npm test`, `npm run type-check`, `npm run lint` and `npm 
 
 ## Where things are
 
-| path                             | what it holds                                                                  |
-| -------------------------------- | ------------------------------------------------------------------------------ |
-| `src/model.ts`                   | the invoice data model and its JSON Schema                                     |
-| `src/calculate.ts`               | totals and VAT in exact cents                                                  |
-| `src/check.ts`                   | required fields, formats, arithmetic, comparison with the text of the PDF      |
-| `src/text.ts`, `src/guess.ts`    | text and layout of a PDF, and reading an invoice from them without a model     |
-| `src/ground.ts`                  | drops what a language model returned but the PDF does not show                 |
-| `src/ubl.ts`, `src/create.ts`    | the XML and the PDF/A-3 file                                                   |
-| `src/read.ts`, `src/validate.ts` | reading and checking an existing e-invoice                                     |
-| `src/cli.ts`, `src/mcp.ts`       | command line and MCP server; `server.json` describes the server for registries |
-| `site/`                          | the web app; it imports `src/` directly                                        |
-| `test/`, `examples/`             | tests and the invented sample invoice                                          |
+| path                             | what it holds                                                                                  |
+| -------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `src/model.ts`                   | the invoice data model and its JSON Schema                                                     |
+| `src/calculate.ts`               | totals and VAT in exact cents                                                                  |
+| `src/check.ts`                   | required fields, formats, arithmetic, the XRechnung rules, comparison with the text of the PDF |
+| `src/text.ts`, `src/guess.ts`    | text and layout of a PDF, and reading an invoice from them without a model                     |
+| `src/ground.ts`                  | drops what a language model returned but the PDF does not show                                 |
+| `src/ubl.ts`, `src/create.ts`    | the XML (in the PDF, or alone as XRechnung) and the PDF/A-3 file                               |
+| `src/read.ts`, `src/validate.ts` | reading and checking an existing e-invoice                                                     |
+| `src/cli.ts`, `src/mcp.ts`       | command line and MCP server; `server.json` describes the server for registries                 |
+| `site/`                          | the web app; it imports `src/` directly                                                        |
+| `test/`, `examples/`             | tests and the invented sample invoice                                                          |
 
 ## Rules
 

@@ -1,5 +1,6 @@
 // Validates generated e-invoices with Mustang, the reference validator of the ZUGFeRD community: veraPDF for
-// PDF/A-3 plus the official EN 16931 / Factur-X Schematron rules. Opt-in, because it needs Java and a download:
+// PDF/A-3 plus the official EN 16931 / Factur-X Schematron rules, and for a file that declares XRechnung the
+// XRechnung rules of KoSIT. Opt-in, because it needs Java and a download:
 //
 //   curl -LO https://github.com/ZUGFeRD/mustangproject/releases/download/core-2.26.0/Mustang-CLI-2.26.0.jar
 //   MUSTANG_JAR=$PWD/Mustang-CLI-2.26.0.jar npm run test:reference
@@ -9,7 +10,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { describe, expect, it } from 'vitest';
-import { createEInvoice } from '../src/create.js';
+import { createEInvoice, createXRechnung } from '../src/create.js';
 import type { InvoiceDraft } from '../src/model.js';
 
 const jar = process.env.MUSTANG_JAR;
@@ -73,23 +74,107 @@ const CASES: Record<string, InvoiceDraft> = {
   ),
 };
 
+/** What XRechnung asks for on top: the buyer reference (Leitweg-ID), a contact at the seller, an electronic address of the buyer. */
+const forXRechnung = (invoice: InvoiceDraft): InvoiceDraft => {
+  const draft = structuredClone(invoice) as any;
+  draft.buyerReference ??= '99000000-BEISPIEL-00';
+  draft.seller = { contactName: 'Erika Muster', phone: '+49 30 1234567', ...draft.seller };
+  draft.buyer = { email: 'einkauf@beispiel.example', ...draft.buyer };
+  return draft;
+};
+// An intra-community supply is left out: as an XRechnung it needs a delivery address, which the data cannot hold, and `check` refuses it.
+const { 'intra-community supply of goods': _refused, ...SHARED } = CASES;
+const XRECHNUNG_CASES: Record<string, InvoiceDraft> = Object.fromEntries(
+  Object.entries({
+    ...SHARED,
+    'no bank account': sample((d) => {
+      delete d.iban;
+      delete d.bic;
+    }),
+    'cash discount in the payment terms': sample((d) => (d.paymentTerms = 'Zahlbar innerhalb von 30 Tagen.\n#SKONTO#TAGE=14#PROZENT=2.00#')),
+    'credit note with negative amounts and neither due date nor bank account': sample((d) => {
+      for (const line of d.lines) line.quantity = -line.quantity;
+      for (const field of ['dueDate', 'paymentTerms', 'iban', 'bic', 'totals']) delete d[field];
+      Object.assign(d, { typeCode: '381', precedingInvoiceNumber: 'RE-2026-0041', precedingInvoiceDate: '2026-10-20' });
+    }),
+  }).map(([name, invoice]) => [name, forXRechnung(invoice)]),
+);
+const XRECHNUNG_3_0 = 'urn:cen.eu:en16931:2017#compliant#urn:xeinkauf.de:kosit:xrechnung_3.0';
+
 const status = (report: string, part: 'pdf' | 'xml') => new RegExp(`<${part}>[\\s\\S]*?<summary status="(\\w+)"`).exec(report)?.[1];
 const problems = (report: string) => [...report.matchAll(/<(?:error|warning)[^>]*>([^<]+)/g)].map((m) => m[1]!.trim());
 
 describe.skipIf(!jar)('reference validation with Mustang', () => {
   const dir = mkdtempSync(join(tmpdir(), 'pdf-to-einvoice-'));
+  const samplePdf = () => new Uint8Array(file('sample-invoice.pdf'));
+  /** Writes the file and returns what the validator says about it. */
+  const validate = async (name: string, content: Uint8Array | string) => {
+    const path = join(dir, name.replace(/[^\w.]+/g, '-'));
+    writeFileSync(path, content);
+    const { stdout } = await promisify(execFile)('java', ['-jar', jar!, '--no-notices', '--action', 'validate', '--source', path], {
+      maxBuffer: 64 * 1024 * 1024,
+    }).catch((e) => e as { stdout: string });
+    return { pdf: status(stdout, 'pdf'), xml: status(stdout, 'xml'), problems: problems(stdout), report: stdout };
+  };
 
   it.concurrent.each(Object.entries(CASES))(
     '%s',
     async (name, invoice) => {
-      const { pdf } = await createEInvoice({ pdf: new Uint8Array(file('sample-invoice.pdf')), invoice });
-      const path = join(dir, `${name.replace(/\W+/g, '-')}.pdf`);
-      writeFileSync(path, pdf);
-      const { stdout } = await promisify(execFile)('java', ['-jar', jar!, '--no-notices', '--action', 'validate', '--source', path], {
-        maxBuffer: 64 * 1024 * 1024,
-      }).catch((e) => e as { stdout: string });
-      expect({ pdf: status(stdout, 'pdf'), xml: status(stdout, 'xml'), problems: problems(stdout) }).toEqual({ pdf: 'valid', xml: 'valid', problems: [] });
+      const { pdf } = await createEInvoice({ pdf: samplePdf(), invoice });
+      expect(await validate(`${name}.pdf`, pdf)).toMatchObject({ pdf: 'valid', xml: 'valid', problems: [] });
     },
     120_000,
   );
+
+  describe('XRechnung', () => {
+    it.concurrent.each(Object.entries(XRECHNUNG_CASES))(
+      'as UBL: %s',
+      async (name, invoice) => {
+        const { xml } = await createXRechnung({ invoice });
+        const result = await validate(`${name}.ubl.xml`, xml);
+        expect(result).toMatchObject({ xml: 'valid', problems: [] });
+        expect(result.report).toContain(`<profile>${XRECHNUNG_3_0}</profile>`);
+      },
+      120_000,
+    );
+
+    it.concurrent.each(Object.entries(XRECHNUNG_CASES))(
+      'as CII: %s',
+      async (name, invoice) => {
+        const { xml } = await createXRechnung({ invoice, syntax: 'cii' });
+        const result = await validate(`${name}.cii.xml`, xml);
+        expect(result).toMatchObject({ xml: 'valid', problems: [] });
+        expect(result.report).toContain(`<profile>${XRECHNUNG_3_0}</profile>`);
+      },
+      120_000,
+    );
+
+    it.concurrent.each(Object.entries(XRECHNUNG_CASES))(
+      'in a hybrid PDF: %s',
+      async (name, invoice) => {
+        const { pdf } = await createEInvoice({ pdf: samplePdf(), invoice, profile: 'xrechnung' });
+        const result = await validate(`${name}.xrechnung.pdf`, pdf);
+        expect(result).toMatchObject({ pdf: 'valid', xml: 'valid', problems: [] });
+        expect(result.report).toContain(`<profile>${XRECHNUNG_3_0}</profile>`);
+      },
+      120_000,
+    );
+
+    // The cases above prove something only while the validator applies the XRechnung rules to the files. These make sure it does:
+    // the same files, with one thing taken out that only XRechnung asks for.
+    it.concurrent.each([
+      ['UBL', 'ubl', /<cbc:BuyerReference>[^<]*<\/cbc:BuyerReference>/],
+      ['CII', 'cii', /<ram:BuyerReference>[^<]*<\/ram:BuyerReference>/],
+    ] as const)(
+      'the validator applies the XRechnung rules to %s',
+      async (_name, syntax, buyerReference) => {
+        const { xml } = await createXRechnung({ invoice: XRECHNUNG_CASES['domestic invoice with VAT']!, syntax });
+        expect(xml).toMatch(buyerReference);
+        const result = await validate(`without-buyer-reference.${syntax}.xml`, xml.replace(buyerReference, ''));
+        expect(result.xml).toBe('invalid');
+        expect(result.problems).toEqual([expect.stringContaining('[BR-DE-15]')]);
+      },
+      120_000,
+    );
+  });
 });

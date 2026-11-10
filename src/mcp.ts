@@ -4,13 +4,13 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ErrorCode, ListToolsRequestSchema, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { check } from './check.js';
-import { createFile, describePdf, packageVersion, validateFile } from './cli.js';
+import { CHOICES, createFile, createXRechnungFile, describePdf, packageVersion, validateFile } from './cli.js';
 import { InvoiceError } from './create.js';
 import { invoiceJsonSchema, type InvoiceDraft } from './model.js';
 import { readEmbeddedXml } from './pdf.js';
 import { extractText } from './text.js';
 
-const INSTRUCTIONS = `pdf-to-einvoice turns an existing invoice PDF into an EN 16931 e-invoice (ZUGFeRD / Factur-X): the invoice data is attached to the PDF as XML, the pages stay as they are. Everything runs locally; no file is uploaded.
+const INSTRUCTIONS = `pdf-to-einvoice turns an existing invoice PDF into an EN 16931 e-invoice (ZUGFeRD / Factur-X): the invoice data is attached to the PDF as XML, the pages stay as they are. It also writes the data as an XRechnung, the XML German public bodies ask for. Everything runs locally; no file is uploaded.
 
 Workflow:
 1. read_invoice_pdf: get the text of the PDF and a first guess of the labelled values.
@@ -18,6 +18,8 @@ Workflow:
 3. check_invoice with pdf_path: fix every error; look at every warning.
 4. Show the user the data and the findings, and wait for their confirmation.
 5. create_einvoice.
+
+XRechnung (version 3.0) is for an invoice to a German public body, or for a user who asks for it by name; do not choose it on your own. It takes more data: the buyer reference (the Leitweg-ID, which the public body names), a contact at the seller with phone number and e-mail address, and an e-mail address of the buyer. In step 3 pass rules "xrechnung" to check_invoice. In step 5 call create_xrechnung for the XML alone (UBL, or CII if asked for), or create_einvoice with profile "xrechnung" for a PDF that carries that XML. Ask the user for what is missing; a Leitweg-ID is never made up.
 
 To check an e-invoice that already exists, issued or received, call validate_einvoice: it reads the embedded XML and reports what is missing, what does not add up and what the visible PDF does not show; it is a plausibility check, not a full EN 16931 validation, and you say so with the result.
 
@@ -43,7 +45,10 @@ const optional = (schema: any): any =>
 const DRAFT_SCHEMA = optional(INVOICE_SCHEMA);
 // No tool reaches beyond this machine: files are read and written locally, nothing is sent anywhere.
 const READS = { readOnlyHint: true, openWorldHint: false };
+// A tool that creates writes one new file and replaces nothing unless `overwrite` is set.
+const WRITES = { readOnlyHint: false, destructiveHint: false, openWorldHint: false };
 const pathSchema = (description: string) => ({ type: 'string', description: `${description} Absolute path.` });
+const choiceSchema = (key: keyof typeof CHOICES, description: string) => ({ type: 'string', enum: CHOICES[key], description });
 
 const TOOLS = [
   {
@@ -58,11 +63,15 @@ const TOOLS = [
     name: 'check_invoice',
     title: 'Check invoice data',
     description:
-      'Checks invoice data against the main EN 16931 rules (required fields, formats, arithmetic, VAT categories) and the particulars German VAT law asks for. It is not a full validator. Returns { ok, findings, totals }: errors block the e-invoice, warnings need a second look, totals are calculated from the lines. The data may be incomplete; what is missing is reported. With pdf_path, values that do not occur in the text of the PDF are reported too.',
+      'Checks invoice data against the main EN 16931 rules (required fields, formats, arithmetic, VAT categories) and the particulars German VAT law asks for. It is not a full validator. Returns { ok, findings, totals }: errors block the e-invoice, warnings need a second look, totals are calculated from the lines. The data may be incomplete; what is missing is reported. With pdf_path, values that do not occur in the text of the PDF are reported too. With rules "xrechnung", what XRechnung 3.0 asks for beyond EN 16931 is reported too, under codes that start with "xrechnung-".',
     annotations: READS,
     inputSchema: {
       type: 'object',
-      properties: { invoice: DRAFT_SCHEMA, pdf_path: pathSchema('The invoice PDF to compare the data with. Optional.') },
+      properties: {
+        invoice: DRAFT_SCHEMA,
+        pdf_path: pathSchema('The invoice PDF to compare the data with. Optional.'),
+        rules: choiceSchema('rules', 'Further rules to check the data against. Optional.'),
+      },
       required: ['invoice'],
     },
   },
@@ -70,9 +79,8 @@ const TOOLS = [
     name: 'create_einvoice',
     title: 'Create the e-invoice',
     description:
-      'Writes the e-invoice: a copy of the PDF as PDF/A-3 with the invoice attached as factur-x.xml (Factur-X / ZUGFeRD, profile EN 16931). The input PDF is never changed. Call it only after check_invoice reports no errors and the user has confirmed the data. Returns { output_path, findings, totals }; with errors in the data nothing is written and the findings say what to fix.',
-    // It writes one new file and replaces nothing unless `overwrite` is set.
-    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+      'Writes the e-invoice: a copy of the PDF as PDF/A-3 with the invoice attached as factur-x.xml (Factur-X / ZUGFeRD, profile EN 16931). The input PDF is never changed. Call it only after check_invoice reports no errors and the user has confirmed the data. Returns { output_path, findings, totals }; with errors in the data nothing is written and the findings say what to fix. With profile "xrechnung" the data has to meet the XRechnung rules as well (check_invoice with rules "xrechnung"), and the attached XML is xrechnung.xml, which declares XRechnung 3.0.',
+    annotations: WRITES,
     inputSchema: {
       type: 'object',
       properties: {
@@ -80,8 +88,26 @@ const TOOLS = [
         invoice: INVOICE_SCHEMA,
         output_path: pathSchema('Where to write the e-invoice. Default: <name>.einvoice.pdf next to the input.'),
         overwrite: { type: 'boolean', description: 'Replace output_path if it exists. Default false.' },
+        profile: choiceSchema('profile', 'The profile of the XML. Default en16931.'),
       },
       required: ['pdf_path', 'invoice'],
+    },
+  },
+  {
+    name: 'create_xrechnung',
+    title: 'Create an XRechnung',
+    description:
+      'Writes the invoice data as an XRechnung 3.0, the XML German public bodies ask for: one XML file, without a PDF. Call it only after check_invoice with rules "xrechnung" reports no errors and the user has confirmed the data. Returns { output_path, findings, totals }; with errors in the data nothing is written and the findings say what to fix.',
+    annotations: WRITES,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        invoice: INVOICE_SCHEMA,
+        output_path: pathSchema('Where to write the XML file.'),
+        syntax: choiceSchema('syntax', 'The XML syntax: ubl (default) or cii, UN/CEFACT Cross Industry Invoice. XRechnung allows both.'),
+        overwrite: { type: 'boolean', description: 'Replace output_path if it exists. Default false.' },
+      },
+      required: ['invoice', 'output_path'],
     },
   },
   {
@@ -115,6 +141,13 @@ function invoiceArg(args: Args): InvoiceDraft {
   return value as InvoiceDraft;
 }
 
+/** An optional argument that takes one of a few words. */
+function choiceArg<K extends keyof typeof CHOICES>(args: Args, key: K): (typeof CHOICES)[K][number] | undefined {
+  const value = args[key];
+  if (value !== undefined && !(CHOICES[key] as readonly unknown[]).includes(value)) throw new Error(`${key} must be ${CHOICES[key].join(' or ')}.`);
+  return value as (typeof CHOICES)[K][number] | undefined;
+}
+
 const readPdf = async (path: string) => new Uint8Array(await readFile(path));
 
 /** Each handler returns the result (an object, or text to pass on as it is) or throws what went wrong. */
@@ -122,14 +155,20 @@ const HANDLERS: Record<string, (args: Args) => Promise<object | string>> = {
   read_invoice_pdf: (args) => describePdf(pathArg(args, 'pdf_path')),
 
   async check_invoice(args) {
+    const rules = choiceArg(args, 'rules');
     const pdfText = args.pdf_path === undefined ? undefined : await extractText(await readPdf(pathArg(args, 'pdf_path')));
-    const { findings, totals, invoice } = check(invoiceArg(args), { pdfText });
+    const { findings, totals, invoice } = check(invoiceArg(args), { pdfText, rules });
     return { ok: invoice !== undefined, findings, totals };
   },
 
   async create_einvoice(args) {
     const output = args.output_path === undefined ? undefined : pathArg(args, 'output_path');
-    const result = await createFile(pathArg(args, 'pdf_path'), invoiceArg(args), output, args.overwrite === true);
+    const result = await createFile(pathArg(args, 'pdf_path'), invoiceArg(args), output, args.overwrite === true, choiceArg(args, 'profile'));
+    return { output_path: result.outputPath, findings: result.findings, totals: result.totals };
+  },
+
+  async create_xrechnung(args) {
+    const result = await createXRechnungFile(invoiceArg(args), pathArg(args, 'output_path'), choiceArg(args, 'syntax'), args.overwrite === true);
     return { output_path: result.outputPath, findings: result.findings, totals: result.totals };
   },
 

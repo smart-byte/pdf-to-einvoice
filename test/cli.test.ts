@@ -253,3 +253,141 @@ describe('usage', () => {
     expect((await cli('check', SAMPLE_JSON, '--nope')).code).toBe(2);
   });
 });
+
+describe('XRechnung', () => {
+  const XRECHNUNG_3_0 = 'urn:cen.eu:en16931:2017#compliant#urn:xeinkauf.de:kosit:xrechnung_3.0';
+  /** The sample data with what XRechnung asks for on top, as a file. */
+  const xrechnungData = (change: (draft: any) => void = () => {}) =>
+    dataWith((d) => {
+      d.buyerReference = '99000000-BEISPIEL-00';
+      Object.assign(d.seller, { contactName: 'Erika Muster', phone: '+49 30 1234567' });
+      d.buyer.email = 'einkauf@beispiel.example';
+      change(d);
+    });
+
+  describe('xrechnung', () => {
+    it('prints the invoice as UBL that declares XRechnung 3.0', async () => {
+      const result = await cli('xrechnung', xrechnungData());
+      expect(result.code).toBe(0);
+      expect(result.stderr).toBe('');
+      expect(result.stdout).toMatch(/^<\?xml[^\n]*\n<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"/);
+      expect(result.stdout).toContain(`<cbc:CustomizationID>${XRECHNUNG_3_0}</cbc:CustomizationID>`);
+      expect(result.stdout.endsWith('</Invoice>\n')).toBe(true);
+    });
+
+    it('prints a Cross Industry Invoice with --syntax cii', async () => {
+      const result = await cli('xrechnung', xrechnungData(), '--syntax', 'cii');
+      expect(result.code).toBe(0);
+      expect(result.stdout).toContain('<rsm:CrossIndustryInvoice');
+      expect(result.stdout).toContain(`<ram:ID>${XRECHNUNG_3_0}</ram:ID>`);
+    });
+
+    it('writes the XML to the file named by -o and prints its path', async () => {
+      const out = join(tmp(), 'out.xml');
+      const result = await cli('xrechnung', xrechnungData(), '-o', out);
+      expect(result).toEqual({ code: 0, stdout: `${out}\n`, stderr: '' });
+      expect(readFileSync(out, 'utf8')).toContain('<cbc:ID>RE-2026-0042</cbc:ID>');
+    });
+
+    it('leaves an existing file alone unless --force is given', async () => {
+      const out = join(tmp(), 'out.xml');
+      writeFileSync(out, 'keep me');
+      const refused = await cli('xrechnung', xrechnungData(), '-o', out);
+      expect(refused.code).toBe(1);
+      expect(refused.stderr).toContain('--force');
+      expect(readFileSync(out, 'utf8')).toBe('keep me');
+      expect((await cli('xrechnung', xrechnungData(), '-o', out, '--force')).code).toBe(0);
+      expect(readFileSync(out, 'utf8')).toContain('<cbc:ID>RE-2026-0042</cbc:ID>');
+    });
+
+    it('never writes over the data it reads, even with --force', async () => {
+      const data = xrechnungData();
+      const before = readFileSync(data, 'utf8');
+      const result = await cli('xrechnung', data, '-o', data, '--force');
+      expect(result.code).toBe(1);
+      expect(readFileSync(data, 'utf8')).toBe(before);
+    });
+
+    it('says what XRechnung lacks in the data and prints no XML', async () => {
+      const result = await cli('xrechnung', SAMPLE_JSON);
+      expect(result.code).toBe(1);
+      expect(result.stdout).toBe('');
+      expect(result.stderr).toContain('error buyerReference: XRechnung needs the buyer reference');
+      expect(result.stderr).toContain('error seller.phone:');
+    });
+
+    it('prints warnings to standard error, next to the XML on standard output', async () => {
+      const result = await cli(
+        'xrechnung',
+        xrechnungData((d) => delete d.buyer.street),
+      );
+      expect(result.code).toBe(0);
+      expect(result.stderr).toContain('warning buyer.street:');
+      expect(result.stdout).toContain('<Invoice ');
+    });
+
+    it('exits 2 for a syntax it does not know', async () => {
+      const result = await cli('xrechnung', xrechnungData(), '--syntax', 'edifact');
+      expect(result.code).toBe(2);
+      expect(result.stderr).toContain('--syntax');
+    });
+  });
+
+  describe('create --profile xrechnung', () => {
+    it('writes a PDF whose XML declares XRechnung 3.0', async () => {
+      const out = join(tmp(), 'out.pdf');
+      const result = await cli('create', SAMPLE_PDF, xrechnungData(), '-o', out, '--profile', 'xrechnung');
+      expect(result).toEqual({ code: 0, stdout: `${out}\n`, stderr: '' });
+      expect(await embeddedXml(out)).toContain(`<ram:ID>${XRECHNUNG_3_0}</ram:ID>`);
+    });
+
+    it('applies the XRechnung rules and writes nothing while they are not met', async () => {
+      const out = join(tmp(), 'out.pdf');
+      const result = await cli('create', SAMPLE_PDF, SAMPLE_JSON, '-o', out, '--profile', 'xrechnung');
+      expect(result.code).toBe(1);
+      expect(result.stderr).toContain('error buyerReference:');
+      expect(existsSync(out)).toBe(false);
+    });
+
+    it('writes the EN 16931 profile when asked for it by name', async () => {
+      const out = join(tmp(), 'out.pdf');
+      expect((await cli('create', SAMPLE_PDF, SAMPLE_JSON, '-o', out, '--profile', 'en16931')).code).toBe(0);
+      expect(await embeddedXml(out)).toContain('<ram:ID>urn:cen.eu:en16931:2017</ram:ID>');
+    });
+
+    it('exits 2 for a profile it does not know', async () => {
+      const out = join(tmp(), 'out.pdf');
+      const result = await cli('create', SAMPLE_PDF, SAMPLE_JSON, '-o', out, '--profile', 'extended');
+      expect(result.code).toBe(2);
+      expect(result.stderr).toContain('--profile');
+      expect(existsSync(out)).toBe(false);
+    });
+  });
+
+  describe('check --rules xrechnung', () => {
+    it('reports what XRechnung asks for on top and exits 1', async () => {
+      const result = await cli('check', SAMPLE_JSON, '--rules', 'xrechnung');
+      expect(result.code).toBe(1);
+      expect(result.stdout).toContain('error buyerReference: XRechnung needs the buyer reference');
+    });
+
+    it('exits 0 for data that has it, also as JSON', async () => {
+      expect((await cli('check', xrechnungData(), '--rules', 'xrechnung')).stdout).toMatch(/^No findings\./);
+      const result = await cli('check', SAMPLE_JSON, '--rules', 'xrechnung', '--json');
+      expect(JSON.parse(result.stdout).findings.map((f: { code: string }) => f.code)).toContain('xrechnung-buyer-email');
+    });
+
+    it('exits 2 for rules it does not know', async () => {
+      const result = await cli('check', SAMPLE_JSON, '--rules', 'peppol');
+      expect(result.code).toBe(2);
+      expect(result.stderr).toContain('--rules');
+    });
+  });
+
+  it('is part of the usage', async () => {
+    const { stdout } = await cli('--help');
+    expect(stdout).toContain('pdf-to-einvoice xrechnung <data.json> [--syntax ubl|cii] [-o out.xml]');
+    expect(stdout).toContain('--profile en16931|xrechnung');
+    expect(stdout).toContain('--rules xrechnung');
+  });
+});

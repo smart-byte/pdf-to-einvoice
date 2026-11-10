@@ -1,6 +1,15 @@
 export { calculate, type Totals, type VatGroup } from './calculate.js';
 export { check, type CheckOptions, type CheckResult, type Finding } from './check.js';
-export { createEInvoice, InvoiceError, type CreateOptions, type CreateResult, type InvoiceErrorCode } from './create.js';
+export {
+  createEInvoice,
+  createXRechnung,
+  InvoiceError,
+  type CreateOptions,
+  type CreateResult,
+  type InvoiceErrorCode,
+  type XRechnungOptions,
+  type XRechnungResult,
+} from './create.js';
 export { keepWhatThePdfShows } from './ground.js';
 export { guessFromText, languageOf, type GuessOptions } from './guess.js';
 export {

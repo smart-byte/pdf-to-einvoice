@@ -1,4 +1,4 @@
-import { calculate, type Totals } from './calculate.js';
+import { calculate, micro, type Totals } from './calculate.js';
 import { INVOICE_TYPES, VAT_CATEGORIES, type Invoice, type InvoiceDraft, type VatCategory } from './model.js';
 
 export interface Finding {
@@ -21,6 +21,8 @@ export interface CheckResult {
 export interface CheckOptions {
   /** Text of the PDF. Values that do not occur in it are reported. */
   pdfText?: string;
+  /** `xrechnung` adds what XRechnung 3.0 asks for beyond EN 16931: an error where it demands, a warning where it recommends. */
+  rules?: 'xrechnung';
 }
 
 type Bag = Record<string, any>;
@@ -77,7 +79,8 @@ const DATE_FIELDS = ['issueDate', 'dueDate', 'deliveryDate', 'periodStart', 'per
 /**
  * Checks invoice data against the rules an EN 16931 invoice has to meet and
  * the particulars German VAT law asks for, and optionally against the text of
- * the PDF it was read from. Never throws on incomplete data.
+ * the PDF it was read from and against what XRechnung asks for on top. Never
+ * throws on incomplete data.
  */
 export function check(draft: InvoiceDraft, options: CheckOptions = {}): CheckResult {
   const d = withDefaults(draft);
@@ -190,10 +193,116 @@ export function check(draft: InvoiceDraft, options: CheckOptions = {}): CheckRes
     }
   }
 
+  if (options.rules === 'xrechnung') findings.push(...xrechnungFindings(d, totals));
   if (options.pdfText !== undefined) findings.push(...compareWithPdf(d, totals, options.pdfText));
 
   const ok = !findings.some((f) => f.severity === 'error');
   return { findings, totals, invoice: ok ? (d as Invoice) : undefined };
+}
+
+/** A cash discount as XRechnung wants it written into the payment terms, one to a line. */
+const SKONTO = /^#SKONTO#TAGE=\d+#PROZENT=\d+\.\d{2}(#BASISBETRAG=-?\d+\.\d{2})?#$/;
+
+/**
+ * What XRechnung 3.0 asks for beyond EN 16931. Each check stands for the rule named behind it, taken from the
+ * specification (XRechnung 3.0.2, chapters 12.5 and 12.6) and confirmed with the Schematron rules KoSIT publishes
+ * for it: an error where the rule says "must" and the validator rejects the file, a warning where it says "should".
+ * What the rules ask of the XML alone (payment instructions, a VAT rate in every breakdown) is the job of `toUbl`.
+ */
+function xrechnungFindings(d: Bag, totals: Totals | undefined): Finding[] {
+  const findings: Finding[] = [];
+  const add = (severity: Finding['severity'], path: string, code: string, message: string) =>
+    findings.push({ path, severity, code: `xrechnung-${code}`, message });
+  const need = (path: string, code: string, message: string) => {
+    if (path.split('.').reduce((o, k) => o?.[k], d as any) === undefined) add('error', path, code, message);
+  };
+
+  // BR-DE-15
+  need(
+    'buyerReference',
+    'buyer-reference',
+    'XRechnung needs the buyer reference: for a German public body its Leitweg-ID, which the buyer names, usually with the order.',
+  );
+  // BR-DE-2, BR-DE-5
+  need('seller.contactName', 'seller-contact', 'XRechnung needs a contact at the seller: the person or department the buyer can ask about the invoice.');
+  // BR-DE-6
+  need('seller.phone', 'seller-phone', 'XRechnung needs the phone number of the contact at the seller.');
+  // BR-DE-7 for the contact, PEPPOL-EN16931-R020 for the electronic address: both are this one e-mail address.
+  need(
+    'seller.email',
+    'seller-email',
+    'XRechnung needs the e-mail address of the seller. It is written as the address of the contact and as the electronic address of the seller.',
+  );
+  // PEPPOL-EN16931-R010
+  need(
+    'buyer.email',
+    'buyer-email',
+    'XRechnung needs an electronic address of the buyer, and this tool writes the e-mail address there. Ask the buyer where invoices are to be sent.',
+  );
+  // BR-DE-3, BR-DE-4, BR-DE-8, BR-DE-9
+  for (const who of ['seller', 'buyer']) {
+    need(`${who}.city`, 'address', `XRechnung needs the city of the ${who}.`);
+    need(`${who}.postalCode`, 'address', `XRechnung needs the postal code of the ${who}.`);
+  }
+
+  // PEPPOL-EN16931-R120. The validator applies it to UBL only; the specification states it for both syntaxes.
+  const slack = d.currency === 'HUF' ? 0.5 : 0.02;
+  d.lines.forEach((line: Bag, i: number) => {
+    if (!totals || !isNumber(line.netAmount)) return;
+    const apart = micro(line.quantity) * micro(line.unitPrice) - micro(totals.lineNet[i]!) * 10n ** 6n;
+    if ((apart < 0n ? -apart : apart) > micro(slack) * 10n ** 6n) {
+      add(
+        'error',
+        `lines.${i}.netAmount`,
+        'line-net',
+        `XRechnung wants the total of a line to be quantity times unit price, here ${(line.quantity * line.unitPrice).toFixed(2)}, at most ${slack.toFixed(2)} apart. This line states ${totals.lineNet[i]!.toFixed(2)}. Correct the quantity, the price or the total; a discount on a line cannot be stated yet.`,
+      );
+    }
+  });
+
+  // BR-DE-18. The validator also wants a line break right after the last "#...#" of the text; `toUbl` ends the text with one.
+  if (typeof d.paymentTerms === 'string') {
+    const marked = d.paymentTerms.split(/\r?\n/).filter((line: string) => line.trim().startsWith('#'));
+    if (marked.some((line: string) => !SKONTO.test(line.trim())) || (marked.length > 0 && !/^\s*\n/.test(`${d.paymentTerms}\n`.split(/#.+#/).at(-1)!))) {
+      add(
+        'error',
+        'paymentTerms',
+        'payment-terms',
+        'XRechnung reads a line of the payment terms that starts with # as a cash discount, which has to be written exactly like #SKONTO#TAGE=14#PROZENT=2.00# on a line of its own (days, then percent with two decimals). Write the line that way, or do not start it with #.',
+      );
+    }
+  }
+
+  // BR-IC-12 asks for the country of delivery of an intra-community supply, and BR-DE-10 and BR-DE-11 then for its city and postal code.
+  // Known limit: the data model has no delivery address, so such an invoice is refused instead of naming the buyer's address as the place of delivery.
+  const intraCommunity = d.lines.findIndex((line: Bag) => line.vatCategory === 'K');
+  if (intraCommunity >= 0) {
+    add(
+      'error',
+      `lines.${intraCommunity}.vatCategory`,
+      'delivery-address',
+      'An intra-community supply cannot be written as XRechnung yet: XRechnung then asks for the city and postal code of the place of delivery, and the invoice data has no field for them.',
+    );
+  }
+
+  // BR-DE-17: of the types this tool knows, the prepayment invoice is the one XRechnung does not list.
+  if (d.typeCode === '386') {
+    add(
+      'warning',
+      'typeCode',
+      'type-code',
+      'XRechnung does not list the prepayment invoice (type 386) among its invoice types. A recipient may not accept it.',
+    );
+  }
+  // BR-DE-27
+  if (typeof d.seller.phone === 'string' && (d.seller.phone.match(/\d/g) ?? []).length < 3) {
+    add('warning', 'seller.phone', 'phone', 'XRechnung expects a phone number here, with three digits at least.');
+  }
+  // BR-DE-28
+  if (typeof d.seller.email === 'string' && !/^[^@\s]+@([^@.\s]+\.)+[^@.\s]+$/.test(d.seller.email)) {
+    add('warning', 'seller.email', 'email', 'XRechnung expects an e-mail address of the form name@example.org here.');
+  }
+  return findings;
 }
 
 const MONTHS = [

@@ -8,6 +8,13 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- XRechnung, the German version of EN 16931 for invoices to public bodies, as a second output. `createXRechnung`
+  returns the invoice data as XML that declares XRechnung 3.0, in UBL or CII, and `createEInvoice` takes
+  `profile: 'xrechnung'` for a hybrid PDF whose XML follows XRechnung. `check` takes `rules: 'xrechnung'` and then
+  reports what XRechnung asks for beyond EN 16931, each under a code of its own (`xrechnung-...`); both create
+  functions run it. On the command line that is `xrechnung <data.json> [--syntax ubl|cii] [-o out.xml]`,
+  `create --profile xrechnung` and `check --rules xrechnung`; in the MCP server the tool `create_xrechnung`, `rules`
+  for `check_invoice` and `profile` for `create_einvoice`. The reference validation covers the three outputs.
 - `extractLayout`: the text of a PDF with its geometry (blocks, pieces with positions, page sizes).
 - `guessFromText` reads by what fits together instead of where it stands: totals by arithmetic, items that add up to
   them, the seller by evidence and the buyer by exclusion, identifiers by their shape; labels in German, English and

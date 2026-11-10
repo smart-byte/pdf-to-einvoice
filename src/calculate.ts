@@ -20,7 +20,7 @@ export interface Totals {
 
 // Amounts are summed as whole cents in BigInt: binary floating point cannot
 // represent 1.005 and would round it down.
-const micro = (n: number) => BigInt(Math.round(n * 1e6));
+export const micro = (n: number) => BigInt(Math.round(n * 1e6));
 
 /** Integer division, rounding half away from zero (commercial rounding). */
 function divRound(n: bigint, d: bigint): bigint {
