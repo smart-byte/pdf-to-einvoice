@@ -1051,6 +1051,15 @@ select.warned {
   mix-blend-mode: multiply;
   animation: stamp 0.5s cubic-bezier(0.2, 1.5, 0.4, 1) both;
 }
+/* What the stamp stands for: this page's own check, not an official validation. */
+.stamp small {
+  display: block;
+  margin-top: 0.2em;
+  font-size: 0.4em;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-align: center;
+}
 @keyframes stamp {
   from {
     opacity: 0;

@@ -49,6 +49,7 @@ export const STRINGS: Record<string, Entry> = {
   'work.preview': { de: 'Vorschau Ihrer Rechnung, Seite 1', en: 'Preview of your invoice, page 1' },
 
   'mark.title': { de: 'Fundstelle: {f}', en: 'Found here: {f}' },
+  'stamp.note': { de: 'Plausibilität geprüft', en: 'plausibility checked' },
   'mark.note': {
     de: 'Gelb markiert sind die Fundstellen der Angaben. Ein Klick führt zum Feld.',
     en: 'Marked in yellow: where each value is printed. Click a mark to go to its field.',
