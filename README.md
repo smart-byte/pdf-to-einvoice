@@ -143,6 +143,8 @@ not a strict PDF/A-3. Export the PDF with embedded fonts (or as PDF/A) and run i
 - **Only the issuer can issue an e-invoice.** A PDF you _received_ does not become a valid e-invoice because you
   converted it. If you sent a plain PDF where an e-invoice was required, issue a corrected invoice (type 384) that
   refers to the original.
+- **Reading is still being broadened.** Pattern matching reads the layouts it knows well and less of others; what it
+  cannot place is left empty and shown as missing. Reading invoices of every kind is work in progress.
 - **The XML is the binding part.** The tool checks arithmetic and compares the data with the text of the PDF, but
   it cannot know what you meant. Review the data before you create the file.
 - **Profile and syntax:** Factur-X / ZUGFeRD profile EN 16931 (CII). Plain XRechnung and UBL output are not built

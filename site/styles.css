@@ -132,6 +132,10 @@ pre {
 .nav nav a:hover {
   color: var(--blue);
 }
+/* On pages without navigation links the language switch still sits at the right edge. */
+.wordmark + .langs {
+  margin-left: auto;
+}
 .langs {
   display: flex;
   border: 1px solid var(--line);
@@ -734,6 +738,22 @@ select.warned {
   overflow-x: auto;
   max-width: 46rem;
   color: var(--ink);
+}
+/* Legal notice and privacy policy: plain reading pages, each in English and German. */
+.legal h1 {
+  font-size: clamp(1.8rem, 3.4vw, 2.4rem);
+}
+.legal h2 {
+  font-size: 1.25rem;
+  margin-top: 2.2rem !important;
+}
+/* With the language switch running, only the chosen language is shown; without scripts both are. */
+html[lang='de']:has([data-lang][aria-pressed='true']) .legal[lang='en'],
+html[lang='en']:has([data-lang][aria-pressed='true']) .legal[lang='de'] {
+  display: none;
+}
+.legal address {
+  font-style: normal;
 }
 .foot {
   display: flex;
