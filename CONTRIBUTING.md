@@ -44,6 +44,17 @@ npm run eval:reader -- /tmp/corpus/ZUGFeRDv2/correct            # table: correct
 npm run eval:reader -- /tmp/corpus/ZUGFeRDv2/correct --files    # what each file lacks
 ```
 
+The same script measures reading with a language model, where the web app runs it: in Chrome with WebGPU. It takes
+about a minute per invoice, so take a sample. Chrome has to be installed; the model is downloaded once.
+
+```bash
+npm run eval:reader -- /tmp/corpus/ZUGFeRDv2/correct --sample 4 --model Qwen2.5-1.5B-Instruct-q4f16_1-MLC
+```
+
+Its second table compares three ways of reading the same invoices: the rules alone, the model alone (after dropping
+what the page does not show), and what the web app does: the rules first, the model for what they left empty. A
+change to the models in `site/llm.ts`, to the prompt or to `src/ground.ts` comes with that table before and after.
+
 A wrong value is worse than a missing one: a missing value is asked for, a wrong one may end up in the XML unnoticed.
 A change to `src/guess.ts` or `src/text.ts` comes with the table before and after. Keep the corpus out of this
 repository, and do not write rules for a single vendor's sample: most of its files come from very few generators.
