@@ -46,7 +46,11 @@ export const STRINGS: Record<string, Entry> = {
     en: 'This is what its XML says. Compare it with the page: the XML counts, not the picture. This is a plausibility check and does not replace a full validator.',
   },
   'work.other': { de: 'Anderes PDF wählen', en: 'Choose another PDF' },
-  'work.preview': { de: 'Vorschau Ihrer Rechnung, Seite 1', en: 'Preview of your invoice, page 1' },
+  'work.preview': { de: 'Vorschau Ihrer Rechnung, Seite {n}', en: 'Preview of your invoice, page {n}' },
+  'page.now': { de: 'Seite {n} von {m}', en: 'Page {n} of {m}' },
+  'page.prev': { de: 'Vorherige Seite', en: 'Previous page' },
+  'page.next': { de: 'Nächste Seite', en: 'Next page' },
+  'page.turned': { de: 'Die Vorschau zeigt jetzt Seite {n}: Dort steht „{f}“.', en: 'The preview now shows page {n}: “{f}” is printed there.' },
 
   'mark.title': { de: 'Fundstelle: {f}', en: 'Found here: {f}' },
   'stamp.note': { de: 'Plausibilität geprüft', en: 'plausibility checked' },

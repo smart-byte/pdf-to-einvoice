@@ -9,7 +9,7 @@ import { inspectPdf } from '../src/pdf.js';
 import { extractLayout } from '../src/text.js';
 import { lang, setLang, t } from './i18n.js';
 import { DEFAULT_MODEL, MODELS, hasWebGpu, readWithBrowserModel, readWithEndpoint } from './llm.js';
-import { locate, type Piece, type Rect } from './locate.js';
+import { locate, pageToShow, type Piece, type Rect } from './locate.js';
 import './styles.css';
 import './theme-switch.js';
 
@@ -290,9 +290,16 @@ function validate(): void {
         el('dd', {}, money(result.totals[key])),
       );
       if (mismatch && typeof printed[key] === 'number') row.append(el('dd', { className: 'total__printed' }, t('t.printed', { v: money(printed[key]!) })));
-      // A total has no field to focus: pointing at it shows where it stands on the page.
-      row.onmouseenter = () => highlight(`totals.${key}`);
-      row.onmouseleave = () => highlight(focusedPath());
+      // A total has no field to focus: pointing at it shows where it stands, on whichever page that is.
+      row.onmouseenter = () => {
+        pointed = `totals.${key}`;
+        turnTo(pointed);
+        highlight(pointed);
+      };
+      row.onmouseleave = () => {
+        pointed = undefined;
+        highlight(focusedPath());
+      };
       totals.append(row);
     }
   } else totals.append(el('p', { className: 'muted' }, t('t.empty')));
@@ -346,10 +353,15 @@ $('#form').addEventListener('input', (event) => {
 // ---------------------------------------------------------------------------------------------------------------
 // Where the values stand on the page
 
-/** The text of page 1 with the place of every piece, in percent of the page. Empty for a scan. */
-let pieces: Piece[] = [];
+/** The text of every page with the place of each piece, in percent of its page. A page that is not read yet, or a scan, has none. */
+let pagePieces: Piece[][] = [];
+/** The page the preview shows, counted from 0, and the one it was last asked for: drawing a page takes a moment. */
+let shown = 0;
+let wanted = 0;
 const marks = $('#marks');
 const focusedPath = () => (document.activeElement as HTMLElement | null)?.dataset.path;
+/** The total the pointer rests on: it stays the marked one while its page is being turned to. */
+let pointed: string | undefined;
 
 // Known limit: letters are measured in the browser's sans-serif, not in the font of the PDF, so a mark inside a long
 // piece of text can be off by a letter. Measure with the embedded font if that shows.
@@ -363,7 +375,20 @@ function highlight(path?: string): void {
   for (const mark of marks.children) mark.classList.toggle('is-active', (mark as HTMLElement).dataset.for === path);
 }
 
-/** Marks on the preview where the values of the form are printed. A value that is not found on page 1 gets no mark. */
+/** Where the value of a field, or one of the totals, is printed among the pieces of one page. */
+function placesOf(path: string, on: Piece[]): Rect[] {
+  const find = (value: unknown, beside?: Rect[]) => locate(on, value, { beside, widthOf });
+  const total = /^totals\.(net|vat|gross)$/.exec(path);
+  if (total) return find(state.result?.totals?.[total[1] as 'net' | 'vat' | 'gross'] || undefined);
+  const value = getPath(state.draft, path);
+  if (isEmpty(value)) return [];
+  const line = /^(lines\.\d+)\.(\w+)$/.exec(path);
+  // The numbers of a line item are looked for next to its name: a "2" elsewhere on the page is not its quantity.
+  // Known limit: the rate is looked for as "19 %" anywhere, since most invoices print it with the totals only; "7,5 %" is not found.
+  return !line || line[2] === 'name' ? find(value) : line[2] === 'vatRate' ? find(`${value} %`) : find(value, find(getPath(state.draft, `${line[1]}.name`)));
+}
+
+/** Marks on the page that is shown, where the values of the form are printed there. A value that stands on another page gets its mark when that page is shown. */
 function renderMarks(): void {
   marks.replaceChildren();
   const taken = new Set<string>();
@@ -379,28 +404,32 @@ function renderMarks(): void {
       marks.append(mark);
     }
   };
-  const find = (value: unknown, beside?: Rect[]) => locate(pieces, value, { beside, widthOf });
+  const on = pagePieces[shown] ?? [];
   // Dropdowns hold codes, which are not printed; everything else is looked for.
   for (const input of $('#form').querySelectorAll<HTMLInputElement>('input[data-path]')) {
     const path = input.dataset.path!;
-    const value = getPath(state.draft, path);
-    const line = /^(lines\.\d+)\.(\w+)$/.exec(path);
-    if (isEmpty(value)) continue;
-    // The numbers of a line item are looked for next to its name: a "2" elsewhere on the page is not its quantity.
-    // Known limit: the rate is looked for as "19 %" anywhere, since most invoices print it with the totals only; "7,5 %" is not found.
-    const rects =
-      !line || line[2] === 'name' ? find(value) : line[2] === 'vatRate' ? find(`${value} %`) : find(value, find(getPath(state.draft, `${line[1]}.name`)));
-    place(path, fieldLabel(path), rects);
+    place(path, fieldLabel(path), placesOf(path, on));
   }
-  for (const key of ['net', 'vat', 'gross'] as const) {
-    const total = state.result?.totals?.[key];
-    if (total) place(`totals.${key}`, t(`t.${key}`), find(total));
-  }
+  for (const key of ['net', 'vat', 'gross'] as const) place(`totals.${key}`, t(`t.${key}`), placesOf(`totals.${key}`, on));
   $('#marks-note').hidden = marks.children.length === 0;
-  highlight(focusedPath());
+  renderPager();
+  highlight(pointed ?? focusedPath());
 }
 
-$('#form').addEventListener('focusin', (event) => highlight((event.target as HTMLElement).dataset.path));
+/** Turns the preview to the page a value stands on, unless the page that is shown has it too. */
+function turnTo(path: string): void {
+  const page = pageToShow(pagePieces, shown, (on) => placesOf(path, on).length > 0);
+  if (page === undefined || page === shown) return;
+  const label = path.startsWith('totals.') ? t(`t.${path.slice(7)}`) : fieldLabel(path);
+  void showPage(page).then(() => ($('#page-live').textContent = t('page.turned', { n: page + 1, f: label })));
+}
+
+$('#form').addEventListener('focusin', (event) => {
+  const field = event.target as HTMLElement;
+  // Dropdowns hold codes, which are printed nowhere: they turn no page.
+  if (field.dataset.path && field instanceof HTMLInputElement) turnTo(field.dataset.path);
+  highlight(field.dataset.path);
+});
 $('#form').addEventListener('focusout', () => highlight());
 marks.addEventListener('click', (event) => {
   const path = (event.target as HTMLElement).dataset.for;
@@ -422,21 +451,18 @@ $('#scan').addEventListener('animationend', () => scan('off'));
 // ---------------------------------------------------------------------------------------------------------------
 // Opening a PDF
 
-async function preview(pdf: Uint8Array): Promise<void> {
-  const task = pdfjs.getDocument({ data: pdf.slice(), verbosity: 0 });
-  const doc = await task.promise;
-  const page = await doc.getPage(1);
-  const canvas = $<HTMLCanvasElement>('#preview');
-  const viewport = page.getViewport({ scale: (Math.min(720, canvas.parentElement!.clientWidth) / page.getViewport({ scale: 1 }).width) * devicePixelRatio });
-  canvas.width = viewport.width;
-  canvas.height = viewport.height;
-  await page.render({ canvas, viewport }).promise;
-  // Measured here and not taken from extractLayout: the marks lie on this drawing, so they use its view of the page.
+/** The PDF that is open, as pdf.js holds it: its pages are drawn when they are turned to. */
+let opened: { task: pdfjs.PDFDocumentLoadingTask; doc: pdfjs.PDFDocumentProxy } | undefined;
+
+/** The text of a page with the place of every piece, in percent of the page. */
+async function piecesOf(page: pdfjs.PDFPageProxy): Promise<Piece[]> {
+  // Measured here and not taken from extractLayout: the marks lie on the drawing of the page, so they use its view of the page.
   // Known limit: upright text only. Text that is printed turned gets its mark in the wrong place; use the whole text matrix if such invoices turn up.
-  pieces = (await page.getTextContent()).items.flatMap((item) => {
+  const viewport = page.getViewport({ scale: 1 });
+  return (await page.getTextContent()).items.flatMap((item) => {
     if (!('str' in item) || !item.str.trim()) return [];
     const [x, y, height] = [item.transform[4] as number, item.transform[5] as number, item.height];
-    // From a little below the baseline to the top of the tall letters, in the same view the page is drawn with.
+    // From a little below the baseline to the top of the tall letters.
     const [x1, y1] = viewport.convertToViewportPoint(x, y - 0.25 * height) as [number, number];
     const [x2, y2] = viewport.convertToViewportPoint(x + item.width, y + 0.85 * height) as [number, number];
     return [
@@ -449,8 +475,58 @@ async function preview(pdf: Uint8Array): Promise<void> {
       },
     ];
   });
-  await task.destroy();
+}
+
+/** Says which page is shown, and lets the pages be turned where there is more than one. */
+function renderPager(): void {
+  const count = opened?.doc.numPages ?? 1;
+  $('#pager').hidden = count < 2;
+  $('#page-now').textContent = t('page.now', { n: shown + 1, m: count });
+  $<HTMLButtonElement>('#page-prev').disabled = shown === 0;
+  $<HTMLButtonElement>('#page-next').disabled = shown >= count - 1;
+  $('#preview').setAttribute('aria-label', t('work.preview', { n: shown + 1 }));
+}
+
+/**
+ * Draws one page of the open PDF, counted from 0, and shows its marks. A page is drawn when it is turned to and kept
+ * nowhere: a long PDF costs no more memory than a short one.
+ */
+async function showPage(index: number): Promise<void> {
+  const pdf = opened;
+  if (!pdf || index < 0 || index >= pdf.doc.numPages) return;
+  wanted = index;
+  const page = await pdf.doc.getPage(index + 1);
+  const canvas = $<HTMLCanvasElement>('#preview');
+  const viewport = page.getViewport({ scale: (Math.min(720, canvas.parentElement!.clientWidth) / page.getViewport({ scale: 1 }).width) * devicePixelRatio });
+  // Drawn beside the stage and put on it when done: turning on while a page is still being drawn leaves no half page behind.
+  const sheet = el('canvas', { width: viewport.width, height: viewport.height });
+  await page.render({ canvas: sheet, viewport }).promise;
+  pagePieces[index] ??= await piecesOf(page);
+  // Another page was turned to, or another PDF opened, while this one was drawn.
+  if (opened !== pdf || wanted !== index) return;
+  shown = index;
+  Object.assign(canvas, { width: sheet.width, height: sheet.height });
+  canvas.getContext('2d')!.drawImage(sheet, 0, 0);
   renderMarks();
+}
+$('#page-prev').onclick = () => showPage(wanted - 1);
+$('#page-next').onclick = () => showPage(wanted + 1);
+
+async function preview(pdf: Uint8Array): Promise<void> {
+  const before = opened;
+  opened = undefined;
+  await before?.task.destroy();
+  const task = pdfjs.getDocument({ data: pdf.slice(), verbosity: 0 });
+  const mine = (opened = { task, doc: await task.promise });
+  pagePieces = [];
+  shown = 0;
+  await showPage(0);
+  // The other pages are read in the background, so that a value that stands on one of them can be turned to.
+  void (async () => {
+    for (let index = 1; index < mine.doc.numPages && opened === mine; index++) pagePieces[index] ??= await piecesOf(await mine.doc.getPage(index + 1));
+  })().catch(() => {
+    // The PDF was closed while its pages were read: nothing is left to read.
+  });
 }
 
 function show(view: 'start' | 'work' | 'done'): void {
@@ -483,7 +559,7 @@ async function open(pdf: Uint8Array, fileName: string): Promise<void> {
   try {
     const info = await inspectPdf(pdf);
     const { text, blocks } = await extractLayout(pdf);
-    pieces = [];
+    pagePieces = [];
     xmlSection.open = false;
     Object.assign(state, {
       pdf,
