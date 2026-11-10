@@ -56,7 +56,8 @@ function withDefaults(draft: InvoiceDraft): Bag {
   return d;
 }
 
-function isDate(v: unknown): boolean {
+/** Whether a value is a day of the calendar written as `YYYY-MM-DD`; `2026-02-31` is not. */
+export function isDate(v: unknown): boolean {
   if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
   const d = new Date(`${v}T00:00:00Z`);
   return !Number.isNaN(d.getTime()) && d.toISOString().startsWith(v);
@@ -228,7 +229,8 @@ export function dateSpellings(iso: string): string[] {
     `${m}/${d}/${yy}`,
     `${d}-${m}-${y}`,
   ];
-  const named = MONTHS[Number(m) - 1]!.flatMap((name) => [
+  // A month that does not exist has no name: such a date is only looked for in digits.
+  const named = (MONTHS[Number(m) - 1] ?? []).flatMap((name) => [
     `${day}.${name}${y}`,
     `${d}.${name}${y}`,
     `${day}${name}${y}`,

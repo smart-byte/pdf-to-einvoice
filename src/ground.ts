@@ -1,4 +1,4 @@
-import { amountSpellings, dateSpellings, isIban } from './check.js';
+import { amountSpellings, dateSpellings, isDate, isIban } from './check.js';
 import type { InvoiceDraft } from './model.js';
 
 type Bag = Record<string, any>;
@@ -42,7 +42,8 @@ export function keepWhatThePdfShows(draft: unknown, pdfText: string): InvoiceDra
     (pattern: RegExp): Rule =>
     (v) =>
       typeof v === 'string' && pattern.test(v.replace(/\s+/g, '')) && shows([v]);
-  const date: Rule = (v) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) && shows(dateSpellings(v));
+  // A date that does not exist is dropped even if its digits are printed: "13/01/2026" does not show a 13th month.
+  const date: Rule = (v) => typeof v === 'string' && isDate(v) && shows(dateSpellings(v));
   // An amount has to stand on its own: "3.11" inside the date "03.11.2026" is not one.
   const amount: Rule = (v) =>
     typeof v === 'number' &&

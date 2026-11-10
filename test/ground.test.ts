@@ -37,6 +37,14 @@ describe('keepWhatThePdfShows', () => {
     expect(keepWhatThePdfShows(invented, pdfText)).toEqual({ lines: [{ name: 'Beratung E-Rechnung' }] });
   });
 
+  it('drops a date that does not exist instead of failing on it', () => {
+    // A small model writes such dates. "13/01/2026" is the 13th of January, not the first day of a 13th month.
+    const text = `${pdfText}\nDatum 13/01/2026   Fällig 31.02.2026`;
+    expect(keepWhatThePdfShows({ number: 'RE-2026-0042', issueDate: '2026-13-01', dueDate: '2026-02-31', deliveryDate: '2026-00-10' }, text)).toEqual({
+      number: 'RE-2026-0042',
+    });
+  });
+
   it('drops a value that sits in the wrong kind of field', () => {
     const draft = { seller: { taxNumber: 'rechnung@muster-software.example', email: 'Beispielweg 1', vatId: 'Musterstadt' } };
     expect(keepWhatThePdfShows(draft, pdfText)).toEqual({});
