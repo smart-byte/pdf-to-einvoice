@@ -3,6 +3,9 @@
 pdf-to-einvoice's own code is the TypeScript in `src/` and `site/`. It builds on the following components. The
 npm package declares them as dependencies; the web app bundles them. Their licences apply to those parts.
 
+The website is a copy of the code and fonts it bundles, so it ships their licence texts: `npm run site:build` writes
+them, for every package in the dependency tree, into `third-party-licenses.txt` next to the page.
+
 ## Used by the library, the CLI and the web app
 
 - **@e-invoice-eu/core** — Guido Flohr, WTFPL. Writes the CII XML and embeds it into the PDF. Its browser bundle
