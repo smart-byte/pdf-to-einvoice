@@ -53,6 +53,7 @@ describe('guessFromText', () => {
       issueDate: '2026-11-03',
       deliveryDate: '2026-10-31',
       dueDate: '2026-11-17',
+      paymentTerms: 'Zahlbar innerhalb von 14 Tagen ohne Abzug. Fällig am 17.11.2026.',
       currency: 'EUR',
       iban: 'DE02120300000000202051',
       bic: 'BYLADEM1001',

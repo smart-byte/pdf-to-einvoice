@@ -9,7 +9,7 @@ import { inspectPdf } from '../src/pdf.js';
 import { extractLayout } from '../src/text.js';
 import { lang, setLang, t } from './i18n.js';
 import { DEFAULT_MODEL, MODELS, hasWebGpu, readWithBrowserModel, readWithEndpoint } from './llm.js';
-import { locate, type Piece, type Rect } from './locate.js';
+import { locate, pageToShow, type Piece, type Rect } from './locate.js';
 import './styles.css';
 import './theme-switch.js';
 
@@ -37,10 +37,13 @@ interface State {
   fileFindings: Finding[];
   /** `validate` shows what an existing e-invoice says; nothing can be edited or created then. */
   mode: 'create' | 'validate';
-  /** Fields filled with a suggestion that is not on the PDF, until the user changes them. */
-  suggested: Set<string>;
+  /**
+   * Values nobody has looked at yet, by the path of their field or of a whole line item ("lines.2"): a suggestion that
+   * is not on the PDF, or what a language model read. Each stays until the user changes the value or says it is right.
+   */
+  toCheck: Map<string, 'suggested' | 'model'>;
 }
-const state: State = { fileName: '', pdfText: '', draft: {}, touched: new Set(), fileFindings: [], mode: 'create', suggested: new Set() };
+const state: State = { fileName: '', pdfText: '', draft: {}, touched: new Set(), fileFindings: [], mode: 'create', toCheck: new Map() };
 
 // ---------------------------------------------------------------------------------------------------------------
 // Paths into the draft, e.g. "seller.name" or "lines.0.unitPrice"
@@ -59,19 +62,26 @@ const hasContent = (lines: unknown) => Array.isArray(lines) && lines.some((line)
 
 /**
  * Copies the values of `extra` into the draft, except where the user has already typed. With `onlyEmpty`, values
- * that are already there stay as well: what the patterns found is not replaced by what a model read.
+ * that are already there stay as well: what the patterns found is not replaced by what a model read. Returns what
+ * was filled in: the paths of the fields, and one path per line item ("lines.2") where the lines were taken over.
  */
-function merge(extra: any, onlyEmpty = false, prefix = ''): void {
+function merge(extra: any, onlyEmpty = false, prefix = '', filled: string[] = []): string[] {
   for (const [key, value] of Object.entries(extra ?? {})) {
     const path = prefix ? `${prefix}.${key}` : key;
     if (isEmpty(value)) continue;
     if (key === 'lines' && Array.isArray(value)) {
       const typed = [...state.touched].some((p) => p.startsWith('lines.'));
-      if (!typed && !(onlyEmpty && hasContent(state.draft.lines)) && hasContent(value)) state.draft.lines = value.map(normalise) as InvoiceDraft['lines'];
-    } else if (typeof value === 'object') merge(value, onlyEmpty, path);
-    else if (!state.touched.has(path) && !(onlyEmpty && !isEmpty(getPath(state.draft, path))))
+      if (!typed && !(onlyEmpty && hasContent(state.draft.lines)) && hasContent(value)) {
+        state.draft.lines = value.map(normalise) as InvoiceDraft['lines'];
+        filled.push(...value.map((_, i) => `lines.${i}`));
+      }
+    } else if (typeof value === 'object') merge(value, onlyEmpty, path, filled);
+    else if (!state.touched.has(path) && !(onlyEmpty && !isEmpty(getPath(state.draft, path)))) {
       setPath(state.draft, path, NUMERIC.test(path) ? toNumber(value) : value);
+      filled.push(path);
+    }
   }
+  return filled;
 }
 
 const NUMERIC = /(quantity|unitPrice|netAmount|vatRate|prepaidAmount|totals\.\w+)$/;
@@ -200,10 +210,26 @@ function renderLines(): HTMLElement {
     remove.onclick = () => {
       lines.splice(i, 1);
       state.touched.add('lines.removed');
+      // The lines below move up by one, and what is still to be checked moves with them.
+      state.toCheck = new Map(
+        [...state.toCheck].flatMap(([path, why]): [string, 'suggested' | 'model'][] => {
+          const at = /^lines\.(\d+)(.*)$/.exec(path);
+          if (!at || Number(at[1]) < i) return [[path, why]];
+          return Number(at[1]) === i ? [] : [[`lines.${Number(at[1]) - 1}${at[2]}`, why]];
+        }),
+      );
       renderForm();
     };
     list.append(
-      el('fieldset', { className: 'line' }, el('legend', {}, String(i + 1)), ...LINE_FIELDS.map((field) => control(field, `lines.${i}.${field.path}`)), remove),
+      el(
+        'fieldset',
+        { className: 'line' },
+        el('legend', {}, String(i + 1)),
+        ...LINE_FIELDS.map((field) => control(field, `lines.${i}.${field.path}`)),
+        remove,
+        // Says something about the line as a whole, e.g. that a model added it.
+        el('p', { className: 'hint', dataset: { hint: `lines.${i}` } }),
+      ),
     );
   });
   const add = el('button', { type: 'button', className: 'quiet' }, t('l.add'));
@@ -259,22 +285,48 @@ function fieldLabel(path: string): string {
   return path.startsWith('totals') ? t('s.totals') : path === 'lines' ? t('s.lines') : '';
 }
 
+/** The field of a path, or the first field of a line item for the path of the whole line. */
+const fieldOf = (path: string) => document.querySelector<HTMLElement>(`[data-path="${path}"], [data-path="${path}.name"]`);
+
 function validate(): void {
   const result = (state.result = check(state.draft, state.pdf ? { pdfText: state.pdfText } : {}));
-  // A suggestion is not on the PDF; it is listed until the user has looked at it and changed or kept it by typing.
-  const suggestions: Finding[] = [...state.suggested]
-    .filter((path) => !state.touched.has(path))
-    .map((path) => ({ path, severity: 'warning', code: 'suggested', message: t('hint.suggested') }));
-  const findings = [...result.findings, ...state.fileFindings, ...suggestions];
+  // What nobody has looked at yet is said at its field. A model may have read a value the form has no field for: that one is not counted.
+  const unchecked: Finding[] = [...state.toCheck]
+    .filter(([path]) => document.querySelector(`[data-hint="${path}"]`))
+    .map(([path, why]) => ({
+      path,
+      severity: 'warning',
+      code: why,
+      message: t(why === 'suggested' ? 'hint.suggested' : /^lines\.\d+$/.test(path) ? 'hint.model.line' : 'hint.model'),
+    }));
+  const findings = [...result.findings, ...state.fileFindings, ...unchecked];
 
   for (const hint of document.querySelectorAll<HTMLElement>('[data-hint]')) {
-    const own = findings.filter((f) => f.path === hint.dataset.hint);
+    const path = hint.dataset.hint!;
+    const own = findings.filter((f) => f.path === path);
     const worst = own.find((f) => f.severity === 'error') ?? own[0];
     hint.textContent = worst ? describe(worst) : '';
     hint.className = `hint${worst ? ` hint--${worst.severity}` : ''}`;
-    const input = document.querySelector<HTMLElement>(`[data-path="${hint.dataset.hint}"]`);
+    const input = document.querySelector<HTMLElement>(`[data-path="${path}"]`);
     input?.toggleAttribute('aria-invalid', worst?.severity === 'error');
     input?.classList.toggle('warned', worst?.severity === 'warning');
+    // The hint of a whole line item: its frame says so too.
+    if (hint.parentElement?.matches('.line'))
+      hint.parentElement.classList.toggle(
+        'line--check',
+        unchecked.some((f) => f.path === path),
+      );
+    // A value that is still to be checked can be ticked off where it stands, without typing it again.
+    if (worst && unchecked.includes(worst) && state.mode === 'create') {
+      const ok = el('button', { type: 'button', className: 'ok' }, t('hint.ok'));
+      ok.setAttribute('aria-label', t('hint.ok.label', { f: fieldLabel(path) || `${t('s.lines')} ${Number(path.split('.')[1]) + 1}` }));
+      ok.onclick = () => {
+        state.toCheck.delete(path);
+        validate();
+        fieldOf(path)?.focus();
+      };
+      hint.append(' ', ok);
+    }
   }
 
   const totals = $('#totals');
@@ -290,15 +342,25 @@ function validate(): void {
         el('dd', {}, money(result.totals[key])),
       );
       if (mismatch && typeof printed[key] === 'number') row.append(el('dd', { className: 'total__printed' }, t('t.printed', { v: money(printed[key]!) })));
-      // A total has no field to focus: pointing at it shows where it stands on the page.
-      row.onmouseenter = () => highlight(`totals.${key}`);
-      row.onmouseleave = () => highlight(focusedPath());
+      // A total has no field to focus: pointing at it shows where it stands, on whichever page that is.
+      row.onmouseenter = () => {
+        pointed = `totals.${key}`;
+        turnTo(pointed);
+        highlight(pointed);
+      };
+      row.onmouseleave = () => {
+        pointed = undefined;
+        highlight(focusedPath());
+      };
       totals.append(row);
     }
   } else totals.append(el('p', { className: 'muted' }, t('t.empty')));
 
   const errors = findings.filter((f) => f.severity === 'error');
-  const warnings = findings.filter((f) => f.severity === 'warning');
+  // What a model added is one thing to check, however many values it is: the form shows each of them.
+  const added = unchecked.filter((f) => f.code === 'model');
+  const warnings = findings.filter((f) => f.severity === 'warning' && !added.includes(f));
+  if (added.length) warnings.push({ ...added[0]!, message: t(added.length === 1 ? 'sum.model.one' : 'sum.model', { n: added.length }) });
   const summary = $('#summary');
   summary.replaceChildren();
   summary.className = `summary summary--${errors.length ? 'error' : warnings.length ? 'warning' : 'ok'}`;
@@ -309,9 +371,10 @@ function validate(): void {
   summary.append(el('p', { className: 'summary__title' }, headline || t(state.mode === 'validate' ? 'sum.valid' : 'sum.ok')));
   const list = el('ul');
   for (const finding of [...errors, ...warnings]) {
-    const where = fieldLabel(finding.path);
+    // The sentence about what a model added speaks for all those values; it leads to the first of them.
+    const where = finding.code === 'model' ? '' : fieldLabel(finding.path);
     const text = `${where ? `${where}: ` : ''}${describe(finding)}`;
-    const target = document.querySelector<HTMLElement>(`[data-path="${finding.path}"]`);
+    const target = fieldOf(finding.path);
     const item = el('li', { className: finding.severity });
     if (target) {
       const jump = el('button', { type: 'button', className: 'link' }, text);
@@ -340,16 +403,24 @@ $('#form').addEventListener('input', (event) => {
   const number = (input as HTMLInputElement).type === 'number';
   setPath(state.draft, path, number ? (input.value === '' ? undefined : Number(input.value)) : input.value.trim());
   state.touched.add(path);
+  // Whoever changes a value has looked at it, and whoever changes a cell of a line has looked at the line.
+  state.toCheck.delete(path);
+  state.toCheck.delete(path.replace(/^(lines\.\d+)\..*$/, '$1'));
   validate();
 });
 
 // ---------------------------------------------------------------------------------------------------------------
 // Where the values stand on the page
 
-/** The text of page 1 with the place of every piece, in percent of the page. Empty for a scan. */
-let pieces: Piece[] = [];
+/** The text of every page with the place of each piece, in percent of its page. A page that is not read yet, or a scan, has none. */
+let pagePieces: Piece[][] = [];
+/** The page the preview shows, counted from 0, and the one it was last asked for: drawing a page takes a moment. */
+let shown = 0;
+let wanted = 0;
 const marks = $('#marks');
 const focusedPath = () => (document.activeElement as HTMLElement | null)?.dataset.path;
+/** The total the pointer rests on: it stays the marked one while its page is being turned to. */
+let pointed: string | undefined;
 
 // Known limit: letters are measured in the browser's sans-serif, not in the font of the PDF, so a mark inside a long
 // piece of text can be off by a letter. Measure with the embedded font if that shows.
@@ -363,7 +434,20 @@ function highlight(path?: string): void {
   for (const mark of marks.children) mark.classList.toggle('is-active', (mark as HTMLElement).dataset.for === path);
 }
 
-/** Marks on the preview where the values of the form are printed. A value that is not found on page 1 gets no mark. */
+/** Where the value of a field, or one of the totals, is printed among the pieces of one page. */
+function placesOf(path: string, on: Piece[]): Rect[] {
+  const find = (value: unknown, beside?: Rect[]) => locate(on, value, { beside, widthOf });
+  const total = /^totals\.(net|vat|gross)$/.exec(path);
+  if (total) return find(state.result?.totals?.[total[1] as 'net' | 'vat' | 'gross'] || undefined);
+  const value = getPath(state.draft, path);
+  if (isEmpty(value)) return [];
+  const line = /^(lines\.\d+)\.(\w+)$/.exec(path);
+  // The numbers of a line item are looked for next to its name: a "2" elsewhere on the page is not its quantity.
+  // Known limit: the rate is looked for as "19 %" anywhere, since most invoices print it with the totals only; "7,5 %" is not found.
+  return !line || line[2] === 'name' ? find(value) : line[2] === 'vatRate' ? find(`${value} %`) : find(value, find(getPath(state.draft, `${line[1]}.name`)));
+}
+
+/** Marks on the page that is shown, where the values of the form are printed there. A value that stands on another page gets its mark when that page is shown. */
 function renderMarks(): void {
   marks.replaceChildren();
   const taken = new Set<string>();
@@ -379,28 +463,32 @@ function renderMarks(): void {
       marks.append(mark);
     }
   };
-  const find = (value: unknown, beside?: Rect[]) => locate(pieces, value, { beside, widthOf });
+  const on = pagePieces[shown] ?? [];
   // Dropdowns hold codes, which are not printed; everything else is looked for.
   for (const input of $('#form').querySelectorAll<HTMLInputElement>('input[data-path]')) {
     const path = input.dataset.path!;
-    const value = getPath(state.draft, path);
-    const line = /^(lines\.\d+)\.(\w+)$/.exec(path);
-    if (isEmpty(value)) continue;
-    // The numbers of a line item are looked for next to its name: a "2" elsewhere on the page is not its quantity.
-    // Known limit: the rate is looked for as "19 %" anywhere, since most invoices print it with the totals only; "7,5 %" is not found.
-    const rects =
-      !line || line[2] === 'name' ? find(value) : line[2] === 'vatRate' ? find(`${value} %`) : find(value, find(getPath(state.draft, `${line[1]}.name`)));
-    place(path, fieldLabel(path), rects);
+    place(path, fieldLabel(path), placesOf(path, on));
   }
-  for (const key of ['net', 'vat', 'gross'] as const) {
-    const total = state.result?.totals?.[key];
-    if (total) place(`totals.${key}`, t(`t.${key}`), find(total));
-  }
+  for (const key of ['net', 'vat', 'gross'] as const) place(`totals.${key}`, t(`t.${key}`), placesOf(`totals.${key}`, on));
   $('#marks-note').hidden = marks.children.length === 0;
-  highlight(focusedPath());
+  renderPager();
+  highlight(pointed ?? focusedPath());
 }
 
-$('#form').addEventListener('focusin', (event) => highlight((event.target as HTMLElement).dataset.path));
+/** Turns the preview to the page a value stands on, unless the page that is shown has it too. */
+function turnTo(path: string): void {
+  const page = pageToShow(pagePieces, shown, (on) => placesOf(path, on).length > 0);
+  if (page === undefined || page === shown) return;
+  const label = path.startsWith('totals.') ? t(`t.${path.slice(7)}`) : fieldLabel(path);
+  void showPage(page).then(() => ($('#page-live').textContent = t('page.turned', { n: page + 1, f: label })));
+}
+
+$('#form').addEventListener('focusin', (event) => {
+  const field = event.target as HTMLElement;
+  // Dropdowns hold codes, which are printed nowhere: they turn no page.
+  if (field.dataset.path && field instanceof HTMLInputElement) turnTo(field.dataset.path);
+  highlight(field.dataset.path);
+});
 $('#form').addEventListener('focusout', () => highlight());
 marks.addEventListener('click', (event) => {
   const path = (event.target as HTMLElement).dataset.for;
@@ -422,21 +510,18 @@ $('#scan').addEventListener('animationend', () => scan('off'));
 // ---------------------------------------------------------------------------------------------------------------
 // Opening a PDF
 
-async function preview(pdf: Uint8Array): Promise<void> {
-  const task = pdfjs.getDocument({ data: pdf.slice(), verbosity: 0 });
-  const doc = await task.promise;
-  const page = await doc.getPage(1);
-  const canvas = $<HTMLCanvasElement>('#preview');
-  const viewport = page.getViewport({ scale: (Math.min(720, canvas.parentElement!.clientWidth) / page.getViewport({ scale: 1 }).width) * devicePixelRatio });
-  canvas.width = viewport.width;
-  canvas.height = viewport.height;
-  await page.render({ canvas, viewport }).promise;
-  // Measured here and not taken from extractLayout: the marks lie on this drawing, so they use its view of the page.
+/** The PDF that is open, as pdf.js holds it: its pages are drawn when they are turned to. */
+let opened: { task: pdfjs.PDFDocumentLoadingTask; doc: pdfjs.PDFDocumentProxy } | undefined;
+
+/** The text of a page with the place of every piece, in percent of the page. */
+async function piecesOf(page: pdfjs.PDFPageProxy): Promise<Piece[]> {
+  // Measured here and not taken from extractLayout: the marks lie on the drawing of the page, so they use its view of the page.
   // Known limit: upright text only. Text that is printed turned gets its mark in the wrong place; use the whole text matrix if such invoices turn up.
-  pieces = (await page.getTextContent()).items.flatMap((item) => {
+  const viewport = page.getViewport({ scale: 1 });
+  return (await page.getTextContent()).items.flatMap((item) => {
     if (!('str' in item) || !item.str.trim()) return [];
     const [x, y, height] = [item.transform[4] as number, item.transform[5] as number, item.height];
-    // From a little below the baseline to the top of the tall letters, in the same view the page is drawn with.
+    // From a little below the baseline to the top of the tall letters.
     const [x1, y1] = viewport.convertToViewportPoint(x, y - 0.25 * height) as [number, number];
     const [x2, y2] = viewport.convertToViewportPoint(x + item.width, y + 0.85 * height) as [number, number];
     return [
@@ -449,8 +534,58 @@ async function preview(pdf: Uint8Array): Promise<void> {
       },
     ];
   });
-  await task.destroy();
+}
+
+/** Says which page is shown, and lets the pages be turned where there is more than one. */
+function renderPager(): void {
+  const count = opened?.doc.numPages ?? 1;
+  $('#pager').hidden = count < 2;
+  $('#page-now').textContent = t('page.now', { n: shown + 1, m: count });
+  $<HTMLButtonElement>('#page-prev').disabled = shown === 0;
+  $<HTMLButtonElement>('#page-next').disabled = shown >= count - 1;
+  $('#preview').setAttribute('aria-label', t('work.preview', { n: shown + 1 }));
+}
+
+/**
+ * Draws one page of the open PDF, counted from 0, and shows its marks. A page is drawn when it is turned to and kept
+ * nowhere: a long PDF costs no more memory than a short one.
+ */
+async function showPage(index: number): Promise<void> {
+  const pdf = opened;
+  if (!pdf || index < 0 || index >= pdf.doc.numPages) return;
+  wanted = index;
+  const page = await pdf.doc.getPage(index + 1);
+  const canvas = $<HTMLCanvasElement>('#preview');
+  const viewport = page.getViewport({ scale: (Math.min(720, canvas.parentElement!.clientWidth) / page.getViewport({ scale: 1 }).width) * devicePixelRatio });
+  // Drawn beside the stage and put on it when done: turning on while a page is still being drawn leaves no half page behind.
+  const sheet = el('canvas', { width: viewport.width, height: viewport.height });
+  await page.render({ canvas: sheet, viewport }).promise;
+  pagePieces[index] ??= await piecesOf(page);
+  // Another page was turned to, or another PDF opened, while this one was drawn.
+  if (opened !== pdf || wanted !== index) return;
+  shown = index;
+  Object.assign(canvas, { width: sheet.width, height: sheet.height });
+  canvas.getContext('2d')!.drawImage(sheet, 0, 0);
   renderMarks();
+}
+$('#page-prev').onclick = () => showPage(wanted - 1);
+$('#page-next').onclick = () => showPage(wanted + 1);
+
+async function preview(pdf: Uint8Array): Promise<void> {
+  const before = opened;
+  opened = undefined;
+  await before?.task.destroy();
+  const task = pdfjs.getDocument({ data: pdf.slice(), verbosity: 0 });
+  const mine = (opened = { task, doc: await task.promise });
+  pagePieces = [];
+  shown = 0;
+  await showPage(0);
+  // The other pages are read in the background, so that a value that stands on one of them can be turned to.
+  void (async () => {
+    for (let index = 1; index < mine.doc.numPages && opened === mine; index++) pagePieces[index] ??= await piecesOf(await mine.doc.getPage(index + 1));
+  })().catch(() => {
+    // The PDF was closed while its pages were read: nothing is left to read.
+  });
 }
 
 function show(view: 'start' | 'work' | 'done'): void {
@@ -465,7 +600,7 @@ const USUAL_PAYMENT_TERMS = { de: 'Zahlbar innerhalb von 14 Tagen ab Rechnungsda
 function suggestPaymentTerms(): void {
   if (!isEmpty(state.draft.dueDate) || !isEmpty(state.draft.paymentTerms)) return;
   state.draft.paymentTerms = USUAL_PAYMENT_TERMS[languageOf(state.pdfText)];
-  state.suggested.add('paymentTerms');
+  state.toCheck.set('paymentTerms', 'suggested');
 }
 
 /** Findings that are about the file, not about a field of the form. */
@@ -483,7 +618,7 @@ async function open(pdf: Uint8Array, fileName: string): Promise<void> {
   try {
     const info = await inspectPdf(pdf);
     const { text, blocks } = await extractLayout(pdf);
-    pieces = [];
+    pagePieces = [];
     xmlSection.open = false;
     Object.assign(state, {
       pdf,
@@ -492,7 +627,7 @@ async function open(pdf: Uint8Array, fileName: string): Promise<void> {
       draft: {},
       touched: new Set(),
       fileFindings: [],
-      suggested: new Set(),
+      toCheck: new Map(),
       mode: info.embeddedXml === null ? 'create' : 'validate',
     });
     if (state.mode === 'validate') {
@@ -595,8 +730,9 @@ $('#ai-run').onclick = async () => {
     const answer = await read;
     // Another PDF was opened while the model read: its answer is about the invoice that is gone.
     if (state.pdf !== pdf) return;
-    // A small model translates names and makes up identifiers. Only what the PDF shows is taken over.
-    merge(keepWhatThePdfShows(normaliseDraft(answer), state.pdfText), true);
+    // A small model translates names and makes up identifiers. Only what the PDF shows is taken over, and even of
+    // that a good part is wrong: every value the model added is marked until the user has looked at it.
+    for (const path of merge(keepWhatThePdfShows(normaliseDraft(answer), state.pdfText), true)) state.toCheck.set(path, 'model');
     renderForm();
     status.textContent = t('ai.done');
   } catch (error) {

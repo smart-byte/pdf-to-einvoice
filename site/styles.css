@@ -705,6 +705,37 @@ select:disabled {
 .work__pdf p {
   margin-top: 0.7rem;
 }
+/* Turning the pages of a PDF that has more than one. */
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.9rem;
+  margin-top: 0.9rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.pager .i--back {
+  rotate: 180deg;
+}
+.pager .tool:disabled {
+  color: var(--muted);
+  border-color: var(--line);
+  opacity: 0.55;
+  cursor: default;
+}
+/* Said to a screen reader, not shown. */
+.hidden-visually {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
 .work__pdf p + p {
   margin-top: 0.15rem;
 }
@@ -913,6 +944,22 @@ select.warned {
 .hint--warning {
   color: var(--amber);
 }
+/* Ticks off a value that is still to be checked. */
+.hint .ok {
+  margin-left: 0.35rem;
+  padding: 0.14rem 0.6rem;
+  border: 1px solid currentColor;
+  border-radius: var(--radius);
+  background: var(--paper);
+  color: inherit;
+  font-size: inherit;
+  font-weight: 650;
+  line-height: 1.5;
+  cursor: pointer;
+}
+.hint .ok:hover {
+  background: var(--amber-wash);
+}
 
 .lines {
   display: grid;
@@ -946,6 +993,13 @@ select.warned {
 }
 .line > .field:nth-of-type(6) {
   grid-column: span 4;
+}
+/* A line item a model added as a whole. */
+.line--check {
+  border-color: var(--amber);
+}
+.line > .hint {
+  grid-column: 1 / -1;
 }
 .line legend {
   padding: 0 0.45rem;
@@ -1018,6 +1072,10 @@ select.warned {
   margin: 0.5rem 0 0;
   padding-left: 1.1rem;
   font-size: 0.9375rem;
+}
+/* A sentence of several lines keeps its bullet at its first line. */
+.summary li .link {
+  vertical-align: top;
 }
 .summary li + li {
   margin-top: 0.25rem;

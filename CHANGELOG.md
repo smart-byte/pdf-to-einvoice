@@ -22,9 +22,13 @@ All notable changes to this project are documented here. The format follows
   with an in-browser language model.
 - Legal notice and privacy policy for the web app, in English and German, with the same footer and language switch
   on every page.
-- Web app: marks on the preview show where each value stands on the page and lead to its field; a progress bar
+- Web app: marks on the preview show where each value stands on the page and lead to its field, on every page of the
+  PDF: the preview turns to the page a value stands on; a progress bar
   while a model downloads and a band of light over the page while it reads; the XML that will be embedded can be
   viewed before the file is created.
+- Web app: every value a language model added is marked at its field until the user has changed it or ticked it
+  off, and the verdict counts them. A model gets about four in ten of the values it adds wrong.
+- Web app: the built pages carry a Content-Security-Policy.
 - `createEInvoice`: turns an existing invoice PDF plus invoice data into a ZUGFeRD / Factur-X e-invoice
   (PDF/A-3 with CII XML, profile EN 16931) without redrawing the pages.
 - `check`: required fields, formats, EN 16931 arithmetic, and a comparison of the data with the text of the PDF.
