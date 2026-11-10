@@ -1,0 +1,49 @@
+name: Release
+
+# Pushing a version tag (v0.2.0) publishes that version to npm and creates the GitHub release from its changelog
+# section. npm trusts this workflow directly (trusted publishing over OIDC), so no token is stored: the package's
+# settings on npmjs.com must name repository smart-byte/pdf-to-einvoice and workflow file release.yml.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    if: github.repository == 'smart-byte/pdf-to-einvoice' # npm trusts only this repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # create the GitHub release
+      id-token: write # prove to npm which workflow this is; npm signs the provenance statement with it
+    env:
+      MUSTANG_VERSION: 2.26.0
+      MUSTANG_SHA256: 42d7868cb68264874a7b8cab4c3587b03b23ccc7cd72373da917f66758bb9736
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version-file: .nvmrc
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false # a release builds from scratch
+      - name: Check the tag against package.json and the changelog
+        run: |
+          version=$(node -p "require('./package.json').version")
+          [ "v$version" = "$GITHUB_REF_NAME" ] || { echo "::error::tag $GITHUB_REF_NAME does not match package.json version $version"; exit 1; }
+          grep -q "^## \[$version\] - [0-9]" CHANGELOG.md || { echo "::error::CHANGELOG.md has no dated section for $version"; exit 1; }
+      # Trusted publishing needs npm 11.5.1 or newer; Node 22 ships npm 10. A fixed version, not the newest.
+      - run: npm install -g npm@11.21.1
+      - run: npm ci
+      - name: Validate generated e-invoices with the reference validator
+        run: |
+          curl -sSL -o mustang.jar "https://github.com/ZUGFeRD/mustangproject/releases/download/core-$MUSTANG_VERSION/Mustang-CLI-$MUSTANG_VERSION.jar"
+          echo "$MUSTANG_SHA256  mustang.jar" | sha256sum --check
+          MUSTANG_JAR="$GITHUB_WORKSPACE/mustang.jar" npm run test:reference
+      - run: npm publish # prepublishOnly runs the type-check, the linter, the format check, the build and the tests first
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          awk -v heading="## [${GITHUB_REF_NAME#v}]" 'index($0, "## [") == 1 { on = index($0, heading) == 1; next } on' CHANGELOG.md > "$RUNNER_TEMP/notes.md"
+          gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/notes.md" --verify-tag

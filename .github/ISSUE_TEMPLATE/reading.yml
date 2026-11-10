@@ -1,0 +1,29 @@
+name: An invoice is read wrongly or incompletely
+description: Values are missing, wrong or in the wrong field after a PDF was opened.
+labels: [reading]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Do not attach a real invoice and do not paste data from one.** Issues are public. What helps is the layout, not the content: which software produced the PDF, where the values stand, and how they are labelled.
+  - type: textarea
+    id: fields
+    attributes:
+      label: Which values were missing or wrong
+      description: For example "the seller's name was taken from the footer", "no line items", "the net total was read as the gross total".
+    validations:
+      required: true
+  - type: textarea
+    id: layout
+    attributes:
+      label: How the invoice is laid out
+      description: The program that created it if you know, the language, and where the affected values stand and what their labels say. A PDF with invented data in the same layout is welcome.
+    validations:
+      required: true
+  - type: dropdown
+    id: model
+    attributes:
+      label: How it was read
+      options: [Rules only, Rules and a language model in the browser, Rules and my own model endpoint]
+    validations:
+      required: true
