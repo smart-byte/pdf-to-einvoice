@@ -198,20 +198,14 @@ export const STRINGS: Record<string, Entry> = {
   'e.invalid-pdf': { de: 'Diese Datei lässt sich nicht als PDF lesen.', en: 'This file cannot be read as a PDF.' },
 
   'pair.title': { de: 'Was in Ihrer Datei dazukommt', en: 'What is added to your file' },
-  'pair.lead': {
-    de: 'Die Seite bleibt, wie sie ist. Dahinter steht dieselbe Rechnung noch einmal, so dass Programme sie lesen können.',
-    en: 'The page stays as it is. Behind it, the same invoice is written down a second time, so that software can read it.',
-  },
   'pair.page': { de: 'Auf Ihrer Rechnung steht', en: 'Printed on your invoice' },
   'pair.xml': { de: 'Im XML steht dann', en: 'Written into the XML' },
   'pair.note': {
-    de: 'Menschen lesen die linke Seite, die Software Ihres Kunden und des Finanzamts die rechte. Beide müssen dasselbe sagen. Deshalb wird jede Angabe mit Ihrem PDF verglichen, bevor die Datei entsteht.',
-    en: 'People read the left side; the software of your customer and of the tax office reads the right one. Both have to say the same, which is why every value is compared with your PDF before the file is created.',
+    de: 'Links lesen Menschen, rechts liest Software. Beides muss dasselbe sagen, deshalb wird jede Angabe mit Ihrem PDF verglichen.',
+    en: 'People read the left side, software the right one. Both have to say the same, so every value is compared with your PDF.',
   },
 
-  'kinds.title': { de: 'Für jede Art von Rechnung', en: 'For every kind of invoice' },
-  'kinds.kind': { de: 'Ihre Rechnung', en: 'Your invoice' },
-  'kinds.xml': { de: 'So steht es im XML', en: 'How the XML says it' },
+  'kinds.title': { de: 'Diese Rechnungsarten gehen', en: 'Which kinds of invoices work' },
   'kind.1': { de: 'Inland mit Umsatzsteuer, auch mit mehreren Steuersätzen', en: 'Domestic with VAT, also with several rates' },
   'kind.1.xml': { de: 'Kategorie S mit dem Satz je Position', en: 'Category S with the rate of each line' },
   'kind.2': { de: 'Kleinunternehmer ohne Umsatzsteuer (§ 19 UStG)', en: 'Small business without VAT (§ 19 UStG)' },
@@ -226,41 +220,34 @@ export const STRINGS: Record<string, Entry> = {
   'kind.6.xml': { de: 'Kategorie O (nicht steuerbar), auch in US-Dollar', en: 'Category O (not subject to VAT), also in US dollars' },
   'kind.7': { de: 'Gutschrift oder Korrektur einer früheren Rechnung', en: 'Credit note or correction of an earlier invoice' },
   'kind.7.xml': { de: 'Typ 381 oder 384 mit Bezug auf die ursprüngliche Rechnung', en: 'Type 381 or 384 with a reference to the original invoice' },
-  'kinds.text': {
-    de: 'Jede dieser Arten läuft bei jeder Änderung durch den Referenzprüfer der ZUGFeRD-Community.',
-    en: 'Each of these is run through the reference validator of the ZUGFeRD community on every change.',
-  },
 
   'limits.title': { de: 'Was Sie wissen sollten', en: 'What you should know' },
   'limits.1': {
-    de: 'Nur der Rechnungssteller kann eine E-Rechnung ausstellen. Eine erhaltene PDF-Rechnung wird durch Umwandeln beim Empfänger nicht zur gültigen E-Rechnung.',
-    en: 'Only the issuer can issue an e-invoice. A PDF you received does not become a valid e-invoice by converting it yourself.',
+    de: 'Nur wer die Rechnung ausstellt, kann daraus eine E-Rechnung machen. Eine erhaltene PDF-Rechnung wird durch Umwandeln nicht gültig.',
+    en: 'Only the issuer can turn an invoice into an e-invoice. A PDF you received does not become valid by converting it.',
   },
   'limits.2': {
-    de: 'Bei einer E-Rechnung zählt das XML, nicht das Bild. Sie sind dafür verantwortlich, dass die Angaben stimmen.',
-    en: 'In an e-invoice the XML counts, not the picture. You are responsible for the data being right.',
+    de: 'Bei einer E-Rechnung zählt das XML, nicht das Bild. Prüfen Sie die Angaben, bevor Sie die Datei erstellen.',
+    en: 'In an e-invoice the XML counts, not the picture. Check the data before you create the file.',
   },
   'limits.3': {
-    de: 'Ein strenges PDF/A-3 setzt voraus, dass Ihr PDF seine Schriften einbettet. Fehlen sie, weist die Seite darauf hin.',
-    en: 'A strict PDF/A-3 requires your PDF to embed its fonts. If they are missing, the page tells you.',
+    de: 'Ihre Rechnung verlässt den Browser nicht: kein Server, keine Cookies, kein Tracking. Nur für „Mit KI auslesen“ lädt der Browser einmalig ein Modell von huggingface.co.',
+    en: 'Your invoice does not leave the browser: no server, no cookies, no tracking. Only for “Read with AI” does the browser download a model from huggingface.co, once.',
   },
-  'limits.4': {
-    de: 'Rabatte auf die ganze Rechnung gibt es noch nicht als eigenes Feld: Tragen Sie sie als Position mit negativer Menge ein.',
-    en: 'Discounts on the whole invoice have no field of their own yet: enter them as a line with a negative quantity.',
+  'limits.4': { de: 'Diese Seite ist ein Werkzeug und keine Steuerberatung.', en: 'This page is a tool, not tax advice.' },
+  'limits.5': {
+    de: 'Die automatische Erkennung liest noch nicht aus jeder Rechnung alles. Wir arbeiten daran, dass Rechnungen jeder Art erkannt werden; was fehlt, zeigt das Formular an.',
+    en: 'Automatic reading does not get everything from every invoice yet. We are working on reading invoices of every kind; the form shows what is missing.',
   },
-  'limits.5': { de: 'Diese Seite ist ein Werkzeug und keine Steuerberatung.', en: 'This page is a tool, not tax advice.' },
 
   'dev.title': { de: 'Für Entwickler und KI-Assistenten', en: 'For developers and AI assistants' },
   'dev.text': {
     de: 'Derselbe Kern läuft als Bibliothek, als Kommandozeilenprogramm und als MCP-Server, über den Assistenten wie Claude Rechnungen umwandeln.',
     en: 'The same core runs as a library, as a command line tool and as an MCP server that lets assistants like Claude convert invoices.',
   },
-  'privacy.title': { de: 'Datenschutz', en: 'Privacy' },
-  'privacy.text': {
-    de: 'Die Seite hat keinen Server, der Ihre Rechnung sieht, keine Cookies und kein Tracking. Nur wenn Sie „Mit KI auslesen“ wählen, lädt der Browser einmalig ein Modell von huggingface.co; Ihre Rechnung wird dabei nicht übertragen.',
-    en: 'There is no server that sees your invoice, no cookies and no tracking. Only if you choose “Read with AI” does the browser download a model from huggingface.co, once; your invoice is not transmitted.',
-  },
   'foot.source': { de: 'Quelltext auf GitHub', en: 'Source on GitHub' },
+  'foot.legal': { de: 'Impressum', en: 'Legal notice' },
+  'foot.privacy': { de: 'Datenschutz', en: 'Privacy' },
   'foot.licence': { de: 'MIT-Lizenz', en: 'MIT licence' },
 };
 

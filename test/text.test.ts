@@ -86,7 +86,7 @@ describe('guessFromText', () => {
   });
 
   it('reads a bare "Nr." as the invoice number and "Gesamt" as the total', () => {
-    expect(guessFromText('Beispiel AG Nr.: 2617\nKunden-Nr.: 77\nGesamt 376,01 €')).toEqual({ number: '2617', currency: 'EUR', totals: { gross: 376.01 } });
+    expect(guessFromText('Beispiel AG   Nr.: 2617\nKunden-Nr.: 77\nGesamt 376,01 €')).toEqual({ number: '2617', currency: 'EUR', totals: { gross: 376.01 } });
   });
 
   it('reads a date with slashes when only one reading is possible', () => {

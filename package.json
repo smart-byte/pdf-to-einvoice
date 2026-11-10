@@ -31,7 +31,7 @@
     "type": "git",
     "url": "git+https://github.com/smart-byte/pdf-to-einvoice.git"
   },
-  "homepage": "https://github.com/smart-byte/pdf-to-einvoice#readme",
+  "homepage": "https://smart-byte.github.io/pdf-to-einvoice/",
   "bugs": {
     "url": "https://github.com/smart-byte/pdf-to-einvoice/issues"
   },
@@ -65,6 +65,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:reference": "vitest run test/reference.test.ts",
+    "eval:reader": "node scripts/eval-reader.mjs",
     "sample": "node scripts/make-sample.mjs",
     "site": "vite --config site/vite.config.ts --open",
     "site:build": "vite build --config site/vite.config.ts",

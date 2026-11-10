@@ -156,7 +156,6 @@
 
       <section class="info" id="how">
         <h2 data-i18n="pair.title">What is added to your file</h2>
-        <p data-i18n="pair.lead">The page stays as it is. Behind it, the same invoice is written down a second time, so that software can read it.</p>
         <!-- The printed text is that of the sample invoice, so it stays German in both languages. -->
         <table class="pair">
           <thead>
@@ -175,14 +174,6 @@
               <td><code>&lt;udt:DateTimeString format="102"&gt;20261103&lt;/udt:DateTimeString&gt;</code></td>
             </tr>
             <tr>
-              <td>Muster Software GmbH</td>
-              <td><code>&lt;ram:SellerTradeParty&gt;&lt;ram:Name&gt;Muster Software GmbH&lt;/ram:Name&gt;</code></td>
-            </tr>
-            <tr>
-              <td>Beratung, 10 Std. zu 100,00 €</td>
-              <td><code>&lt;ram:BilledQuantity unitCode="HUR"&gt;10&lt;/ram:BilledQuantity&gt;</code></td>
-            </tr>
-            <tr>
               <td>Umsatzsteuer 19 % 284,81 €</td>
               <td><code>&lt;ram:CalculatedAmount&gt;284.81&lt;/ram:CalculatedAmount&gt;</code></td>
             </tr>
@@ -192,67 +183,55 @@
             </tr>
           </tbody>
         </table>
-        <p data-i18n="pair.note">
-          People read the left side; the software of your customer and of the tax office reads the right one. Both have to say the same, which is why every
-          value is compared with your PDF before the file is created.
-        </p>
-
-        <h2 data-i18n="kinds.title">For every kind of invoice</h2>
-        <table class="kinds">
-          <thead>
-            <tr>
-              <th data-i18n="kinds.kind">Your invoice</th>
-              <th data-i18n="kinds.xml">How the XML says it</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td data-i18n="kind.1">.</td>
-              <td data-i18n="kind.1.xml">.</td>
-            </tr>
-            <tr>
-              <td data-i18n="kind.2">.</td>
-              <td data-i18n="kind.2.xml">.</td>
-            </tr>
-            <tr>
-              <td data-i18n="kind.3">.</td>
-              <td data-i18n="kind.3.xml">.</td>
-            </tr>
-            <tr>
-              <td data-i18n="kind.4">.</td>
-              <td data-i18n="kind.4.xml">.</td>
-            </tr>
-            <tr>
-              <td data-i18n="kind.5">.</td>
-              <td data-i18n="kind.5.xml">.</td>
-            </tr>
-            <tr>
-              <td data-i18n="kind.6">.</td>
-              <td data-i18n="kind.6.xml">.</td>
-            </tr>
-            <tr>
-              <td data-i18n="kind.7">.</td>
-              <td data-i18n="kind.7.xml">.</td>
-            </tr>
-          </tbody>
-        </table>
-        <p data-i18n="kinds.text">Each of these is run through the reference validator of the ZUGFeRD community on every change.</p>
+        <p data-i18n="pair.note">People read the left side, software the right one. Both have to say the same, so every value is compared with your PDF.</p>
       </section>
 
       <section class="info" id="limits">
         <h2 data-i18n="limits.title">What you should know</h2>
         <ul>
-          <li data-i18n="limits.1">Only the issuer can issue an e-invoice. A PDF you received does not become a valid e-invoice by converting it yourself.</li>
-          <li data-i18n="limits.2">In an e-invoice the XML counts, not the picture. You are responsible for the data being right.</li>
-          <li data-i18n="limits.3">A strict PDF/A-3 requires your PDF to embed its fonts. If they are missing, the page tells you.</li>
-          <li data-i18n="limits.4">Discounts on the whole invoice have no field of their own yet: enter them as a line with a negative quantity.</li>
-          <li data-i18n="limits.5">This page is a tool, not tax advice.</li>
+          <li data-i18n="limits.1">Only the issuer can turn an invoice into an e-invoice. A PDF you received does not become valid by converting it.</li>
+          <li data-i18n="limits.2">In an e-invoice the XML counts, not the picture. Check the data before you create the file.</li>
+          <li data-i18n="limits.3">Your invoice does not leave the browser: no server, no cookies, no tracking.</li>
+          <li data-i18n="limits.5">
+            Automatic reading does not get everything from every invoice yet. We are working on reading invoices of every kind; the form shows what is missing.
+          </li>
+          <li data-i18n="limits.4">This page is a tool, not tax advice.</li>
         </ul>
-        <h2 data-i18n="privacy.title">Privacy</h2>
-        <p data-i18n="privacy.text">
-          There is no server that sees your invoice, no cookies and no tracking. Only if you choose “Read with AI” does the browser download a model from
-          huggingface.co, once; your invoice is not transmitted.
-        </p>
+        <details>
+          <summary data-i18n="kinds.title">Which kinds of invoices work</summary>
+          <table class="kinds">
+            <tbody>
+              <tr>
+                <td data-i18n="kind.1">.</td>
+                <td data-i18n="kind.1.xml">.</td>
+              </tr>
+              <tr>
+                <td data-i18n="kind.2">.</td>
+                <td data-i18n="kind.2.xml">.</td>
+              </tr>
+              <tr>
+                <td data-i18n="kind.3">.</td>
+                <td data-i18n="kind.3.xml">.</td>
+              </tr>
+              <tr>
+                <td data-i18n="kind.4">.</td>
+                <td data-i18n="kind.4.xml">.</td>
+              </tr>
+              <tr>
+                <td data-i18n="kind.5">.</td>
+                <td data-i18n="kind.5.xml">.</td>
+              </tr>
+              <tr>
+                <td data-i18n="kind.6">.</td>
+                <td data-i18n="kind.6.xml">.</td>
+              </tr>
+              <tr>
+                <td data-i18n="kind.7">.</td>
+                <td data-i18n="kind.7.xml">.</td>
+              </tr>
+            </tbody>
+          </table>
+        </details>
       </section>
 
       <section class="info" id="dev">
@@ -270,9 +249,11 @@ npx pdf-to-einvoice mcp        # MCP server on stdio</code></pre>
     </main>
 
     <footer class="foot">
-      <a href="https://github.com/smart-byte/pdf-to-einvoice" data-i18n="foot.source">Source on GitHub</a>
+      <span>© 2026 Smart-Byte GmbH</span>
+      <a href="./legal-notice.html" data-i18n="foot.legal">Legal notice</a>
+      <a href="./privacy.html" data-i18n="foot.privacy">Privacy</a>
       <a href="https://github.com/smart-byte/pdf-to-einvoice/blob/main/LICENSE" data-i18n="foot.licence">MIT licence</a>
-      <span>Smart-Byte GmbH</span>
+      <a href="https://github.com/smart-byte/pdf-to-einvoice" data-i18n="foot.source">Source on GitHub</a>
     </footer>
   </body>
 </html>

@@ -26,7 +26,7 @@ in their format. This one starts from the PDF you already produce with Word, you
 
 ## In the browser
 
-`npm run site` starts the web app locally. Drop a PDF, check the data that was read from it, download the
+**[Open the web app](https://smart-byte.github.io/pdf-to-einvoice/)**, or start it locally with `npm run site`. Drop a PDF, check the data that was read from it, download the
 e-invoice. Reading works without any AI by pattern matching; optionally a small language model that runs in your
 browser (WebGPU) fills in what the patterns did not find. The page is available in English and German.
 
@@ -59,18 +59,19 @@ await writeFile('invoice.einvoice.pdf', pdf);
 
 It works the same in a browser: `pdf` is a `Uint8Array` in and out.
 
-| function                           | what it does                                                                                           |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `createEInvoice({ pdf, invoice })` | checks the data, then returns `{ pdf, xml, findings, totals }`; throws `InvoiceError` if data is wrong |
-| `check(invoice, { pdfText? })`     | returns `{ findings, totals, invoice? }` without creating anything; never throws on incomplete data    |
-| `extractText(pdf)`                 | the text of a PDF, row by row                                                                          |
-| `guessFromText(text)`              | reads an invoice by pattern matching: labelled values, seller and buyer, table rows that add up        |
-| `keepWhatThePdfShows(draft, text)` | drops every value the PDF does not show: a guard for data read by a small language model               |
-| `languageOf(text)`                 | `'de'` or `'en'`: the language an invoice is written in                                                |
-| `validateEInvoice(pdf)`            | looks at an existing e-invoice: profile, embedded data, and whether the XML matches the visible page   |
-| `readEmbeddedXml(pdf)`             | the XML of an existing e-invoice, or `null`                                                            |
-| `calculate(invoice)`               | the totals, following the EN 16931 rounding rules                                                      |
-| `invoiceJsonSchema`                | JSON Schema of the invoice data, for forms, validation and language models                             |
+| function                           | what it does                                                                                                       |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `createEInvoice({ pdf, invoice })` | checks the data, then returns `{ pdf, xml, findings, totals }`; throws `InvoiceError` if data is wrong             |
+| `check(invoice, { pdfText? })`     | returns `{ findings, totals, invoice? }` without creating anything; never throws on incomplete data                |
+| `extractText(pdf)`                 | the text of a PDF, row by row                                                                                      |
+| `extractLayout(pdf)`               | the text plus its geometry: `blocks` (text that stands together), `pieces` with their position, `pages`            |
+| `guessFromText(text, { blocks })`  | reads an invoice without a model: totals that add up, items that add up to them, seller and buyer, labelled values |
+| `keepWhatThePdfShows(draft, text)` | drops every value the PDF does not show: a guard for data read by a small language model                           |
+| `languageOf(text)`                 | `'de'` or `'en'`: the language an invoice is written in                                                            |
+| `validateEInvoice(pdf)`            | looks at an existing e-invoice: profile, embedded data, and whether the XML matches the visible page               |
+| `readEmbeddedXml(pdf)`             | the XML of an existing e-invoice, or `null`                                                                        |
+| `calculate(invoice)`               | the totals, following the EN 16931 rounding rules                                                                  |
+| `invoiceJsonSchema`                | JSON Schema of the invoice data, for forms, validation and language models                                         |
 
 A finding is `{ path, severity, code, message }`. An `error` blocks the e-invoice; a `warning` asks for a second
 look.
@@ -142,6 +143,8 @@ not a strict PDF/A-3. Export the PDF with embedded fonts (or as PDF/A) and run i
 - **Only the issuer can issue an e-invoice.** A PDF you _received_ does not become a valid e-invoice because you
   converted it. If you sent a plain PDF where an e-invoice was required, issue a corrected invoice (type 384) that
   refers to the original.
+- **Reading is still being broadened.** Pattern matching reads the layouts it knows well and less of others; what it
+  cannot place is left empty and shown as missing. Reading invoices of every kind is work in progress.
 - **The XML is the binding part.** The tool checks arithmetic and compares the data with the text of the PDF, but
   it cannot know what you meant. Review the data before you create the file.
 - **Profile and syntax:** Factur-X / ZUGFeRD profile EN 16931 (CII). Plain XRechnung and UBL output are not built
@@ -175,6 +178,9 @@ npm run site             # the web app on http://localhost:4350
 
 `npm run test:reference` validates generated invoices with Mustang; it needs Java and the Mustang CLI, see
 [CONTRIBUTING.md](CONTRIBUTING.md).
+
+`npm run eval:reader -- <folder>` measures how much the reader gets right on e-invoices that carry their own answer
+(their XML); CONTRIBUTING.md says where to get such files.
 
 ## Licence
 
