@@ -9,6 +9,7 @@ import { inspectPdf } from '../src/pdf.js';
 import { extractLayout } from '../src/text.js';
 import { lang, setLang, t } from './i18n.js';
 import { DEFAULT_MODEL, MODELS, hasWebGpu, readWithBrowserModel, readWithEndpoint } from './llm.js';
+import { locate, type Piece, type Rect } from './locate.js';
 import './styles.css';
 
 pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
@@ -217,6 +218,7 @@ function renderLines(): HTMLElement {
 function renderForm(): void {
   const form = $('#form');
   const expanded = new Set([...form.querySelectorAll('details[open]')].map((d) => (d as HTMLElement).dataset.section));
+  const focused = focusedPath();
   form.replaceChildren();
   const section = (title: string, body: HTMLElement, collapsed = false) => {
     if (!collapsed) return el('section', { className: 'group' }, el('h3', {}, t(title)), body);
@@ -228,9 +230,13 @@ function renderForm(): void {
   );
   form.append(invoice!, seller!, buyer!, section('s.lines', renderLines()), payment!, more!);
   if (state.mode === 'validate') {
-    for (const field of form.querySelectorAll<HTMLInputElement>('input, select, button')) field.disabled = true;
+    // Read only rather than disabled: a field can still take the focus, which shows where its value stands on the page.
+    for (const field of form.querySelectorAll('input')) field.readOnly = true;
+    for (const field of form.querySelectorAll<HTMLSelectElement | HTMLButtonElement>('select, button')) field.disabled = true;
     for (const details of form.querySelectorAll('details')) details.open = true;
   }
+  // Whoever was typing while a model read the invoice goes on typing in the same field.
+  if (focused) form.querySelector<HTMLElement>(`[data-path="${focused}"]`)?.focus();
   validate();
 }
 
@@ -283,6 +289,9 @@ function validate(): void {
         el('dd', {}, money(result.totals[key])),
       );
       if (mismatch && typeof printed[key] === 'number') row.append(el('dd', { className: 'total__printed' }, t('t.printed', { v: money(printed[key]!) })));
+      // A total has no field to focus: pointing at it shows where it stands on the page.
+      row.onmouseenter = () => highlight(`totals.${key}`);
+      row.onmouseleave = () => highlight(focusedPath());
       totals.append(row);
     }
   } else totals.append(el('p', { className: 'muted' }, t('t.empty')));
@@ -317,6 +326,8 @@ function validate(): void {
   $<HTMLButtonElement>('#create').disabled = errors.length > 0 || !state.pdf;
   // An existing e-invoice that passes the check gets its stamp on the preview.
   $('#work-stamp').hidden = !(state.mode === 'validate' && errors.length === 0);
+  renderMarks();
+  refreshXml();
 }
 
 $('#form').addEventListener('input', (event) => {
@@ -330,6 +341,82 @@ $('#form').addEventListener('input', (event) => {
 });
 
 // ---------------------------------------------------------------------------------------------------------------
+// Where the values stand on the page
+
+/** The text of page 1 with the place of every piece, in percent of the page. Empty for a scan. */
+let pieces: Piece[] = [];
+const marks = $('#marks');
+const focusedPath = () => (document.activeElement as HTMLElement | null)?.dataset.path;
+
+// ponytail: letters are measured in the browser's sans-serif, not in the font of the PDF, so a mark inside a long
+// piece of text can be off by a letter. Measure with the embedded font if that shows.
+const ruler = document.createElement('canvas').getContext('2d')!;
+ruler.font = '16px sans-serif';
+const widthOf = (text: string) => ruler.measureText(text).width;
+
+/** Shows the marks of one value strongly and lets the others step back; without a path all are shown faintly. */
+function highlight(path?: string): void {
+  marks.classList.toggle('is-focused', path !== undefined);
+  for (const mark of marks.children) mark.classList.toggle('is-active', (mark as HTMLElement).dataset.for === path);
+}
+
+/** Marks on the preview where the values of the form are printed. A value that is not found on page 1 gets no mark. */
+function renderMarks(): void {
+  marks.replaceChildren();
+  const taken = new Set<string>();
+  const place = (path: string, label: string, rects: Rect[]) => {
+    for (const rect of rects) {
+      const box = { left: `${rect.x}%`, top: `${rect.y}%`, width: `${rect.width}%`, height: `${rect.height}%` };
+      const twin = taken.size === taken.add(Object.values(box).join()).size;
+      const mark = el('button', { type: 'button', className: `mark${twin ? ' mark--twin' : ''}`, tabIndex: -1, title: t('mark.title', { f: label }) });
+      mark.dataset.for = path;
+      Object.assign(mark.style, box);
+      // How far down the page the mark is: the band of light uncovers it when it gets there.
+      mark.style.setProperty('--y', String(rect.y / 100));
+      marks.append(mark);
+    }
+  };
+  const find = (value: unknown, beside?: Rect[]) => locate(pieces, value, { beside, widthOf });
+  // Dropdowns hold codes, which are not printed; everything else is looked for.
+  for (const input of $('#form').querySelectorAll<HTMLInputElement>('input[data-path]')) {
+    const path = input.dataset.path!;
+    const value = getPath(state.draft, path);
+    const line = /^(lines\.\d+)\.(\w+)$/.exec(path);
+    if (isEmpty(value)) continue;
+    // The numbers of a line item are looked for next to its name: a "2" elsewhere on the page is not its quantity.
+    // ponytail: the rate is looked for as "19 %" anywhere, since most invoices print it with the totals only; "7,5 %" is not found.
+    const rects =
+      !line || line[2] === 'name' ? find(value) : line[2] === 'vatRate' ? find(`${value} %`) : find(value, find(getPath(state.draft, `${line[1]}.name`)));
+    place(path, fieldLabel(path), rects);
+  }
+  for (const key of ['net', 'vat', 'gross'] as const) {
+    const total = state.result?.totals?.[key];
+    if (total) place(`totals.${key}`, t(`t.${key}`), find(total));
+  }
+  $('#marks-note').hidden = marks.children.length === 0;
+  highlight(focusedPath());
+}
+
+$('#form').addEventListener('focusin', (event) => highlight((event.target as HTMLElement).dataset.path));
+$('#form').addEventListener('focusout', () => highlight());
+marks.addEventListener('click', (event) => {
+  const path = (event.target as HTMLElement).dataset.for;
+  const field = path && document.querySelector<HTMLElement>(`[data-path="${path}"]`);
+  if (field) {
+    field.closest('details')?.setAttribute('open', '');
+    field.focus();
+  } else if (path) $('#totals').scrollIntoView({ block: 'center' });
+});
+
+/** The band of light over the preview: it keeps travelling while a model reads, and passes once when a PDF was opened. */
+function scan(mode: 'on' | 'once' | 'off'): void {
+  const band = $('#scan');
+  band.dataset.mode = mode;
+  band.hidden = mode === 'off';
+}
+$('#scan').addEventListener('animationend', () => scan('off'));
+
+// ---------------------------------------------------------------------------------------------------------------
 // Opening a PDF
 
 async function preview(pdf: Uint8Array): Promise<void> {
@@ -341,7 +428,26 @@ async function preview(pdf: Uint8Array): Promise<void> {
   canvas.width = viewport.width;
   canvas.height = viewport.height;
   await page.render({ canvas, viewport }).promise;
+  // Measured here and not taken from extractLayout: the marks lie on this drawing, so they use its view of the page.
+  // ponytail: upright text only. Text that is printed turned gets its mark in the wrong place; use the whole text matrix if such invoices turn up.
+  pieces = (await page.getTextContent()).items.flatMap((item) => {
+    if (!('str' in item) || !item.str.trim()) return [];
+    const [x, y, height] = [item.transform[4] as number, item.transform[5] as number, item.height];
+    // From a little below the baseline to the top of the tall letters, in the same view the page is drawn with.
+    const [x1, y1] = viewport.convertToViewportPoint(x, y - 0.25 * height) as [number, number];
+    const [x2, y2] = viewport.convertToViewportPoint(x + item.width, y + 0.85 * height) as [number, number];
+    return [
+      {
+        text: item.str,
+        x: (Math.min(x1, x2) / viewport.width) * 100,
+        y: (Math.min(y1, y2) / viewport.height) * 100,
+        width: (Math.abs(x2 - x1) / viewport.width) * 100,
+        height: (Math.abs(y2 - y1) / viewport.height) * 100,
+      },
+    ];
+  });
   await task.destroy();
+  renderMarks();
 }
 
 function show(view: 'start' | 'work' | 'done'): void {
@@ -374,6 +480,8 @@ async function open(pdf: Uint8Array, fileName: string): Promise<void> {
   try {
     const info = await inspectPdf(pdf);
     const { text, blocks } = await extractLayout(pdf);
+    pieces = [];
+    xmlSection.open = false;
     Object.assign(state, {
       pdf,
       fileName,
@@ -408,6 +516,8 @@ async function open(pdf: Uint8Array, fileName: string): Promise<void> {
     show('work');
     await preview(pdf);
     status.textContent = '';
+    // The patterns have read the page: one pass of the light shows it.
+    if (state.mode === 'create' && text.trim()) scan('once');
   } catch (error) {
     console.error(error);
     status.textContent = t('e.invalid-pdf');
@@ -451,6 +561,18 @@ function renderModels(): void {
 }
 modelSelect.onchange = () => ($('#ai-endpoint').hidden = modelSelect.value !== 'endpoint');
 
+/**
+ * Shows how far reading with a model is: below 1 the model is still loading and a bar says how much of it is there,
+ * at 1 it reads and the band of light travels over the page. Without a number, reading is over.
+ */
+function reading(fraction?: number): void {
+  const loading = fraction !== undefined && fraction < 1;
+  $('#ai-loading').hidden = !loading;
+  $<HTMLProgressElement>('#ai-progress').value = fraction ?? 0;
+  if (fraction !== undefined) $('#ai-status').textContent = loading ? t('ai.loading', { p: Math.round(fraction * 100) }) : t('ai.reading');
+  scan(fraction !== undefined && !loading ? 'on' : 'off');
+}
+
 $('#ai-run').onclick = async () => {
   const status = $('#ai-status');
   const button = $<HTMLButtonElement>('#ai-run');
@@ -458,16 +580,14 @@ $('#ai-run').onclick = async () => {
   if (!viaEndpoint && !hasWebGpu()) return void (status.textContent = t('ai.nogpu'));
   button.disabled = true;
   try {
+    reading(viaEndpoint ? 1 : 0);
     const read = viaEndpoint
-      ? (status.textContent = t('ai.reading')) &&
-        readWithEndpoint(state.pdfText, {
+      ? readWithEndpoint(state.pdfText, {
           url: $<HTMLInputElement>('#ai-url').value,
           model: $<HTMLInputElement>('#ai-name').value,
           key: $<HTMLInputElement>('#ai-key').value,
         })
-      : readWithBrowserModel(state.pdfText, modelSelect.value, (fraction) => {
-          status.textContent = fraction < 1 ? t('ai.loading', { p: Math.round(fraction * 100) }) : t('ai.reading');
-        });
+      : readWithBrowserModel(state.pdfText, modelSelect.value, reading);
     // A small model translates names and makes up identifiers. Only what the PDF shows is taken over.
     merge(keepWhatThePdfShows(normaliseDraft(await read), state.pdfText), true);
     renderForm();
@@ -475,7 +595,85 @@ $('#ai-run').onclick = async () => {
   } catch (error) {
     status.textContent = t('ai.failed', { m: error instanceof Error ? error.message : String(error) });
   } finally {
+    reading();
     button.disabled = false;
+  }
+};
+
+// ---------------------------------------------------------------------------------------------------------------
+// What goes into the file
+
+const xmlSection = $<HTMLDetailsElement>('#xml');
+let xmlTimer = 0;
+let xmlRun = 0;
+
+/** An element of the XML exactly as it is written there: the first `names[0]`, in it the first `names[1]`, and so on. */
+function fragment(xml: string, ...names: string[]): string | undefined {
+  let part: string | undefined = xml;
+  for (const name of names) part = part && new RegExp(`<${name}(\\s[^>]*)?>[^]*?</${name}>`).exec(part)?.[0];
+  return part;
+}
+
+/**
+ * Shows the XML that "Create e-invoice" would embed right now. It is not put together a second time for this view:
+ * the e-invoice is created and its XML is shown, and the rows of the table are cut out of that XML.
+ */
+async function renderXml(): Promise<void> {
+  const run = ++xmlRun;
+  const [status, pair, whole] = [$('#xml-status'), $('#xml-pair'), $('#xml-whole')];
+  const instead = (text: string) => {
+    status.textContent = text;
+    pair.hidden = whole.hidden = true;
+  };
+  if (!state.pdf || !state.result?.invoice) return instead(t('xml.errors'));
+  if (pair.hidden) status.textContent = t('xml.busy');
+  try {
+    const invoice = structuredClone(state.draft);
+    const { createEInvoice } = await import('../src/create.js');
+    const { xml, totals } = await createEInvoice({ pdf: state.pdf, invoice, lang });
+    // The data has changed again in the meantime: the newer run shows its XML.
+    if (run !== xmlRun) return;
+    const date = (iso: unknown) => new Intl.DateTimeFormat(lang, { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(`${iso}T00:00:00Z`));
+    const rows: [label: string, value: string, written: string | undefined][] = [
+      [t('f.number'), String(invoice.number), fragment(xml, 'rsm:ExchangedDocument', 'ram:ID')],
+      [t('f.issueDate'), date(invoice.issueDate), fragment(xml, 'rsm:ExchangedDocument', 'ram:IssueDateTime', 'udt:DateTimeString')],
+      [t('xml.seller'), String(invoice.seller?.name), fragment(xml, 'ram:SellerTradeParty', 'ram:Name')],
+      [t('t.vat'), money(totals.vat), fragment(xml, 'ram:TaxTotalAmount')],
+      [t('t.gross'), money(totals.gross), fragment(xml, 'ram:GrandTotalAmount')],
+    ];
+    // In a narrow column the XML breaks where a tag ends, not in the middle of a name.
+    const code = (written: string) => el('code', {}, ...written.split(/(?<=>)(?!$)|(?=<\/)/).flatMap((part, i) => (i ? [el('wbr'), part] : [part])));
+    pair
+      .querySelector('tbody')!
+      .replaceChildren(
+        ...rows.flatMap(([label, value, written]) =>
+          written ? [el('tr', {}, el('td', {}, `${label} `, el('strong', {}, value)), el('td', {}, code(written)))] : [],
+        ),
+      );
+    $('#xml-code').textContent = xml;
+    status.textContent = '';
+    pair.hidden = whole.hidden = false;
+  } catch (error) {
+    if (run === xmlRun) instead(t('create.failed', { m: error instanceof Error ? error.message : String(error) }));
+  }
+}
+
+/** Creating the XML is work: it is done when the section is opened, and again a moment after the data last changed. */
+function refreshXml(): void {
+  clearTimeout(xmlTimer);
+  if (xmlSection.open) xmlTimer = window.setTimeout(renderXml, 400);
+}
+xmlSection.addEventListener('toggle', () => xmlSection.open && renderXml());
+
+$('#xml-copy').onclick = async () => {
+  const code = $('#xml-code');
+  try {
+    await navigator.clipboard.writeText(code.textContent ?? '');
+    setText('#xml-copy', 'xml.copied');
+    setTimeout(() => setText('#xml-copy', 'xml.copy'), 2000);
+  } catch {
+    // The browser does not let the page write to the clipboard: the XML is selected, ready for Ctrl+C.
+    getSelection()?.selectAllChildren(code);
   }
 };
 

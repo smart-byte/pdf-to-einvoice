@@ -74,9 +74,14 @@
           <aside class="work__pdf">
             <div class="page">
               <canvas id="preview" role="img" data-i18n-label="work.preview" aria-label="Preview of your invoice, page 1"></canvas>
+              <!-- A band of light while the page is being read, and marks where the values of the form are printed.
+                   Both are aids for the eye: the form itself says everything to a screen reader. -->
+              <div class="scan" id="scan" aria-hidden="true" hidden></div>
+              <div class="marks" id="marks" aria-hidden="true"></div>
               <div class="stamp" id="work-stamp" aria-hidden="true" hidden>EN 16931</div>
             </div>
             <p class="muted" id="file-name"></p>
+            <p class="muted" id="marks-note" data-i18n="mark.note" hidden>Marked in blue: where each value is printed. Click a mark to go to its field.</p>
           </aside>
 
           <div class="work__data">
@@ -114,6 +119,10 @@
                 </div>
                 <button type="button" class="quiet" id="ai-run" data-i18n="ai.run">Read invoice</button>
                 <p class="status" id="ai-status" role="status"></p>
+                <div class="loading" id="ai-loading" hidden>
+                  <progress id="ai-progress" max="1" value="0" data-i18n-label="ai.progress" aria-label="Progress of loading the model"></progress>
+                  <p class="hint" data-i18n="ai.wait">You can keep working while the model loads; it is kept for next time.</p>
+                </div>
               </details>
             </div>
 
@@ -123,6 +132,27 @@
               <h3 data-i18n="s.totals">Totals</h3>
               <dl class="totals" id="totals"></dl>
             </section>
+
+            <details class="group" id="xml">
+              <summary data-i18n="xml.title">What goes into your file</summary>
+              <p class="muted" id="xml-status" role="status"></p>
+              <table class="pair" id="xml-pair" hidden>
+                <thead>
+                  <tr>
+                    <th data-i18n="pair.page">Printed on your invoice</th>
+                    <th data-i18n="pair.xml">Written into the XML</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+              <details id="xml-whole" hidden>
+                <summary data-i18n="xml.whole">Show the whole XML</summary>
+                <div class="xml">
+                  <button type="button" class="quiet" id="xml-copy" data-i18n="xml.copy">Copy</button>
+                  <pre id="xml-code" tabindex="0" role="region" data-i18n-label="xml.label" aria-label="The XML of your e-invoice"></pre>
+                </div>
+              </details>
+            </details>
 
             <div class="finish">
               <div class="summary" id="summary" role="status"></div>

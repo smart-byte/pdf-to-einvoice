@@ -38,6 +38,12 @@ export const STRINGS: Record<string, Entry> = {
   'work.other': { de: 'Anderes PDF wählen', en: 'Choose another PDF' },
   'work.preview': { de: 'Vorschau Ihrer Rechnung, Seite 1', en: 'Preview of your invoice, page 1' },
 
+  'mark.title': { de: 'Fundstelle: {f}', en: 'Found here: {f}' },
+  'mark.note': {
+    de: 'Blau markiert sind die Fundstellen der Angaben. Ein Klick führt zum Feld.',
+    en: 'Marked in blue: where each value is printed. Click a mark to go to its field.',
+  },
+
   'read.found': { de: '{n} Angaben per Mustersuche erkannt.', en: '{n} values found by pattern matching.' },
   'read.none': {
     de: 'Das PDF enthält keinen lesbaren Text (vermutlich ein Scan). Bitte tragen Sie die Angaben von Hand ein.',
@@ -63,6 +69,11 @@ export const STRINGS: Record<string, Entry> = {
   },
   'ai.run': { de: 'Auslesen', en: 'Read invoice' },
   'ai.loading': { de: 'Modell wird geladen … {p} %', en: 'Loading the model … {p} %' },
+  'ai.progress': { de: 'Fortschritt beim Laden des Modells', en: 'Progress of loading the model' },
+  'ai.wait': {
+    de: 'Sie können weiterarbeiten, während das Modell lädt; es bleibt für das nächste Mal gespeichert.',
+    en: 'You can keep working while the model loads; it is kept for next time.',
+  },
   'ai.reading': { de: 'Das Modell liest die Rechnung …', en: 'The model is reading the invoice …' },
   'ai.done': {
     de: 'Fertig. Die Angaben wurden ergänzt. Ein Modell kann sich irren: Bitte alles prüfen.',
@@ -145,6 +156,18 @@ export const STRINGS: Record<string, Entry> = {
   't.due': { de: 'Zu zahlen', en: 'Amount due' },
   't.printed': { de: 'im PDF: {v}', en: 'on the PDF: {v}' },
   't.empty': { de: 'Die Summen erscheinen, sobald die Positionen vollständig sind.', en: 'Totals appear once the line items are complete.' },
+
+  'xml.title': { de: 'Was in Ihre Datei kommt', en: 'What goes into your file' },
+  'xml.seller': { de: 'Rechnungssteller', en: 'Seller' },
+  'xml.whole': { de: 'Das ganze XML anzeigen', en: 'Show the whole XML' },
+  'xml.label': { de: 'Das XML Ihrer E-Rechnung', en: 'The XML of your e-invoice' },
+  'xml.copy': { de: 'Kopieren', en: 'Copy' },
+  'xml.copied': { de: 'Kopiert', en: 'Copied' },
+  'xml.busy': { de: 'Das XML wird erstellt …', en: 'Creating the XML …' },
+  'xml.errors': {
+    de: 'Solange Angaben fehlen oder fehlerhaft sind, lässt sich kein XML erstellen.',
+    en: 'No XML can be created while values are missing or wrong.',
+  },
 
   'sum.ok': { de: 'Alle Pflichtangaben sind vorhanden.', en: 'All required data is there.' },
   'sum.valid': {
