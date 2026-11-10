@@ -1,31 +1,28 @@
 name: Deploy site
 
-# Builds site/ and publishes it with GitHub Pages at https://smart-byte.github.io/pdf-to-einvoice/.
-# Pages must be switched on once, with "GitHub Actions" as its source (see docs/releasing.md).
+# Builds site/ and publishes it to Cloudflare as the Worker in site/wrangler.jsonc, served at https://pdf-to-einvoice.app.
+# Needs two repository secrets: CLOUDFLARE_API_TOKEN ("Edit Cloudflare Workers" template, limited to the account and
+# the pdf-to-einvoice.app zone) and CLOUDFLARE_ACCOUNT_ID.
 on:
   push:
     branches: [main]
     # The page runs the code in src/, so library changes redeploy it too.
-    paths: [site/**, src/**, examples/**, package.json, package-lock.json, .github/workflows/deploy-site.yml]
+    paths: [site/**, src/**, examples/**, scripts/finish-site.mjs, package.json, package-lock.json, .github/workflows/deploy-site.yml]
   workflow_dispatch:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 # One deploy at a time; a newer push waits for the running one instead of racing it.
-concurrency:
-  group: pages
-  cancel-in-progress: false
+concurrency: deploy-site
 
 jobs:
   deploy:
-    if: github.repository == 'smart-byte/pdf-to-einvoice' # forks have no Pages site to deploy to
+    if: github.repository == 'smart-byte/pdf-to-einvoice' # forks have no Cloudflare secrets
     runs-on: ubuntu-latest
     environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      name: production
+      url: https://pdf-to-einvoice.app
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
@@ -34,9 +31,10 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run site:build
-      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6
-      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
+      - uses: cloudflare/wrangler-action@953926a2e2182532811c01a25e53647d93bf07c0 # v4
         with:
-          path: site-dist
-      - id: deployment
-        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: 4.153.0 # a fixed release, older than two weeks when it was chosen
+          workingDirectory: site
+          command: deploy

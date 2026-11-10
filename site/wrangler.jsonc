@@ -1,0 +1,8 @@
+// The Cloudflare Worker that serves the built site: static files only, no script.
+// Deployed by .github/workflows/deploy-site.yml; `custom_domain` attaches pdf-to-einvoice.app (DNS record and certificate) on deploy.
+{
+  "name": "pdf-to-einvoice-site",
+  "compatibility_date": "2026-10-26",
+  "assets": { "directory": "../site-dist" },
+  "routes": [{ "pattern": "pdf-to-einvoice.app", "custom_domain": true }],
+}
