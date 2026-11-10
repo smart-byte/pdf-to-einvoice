@@ -215,7 +215,19 @@ export function dateSpellings(iso: string): string[] {
   const [y, m, d] = iso.split('-') as [string, string, string];
   const day = String(Number(d));
   const month = String(Number(m));
-  const numeric = [iso, `${d}.${m}.${y}`, `${day}.${month}.${y}`, `${d}.${m}.${y.slice(2)}`, `${d}/${m}/${y}`, `${m}/${d}/${y}`, `${d}-${m}-${y}`];
+  const yy = y.slice(2);
+  const numeric = [
+    iso,
+    `${d}.${m}.${y}`,
+    `${day}.${month}.${y}`,
+    `${d}.${m}.${yy}`,
+    `${day}.${month}.${yy}`,
+    `${d}/${m}/${y}`,
+    `${m}/${d}/${y}`,
+    `${d}/${m}/${yy}`,
+    `${m}/${d}/${yy}`,
+    `${d}-${m}-${y}`,
+  ];
   const named = MONTHS[Number(m) - 1]!.flatMap((name) => [
     `${day}.${name}${y}`,
     `${d}.${name}${y}`,
