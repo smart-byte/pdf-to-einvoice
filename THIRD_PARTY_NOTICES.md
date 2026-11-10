@@ -25,7 +25,7 @@ npm package declares them as dependencies; the web app bundles them. Their licen
 - **JetBrains Mono** — JetBrains, SIL Open Font License 1.1 (via `@fontsource-variable/jetbrains-mono`).
 
 Language models are not part of this project or its bundles. The page offers to download them from
-huggingface.co at the user's request; the defaults are Qwen2.5-1.5B-Instruct and Qwen3-4B (Alibaba Cloud,
+huggingface.co at the user's request; the defaults are Qwen2.5-1.5B-Instruct and Qwen3.5-4B (Alibaba Cloud,
 Apache-2.0) and Phi-3.5-mini-instruct (Microsoft, MIT), in the builds published by MLC AI.
 
 ## In the sample invoice

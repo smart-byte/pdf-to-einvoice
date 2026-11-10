@@ -179,7 +179,7 @@ npm run site             # the web app on http://localhost:4350
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
 `npm run eval:reader -- <folder>` measures how much the reader gets right on e-invoices that carry their own answer
-(their XML); CONTRIBUTING.md says where to get such files.
+(their XML), with the rules alone or together with a language model; CONTRIBUTING.md says where to get such files.
 
 ## Licence
 

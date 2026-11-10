@@ -11,7 +11,8 @@ All notable changes to this project are documented here. The format follows
 - `extractLayout`: the text of a PDF with its geometry (blocks, pieces with positions, page sizes).
 - `guessFromText` reads by what fits together instead of where it stands: totals by arithmetic, items that add up to
   them, the seller by evidence and the buyer by exclusion, identifiers by their shape; labels in German, English and
-  French. `scripts/eval-reader.mjs` measures it against e-invoices that carry their own answer.
+  French. `scripts/eval-reader.mjs` measures it against e-invoices that carry their own answer, alone and together
+  with an in-browser language model.
 - Legal notice and privacy policy for the web app, in English and German, with the same footer and language switch
   on every page.
 - Web app: marks on the preview show where each value stands on the page and lead to its field; a progress bar
