@@ -3,10 +3,14 @@
 Thanks for helping out. The project stays small on purpose: established libraries do the heavy lifting (XML,
 PDF, text extraction), and this repository adds the data model, the checks and the front ends.
 
+Coding agents find the commands, a map of the code and the rules in short form in [AGENTS.md](AGENTS.md).
+
+Everyone who takes part is expected to follow the [code of conduct](CODE_OF_CONDUCT.md).
+
 ## Setup
 
 ```bash
-npm install            # Node >= 22.12, see .nvmrc
+npm install            # Node >= 22.13, see .nvmrc
 npm test               # unit tests (vitest)
 npm run type-check     # tsc for src/, test/ and site/
 npm run lint           # oxlint
@@ -43,6 +47,17 @@ npm run build
 npm run eval:reader -- /tmp/corpus/ZUGFeRDv2/correct            # table: correct, missing, wrong per field
 npm run eval:reader -- /tmp/corpus/ZUGFeRDv2/correct --files    # what each file lacks
 ```
+
+The same script measures reading with a language model, where the web app runs it: in Chrome with WebGPU. It takes
+about a minute per invoice, so take a sample. Chrome has to be installed; the model is downloaded once.
+
+```bash
+npm run eval:reader -- /tmp/corpus/ZUGFeRDv2/correct --sample 4 --model Qwen2.5-1.5B-Instruct-q4f16_1-MLC
+```
+
+Its second table compares three ways of reading the same invoices: the rules alone, the model alone (after dropping
+what the page does not show), and what the web app does: the rules first, the model for what they left empty. A
+change to the models in `site/llm.ts`, to the prompt or to `src/ground.ts` comes with that table before and after.
 
 A wrong value is worse than a missing one: a missing value is asked for, a wrong one may end up in the XML unnoticed.
 A change to `src/guess.ts` or `src/text.ts` comes with the table before and after. Keep the corpus out of this

@@ -3,7 +3,7 @@ import { invoiceJsonSchema, type InvoiceDraft } from '../src/model.js';
 /** In-browser models offered by default: permissively licensed (Apache-2.0 / MIT) and small enough to download. */
 export const MODELS = [
   { id: 'Qwen2.5-1.5B-Instruct-q4f16_1-MLC', note: { de: 'schnell, ca. 1 GB', en: 'fast, about 1 GB' } },
-  { id: 'Qwen3-4B-q4f16_1-MLC', note: { de: 'genauer, ca. 2,5 GB', en: 'more accurate, about 2.5 GB' } },
+  { id: 'Qwen3.5-4B-q4f16_1-MLC', note: { de: 'genauer, ca. 2,4 GB', en: 'more accurate, about 2.4 GB' } },
   { id: 'Phi-3.5-mini-instruct-q4f16_1-MLC', note: { de: 'Alternative, ca. 2,2 GB', en: 'alternative, about 2.2 GB' } },
 ] as const;
 export const DEFAULT_MODEL = MODELS[0].id;
@@ -82,8 +82,11 @@ export async function readWithBrowserModel(text: string, modelId: string, onProg
   const reply = await engine.instance.chat.completions.create({
     messages: [{ role: 'user', content: prompt(text) }],
     temperature: 0,
-    max_tokens: 1500,
+    // Room for an invoice with many lines; what really limits the answer is the context of the model.
+    max_tokens: 3000,
     response_format: { type: 'json_object', schema: JSON.stringify(extractionSchema()) },
+    // A model that can think aloud first would spend the answer on it: the data is wanted, nothing else.
+    extra_body: { enable_thinking: false },
   });
   return parse(reply.choices[0]?.message.content);
 }

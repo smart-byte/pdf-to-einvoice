@@ -1,6 +1,6 @@
 # pdf-to-einvoice
 
-> Turns an existing invoice PDF into a valid EN 16931 e-invoice (ZUGFeRD / Factur-X, German "E-Rechnung") without changing how the PDF looks: the invoice data is attached as CII XML and the file becomes a PDF/A-3. TypeScript library, CLI, MCP server and a browser app. Everything runs locally; no API key, no upload. MIT licence.
+> Turns an existing invoice PDF into an EN 16931 e-invoice (ZUGFeRD / Factur-X, German "E-Rechnung") without changing how the PDF looks: the invoice data is attached as CII XML and the file becomes a PDF/A-3. TypeScript library, CLI, MCP server and a browser app. Everything runs locally; no API key, no upload. MIT licence.
 
 Install with `npm install pdf-to-einvoice`, or run without installing: `npx pdf-to-einvoice <command>`.
 
@@ -26,10 +26,11 @@ Rules for an assistant converting an invoice:
 - `vatCategory`: `S` VAT charged; `AE` reverse charge (EU business customer, needs `buyer.vatId`); `K` intra-community supply of goods (needs `buyer.vatId`); `G` export of goods outside the EU; `O` not subject to VAT (e.g. service for a business outside the EU); `E` exempt (e.g. German small business, § 19 UStG); `Z` zero rated. Every category except `S` and `Z` has `vatRate` 0 and needs `vatExemptionReason`, the sentence printed on the invoice.
 - `totals` (`net`, `vat`, `gross`, `due`) are the sums printed on the PDF. A contradiction with the calculated totals is an error: fix the data, do not drop the totals.
 - No discounts on document level yet: enter them as a line with a negative quantity.
-- Output profile: Factur-X / ZUGFeRD EN 16931 (CII). Not tax advice.
+- Output profile: Factur-X / ZUGFeRD EN 16931 (CII). Not tax or legal advice.
 
 ## Docs
 
+- [The whole documentation in one file](llms-full.txt)
 - [README](https://github.com/smart-byte/pdf-to-einvoice#readme): API, CLI, MCP setup, data model, limits
 - [Skill for agents](https://github.com/smart-byte/pdf-to-einvoice/blob/main/skills/pdf-to-einvoice/SKILL.md)
 - [Changelog](https://github.com/smart-byte/pdf-to-einvoice/blob/main/CHANGELOG.md)

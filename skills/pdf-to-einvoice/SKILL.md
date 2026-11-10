@@ -1,6 +1,6 @@
 ---
 name: pdf-to-einvoice
-description: Turn an existing invoice PDF into a valid e-invoice (E-Rechnung) - ZUGFeRD / Factur-X, EN 16931 - by attaching the invoice data as XML without changing how the PDF looks. Use when the user has an invoice PDF and wants an e-invoice, asks about ZUGFeRD, Factur-X, XRechnung-style data or "E-Rechnung", wants invoice data checked against EN 16931, wants an existing e-invoice PDF validated, or wants the XML read out of an e-invoice PDF.
+description: Turn an existing invoice PDF into an e-invoice (E-Rechnung) - ZUGFeRD / Factur-X, EN 16931 - by attaching the invoice data as XML without changing how the PDF looks. Use when the user has an invoice PDF and wants an e-invoice, asks about ZUGFeRD, Factur-X, XRechnung-style data or "E-Rechnung", wants invoice data checked against EN 16931, wants an existing e-invoice PDF validated, or wants the XML read out of an e-invoice PDF.
 ---
 
 # PDF to e-invoice
@@ -10,6 +10,9 @@ PDF as PDF/A-3 with the data attached as `factur-x.xml` (Factur-X / ZUGFeRD, pro
 are. Everything runs locally; nothing is uploaded.
 
 Your job is to read the data off the PDF, have the tool check it, let the user confirm it, and create the file.
+
+To use this skill, copy the folder `skills/pdf-to-einvoice` into the skills folder of your agent; the npm package
+ships it under `node_modules/pdf-to-einvoice/skills/`.
 
 ## Rules
 
@@ -101,7 +104,8 @@ e-invoice with errors has to be corrected by its issuer.
 
 ### VAT categories
 
-Every category except `S` has `vatRate` 0 and needs `vatExemptionReason`: the sentence the PDF prints about it.
+Every category except `S` has `vatRate` 0. All of those except `Z` need `vatExemptionReason`: the sentence the PDF
+prints about it.
 
 | Code | Meaning                | Typical case                                                                 |
 | ---- | ---------------------- | ---------------------------------------------------------------------------- |

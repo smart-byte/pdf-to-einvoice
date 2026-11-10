@@ -4,3 +4,5 @@ site-dist
 .remember
 .DS_Store
 *.log
+*.tgz
+*.jar

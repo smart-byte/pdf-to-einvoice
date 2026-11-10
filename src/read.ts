@@ -103,7 +103,7 @@ export function readInvoiceXml(xml: string): { profile?: string; invoice: Invoic
   const vatTotals = all(sums, 'TaxTotalAmount');
   const notes = all(document, 'IncludedNote').map((note) => text(note, 'Content'));
 
-  // ponytail: document-level allowances and charges (BG-20, BG-21) are not in the model, so an invoice that has them
+  // Known limit: document-level allowances and charges (BG-20, BG-21) are not in the model, so an invoice that has them
   // shows up in `check` as totals-mismatch. Add them to the model and to `calculate` when such invoices matter.
   return {
     profile: text(root, 'ExchangedDocumentContext', 'GuidelineSpecifiedDocumentContextParameter', 'ID'),
