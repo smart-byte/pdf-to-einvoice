@@ -83,6 +83,14 @@ describe('createEInvoice', () => {
     expect(await firstPageContent(result.pdf)).toBe(await firstPageContent(samplePdf()));
   });
 
+  it('names itself as the program that produced the file', async () => {
+    const { pdf } = await createEInvoice({ pdf: samplePdf(), invoice: sample() });
+    const doc = await PDFDocument.load(pdf, { updateMetadata: false });
+    expect(doc.getProducer()).toBe('pdf-to-einvoice');
+    // PDF/A wants the document properties and the XMP metadata to say the same.
+    expect(Buffer.from(pdf).toString('latin1')).toContain('<pdf:Producer>pdf-to-einvoice</pdf:Producer>');
+  });
+
   it('reports nothing for the sample', async () => {
     const result = await createEInvoice({ pdf: samplePdf(), invoice: sample() });
     expect(result.findings).toEqual([]);

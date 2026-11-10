@@ -75,6 +75,8 @@ export async function createEInvoice(options: CreateOptions): Promise<CreateResu
     const output = await service.generate(toUbl(invoice, totals), {
       format: 'Factur-X-EN16931',
       lang: options.lang ?? 'en',
+      // The file names this tool as its producer; the library that writes it is credited in the README.
+      customMetadata: { producer: 'pdf-to-einvoice' },
       pdf: { buffer: await repairForPdfA(options.pdf), filename: 'invoice.pdf', mimetype: 'application/pdf' },
       // @e-invoice-eu/core 3.4 writes the purchase order number (BT-13) for the EXTENDED profile only, although
       // EN 16931 has it. It is the last element of the trade agreement in everything this function writes.
