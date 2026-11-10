@@ -26,7 +26,7 @@ in their format. This one starts from the PDF you already produce with Word, you
 
 ## In the browser
 
-`npm run site` starts the web app locally. Drop a PDF, check the data that was read from it, download the
+**[Open the web app](https://smart-byte.github.io/pdf-to-einvoice/)**, or start it locally with `npm run site`. Drop a PDF, check the data that was read from it, download the
 e-invoice. Reading works without any AI by pattern matching; optionally a small language model that runs in your
 browser (WebGPU) fills in what the patterns did not find. The page is available in English and German.
 
