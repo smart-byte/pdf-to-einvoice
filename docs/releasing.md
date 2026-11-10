@@ -26,8 +26,12 @@ Model downloads are cached per address: after a move to another domain, users lo
 
 ## Repository settings the project relies on
 
-- A ruleset protects main: no deletion, no force-push, changes through pull requests with the checks `test` and
-  `reference` passed.
+- A ruleset protects main: no deletion, no force-push. A second one lets only admins create, move or delete version
+  tags (`v*`), since a tag publishes to npm.
+- Actions: the workflow token is read-only unless a workflow asks for more, Actions may not approve pull requests,
+  and only GitHub's own actions and `cloudflare/wrangler-action` may run. Workflows from pull requests of outside
+  contributors wait for approval.
+- The environment `production` deploys from main only.
 - Private vulnerability reporting is switched on (`SECURITY.md` sends reporters there).
 - Dependabot waits 14 days before it proposes a new release (`.github/dependabot.yml`).
 - Description and topics make the project findable: e-invoice, einvoice, e-rechnung, zugferd, factur-x, en16931,

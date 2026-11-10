@@ -108,7 +108,12 @@ function reportNotWritten(invoice: Invoice, xml: string, findings: Finding[]): v
   const given = [head, seller, buyer, ...lines.map(({ name, description }) => ({ name, description }))].flatMap((part) => Object.entries(part));
   for (const [field, value] of given) {
     if (typeof value === 'string' && !/^\d{4}-\d{2}-\d{2}$/.test(value) && !xml.includes(escaped(value))) {
-      findings.push({ path: field, severity: 'warning', code: 'not-written', message: `"${value}" could not be written into the XML. Please report this.` });
+      findings.push({
+        path: field,
+        severity: 'warning',
+        code: 'not-written',
+        message: `"${value}" could not be written into the XML. Do not send this file; please report it at https://github.com/smart-byte/pdf-to-einvoice/issues.`,
+      });
     }
   }
 }
@@ -135,7 +140,7 @@ export async function createEInvoice(options: CreateOptions): Promise<CreateResu
       path: '',
       severity: 'warning',
       code: 'pdf-fonts',
-      message: `The PDF does not embed these fonts: ${info.unembeddedFonts.join(', ')}. The XML will be valid, but the file is not a strict PDF/A-3. Export the PDF again with fonts embedded (or as PDF/A) to fix this.`,
+      message: `The PDF does not embed these fonts: ${info.unembeddedFonts.join(', ')}. The XML is not affected, but the file is not a strict PDF/A-3. Export the PDF again with fonts embedded (or as PDF/A) to fix this.`,
     });
   }
 

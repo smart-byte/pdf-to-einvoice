@@ -47,8 +47,8 @@ A change is done when `npm test`, `npm run type-check`, `npm run lint` and `npm 
   of `npm run eval:reader` before and after. A wrong value is worse than a missing one.
 - A change to how files are written comes with `npm run test:reference`.
 - Money is calculated in whole cents (`src/calculate.ts`), never in floating point euros.
-- The website makes no request to a third party except the model download the user asks for. No CDN, no analytics,
-  no web fonts from elsewhere.
+- The website makes no request to a third party except the model download the user asks for. No scripts, styles or
+  fonts from another origin, no analytics.
 - New dependencies only where they clearly beat a few lines of own code, and no release younger than 14 days
   (`npm install --before=<date>`; Dependabot waits as long).
 - Write the test first and watch it fail.

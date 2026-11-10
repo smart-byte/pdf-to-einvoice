@@ -45,8 +45,8 @@ Usage:
   -h, --help       Show this help.
   -v, --version    Show the version.
 
-Results go to standard output, with --json as JSON that includes the findings; otherwise findings and errors
-go to standard error.
+Results go to standard output. check and validate print their findings there too (with --json as JSON);
+create and xrechnung print findings to standard error, where errors go.
 Exit codes: 0 done, 1 failed or the data has errors, 2 used wrongly.`;
 
 const reason = (e: unknown) => (e instanceof Error ? e.message : String(e));

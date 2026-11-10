@@ -23,7 +23,7 @@ ships it under `node_modules/pdf-to-einvoice/skills/`.
 - Always show the user the findings. Errors block the e-invoice; warnings need a second look.
 - The XML is the legally binding part of the e-invoice and must not contradict the PDF. Get the user's confirmation of
   the data before you create the file.
-- This is not tax advice. Which VAT category applies is the user's decision; ask when the PDF does not say.
+- This is not tax or legal advice. Which VAT category applies is the user's decision; ask when the PDF does not say.
 
 ## Workflow
 
@@ -34,9 +34,10 @@ npx pdf-to-einvoice check data.json --pdf invoice.pdf   # 3. check the data and 
 npx pdf-to-einvoice create invoice.pdf data.json        # 5. writes invoice.einvoice.pdf next to the input
 ```
 
-1. **Read.** `read --json` prints `{ text, guess, pdf }`. `text` is the PDF row by row. `guess` holds labelled values
-   found by pattern (number, dates, IBAN, tax IDs, totals): a starting point, check each one against `text`. If
-   `pdf.isEInvoice` is true the file already is an e-invoice; stop. If you can read the PDF yourself, still use `text`:
+1. **Read.** `read --json` prints `{ text, guess, pdf }`. `text` is the PDF row by row. `guess` holds what the
+   patterns found (number, dates, parties, line items, totals, payment terms, IBAN, tax IDs): a starting point, check
+   each value against `text`. If
+   `pdf.isEInvoice` is true the file is already an e-invoice; stop. If you can read the PDF yourself, still use `text`:
    it is what the check compares against.
 2. **Fill in `data.json`** following `schema`. Leave out what the PDF does not state. Put the totals the PDF prints
    into `totals`; they are only used to detect contradictions.
@@ -96,7 +97,7 @@ e-invoice or has errors.
 - Every other finding is one of `check`, applied to the data read from the XML.
 
 This is a plausibility check, not a full validation: it runs neither the EN 16931 Schematron rules nor a PDF/A
-validator such as veraPDF. No findings does not prove that the file conforms; say so when you report the result. An
+validator such as veraPDF. A result without findings does not prove that the file conforms; say so when you report the result. An
 e-invoice with errors has to be corrected by its issuer.
 
 ## The data
@@ -158,7 +159,7 @@ prints about it.
 - An invoice in a foreign currency that charges VAT cannot state that VAT in euro as well.
 - A scanned PDF has no text: `read` returns nothing and the data cannot be compared with it. Tell the user to check
   every value by eye.
-- A `pdf-fonts` warning means the PDF does not embed its fonts. The XML is still valid, but the file is not a strict
+- A `pdf-fonts` warning means the PDF does not embed its fonts. The XML is not affected, but the file is not a strict
   PDF/A-3; the user should export the PDF again with fonts embedded (or as PDF/A) and repeat.
 - The output is a ZUGFeRD / Factur-X file or an XRechnung. Countries that require invoices to go through a state
   platform or network (Italy, Poland, Belgium, France) need that step in addition.

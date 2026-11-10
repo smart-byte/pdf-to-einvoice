@@ -2,7 +2,7 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.smart-byte/pdf-to-einvoice",
   "title": "pdf-to-einvoice",
-  "description": "Turn an invoice PDF into an EN 16931 e-invoice (ZUGFeRD / Factur-X). Runs locally, no upload.",
+  "description": "Invoice PDF to EN 16931 e-invoice (ZUGFeRD / Factur-X), or invoice data to XRechnung. Runs locally.",
   "repository": {
     "url": "https://github.com/smart-byte/pdf-to-einvoice",
     "source": "github"
