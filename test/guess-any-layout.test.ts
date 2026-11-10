@@ -464,6 +464,60 @@ describe('guessFromText on table rows', () => {
     ]);
   });
 
+  /** An invoice over two pages as invoicing programs print it: page number and footer between the items, the table head once more. */
+  const overTwoPages = (endOfPage: string[] = [], startOfPage: string[] = []) =>
+    [
+      'Rechnung RE-2026-0077',
+      'Pos.   Bezeichnung   Menge   Einzelpreis   Gesamt',
+      '1   Wartung Januar   2 Std.   100,00 €   200,00 €',
+      '2   Wartung Februar   3 Std.   100,00 €   300,00 €',
+      ...endOfPage,
+      'Seite 1 von 2',
+      'Muster Software GmbH · Beispielweg 1 · 12345 Musterstadt',
+      'Pos.   Bezeichnung   Menge   Einzelpreis   Gesamt',
+      ...startOfPage,
+      '3   Wartung März   1 Std.   100,00 €   100,00 €',
+      'Nettobetrag   600,00 €',
+      'Umsatzsteuer 19 %   114,00 €',
+      'Gesamtbetrag   714,00 €',
+      'Seite 2 von 2',
+    ].join('\n');
+  const names = (text: string, blocks?: string[][]) => guessFromText(text, { blocks }).lines?.map((line) => line.name);
+
+  it('reads a table that goes on over a page break, with its head printed again', () => {
+    expect(names(overTwoPages())).toEqual(['Wartung Januar', 'Wartung Februar', 'Wartung März']);
+  });
+
+  it('does not take a subtotal at the end of a page or a carry-over at the start of the next for the end of the table', () => {
+    expect(names(overTwoPages(['Zwischensumme   500,00 €'], ['Übertrag   500,00 €']))).toEqual(['Wartung Januar', 'Wartung Februar', 'Wartung März']);
+    expect(names(overTwoPages(['Übertrag   500,00 €'], ['Übertrag   500,00 €']))).toHaveLength(3);
+  });
+
+  it('still reads an item whose amount happens to be the sum of the items above it', () => {
+    const text = [
+      'Bezeichnung   Betrag',
+      'Einrichtung   500,00 €',
+      'Betrieb   500,00 €',
+      'Nettobetrag   1.000,00 €',
+      'Umsatzsteuer 19 %   190,00 €',
+      'Gesamtbetrag   1.190,00 €',
+    ];
+    expect(names(text.join('\n'))).toEqual(['Einrichtung', 'Betrieb']);
+  });
+
+  it('keeps text that stands below an item in another column out of its name', () => {
+    const text = [
+      'Bezeichnung   Menge   Einzelpreis   Gesamt',
+      'Wartung Januar   2 Std.   100,00 €   200,00 €',
+      'Vielen Dank für Ihren Auftrag',
+      'Nettobetrag   200,00 €',
+      'Umsatzsteuer 19 %   38,00 €',
+      'Gesamtbetrag   238,00 €',
+    ].join('\n');
+    const blocks = [['Bezeichnung', 'Wartung Januar'], ['Vielen Dank für Ihren Auftrag'], ['Nettobetrag', 'Umsatzsteuer 19 %', 'Gesamtbetrag']];
+    expect(names(text, blocks)).toEqual(['Wartung Januar']);
+  });
+
   it('reads only the first line of such a description from the rows alone', () => {
     expect(guessFromText(wrapping.text).lines).toMatchObject([{ name: 'Trennwand' }, { name: 'Wartungs-' }]);
   });

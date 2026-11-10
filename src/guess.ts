@@ -382,6 +382,8 @@ const NUMBER = new RegExp(`(-?\\d[\\d.,']*)\\s*(%|${CURRENCY}|\\p{L}[\\p{L}\\d()
 const IS_CURRENCY = new RegExp(`^${CURRENCY}$`);
 /** How many rows a description may wrap into. */
 const MAX_WRAPPED = 4;
+/** "Seite 1 von 2", "Page 1 of 2", "1 / 2": where a page ends. Nothing below it belongs to the item above it. */
+const PAGE_COUNT = /^(?:(?:seite|page|pagina|página|blatt)\s*)?\d{1,3}\s*(?:von|of|de|sur|di|\/)\s*\d{1,3}$/i;
 
 /** A row of the table as read: `total` is its net amount, or its gross amount where prices include VAT. */
 interface Item {
@@ -480,67 +482,18 @@ const unwrap = (lines: string[]) =>
  * description may wrap into the rows around it. Rows that add up to the gross total carry prices with VAT; their net
  * prices are derived from the rate. Rows that do not add up are not believed: nothing is returned and a person fills
  * the lines in.
+ *
+ * A table may go on over pages. Then the sum so far is often printed at the end of a page and carried over to the
+ * next, and the head of the table stands there once more. Such rows end a table on a single page, so they are read
+ * as part of one table only where the rows do not add up otherwise.
  */
 function readItems(rows: string[], totals: Totals, blocks: string[][] | undefined): Partial<Line>[] | undefined {
-  const items: Item[] = [];
-  /** Rows of text between items: the end of the description above, or the start of the one below. */
-  let loose: string[] = [];
-  let table = 0;
-  /** The last item, while it may still take the rows that follow it. */
-  let open: Item | undefined;
-  const closeLoose = () => {
-    if (open && loose.length <= MAX_WRAPPED) open.name = unwrap([open.name, ...loose].filter((part): part is string => Boolean(part)));
-    loose = [];
-  };
-  for (const row of rows) {
-    const all = cells(row);
-    // A row may end with a cell of the column beside the table.
-    const parts = all.slice(0, lastIndex(all, (cell) => MONEY_CELL.test(cell)) + 1);
-    if (TOTALS_ROW.test(row) || all.some((cell) => TOTALS_CELL.test(cell))) {
-      closeLoose();
-      open = undefined;
-      table++;
-    } else if (parts.length >= 2) {
-      const item = itemOf(parts, table);
-      // A row with only number and amount takes its description from the text above it; other text above belongs to the previous item.
-      if (item.name === undefined && parts.length === 2) item.name = unwrap(loose.splice(0).slice(-MAX_WRAPPED));
-      closeLoose();
-      items.push(item);
-      open = item;
-    } else {
-      items.at(-1)?.below.push(...all);
-      if (all.length === 1 && !/:/.test(row)) loose.push(all[0]!);
-      else {
-        // Another row ends the description above it, and a row of headings starts another table.
-        loose = [];
-        open = undefined;
-        if (all.length >= 3 && !/\d/.test(row)) table++;
-      }
-    }
-  }
-  closeLoose();
-
-  // Beside a description that wraps, other columns go on, and the rows mix them. Its block has it alone: the lines
-  // below its first one, as far as they stand in the rows of this item.
-  const seen = new Map<string, number>();
-  for (const item of items) {
-    if (!blocks || item.cell === undefined) continue;
-    // The same text may name several items: they stand in the blocks in the order of the rows.
-    const nth = seen.get(item.cell) ?? 0;
-    seen.set(item.cell, nth + 1);
-    const place = blocks.flatMap((block) => block.flatMap((line, i) => (line === item.cell ? [{ block, i }] : [])))[nth];
-    const more: string[] = [];
-    for (let k = (place?.i ?? 0) + 1; place && more.length < MAX_WRAPPED && item.below.includes(place.block[k]!) && !KEY_VALUE.test(place.block[k]!); k++)
-      more.push(place.block[k]!);
-    if (more.length) item.name = unwrap([item.cell, ...more]);
-  }
-
   // Without VAT the rows add up to the total itself.
   const net = totals.net ?? (totals.vat === undefined ? totals.gross : undefined);
-  let run = runOf(items, net);
-  const inclusive = !run && totals.net !== undefined;
-  if (inclusive) run = runOf(items, totals.gross);
-  if (!run) return undefined;
+  // Read as one page first, and only where nothing adds up that way as a table that goes on over pages.
+  const found = itemsThatAddUp(rows, totals, net, blocks, false) ?? itemsThatAddUp(rows, totals, net, blocks, true);
+  if (!found) return undefined;
+  const { run, inclusive } = found;
 
   // A rate that the rows do not carry is the one the totals name, if they name exactly one.
   const totalRates = new Set(
@@ -571,6 +524,88 @@ function readItems(rows: string[], totals: Totals, blocks: string[][] | undefine
     vatCategory: 'S' as VatCategory,
     vatRate: rated ? line.vatRate : undefined,
   }));
+}
+
+/**
+ * The rows of the table that add up to the net total, or to the gross total where prices include VAT (`inclusive`).
+ * With `overPages`, a sum of the items so far and a table head that was printed before do not end the table.
+ */
+function itemsThatAddUp(
+  rows: string[],
+  totals: Totals,
+  net: number | undefined,
+  blocks: string[][] | undefined,
+  overPages: boolean,
+): { run: Item[]; inclusive: boolean } | undefined {
+  const items: Item[] = [];
+  /** Rows of text between items: the end of the description above, or the start of the one below. */
+  let loose: string[] = [];
+  let table = 0;
+  /** The last item, while it may still take the rows that follow it. */
+  let open: Item | undefined;
+  const heads = new Set<string>();
+  const closeLoose = () => {
+    if (open && loose.length <= MAX_WRAPPED) open.name = unwrap([open.name, ...loose].filter((part): part is string => Boolean(part)));
+    loose = [];
+  };
+  for (const row of rows) {
+    const all = cells(row);
+    // A row may end with a cell of the column beside the table.
+    const parts = all.slice(0, lastIndex(all, (cell) => MONEY_CELL.test(cell)) + 1);
+    if (TOTALS_ROW.test(row) || all.some((cell) => TOTALS_CELL.test(cell))) {
+      closeLoose();
+      open = undefined;
+      // The sum of the items so far, printed at a page break: a subtotal below them, a carry-over above the next ones.
+      const amount = MONEY_CELL.exec(all.at(-1)!)?.[1];
+      const soFar = items.filter((item) => item.table === table).reduce((sum, item) => sum + cents(item.total), 0);
+      const carried = overPages && amount !== undefined && soFar !== 0 && cents(toNumber(amount)) === soFar;
+      if (!carried) table++;
+    } else if (parts.length >= 2) {
+      const item = itemOf(parts, table);
+      // A row with only number and amount takes its description from the text above it; other text above belongs to the previous item.
+      if (item.name === undefined && parts.length === 2) item.name = unwrap(loose.splice(0).slice(-MAX_WRAPPED));
+      closeLoose();
+      items.push(item);
+      open = item;
+    } else {
+      items.at(-1)?.below.push(...all);
+      if (PAGE_COUNT.test(row)) {
+        closeLoose();
+        open = undefined;
+      } else if (all.length === 1 && !/:/.test(row)) loose.push(all[0]!);
+      else {
+        // Another row ends the description above it, and a row of headings starts another table.
+        loose = [];
+        open = undefined;
+        if (all.length >= 3 && !/\d/.test(row)) {
+          if (!(overPages && heads.has(row))) table++;
+          heads.add(row);
+        }
+      }
+    }
+  }
+  closeLoose();
+
+  // Beside a description that wraps, other columns go on, and the rows mix them. Its block has it alone: the lines
+  // below its first one, as far as they stand in the rows of this item.
+  const seen = new Map<string, number>();
+  for (const item of items) {
+    if (!blocks || item.cell === undefined) continue;
+    // The same text may name several items: they stand in the blocks in the order of the rows.
+    const nth = seen.get(item.cell) ?? 0;
+    seen.set(item.cell, nth + 1);
+    const place = blocks.flatMap((block) => block.flatMap((line, i) => (line === item.cell ? [{ block, i }] : [])))[nth];
+    const more: string[] = [];
+    for (let k = (place?.i ?? 0) + 1; place && more.length < MAX_WRAPPED && item.below.includes(place.block[k]!) && !KEY_VALUE.test(place.block[k]!); k++)
+      more.push(place.block[k]!);
+    // Where the block of the name is known, it says what the name is: text below it in another column is none of it.
+    if (place) item.name = unwrap([item.cell, ...more]);
+  }
+
+  const run = runOf(items, net);
+  if (run) return { run, inclusive: false };
+  const withVat = totals.net !== undefined ? runOf(items, totals.gross) : undefined;
+  return withVat && { run: withVat, inclusive: true };
 }
 
 /** The printed sentence that says why no VAT is charged, joined over the rows it wraps into. */
