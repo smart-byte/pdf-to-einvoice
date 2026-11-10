@@ -155,26 +155,88 @@
       </section>
 
       <section class="info" id="how">
-        <h2 data-i18n="how.title">How it works</h2>
-        <ol class="steps">
-          <li>
-            <h3 data-i18n="how.1.title">Choose your PDF</h3>
-            <p data-i18n="how.1.text">The invoice as you write it today: from Word, your invoicing tool or a template.</p>
-          </li>
-          <li>
-            <h3 data-i18n="how.2.title">Check the data</h3>
-            <p data-i18n="how.2.text">The data is read from the PDF. You see what is missing or does not match the PDF, and complete it.</p>
-          </li>
-          <li>
-            <h3 data-i18n="how.3.title">Download the e-invoice</h3>
-            <p data-i18n="how.3.text">You get the same PDF, which now carries its data as XML. Send it the way you always do.</p>
-          </li>
-        </ol>
-        <h2 data-i18n="kinds.title">For every kind of invoice</h2>
-        <p data-i18n="kinds.text">
-          Domestic with VAT, several VAT rates, small businesses, reverse charge within the EU, intra-community supplies, exports, services to the USA without
-          VAT, credit notes and corrections. Each of these is tested with the reference validator of the ZUGFeRD community.
+        <h2 data-i18n="pair.title">What is added to your file</h2>
+        <p data-i18n="pair.lead">The page stays as it is. Behind it, the same invoice is written down a second time, so that software can read it.</p>
+        <!-- The printed text is that of the sample invoice, so it stays German in both languages. -->
+        <table class="pair">
+          <thead>
+            <tr>
+              <th data-i18n="pair.page">Printed on your invoice</th>
+              <th data-i18n="pair.xml">Written into the XML</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Rechnung Nr. RE-2026-0042</td>
+              <td><code>&lt;ram:ID&gt;RE-2026-0042&lt;/ram:ID&gt;</code></td>
+            </tr>
+            <tr>
+              <td>Rechnungsdatum 03.11.2026</td>
+              <td><code>&lt;udt:DateTimeString format="102"&gt;20261103&lt;/udt:DateTimeString&gt;</code></td>
+            </tr>
+            <tr>
+              <td>Muster Software GmbH</td>
+              <td><code>&lt;ram:SellerTradeParty&gt;&lt;ram:Name&gt;Muster Software GmbH&lt;/ram:Name&gt;</code></td>
+            </tr>
+            <tr>
+              <td>Beratung, 10 Std. zu 100,00 €</td>
+              <td><code>&lt;ram:BilledQuantity unitCode="HUR"&gt;10&lt;/ram:BilledQuantity&gt;</code></td>
+            </tr>
+            <tr>
+              <td>Umsatzsteuer 19 % 284,81 €</td>
+              <td><code>&lt;ram:CalculatedAmount&gt;284.81&lt;/ram:CalculatedAmount&gt;</code></td>
+            </tr>
+            <tr>
+              <td>Gesamtbetrag 1.783,81 €</td>
+              <td><code>&lt;ram:GrandTotalAmount&gt;1783.81&lt;/ram:GrandTotalAmount&gt;</code></td>
+            </tr>
+          </tbody>
+        </table>
+        <p data-i18n="pair.note">
+          People read the left side; the software of your customer and of the tax office reads the right one. Both have to say the same, which is why every
+          value is compared with your PDF before the file is created.
         </p>
+
+        <h2 data-i18n="kinds.title">For every kind of invoice</h2>
+        <table class="kinds">
+          <thead>
+            <tr>
+              <th data-i18n="kinds.kind">Your invoice</th>
+              <th data-i18n="kinds.xml">How the XML says it</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td data-i18n="kind.1">.</td>
+              <td data-i18n="kind.1.xml">.</td>
+            </tr>
+            <tr>
+              <td data-i18n="kind.2">.</td>
+              <td data-i18n="kind.2.xml">.</td>
+            </tr>
+            <tr>
+              <td data-i18n="kind.3">.</td>
+              <td data-i18n="kind.3.xml">.</td>
+            </tr>
+            <tr>
+              <td data-i18n="kind.4">.</td>
+              <td data-i18n="kind.4.xml">.</td>
+            </tr>
+            <tr>
+              <td data-i18n="kind.5">.</td>
+              <td data-i18n="kind.5.xml">.</td>
+            </tr>
+            <tr>
+              <td data-i18n="kind.6">.</td>
+              <td data-i18n="kind.6.xml">.</td>
+            </tr>
+            <tr>
+              <td data-i18n="kind.7">.</td>
+              <td data-i18n="kind.7.xml">.</td>
+            </tr>
+          </tbody>
+        </table>
+        <p data-i18n="kinds.text">Each of these is run through the reference validator of the ZUGFeRD community on every change.</p>
       </section>
 
       <section class="info" id="limits">

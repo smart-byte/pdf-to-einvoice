@@ -160,6 +160,8 @@ pre {
   padding: clamp(2rem, 6vw, 5rem) clamp(1rem, 4vw, 3.5rem) clamp(3rem, 7vw, 6rem);
   max-width: 82rem;
   margin: 0 auto;
+  /* The XML sheet leans out to the right; on a narrow screen it is cut at the edge instead of widening the page. */
+  overflow-x: clip;
 }
 .lead {
   font-size: clamp(1.1rem, 1.6vw, 1.3rem);
@@ -668,29 +670,54 @@ select.warned {
 .info li + li {
   margin-top: 0.6rem;
 }
-.steps {
-  list-style: none;
-  counter-reset: step;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 2rem;
-  padding: 0;
-  margin-top: 1.6rem;
+/* What is printed and what is written: the white page and the blue XML sheet of the hero, side by side. */
+.info table {
+  width: 100%;
+  max-width: 62rem;
+  border-collapse: separate;
+  border-spacing: 0.9rem 0;
+  margin: 1.6rem -0.9rem;
+  font-size: 0.9375rem;
 }
-.steps li {
-  counter-increment: step;
-  border-top: 2px solid var(--ink);
-  padding-top: 0.9rem;
+.info th {
+  text-align: left;
+  font-weight: 650;
+  color: var(--ink);
+  padding: 0.9rem 1.1rem 0.6rem;
 }
-.steps li::before {
-  content: counter(step);
-  display: block;
-  font: 700 1.6rem var(--sans);
+.info td {
+  padding: 0.6rem 1.1rem;
+  border-top: 1px solid var(--line);
+  vertical-align: top;
+}
+.info th,
+.info td {
+  background: var(--paper);
+  width: 50%;
+}
+.info tr:last-child td {
+  padding-bottom: 1rem;
+}
+.pair th:last-child,
+.pair td:last-child {
+  background: var(--blue-wash);
   color: var(--blue);
-  margin-bottom: 0.4rem;
+  border-top-color: color-mix(in srgb, var(--blue) 22%, transparent);
 }
-.steps p {
-  margin-top: 0.4rem;
+.pair code {
+  font-size: 0.8125rem;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+/* The kinds of invoices are one sheet, not two. */
+.kinds {
+  border-spacing: 0;
+  margin-left: 0;
+  margin-right: 0;
+}
+.kinds td:first-child {
+  color: var(--ink);
+  font-weight: 600;
 }
 .info pre {
   background: var(--paper);
@@ -726,9 +753,6 @@ select.warned {
     position: static;
     max-width: 26rem;
   }
-  .steps {
-    grid-template-columns: minmax(0, 1fr);
-  }
   .nav nav {
     display: none;
   }
@@ -737,6 +761,33 @@ select.warned {
   }
 }
 @media (max-width: 40rem) {
+  /* On a phone the two sheets of a row lie on top of each other. */
+  .info table,
+  .info thead,
+  .info tbody,
+  .info tr,
+  .info th,
+  .info td {
+    display: block;
+    width: auto;
+  }
+  .info table {
+    margin: 1.4rem 0;
+  }
+  .info tr + tr,
+  .info tbody tr:first-child {
+    margin-top: 0.7rem;
+  }
+  .info td + td {
+    padding-top: 0.5rem;
+  }
+  .kinds td + td {
+    border-top: 0;
+    padding-top: 0;
+  }
+  .kinds thead {
+    display: none;
+  }
   .line {
     grid-template-columns: 1fr 1fr;
   }
