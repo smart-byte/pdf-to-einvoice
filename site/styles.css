@@ -1073,6 +1073,10 @@ select.warned {
   padding-left: 1.1rem;
   font-size: 0.9375rem;
 }
+/* A sentence of several lines keeps its bullet at its first line. */
+.summary li .link {
+  vertical-align: top;
+}
 .summary li + li {
   margin-top: 0.25rem;
 }
