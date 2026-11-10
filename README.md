@@ -20,9 +20,8 @@ in their format. This one starts from the PDF you already produce with Word, you
 - **Nothing is uploaded.** The web app has no server; the library and CLI run on your machine.
 - **Every kind of invoice.** Domestic with VAT, several rates, small businesses, reverse charge, intra-community
   supplies, exports, services to non-EU customers, credit notes and corrections.
-- **Checked against the reference.** Each of those kinds is validated in CI with
-  [Mustang](https://www.mustangproject.org/), the validator of the ZUGFeRD community (veraPDF plus the official
-  EN 16931 rules).
+- **Checked against the reference.** Each of those kinds is validated in CI by an independent reference validator:
+  veraPDF for PDF/A-3 plus the official EN 16931 and Factur-X rules.
 
 ## In the browser
 
@@ -176,7 +175,7 @@ npm run type-check && npm run lint && npm run format:check
 npm run site             # the web app on http://localhost:4350
 ```
 
-`npm run test:reference` validates generated invoices with Mustang; it needs Java and the Mustang CLI, see
+`npm run test:reference` runs the reference validation on generated invoices; it needs Java and the validator, see
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
 `npm run eval:reader -- <folder>` measures how much the reader gets right on e-invoices that carry their own answer

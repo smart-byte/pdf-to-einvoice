@@ -20,8 +20,8 @@ npm run sample         # regenerate examples/sample-invoice.pdf from its JSON
 ## Reference validation
 
 `npm test` checks this project's own logic. Whether a generated file really is a valid e-invoice is decided by
-[Mustang](https://www.mustangproject.org/), which runs veraPDF (PDF/A-3) and the official EN 16931 / Factur-X
-Schematron rules. It needs Java 11 or newer:
+a reference validator, the Mustang command line tool: it runs veraPDF (PDF/A-3) and the official EN 16931 /
+Factur-X Schematron rules. It needs Java 11 or newer:
 
 ```bash
 curl -LO https://github.com/ZUGFeRD/mustangproject/releases/download/core-2.26.0/Mustang-CLI-2.26.0.jar
