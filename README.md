@@ -20,9 +20,12 @@ in their format. This one starts from the PDF you already produce with Word, you
 - **Nothing is uploaded.** The web app has no server; the library and CLI run on your machine.
 - **The common kinds of invoice.** Domestic with VAT, several rates, small businesses, reverse charge, intra-community
   supplies, exports, services to non-EU customers, credit notes and corrections.
+- **XRechnung for public bodies.** The same data can be written as an [XRechnung](#xrechnung), as plain XML or
+  inside the PDF, once it has what XRechnung asks for on top.
 - **Checked against the reference.** In CI each of those kinds is created from a sample PDF and validated by an
-  independent reference validator: veraPDF for PDF/A-3 plus the official EN 16931 and Factur-X rules. What your own
-  PDF brings along is a different matter, see [What changes in your PDF](#what-changes-in-your-pdf).
+  independent reference validator: veraPDF for PDF/A-3 plus the official EN 16931 and Factur-X rules, and the
+  XRechnung rules for the XRechnung output. What your own PDF brings along is a different matter, see
+  [What changes in your PDF](#what-changes-in-your-pdf).
 
 ## In the browser
 
@@ -61,19 +64,20 @@ It works the same in a browser: `pdf` is a `Uint8Array` in and out. A bundler ne
 [`site/vite.config.ts`](site/vite.config.ts) and [`site/main.ts`](site/main.ts) do: an alias that points
 `@e-invoice-eu/core` to its browser bundle, and the worker of pdf.js.
 
-| function                           | what it does                                                                                                       |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `createEInvoice({ pdf, invoice })` | checks the data, then returns `{ pdf, xml, findings, totals }`; throws `InvoiceError` if data is wrong             |
-| `check(invoice, { pdfText? })`     | returns `{ findings, totals, invoice? }` without creating anything; never throws on incomplete data                |
-| `extractText(pdf)`                 | the text of a PDF, row by row                                                                                      |
-| `extractLayout(pdf)`               | the text plus its geometry: `blocks` (text that stands together), `pieces` with their position, `pages`            |
-| `guessFromText(text, { blocks })`  | reads an invoice without a model: totals that add up, items that add up to them, seller and buyer, labelled values |
-| `keepWhatThePdfShows(draft, text)` | drops every value the PDF does not show: a guard for data read by a small language model                           |
-| `languageOf(text)`                 | `'de'` or `'en'`: the language an invoice is written in                                                            |
-| `validateEInvoice(pdf)`            | looks at an existing e-invoice: profile, embedded data, and whether the XML matches the visible page               |
-| `readEmbeddedXml(pdf)`             | the XML of an existing e-invoice, or `null`                                                                        |
-| `calculate(invoice)`               | the totals, following the EN 16931 rounding rules                                                                  |
-| `invoiceJsonSchema`                | JSON Schema of the invoice data, for forms, validation and language models                                         |
+| function                                     | what it does                                                                                                       |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `createEInvoice({ pdf, invoice, profile? })` | checks the data, then returns `{ pdf, xml, findings, totals }`; throws `InvoiceError` if data is wrong             |
+| `createXRechnung({ invoice, syntax? })`      | the data as an [XRechnung](#xrechnung): returns `{ xml, findings, totals }`, no PDF; throws `InvoiceError` as well |
+| `check(invoice, { pdfText?, rules? })`       | returns `{ findings, totals, invoice? }` without creating anything; never throws on incomplete data                |
+| `extractText(pdf)`                           | the text of a PDF, row by row                                                                                      |
+| `extractLayout(pdf)`                         | the text plus its geometry: `blocks` (text that stands together), `pieces` with their position, `pages`            |
+| `guessFromText(text, { blocks })`            | reads an invoice without a model: totals that add up, items that add up to them, seller and buyer, labelled values |
+| `keepWhatThePdfShows(draft, text)`           | drops every value the PDF does not show: a guard for data read by a small language model                           |
+| `languageOf(text)`                           | `'de'` or `'en'`: the language an invoice is written in                                                            |
+| `validateEInvoice(pdf)`                      | looks at an existing e-invoice: profile, embedded data, and whether the XML matches the visible page               |
+| `readEmbeddedXml(pdf)`                       | the XML of an existing e-invoice, or `null`                                                                        |
+| `calculate(invoice)`                         | the totals, following the EN 16931 rounding rules                                                                  |
+| `invoiceJsonSchema`                          | JSON Schema of the invoice data, for forms, validation and language models                                         |
 
 A finding is `{ path, severity, code, message }`. An `error` blocks the e-invoice; a `warning` asks for a second
 look.
@@ -87,9 +91,10 @@ npx pdf-to-einvoice check invoice.json --pdf invoice.pdf
 npx pdf-to-einvoice create invoice.pdf invoice.json   # writes invoice.einvoice.pdf
 npx pdf-to-einvoice validate invoice.einvoice.pdf
 npx pdf-to-einvoice xml invoice.einvoice.pdf     # prints the embedded XML
+npx pdf-to-einvoice xrechnung invoice.json -o invoice.xml   # the data as an XRechnung, see below
 ```
 
-`create` never overwrites a file unless you pass `--force`, and never writes over its input.
+`create` and `xrechnung` never overwrite a file unless you pass `--force`, and never write over their input.
 
 ## For AI assistants
 
@@ -104,9 +109,10 @@ show you what is missing, and create the file after you confirm.
 }
 ```
 
-Tools: `read_invoice_pdf`, `check_invoice`, `create_einvoice`, `validate_einvoice`, `read_einvoice_xml`. For
-agents that work with a shell instead, [skills/pdf-to-einvoice/SKILL.md](skills/pdf-to-einvoice/SKILL.md) describes
-the same workflow with the CLI. A summary for language models is in [llms.txt](site/public/llms.txt).
+Tools: `read_invoice_pdf`, `check_invoice`, `create_einvoice`, `create_xrechnung`, `validate_einvoice`,
+`read_einvoice_xml`. For agents that work with a shell instead,
+[skills/pdf-to-einvoice/SKILL.md](skills/pdf-to-einvoice/SKILL.md) describes the same workflow with the CLI. A
+summary for language models is in [llms.txt](site/public/llms.txt).
 
 The server needs no API key and calls no model itself: the assistant you already use reads the invoice.
 
@@ -131,6 +137,60 @@ charged. `totals` are the sums printed on the PDF; if they contradict the calcul
 XML must not say something else than the page. The full list of fields is in
 [`src/model.ts`](src/model.ts) and in `npx pdf-to-einvoice schema`.
 
+## XRechnung
+
+XRechnung is the German version of EN 16931 that public bodies ask for. The same invoice data can be written as one,
+in two ways:
+
+- **As plain XML**, without a PDF, in UBL (default) or CII: `createXRechnung({ invoice, syntax? })`, the command
+  `xrechnung <data.json> [--syntax ubl|cii] [-o out.xml]` (to standard output without `-o`), the MCP tool
+  `create_xrechnung`.
+- **Inside the hybrid PDF**, in place of the EN 16931 profile: `createEInvoice({ pdf, invoice, profile: 'xrechnung' })`,
+  `create ... --profile xrechnung`, the argument `profile` of `create_einvoice`. The attachment is then named
+  `xrechnung.xml`.
+
+```ts
+import { createXRechnung } from 'pdf-to-einvoice';
+
+const { xml, findings } = await createXRechnung({ invoice, syntax: 'ubl' }); // or 'cii'
+```
+
+The XML declares XRechnung 3.0 (`urn:cen.eu:en16931:2017#compliant#urn:xeinkauf.de:kosit:xrechnung_3.0`); the rules
+are taken from its specification in version 3.0.2. XRechnung asks for more than EN 16931 does.
+`check(invoice, { rules: 'xrechnung' })`, `check --rules xrechnung` and the argument `rules` of `check_invoice` report
+what is missing, and both ways of creating run that check first and refuse the data while an error is open:
+
+| code                                                                           | what XRechnung asks for                                                                              |
+| ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| `xrechnung-buyer-reference`                                                    | `buyerReference`: for a German public body its Leitweg-ID, which the buyer names                     |
+| `xrechnung-seller-contact`, `xrechnung-seller-phone`, `xrechnung-seller-email` | a contact at the seller: `seller.contactName`, `seller.phone`, `seller.email`                        |
+| `xrechnung-buyer-email`                                                        | `buyer.email`, which is written as the electronic address of the buyer                               |
+| `xrechnung-address`                                                            | `city` and `postalCode` of seller and buyer                                                          |
+| `xrechnung-line-net`                                                           | a `netAmount` of a line that is quantity x unit price, at most 0.02 apart                            |
+| `xrechnung-payment-terms`                                                      | a line of `paymentTerms` that starts with `#` to be a cash discount: `#SKONTO#TAGE=14#PROZENT=2.00#` |
+| `xrechnung-delivery-address`                                                   | the place of delivery of an intra-community supply (`K`); the data has no field for it, see below    |
+
+Three more findings are warnings, because XRechnung only recommends what they are about: `xrechnung-type-code` (a
+prepayment invoice, type 386, is not among its invoice types), `xrechnung-phone` and `xrechnung-email` (a phone
+number with three digits at least, an e-mail address of the usual form).
+
+Some things the tool writes on its own, because XRechnung wants them in the XML: payment instructions in every
+invoice (without an `iban` they read "instrument not defined", code 1), the business process
+`urn:fdc:peppol.eu:2017:poacc:billing:01:1.0`, which the specification names as the default, and the e-mail
+addresses of seller and buyer as their electronic addresses (scheme `EM`). In UBL a credit note (type 381) is
+written as a `CreditNote` document.
+
+Limits of the XRechnung output:
+
+- An intra-community supply (`K`) is refused. XRechnung wants the city and postal code of its place of delivery, and
+  the invoice data has no delivery address yet.
+- The electronic address of seller and buyer is always an e-mail address. A Leitweg-ID or a Peppol participant ID
+  cannot be given there.
+- The extension of XRechnung (sub-lines of an invoice line, payments by a third party) is not written.
+- The file is not sent anywhere. How a public body takes invoices in (a portal upload, e-mail, Peppol) is for it to
+  say.
+- `validateEInvoice` reads the XML inside a PDF. It does not read a plain XML file, and no UBL.
+
 ## What changes in your PDF
 
 Only what the standard asks for: the XML attachment, XMP metadata that declares PDF/A-3 and Factur-X, an sRGB
@@ -151,8 +211,9 @@ validator.
   cannot place is left empty and shown as missing. Reading invoices of every kind is work in progress.
 - **The XML is the binding part.** The tool checks arithmetic and compares the data with the text of the PDF, but
   it cannot know what you meant. Review the data before you create the file.
-- **Profile and syntax:** Factur-X / ZUGFeRD profile EN 16931 (CII). Plain XRechnung and UBL output are not built
-  yet.
+- **Profiles and syntax:** the hybrid PDF carries CII in the Factur-X / ZUGFeRD profile EN 16931 or XRECHNUNG. Plain
+  XML is written as [XRechnung](#xrechnung) only, in UBL or CII; the profiles BASIC and EXTENDED and plain EN 16931
+  XML without XRechnung are not built.
 - **Not modelled yet:** discounts and charges on the whole invoice (use a line with a negative quantity), VAT in a
   second currency, several payment accounts, attachments.
 - **`validateEInvoice` is a plausibility check,** not a replacement for a full validator.

@@ -1,6 +1,6 @@
 ---
 name: pdf-to-einvoice
-description: Turn an existing invoice PDF into an e-invoice (E-Rechnung) - ZUGFeRD / Factur-X, EN 16931 - by attaching the invoice data as XML without changing how the PDF looks. Use when the user has an invoice PDF and wants an e-invoice, asks about ZUGFeRD, Factur-X, XRechnung-style data or "E-Rechnung", wants invoice data checked against EN 16931, wants an existing e-invoice PDF validated, or wants the XML read out of an e-invoice PDF.
+description: Turn an existing invoice PDF into an e-invoice (E-Rechnung) - ZUGFeRD / Factur-X, EN 16931 - by attaching the invoice data as XML without changing how the PDF looks, or write the invoice data as an XRechnung for a German public body. Use when the user has an invoice PDF and wants an e-invoice, asks about ZUGFeRD, Factur-X, XRechnung or "E-Rechnung", wants invoice data checked against EN 16931 or the XRechnung rules, wants an existing e-invoice PDF validated, or wants the XML read out of an e-invoice PDF.
 ---
 
 # PDF to e-invoice
@@ -48,6 +48,34 @@ npx pdf-to-einvoice create invoice.pdf data.json        # 5. writes invoice.einv
    Use `-o out.pdf` for a different name. Warnings go to stderr; pass them on.
 
 `npx pdf-to-einvoice xml einvoice.pdf` prints the XML of an existing e-invoice.
+
+## XRechnung
+
+XRechnung is the German version of EN 16931 that public bodies ask for. Use it for an invoice to a German public body,
+or when the user asks for it by name; do not choose it on your own.
+
+```bash
+npx pdf-to-einvoice check data.json --pdf invoice.pdf --rules xrechnung   # 3. the check, with the XRechnung rules
+npx pdf-to-einvoice xrechnung data.json -o invoice.xml                    # 5. the XML alone: UBL, or --syntax cii
+npx pdf-to-einvoice create invoice.pdf data.json --profile xrechnung      # 5. or the PDF with that XML inside
+```
+
+The steps are the ones above. The XML declares XRechnung 3.0. Without `-o`, `xrechnung` prints the XML to standard
+output; it needs no PDF, but read and compare the PDF all the same if the data comes from one.
+
+XRechnung takes more data, and the check reports what is missing under codes that start with `xrechnung-`:
+
+- `buyerReference`: the Leitweg-ID of the public body. The buyer names it, usually with the order. Ask the user for
+  it; never make one up.
+- `seller.contactName`, `seller.phone`, `seller.email`: a contact at the seller.
+- `buyer.email`: where the buyer takes invoices. It is written as the buyer's electronic address.
+- `city` and `postalCode` of both parties.
+- A line's `netAmount` has to be quantity x unit price, at most 0.02 apart.
+- A line of `paymentTerms` that starts with `#` has to be a cash discount in the fixed form
+  `#SKONTO#TAGE=14#PROZENT=2.00#`.
+
+Not possible as XRechnung: an intra-community supply (category `K`), because the data has no delivery address. The
+tool does not send the file: how the public body takes invoices in (portal, e-mail, Peppol) is for it to say.
 
 ## Validating an existing e-invoice
 
@@ -132,8 +160,9 @@ prints about it.
   every value by eye.
 - A `pdf-fonts` warning means the PDF does not embed its fonts. The XML is still valid, but the file is not a strict
   PDF/A-3; the user should export the PDF again with fonts embedded (or as PDF/A) and repeat.
-- The output is a ZUGFeRD / Factur-X file. Countries that require invoices to go through a state platform or network
-  (Italy, Poland, Belgium, France) need that step in addition.
+- The output is a ZUGFeRD / Factur-X file or an XRechnung. Countries that require invoices to go through a state
+  platform or network (Italy, Poland, Belgium, France) need that step in addition.
 
 With the MCP server (`npx pdf-to-einvoice mcp`) the same steps are the tools `read_invoice_pdf`, `check_invoice`,
-`create_einvoice`, `read_einvoice_xml` and `validate_einvoice`.
+`create_einvoice`, `create_xrechnung`, `read_einvoice_xml` and `validate_einvoice`; `check_invoice` takes
+`rules: "xrechnung"` and `create_einvoice` takes `profile: "xrechnung"`.

@@ -1,7 +1,7 @@
 {
   "$schema": "https://context7.com/schema/context7.json",
   "projectTitle": "pdf-to-einvoice",
-  "description": "Turns an existing invoice PDF into an EN 16931 e-invoice (ZUGFeRD / Factur-X) without changing how it looks. TypeScript library, CLI, MCP server and browser app; runs locally.",
+  "description": "Turns an existing invoice PDF into an EN 16931 e-invoice (ZUGFeRD / Factur-X) without changing how it looks, and writes invoice data as XRechnung. TypeScript library, CLI, MCP server and browser app; runs locally.",
   "excludeFolders": ["src", "site", "test", "scripts", "dist", "examples"],
   "excludeFiles": ["CHANGELOG.md", "CONTRIBUTING.md", "SECURITY.md", "THIRD_PARTY_NOTICES.md", "AGENTS.md"],
   "rules": [
@@ -12,6 +12,7 @@
     "Data read by a language model goes through keepWhatThePdfShows(draft, text) before it is used.",
     "The XML is the binding part of the e-invoice and must not contradict the visible PDF; the user confirms the data before the file is created.",
     "Every VAT category except S has vatRate 0; all of those except Z need vatExemptionReason. AE and K need buyer.vatId.",
+    "For a German public body write an XRechnung: createXRechnung({ invoice, syntax }) for plain XML (UBL or CII), or createEInvoice with profile: 'xrechnung' for a PDF that carries it. Check with check(draft, { rules: 'xrechnung' }) first: XRechnung needs buyerReference (the Leitweg-ID, which the buyer names; never make one up), seller.contactName, seller.phone, seller.email and buyer.email.",
     "Document-level discounts are not modelled: enter them as a line with a negative quantity.",
     "Node 22.13 or newer. In a browser the bundler needs an alias from @e-invoice-eu/core to its browser bundle and the pdf.js worker; see site/vite.config.ts and site/main.ts.",
     "validateEInvoice is a plausibility check, not a full EN 16931 validation."
