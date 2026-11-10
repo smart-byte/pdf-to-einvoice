@@ -4,7 +4,7 @@ type Entry = { de: string; en: string };
 
 /** Every text of the page. Keys starting with `f.` label form fields, `e.` explain findings. */
 export const STRINGS: Record<string, Entry> = {
-  'nav.how': { de: 'So funktioniert es', en: 'How it works' },
+  'nav.how': { de: 'Was dazukommt', en: 'What is added' },
   'nav.dev': { de: 'Für Entwickler', en: 'For developers' },
   'nav.limits': { de: 'Grenzen', en: 'Limits' },
 
@@ -197,27 +197,38 @@ export const STRINGS: Record<string, Entry> = {
   'e.pdf-a': { de: 'Die Datei weist sich nicht als PDF/A-3 aus.', en: '' },
   'e.invalid-pdf': { de: 'Diese Datei lässt sich nicht als PDF lesen.', en: 'This file cannot be read as a PDF.' },
 
-  'how.title': { de: 'So funktioniert es', en: 'How it works' },
-  'how.1.title': { de: 'PDF wählen', en: 'Choose your PDF' },
-  'how.1.text': {
-    de: 'Die Rechnung, wie Sie sie heute schreiben: aus Word, Ihrem Rechnungsprogramm oder einer Vorlage.',
-    en: 'The invoice as you write it today: from Word, your invoicing tool or a template.',
+  'pair.title': { de: 'Was in Ihrer Datei dazukommt', en: 'What is added to your file' },
+  'pair.lead': {
+    de: 'Die Seite bleibt, wie sie ist. Dahinter steht dieselbe Rechnung noch einmal, so dass Programme sie lesen können.',
+    en: 'The page stays as it is. Behind it, the same invoice is written down a second time, so that software can read it.',
   },
-  'how.2.title': { de: 'Angaben prüfen', en: 'Check the data' },
-  'how.2.text': {
-    de: 'Die Angaben werden aus dem PDF gelesen. Sie sehen, was fehlt oder nicht zum PDF passt, und ergänzen es.',
-    en: 'The data is read from the PDF. You see what is missing or does not match the PDF, and complete it.',
-  },
-  'how.3.title': { de: 'E-Rechnung herunterladen', en: 'Download the e-invoice' },
-  'how.3.text': {
-    de: 'Sie erhalten dasselbe PDF, das jetzt die Daten als XML trägt. Versenden Sie es wie gewohnt.',
-    en: 'You get the same PDF, which now carries its data as XML. Send it the way you always do.',
+  'pair.page': { de: 'Auf Ihrer Rechnung steht', en: 'Printed on your invoice' },
+  'pair.xml': { de: 'Im XML steht dann', en: 'Written into the XML' },
+  'pair.note': {
+    de: 'Menschen lesen die linke Seite, die Software Ihres Kunden und des Finanzamts die rechte. Beide müssen dasselbe sagen. Deshalb wird jede Angabe mit Ihrem PDF verglichen, bevor die Datei entsteht.',
+    en: 'People read the left side; the software of your customer and of the tax office reads the right one. Both have to say the same, which is why every value is compared with your PDF before the file is created.',
   },
 
   'kinds.title': { de: 'Für jede Art von Rechnung', en: 'For every kind of invoice' },
+  'kinds.kind': { de: 'Ihre Rechnung', en: 'Your invoice' },
+  'kinds.xml': { de: 'So steht es im XML', en: 'How the XML says it' },
+  'kind.1': { de: 'Inland mit Umsatzsteuer, auch mit mehreren Steuersätzen', en: 'Domestic with VAT, also with several rates' },
+  'kind.1.xml': { de: 'Kategorie S mit dem Satz je Position', en: 'Category S with the rate of each line' },
+  'kind.2': { de: 'Kleinunternehmer ohne Umsatzsteuer (§ 19 UStG)', en: 'Small business without VAT (§ 19 UStG)' },
+  'kind.2.xml': { de: 'Kategorie E mit Ihrem Befreiungshinweis', en: 'Category E with your exemption note' },
+  'kind.3': { de: 'Leistung an ein Unternehmen im EU-Ausland', en: 'Service for a business in another EU country' },
+  'kind.3.xml': { de: 'Kategorie AE (Reverse Charge) mit der USt-IdNr. des Kunden', en: 'Category AE (reverse charge) with the VAT ID of the customer' },
+  'kind.4': { de: 'Warenlieferung an ein Unternehmen im EU-Ausland', en: 'Goods delivered to a business in another EU country' },
+  'kind.4.xml': { de: 'Kategorie K mit dem Bestimmungsland', en: 'Category K with the country of destination' },
+  'kind.5': { de: 'Ausfuhr von Waren in ein Drittland', en: 'Export of goods outside the EU' },
+  'kind.5.xml': { de: 'Kategorie G', en: 'Category G' },
+  'kind.6': { de: 'Leistung in die USA oder ein anderes Drittland', en: 'Service for a customer in the USA or elsewhere outside the EU' },
+  'kind.6.xml': { de: 'Kategorie O (nicht steuerbar), auch in US-Dollar', en: 'Category O (not subject to VAT), also in US dollars' },
+  'kind.7': { de: 'Gutschrift oder Korrektur einer früheren Rechnung', en: 'Credit note or correction of an earlier invoice' },
+  'kind.7.xml': { de: 'Typ 381 oder 384 mit Bezug auf die ursprüngliche Rechnung', en: 'Type 381 or 384 with a reference to the original invoice' },
   'kinds.text': {
-    de: 'Inland mit Umsatzsteuer, mehrere Steuersätze, Kleinunternehmer, Reverse Charge in der EU, innergemeinschaftliche Lieferung, Ausfuhr, Leistungen in die USA ohne Umsatzsteuer, Gutschriften und Korrekturen. Jede dieser Arten wird mit dem Referenzprüfer der ZUGFeRD-Community getestet.',
-    en: 'Domestic with VAT, several VAT rates, small businesses, reverse charge within the EU, intra-community supplies, exports, services to the USA without VAT, credit notes and corrections. Each of these is tested with the reference validator of the ZUGFeRD community.',
+    de: 'Jede dieser Arten läuft bei jeder Änderung durch den Referenzprüfer der ZUGFeRD-Community.',
+    en: 'Each of these is run through the reference validator of the ZUGFeRD community on every change.',
   },
 
   'limits.title': { de: 'Was Sie wissen sollten', en: 'What you should know' },
