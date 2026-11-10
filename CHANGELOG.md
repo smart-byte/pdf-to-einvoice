@@ -14,6 +14,9 @@ All notable changes to this project are documented here. The format follows
   French. `scripts/eval-reader.mjs` measures it against e-invoices that carry their own answer.
 - Legal notice and privacy policy for the web app, in English and German, with the same footer and language switch
   on every page.
+- Web app: marks on the preview show where each value stands on the page and lead to its field; a progress bar
+  while a model downloads and a band of light over the page while it reads; the XML that will be embedded can be
+  viewed before the file is created.
 - `createEInvoice`: turns an existing invoice PDF plus invoice data into a ZUGFeRD / Factur-X e-invoice
   (PDF/A-3 with CII XML, profile EN 16931) without redrawing the pages.
 - `check`: required fields, formats, EN 16931 arithmetic, and a comparison of the data with the text of the PDF.

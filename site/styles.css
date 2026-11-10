@@ -20,6 +20,8 @@
   --green-wash: #e3f3ea;
   --amber: #8f5300;
   --amber-wash: #fbf0dc;
+  /* The page of an invoice is white in both themes, so what is drawn onto it keeps the ink of the light one. */
+  --page-ink: #2440b3;
   --shadow: 0 1px 1px #1b25400f, 0 18px 40px -22px #1b254059;
   --sans: 'Schibsted Grotesk Variable', 'Helvetica Neue', Arial, sans-serif;
   --mono: 'JetBrains Mono Variable', ui-monospace, Menlo, Consolas, monospace;
@@ -323,6 +325,12 @@ button,
 .quiet:hover {
   border-color: var(--ink);
 }
+/* While a model loads or reads, its button waits: it must not look as if it could be pressed again. */
+.quiet:disabled {
+  border-color: var(--line);
+  color: var(--muted);
+  cursor: default;
+}
 .link {
   background: none;
   border: 0;
@@ -373,6 +381,7 @@ body[data-mode='validate'] .finish {
 /* Looking at an existing e-invoice: nothing to read or create. */
 body[data-mode='validate'] .reader details,
 body[data-mode='validate'] #form button,
+body[data-mode='validate'] #xml,
 body[data-mode='validate'] #create {
   display: none;
 }
@@ -414,6 +423,83 @@ select:disabled {
 .work__pdf p {
   margin-top: 0.6rem;
 }
+.work__pdf p + p {
+  margin-top: 0.15rem;
+}
+
+/* Where the values of the form are printed: a wash of ink over each place, the way a reader marks a page. The field
+   that has the focus gets a frame around its place, and the other marks step back. */
+.marks {
+  position: absolute;
+  inset: 0;
+}
+.mark {
+  position: absolute;
+  box-sizing: content-box;
+  margin: -1px -2px;
+  padding: 1px 2px;
+  border: 0;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--page-ink) 11%, transparent);
+  cursor: pointer;
+  transition:
+    opacity 0.15s,
+    background-color 0.15s;
+}
+/* Two values printed in one place, such as the VAT rate of every line: the wash is laid on once. */
+.mark--twin {
+  background: none;
+}
+.mark:hover {
+  background: color-mix(in srgb, var(--page-ink) 24%, transparent);
+}
+.marks.is-focused .mark {
+  opacity: 0.25;
+}
+.marks.is-focused .mark:hover {
+  opacity: 1;
+}
+.marks.is-focused .mark.is-active {
+  opacity: 1;
+  background: color-mix(in srgb, var(--page-ink) 14%, transparent);
+  box-shadow: 0 0 0 2px var(--page-ink);
+}
+
+/* A band of light travels down the page while it is being read. It lies on top of the page without being in the way. */
+.scan {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 2px;
+  pointer-events: none;
+}
+.scan::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  /* The band is the lower part of a sheet as tall as the page: the glow of the lamp fades out behind its front edge. */
+  background: linear-gradient(to bottom, transparent 72%, color-mix(in srgb, var(--page-ink) 15%, transparent));
+  border-bottom: 2px solid color-mix(in srgb, var(--page-ink) 40%, transparent);
+  translate: 0 -100%;
+  animation: scan 2.6s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+.scan[data-mode='once']::before {
+  animation: scan 1.5s linear;
+}
+@keyframes scan {
+  to {
+    translate: 0 28%;
+  }
+}
+/* On the single pass after opening a PDF, each mark appears when the front edge of the band reaches it. */
+.scan[data-mode='once'] + .marks .mark {
+  animation: read 0.35s calc(var(--y) * 1.5s / 1.28) backwards;
+}
+@keyframes read {
+  from {
+    opacity: 0;
+  }
+}
 .work__data {
   background: var(--paper);
   border-radius: 2px;
@@ -429,6 +515,33 @@ select:disabled {
 }
 .reader details > * + * {
   margin-top: 0.8rem;
+}
+/* Loading a model takes minutes the first time: a bar shows how much of it is there. */
+.reader .loading {
+  margin-top: 0.3rem;
+}
+progress {
+  appearance: none;
+  display: block;
+  width: 100%;
+  height: 0.5rem;
+  border: 0;
+  border-radius: 2px;
+  background: var(--line);
+  overflow: hidden;
+}
+progress::-webkit-progress-bar {
+  background: var(--line);
+}
+progress::-webkit-progress-value {
+  background: var(--blue);
+  transition: inline-size 0.3s;
+}
+progress::-moz-progress-bar {
+  background: var(--blue);
+}
+.loading .hint {
+  margin-top: 0.5rem;
 }
 summary {
   cursor: pointer;
@@ -466,11 +579,21 @@ select {
   width: 100%;
   font: inherit;
   color: var(--ink);
-  background: var(--desk);
+  background-color: var(--desk);
   border: 1px solid var(--line);
   border-radius: 4px;
   padding: 0.5rem 0.65rem;
   min-height: 2.6rem;
+}
+/* The arrow of a dropdown is drawn here, so that it keeps its distance from the edge in every browser. */
+select {
+  appearance: none;
+  padding-right: 2.3rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8' fill='none' stroke='%23737c8a' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M1 1.5l5 5 5-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.85rem center;
+  background-size: 0.7rem auto;
+  text-overflow: ellipsis;
 }
 input:hover,
 select:hover {
@@ -479,12 +602,12 @@ select:hover {
 input[aria-invalid],
 select[aria-invalid] {
   border-color: var(--red);
-  background: var(--red-wash);
+  background-color: var(--red-wash);
 }
 input.warned,
 select.warned {
   border-color: var(--amber);
-  background: var(--amber-wash);
+  background-color: var(--amber-wash);
 }
 .hint {
   font-size: 0.8125rem;
@@ -509,7 +632,7 @@ select.warned {
 .line {
   position: relative;
   display: grid;
-  grid-template-columns: 5.5rem 1fr 1fr 1.6fr 5rem;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
   align-items: end;
   gap: 0.7rem 0.8rem;
   width: 100%;
@@ -517,6 +640,22 @@ select.warned {
   padding: 0.9rem 2.6rem 0.9rem 0.9rem;
   border: 1px solid var(--line);
   border-radius: 4px;
+}
+/* Quantity, unit and price share a row; the VAT treatment gets a row with room for its wording, the rate beside it. */
+.line > .field:nth-of-type(2) {
+  grid-column: span 3;
+}
+.line > .field:nth-of-type(3) {
+  grid-column: span 5;
+}
+.line > .field:nth-of-type(4) {
+  grid-column: span 4;
+}
+.line > .field:nth-of-type(5) {
+  grid-column: span 8;
+}
+.line > .field:nth-of-type(6) {
+  grid-column: span 4;
 }
 .line legend {
   padding: 0 0.4rem;
@@ -540,7 +679,6 @@ select.warned {
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 0 1.5rem;
-  font-variant-numeric: tabular-nums;
 }
 .total dd {
   margin: 0;
@@ -609,6 +747,7 @@ select.warned {
   position: absolute;
   top: 56%;
   right: 10%;
+  pointer-events: none;
   font: 700 clamp(1rem, 2.3vw, 1.6rem) var(--mono);
   letter-spacing: 0.08em;
   /* Stamp ink on white paper, whatever the theme of the page. */
@@ -675,7 +814,7 @@ select.warned {
   margin-top: 0.6rem;
 }
 /* What is printed and what is written: the white page and the blue XML sheet of the hero, side by side. */
-.info table {
+:is(.info, .work) table {
   width: 100%;
   max-width: 62rem;
   border-collapse: separate;
@@ -683,23 +822,23 @@ select.warned {
   margin: 1.6rem -0.9rem;
   font-size: 0.9375rem;
 }
-.info th {
+:is(.info, .work) th {
   text-align: left;
   font-weight: 650;
   color: var(--ink);
   padding: 0.9rem 1.1rem 0.6rem;
 }
-.info td {
+:is(.info, .work) td {
   padding: 0.6rem 1.1rem;
   border-top: 1px solid var(--line);
   vertical-align: top;
 }
-.info th,
-.info td {
+:is(.info, .work) th,
+:is(.info, .work) td {
   background: var(--paper);
   width: 50%;
 }
-.info tr:last-child td {
+:is(.info, .work) tr:last-child td {
   padding-bottom: 1rem;
 }
 .pair th:last-child,
@@ -712,6 +851,55 @@ select.warned {
   font-size: 0.8125rem;
   overflow-wrap: anywhere;
   word-break: break-all;
+}
+/* In the workbench the pair shows this invoice. It lies on paper there, so the printed side takes the colour of the desk. */
+.work .pair {
+  width: calc(100% + 1.2rem);
+  margin: 0.2rem -0.6rem 0;
+  border-spacing: 0.6rem 0;
+}
+.work .pair th:first-child,
+.work .pair td:first-child {
+  background: var(--desk);
+}
+.work .pair strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+.work .pair code {
+  word-break: normal;
+}
+#xml-status:empty {
+  display: none;
+}
+#xml-whole {
+  margin-top: 1.2rem;
+}
+/* The whole XML: the blue sheet at full length, in a window that scrolls. The button to copy it stands above, where
+   it covers none of it. */
+.xml {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+.xml pre {
+  align-self: stretch;
+  margin: 0;
+  max-height: 26rem;
+  overflow: auto;
+  padding: 1rem 1.1rem;
+  background: var(--blue-wash);
+  color: var(--blue);
+  border-radius: 2px;
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  tab-size: 2;
+}
+.xml .quiet {
+  padding: 0.3rem 0.8rem;
+  font-size: 0.875rem;
 }
 .info details {
   margin-top: 1.4rem;
@@ -789,23 +977,27 @@ html[lang='en']:has([data-lang][aria-pressed='true']) .legal[lang='de'] {
 }
 @media (max-width: 40rem) {
   /* On a phone the two sheets of a row lie on top of each other. */
-  .info table,
-  .info thead,
-  .info tbody,
-  .info tr,
-  .info th,
-  .info td {
+  :is(.info, .work) table,
+  :is(.info, .work) thead,
+  :is(.info, .work) tbody,
+  :is(.info, .work) tr,
+  :is(.info, .work) th,
+  :is(.info, .work) td {
     display: block;
     width: auto;
   }
   .info table {
     margin: 1.4rem 0;
   }
-  .info tr + tr,
-  .info tbody tr:first-child {
+  .work .pair {
+    width: auto;
+    margin: 0;
+  }
+  :is(.info, .work) tr + tr,
+  :is(.info, .work) tbody tr:first-child {
     margin-top: 0.7rem;
   }
-  .info td + td {
+  :is(.info, .work) td + td {
     padding-top: 0.5rem;
   }
   .kinds td + td {
@@ -818,6 +1010,12 @@ html[lang='en']:has([data-lang][aria-pressed='true']) .legal[lang='de'] {
   .line {
     grid-template-columns: 1fr 1fr;
   }
+  .line > .field:nth-of-type(n + 2) {
+    grid-column: auto;
+  }
+  .line > .field:nth-of-type(5) {
+    grid-column: 1 / -1;
+  }
   .fields {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -827,5 +1025,15 @@ html[lang='en']:has([data-lang][aria-pressed='true']) .legal[lang='de'] {
     animation: none !important;
     transition: none !important;
     scroll-behavior: auto !important;
+  }
+  /* Nothing travels: while a model reads, the page is tinted; the single pass after opening a PDF is left out. */
+  .scan::before {
+    animation: none !important;
+    translate: none;
+    border: 0;
+    background: color-mix(in srgb, var(--page-ink) 9%, transparent);
+  }
+  .scan[data-mode='once'] {
+    display: none;
   }
 }
