@@ -8,6 +8,10 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- `extractLayout`: the text of a PDF with its geometry (blocks, pieces with positions, page sizes).
+- `guessFromText` reads by what fits together instead of where it stands: totals by arithmetic, items that add up to
+  them, the seller by evidence and the buyer by exclusion, identifiers by their shape; labels in German, English and
+  French. `scripts/eval-reader.mjs` measures it against e-invoices that carry their own answer.
 - Legal notice and privacy policy for the web app, in English and German, with the same footer and language switch
   on every page.
 - `createEInvoice`: turns an existing invoice PDF plus invoice data into a ZUGFeRD / Factur-X e-invoice
