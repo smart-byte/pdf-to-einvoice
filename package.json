@@ -1,0 +1,95 @@
+{
+  "name": "pdf-to-einvoice",
+  "version": "0.1.0",
+  "description": "Turn an existing invoice PDF into a valid EN 16931 e-invoice (ZUGFeRD / Factur-X) without changing how it looks. Runs in the browser, as a CLI, as a library and as an MCP server for AI assistants.",
+  "keywords": [
+    "e-invoice",
+    "einvoice",
+    "e-rechnung",
+    "erechnung",
+    "zugferd",
+    "factur-x",
+    "facturx",
+    "xrechnung",
+    "en16931",
+    "invoice",
+    "pdf",
+    "pdfa",
+    "pdf-a3",
+    "cii",
+    "electronic-invoice",
+    "mcp",
+    "mcp-server",
+    "llm",
+    "ai",
+    "browser",
+    "privacy"
+  ],
+  "license": "MIT",
+  "author": "Smart-Byte GmbH",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/smart-byte/pdf-to-einvoice.git"
+  },
+  "homepage": "https://github.com/smart-byte/pdf-to-einvoice#readme",
+  "bugs": {
+    "url": "https://github.com/smart-byte/pdf-to-einvoice/issues"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "pdf-to-einvoice": "dist/cli.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "skills",
+    "README.md",
+    "THIRD_PARTY_NOTICES.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "type-check": "tsc --noEmit && tsc --noEmit -p site/tsconfig.json",
+    "lint": "oxlint",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:reference": "vitest run test/reference.test.ts",
+    "sample": "node scripts/make-sample.mjs",
+    "site": "vite --config site/vite.config.ts --open",
+    "site:build": "vite build --config site/vite.config.ts",
+    "site:preview": "vite preview --config site/vite.config.ts --port 4351",
+    "prepublishOnly": "npm run type-check && npm run lint && npm run format:check && npm run build && npm test"
+  },
+  "dependencies": {
+    "@cantoo/pdf-lib": "^2.11.1",
+    "@e-invoice-eu/core": "^3.4.2",
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "fast-xml-parser": "^5.11.2",
+    "pdfjs-dist": "^6.4.299"
+  },
+  "devDependencies": {
+    "@fontsource-variable/jetbrains-mono": "^5.3.0",
+    "@fontsource-variable/schibsted-grotesk": "^5.3.0",
+    "@mlc-ai/web-llm": "^0.2.86",
+    "@types/node": "^26.6.5",
+    "ajv": "^8.20.0",
+    "dejavu-fonts-ttf": "^2.37.3",
+    "fontkit": "^2.0.4",
+    "oxlint": "^1.89.0",
+    "prettier": "^3.9.10",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5",
+    "vitest": "^5.0.5"
+  }
+}
