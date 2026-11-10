@@ -11,6 +11,7 @@ import { lang, setLang, t } from './i18n.js';
 import { DEFAULT_MODEL, MODELS, hasWebGpu, readWithBrowserModel, readWithEndpoint } from './llm.js';
 import { locate, type Piece, type Rect } from './locate.js';
 import './styles.css';
+import './theme-switch.js';
 
 pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
@@ -330,6 +331,8 @@ function validate(): void {
   refreshXml();
 }
 
+// The form is never sent anywhere: Enter in a field must not reload the page.
+$('#form').addEventListener('submit', (event) => event.preventDefault());
 $('#form').addEventListener('input', (event) => {
   const input = event.target as HTMLInputElement | HTMLSelectElement;
   const path = input.dataset.path;
@@ -670,17 +673,18 @@ function refreshXml(): void {
 }
 xmlSection.addEventListener('toggle', () => xmlSection.open && renderXml());
 
-$('#xml-copy').onclick = async () => {
-  const code = $('#xml-code');
+/** Copies the text of an element; the label of the button says so for a moment. */
+async function copyText(source: HTMLElement, label: string): Promise<void> {
   try {
-    await navigator.clipboard.writeText(code.textContent ?? '');
-    setText('#xml-copy', 'xml.copied');
-    setTimeout(() => setText('#xml-copy', 'xml.copy'), 2000);
+    await navigator.clipboard.writeText(source.textContent ?? '');
+    setText(label, 'xml.copied');
+    setTimeout(() => setText(label, 'xml.copy'), 2000);
   } catch {
-    // The browser does not let the page write to the clipboard: the XML is selected, ready for Ctrl+C.
-    getSelection()?.selectAllChildren(code);
+    // The browser does not let the page write to the clipboard: the text is selected, ready for Ctrl+C.
+    getSelection()?.selectAllChildren(source);
   }
-};
+}
+$('#xml-copy').onclick = () => copyText($('#xml-code'), '#xml-copy');
 
 // ---------------------------------------------------------------------------------------------------------------
 // Creating the e-invoice
@@ -725,6 +729,30 @@ $('#create').onclick = async () => {
   }
 };
 $('#again').onclick = () => show('work');
+
+// ---------------------------------------------------------------------------------------------------------------
+// The listings for developers: one is shown at a time
+
+const tabs = [...document.querySelectorAll<HTMLButtonElement>('.tabs [role="tab"]')];
+function selectTab(tab: HTMLButtonElement): void {
+  for (const other of tabs) {
+    other.setAttribute('aria-selected', String(other === tab));
+    other.tabIndex = other === tab ? 0 : -1;
+    $(`#${other.getAttribute('aria-controls')}`).hidden = other !== tab;
+  }
+}
+for (const [i, tab] of tabs.entries()) {
+  tab.onclick = () => selectTab(tab);
+  // The arrow keys move from tab to tab, as in every list of tabs.
+  tab.onkeydown = (event) => {
+    const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
+    if (!step) return;
+    const next = tabs[(i + step + tabs.length) % tabs.length]!;
+    selectTab(next);
+    next.focus();
+  };
+}
+$('#code-copy').onclick = () => copyText($('.code pre:not([hidden])'), '#code-copy span');
 
 // ---------------------------------------------------------------------------------------------------------------
 // Language
