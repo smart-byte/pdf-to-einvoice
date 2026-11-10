@@ -31,6 +31,23 @@ MUSTANG_JAR=$PWD/Mustang-CLI-2.26.0.jar npm run test:reference
 CI runs this on every push. A new kind of invoice (a VAT category, a document type, a field that changes the XML)
 gets a case in `test/reference.test.ts`.
 
+## Measuring the reader
+
+Reading an invoice from its text must not be fitted to a few layouts. A hybrid e-invoice carries its own answer: the
+data is in its XML, so the text of the page can be read and compared with it. The public
+[ZUGFeRD corpus](https://github.com/ZUGFeRD/corpus) has such files from several vendors:
+
+```bash
+git clone --depth 1 https://github.com/ZUGFeRD/corpus.git /tmp/corpus
+npm run build
+npm run eval:reader -- /tmp/corpus/ZUGFeRDv2/correct            # table: correct, missing, wrong per field
+npm run eval:reader -- /tmp/corpus/ZUGFeRDv2/correct --files    # what each file lacks
+```
+
+A wrong value is worse than a missing one: a missing value is asked for, a wrong one may end up in the XML unnoticed.
+A change to `src/guess.ts` or `src/text.ts` comes with the table before and after. Keep the corpus out of this
+repository, and do not write rules for a single vendor's sample: most of its files come from very few generators.
+
 ## Pull requests
 
 - One change per PR, with a test that fails without it. Tests assert behaviour through the public functions.

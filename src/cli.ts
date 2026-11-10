@@ -10,7 +10,7 @@ import { createEInvoice, InvoiceError } from './create.js';
 import { guessFromText } from './guess.js';
 import { invoiceJsonSchema, type InvoiceDraft } from './model.js';
 import { inspectPdf, readEmbeddedXml } from './pdf.js';
-import { extractText } from './text.js';
+import { extractLayout, extractText } from './text.js';
 import { validateEInvoice, type ValidationResult } from './validate.js';
 
 export interface Io {
@@ -59,8 +59,12 @@ async function readJson(path: string): Promise<InvoiceDraft> {
 export async function describePdf(pdfPath: string) {
   const pdf = await readPdf(pdfPath);
   const info = await inspectPdf(pdf);
-  const text = await extractText(pdf);
-  return { text, guess: guessFromText(text), pdf: { pages: info.pages, unembeddedFonts: info.unembeddedFonts, isEInvoice: info.embeddedXml !== null } };
+  const { text, blocks } = await extractLayout(pdf);
+  return {
+    text,
+    guess: guessFromText(text, { blocks }),
+    pdf: { pages: info.pages, unembeddedFonts: info.unembeddedFonts, isEInvoice: info.embeddedXml !== null },
+  };
 }
 
 /** Where the e-invoice goes when no output is named: invoice.pdf becomes invoice.einvoice.pdf. */

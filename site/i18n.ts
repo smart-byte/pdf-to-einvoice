@@ -235,6 +235,10 @@ export const STRINGS: Record<string, Entry> = {
     en: 'Your invoice does not leave the browser: no server, no cookies, no tracking. Only for “Read with AI” does the browser download a model from huggingface.co, once.',
   },
   'limits.4': { de: 'Diese Seite ist ein Werkzeug und keine Steuerberatung.', en: 'This page is a tool, not tax advice.' },
+  'limits.5': {
+    de: 'Die automatische Erkennung liest noch nicht aus jeder Rechnung alles. Wir arbeiten daran, dass Rechnungen jeder Art erkannt werden; was fehlt, zeigt das Formular an.',
+    en: 'Automatic reading does not get everything from every invoice yet. We are working on reading invoices of every kind; the form shows what is missing.',
+  },
 
   'dev.title': { de: 'Für Entwickler und KI-Assistenten', en: 'For developers and AI assistants' },
   'dev.text': {
@@ -242,6 +246,8 @@ export const STRINGS: Record<string, Entry> = {
     en: 'The same core runs as a library, as a command line tool and as an MCP server that lets assistants like Claude convert invoices.',
   },
   'foot.source': { de: 'Quelltext auf GitHub', en: 'Source on GitHub' },
+  'foot.legal': { de: 'Impressum', en: 'Legal notice' },
+  'foot.privacy': { de: 'Datenschutz', en: 'Privacy' },
   'foot.licence': { de: 'MIT-Lizenz', en: 'MIT licence' },
 };
 
