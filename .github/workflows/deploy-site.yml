@@ -1,19 +1,16 @@
 name: Deploy site
 
 # Builds site/ and publishes it to Cloudflare as the Worker in site/wrangler.jsonc, served at https://pdf-to-einvoice.app.
+# Started by hand only (Actions → Deploy site → Run workflow, on main): a merge does not change the live site.
 # Needs two repository secrets: CLOUDFLARE_API_TOKEN ("Edit Cloudflare Workers" template, limited to the account and
 # the pdf-to-einvoice.app zone) and CLOUDFLARE_ACCOUNT_ID.
 on:
-  push:
-    branches: [main]
-    # The page runs the code in src/, so library changes redeploy it too.
-    paths: [site/**, src/**, examples/**, scripts/finish-site.mjs, package.json, package-lock.json, .github/workflows/deploy-site.yml]
   workflow_dispatch:
 
 permissions:
   contents: read
 
-# One deploy at a time; a newer push waits for the running one instead of racing it.
+# One deploy at a time; a second start waits for the running one instead of racing it.
 concurrency: deploy-site
 
 jobs:
