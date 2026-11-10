@@ -11,6 +11,11 @@ export default defineConfig({
   // bundle is the one the upstream README points browsers to.
   resolve: { alias: { '@e-invoice-eu/core': page('../node_modules/@e-invoice-eu/core/dist/e-invoice-eu.min.js') } },
   server: { port: 4350, host: '127.0.0.1', fs: { allow: [page('..')] } },
-  build: { outDir: '../site-dist', emptyOutDir: true, target: 'es2022' },
+  build: {
+    outDir: '../site-dist',
+    emptyOutDir: true,
+    target: 'es2022',
+    rolldownOptions: { input: ['index.html', 'legal-notice.html', 'privacy.html'].map(page) },
+  },
   worker: { format: 'es' },
 });

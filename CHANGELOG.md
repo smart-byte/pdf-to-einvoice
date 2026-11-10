@@ -8,6 +8,8 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Legal notice and privacy policy for the web app, in English and German, with the same footer and language switch
+  on every page.
 - `createEInvoice`: turns an existing invoice PDF plus invoice data into a ZUGFeRD / Factur-X e-invoice
   (PDF/A-3 with CII XML, profile EN 16931) without redrawing the pages.
 - `check`: required fields, formats, EN 16931 arithmetic, and a comparison of the data with the text of the PDF.
