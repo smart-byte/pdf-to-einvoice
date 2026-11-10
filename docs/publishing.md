@@ -18,8 +18,14 @@ gh repo edit smart-byte/pdf-to-einvoice \
 ## Before the repository goes public
 
 - [ ] Read the commit history once more for anything that should not be public.
-- [ ] Decide where the web app is hosted and add the deploy workflow (imagefast uses Cloudflare; the build output is
-      `site-dist/`). Put the URL into the README, `package.json` (`homepage`) and `site/public/llms.txt`.
+- [ ] Switch on GitHub Pages with "GitHub Actions" as its source, then run the "Deploy site" workflow (it also runs
+      on every push to main that touches the site or the library). The organisation's Team plan allows Pages from a
+      private repository; the published site is public either way.
+      `gh api -X POST repos/smart-byte/pdf-to-einvoice/pages -f build_type=workflow`
+- [ ] Put the address into the repository's "Website" field:
+      `gh repo edit smart-byte/pdf-to-einvoice --homepage https://smart-byte.github.io/pdf-to-einvoice/`
+- [ ] A custom domain can be put in front later. Model downloads are cached per address, so users load their model
+      once more after a move.
 - [ ] A German site needs a legal notice and a privacy page; adapt the ones of imagefast.
 - [ ] Have a tax adviser read the "Limits" section of the README and the texts under "What you should know" on the
       site.
