@@ -42,7 +42,7 @@ const TOOLS = [
   {
     name: 'check_invoice',
     description:
-      'Checks invoice data against the EN 16931 rules and the particulars German VAT law asks for. Returns { ok, findings, totals }: errors block the e-invoice, warnings need a second look, totals are calculated from the lines. The data may be incomplete; what is missing is reported. With pdf_path, values that do not occur in the text of the PDF are reported too.',
+      'Checks invoice data against the main EN 16931 rules (required fields, formats, arithmetic, VAT categories) and the particulars German VAT law asks for. It is not a full validator. Returns { ok, findings, totals }: errors block the e-invoice, warnings need a second look, totals are calculated from the lines. The data may be incomplete; what is missing is reported. With pdf_path, values that do not occur in the text of the PDF are reported too.',
     annotations: { readOnlyHint: true },
     inputSchema: {
       type: 'object',

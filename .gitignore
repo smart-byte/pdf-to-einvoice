@@ -1,6 +1,7 @@
 node_modules
 dist
 site-dist
-.remember
 .DS_Store
 *.log
+*.tgz
+*.jar

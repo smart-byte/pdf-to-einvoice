@@ -1,6 +1,6 @@
 # pdf-to-einvoice
 
-Turn the invoice PDF you already have into a valid e-invoice (ZUGFeRD / Factur-X, EN 16931) without changing how it
+Turn the invoice PDF you already have into an e-invoice (ZUGFeRD / Factur-X, EN 16931) without changing how it
 looks. In the browser, on the command line, as a TypeScript library, or as an MCP server for AI assistants.
 
 [![CI](https://github.com/smart-byte/pdf-to-einvoice/actions/workflows/ci.yml/badge.svg)](https://github.com/smart-byte/pdf-to-einvoice/actions/workflows/ci.yml)
@@ -18,10 +18,11 @@ in their format. This one starts from the PDF you already produce with Word, you
 - **It tells you what is missing.** Required fields, sums that do not add up, and values that do not appear on
   your PDF are listed before anything is created.
 - **Nothing is uploaded.** The web app has no server; the library and CLI run on your machine.
-- **Every kind of invoice.** Domestic with VAT, several rates, small businesses, reverse charge, intra-community
+- **The common kinds of invoice.** Domestic with VAT, several rates, small businesses, reverse charge, intra-community
   supplies, exports, services to non-EU customers, credit notes and corrections.
-- **Checked against the reference.** Each of those kinds is validated in CI by an independent reference validator:
-  veraPDF for PDF/A-3 plus the official EN 16931 and Factur-X rules.
+- **Checked against the reference.** In CI each of those kinds is created from a sample PDF and validated by an
+  independent reference validator: veraPDF for PDF/A-3 plus the official EN 16931 and Factur-X rules. What your own
+  PDF brings along is a different matter, see [What changes in your PDF](#what-changes-in-your-pdf).
 
 ## In the browser
 
@@ -56,7 +57,9 @@ const { pdf, xml, findings } = await createEInvoice({
 await writeFile('invoice.einvoice.pdf', pdf);
 ```
 
-It works the same in a browser: `pdf` is a `Uint8Array` in and out.
+It works the same in a browser: `pdf` is a `Uint8Array` in and out. A bundler needs two things set up, as
+[`site/vite.config.ts`](site/vite.config.ts) and [`site/main.ts`](site/main.ts) do: an alias that points
+`@e-invoice-eu/core` to its browser bundle, and the worker of pdf.js.
 
 | function                           | what it does                                                                                                       |
 | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
@@ -134,8 +137,10 @@ Only what the standard asks for: the XML attachment, XMP metadata that declares 
 output intent and a document ID. Images that ask viewers to smooth them (`/Interpolate true`) have that flag switched
 off, because PDF/A forbids it. The page content is not touched.
 
-What cannot be repaired is reported: if your PDF does not embed its fonts, the XML is still valid, but the file is
-not a strict PDF/A-3. Export the PDF with embedded fonts (or as PDF/A) and run it again.
+One defect is detected and reported: fonts that are not embedded. The XML is still valid then, but the file is not a
+strict PDF/A-3; export the PDF with embedded fonts (or as PDF/A) and run it again. Other things PDF/A forbids in
+your original are neither found nor repaired. If the software of a recipient rejects the file, check it with a PDF/A
+validator.
 
 ## Limits
 
@@ -155,7 +160,7 @@ not a strict PDF/A-3. Export the PDF with embedded fonts (or as PDF/A) and run i
   e-invoice.
 - **Country rules:** a hybrid PDF is how e-invoices are exchanged in Germany. Italy, Poland, Belgium and France
   route invoices through national platforms or networks; a file alone is not enough there.
-- This is a tool, not tax advice.
+- This is a tool, not tax or legal advice.
 
 ## Built on
 
@@ -185,3 +190,6 @@ npm run site             # the web app on http://localhost:4350
 
 MIT, see [LICENSE](LICENSE). The software implements the semantic data model of the European standard
 EN 16931-1:2017; the standard itself is the property of CEN and is not part of this repository.
+
+ZUGFeRD, Factur-X and XRechnung are names of their respective owners. This project is independent: it is not
+affiliated with the organisations behind these standards, and it is neither endorsed nor certified by them.

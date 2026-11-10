@@ -1,7 +1,7 @@
 {
   "name": "pdf-to-einvoice",
   "version": "0.1.0",
-  "description": "Turn an existing invoice PDF into a valid EN 16931 e-invoice (ZUGFeRD / Factur-X) without changing how it looks. Runs in the browser, as a CLI, as a library and as an MCP server for AI assistants.",
+  "description": "Turn an existing invoice PDF into an EN 16931 e-invoice (ZUGFeRD / Factur-X) without changing how it looks. Runs in the browser, as a CLI, as a library and as an MCP server for AI assistants.",
   "keywords": [
     "e-invoice",
     "einvoice",
@@ -10,7 +10,6 @@
     "zugferd",
     "factur-x",
     "facturx",
-    "xrechnung",
     "en16931",
     "invoice",
     "pdf",
@@ -37,7 +36,7 @@
   },
   "type": "module",
   "engines": {
-    "node": ">=20"
+    "node": ">=22.13.0"
   },
   "bin": {
     "pdf-to-einvoice": "dist/cli.js"

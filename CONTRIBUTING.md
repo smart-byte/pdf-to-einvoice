@@ -6,7 +6,7 @@ PDF, text extraction), and this repository adds the data model, the checks and t
 ## Setup
 
 ```bash
-npm install            # Node >= 22.12, see .nvmrc
+npm install            # Node >= 22.13, see .nvmrc
 npm test               # unit tests (vitest)
 npm run type-check     # tsc for src/, test/ and site/
 npm run lint           # oxlint
