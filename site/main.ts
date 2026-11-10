@@ -351,7 +351,7 @@ let pieces: Piece[] = [];
 const marks = $('#marks');
 const focusedPath = () => (document.activeElement as HTMLElement | null)?.dataset.path;
 
-// ponytail: letters are measured in the browser's sans-serif, not in the font of the PDF, so a mark inside a long
+// Known limit: letters are measured in the browser's sans-serif, not in the font of the PDF, so a mark inside a long
 // piece of text can be off by a letter. Measure with the embedded font if that shows.
 const ruler = document.createElement('canvas').getContext('2d')!;
 ruler.font = '16px sans-serif';
@@ -387,7 +387,7 @@ function renderMarks(): void {
     const line = /^(lines\.\d+)\.(\w+)$/.exec(path);
     if (isEmpty(value)) continue;
     // The numbers of a line item are looked for next to its name: a "2" elsewhere on the page is not its quantity.
-    // ponytail: the rate is looked for as "19 %" anywhere, since most invoices print it with the totals only; "7,5 %" is not found.
+    // Known limit: the rate is looked for as "19 %" anywhere, since most invoices print it with the totals only; "7,5 %" is not found.
     const rects =
       !line || line[2] === 'name' ? find(value) : line[2] === 'vatRate' ? find(`${value} %`) : find(value, find(getPath(state.draft, `${line[1]}.name`)));
     place(path, fieldLabel(path), rects);
@@ -432,7 +432,7 @@ async function preview(pdf: Uint8Array): Promise<void> {
   canvas.height = viewport.height;
   await page.render({ canvas, viewport }).promise;
   // Measured here and not taken from extractLayout: the marks lie on this drawing, so they use its view of the page.
-  // ponytail: upright text only. Text that is printed turned gets its mark in the wrong place; use the whole text matrix if such invoices turn up.
+  // Known limit: upright text only. Text that is printed turned gets its mark in the wrong place; use the whole text matrix if such invoices turn up.
   pieces = (await page.getTextContent()).items.flatMap((item) => {
     if (!('str' in item) || !item.str.trim()) return [];
     const [x, y, height] = [item.transform[4] as number, item.transform[5] as number, item.height];
