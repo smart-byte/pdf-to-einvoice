@@ -579,6 +579,7 @@ $('#ai-run').onclick = async () => {
   const viaEndpoint = modelSelect.value === 'endpoint';
   if (!viaEndpoint && !hasWebGpu()) return void (status.textContent = t('ai.nogpu'));
   button.disabled = true;
+  const pdf = state.pdf;
   try {
     reading(viaEndpoint ? 1 : 0);
     const read = viaEndpoint
@@ -588,8 +589,11 @@ $('#ai-run').onclick = async () => {
           key: $<HTMLInputElement>('#ai-key').value,
         })
       : readWithBrowserModel(state.pdfText, modelSelect.value, reading);
+    const answer = await read;
+    // Another PDF was opened while the model read: its answer is about the invoice that is gone.
+    if (state.pdf !== pdf) return;
     // A small model translates names and makes up identifiers. Only what the PDF shows is taken over.
-    merge(keepWhatThePdfShows(normaliseDraft(await read), state.pdfText), true);
+    merge(keepWhatThePdfShows(normaliseDraft(answer), state.pdfText), true);
     renderForm();
     status.textContent = t('ai.done');
   } catch (error) {
@@ -597,6 +601,7 @@ $('#ai-run').onclick = async () => {
   } finally {
     reading();
     button.disabled = false;
+    if (state.pdf !== pdf) status.textContent = '';
   }
 };
 
