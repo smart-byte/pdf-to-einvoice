@@ -944,6 +944,22 @@ select.warned {
 .hint--warning {
   color: var(--amber);
 }
+/* Ticks off a value that is still to be checked. */
+.hint .ok {
+  margin-left: 0.35rem;
+  padding: 0.14rem 0.6rem;
+  border: 1px solid currentColor;
+  border-radius: var(--radius);
+  background: var(--paper);
+  color: inherit;
+  font-size: inherit;
+  font-weight: 650;
+  line-height: 1.5;
+  cursor: pointer;
+}
+.hint .ok:hover {
+  background: var(--amber-wash);
+}
 
 .lines {
   display: grid;
@@ -977,6 +993,13 @@ select.warned {
 }
 .line > .field:nth-of-type(6) {
   grid-column: span 4;
+}
+/* A line item a model added as a whole. */
+.line--check {
+  border-color: var(--amber);
+}
+.line > .hint {
+  grid-column: 1 / -1;
 }
 .line legend {
   padding: 0 0.45rem;

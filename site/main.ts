@@ -37,10 +37,13 @@ interface State {
   fileFindings: Finding[];
   /** `validate` shows what an existing e-invoice says; nothing can be edited or created then. */
   mode: 'create' | 'validate';
-  /** Fields filled with a suggestion that is not on the PDF, until the user changes them. */
-  suggested: Set<string>;
+  /**
+   * Values nobody has looked at yet, by the path of their field or of a whole line item ("lines.2"): a suggestion that
+   * is not on the PDF, or what a language model read. Each stays until the user changes the value or says it is right.
+   */
+  toCheck: Map<string, 'suggested' | 'model'>;
 }
-const state: State = { fileName: '', pdfText: '', draft: {}, touched: new Set(), fileFindings: [], mode: 'create', suggested: new Set() };
+const state: State = { fileName: '', pdfText: '', draft: {}, touched: new Set(), fileFindings: [], mode: 'create', toCheck: new Map() };
 
 // ---------------------------------------------------------------------------------------------------------------
 // Paths into the draft, e.g. "seller.name" or "lines.0.unitPrice"
@@ -59,19 +62,26 @@ const hasContent = (lines: unknown) => Array.isArray(lines) && lines.some((line)
 
 /**
  * Copies the values of `extra` into the draft, except where the user has already typed. With `onlyEmpty`, values
- * that are already there stay as well: what the patterns found is not replaced by what a model read.
+ * that are already there stay as well: what the patterns found is not replaced by what a model read. Returns what
+ * was filled in: the paths of the fields, and one path per line item ("lines.2") where the lines were taken over.
  */
-function merge(extra: any, onlyEmpty = false, prefix = ''): void {
+function merge(extra: any, onlyEmpty = false, prefix = '', filled: string[] = []): string[] {
   for (const [key, value] of Object.entries(extra ?? {})) {
     const path = prefix ? `${prefix}.${key}` : key;
     if (isEmpty(value)) continue;
     if (key === 'lines' && Array.isArray(value)) {
       const typed = [...state.touched].some((p) => p.startsWith('lines.'));
-      if (!typed && !(onlyEmpty && hasContent(state.draft.lines)) && hasContent(value)) state.draft.lines = value.map(normalise) as InvoiceDraft['lines'];
-    } else if (typeof value === 'object') merge(value, onlyEmpty, path);
-    else if (!state.touched.has(path) && !(onlyEmpty && !isEmpty(getPath(state.draft, path))))
+      if (!typed && !(onlyEmpty && hasContent(state.draft.lines)) && hasContent(value)) {
+        state.draft.lines = value.map(normalise) as InvoiceDraft['lines'];
+        filled.push(...value.map((_, i) => `lines.${i}`));
+      }
+    } else if (typeof value === 'object') merge(value, onlyEmpty, path, filled);
+    else if (!state.touched.has(path) && !(onlyEmpty && !isEmpty(getPath(state.draft, path)))) {
       setPath(state.draft, path, NUMERIC.test(path) ? toNumber(value) : value);
+      filled.push(path);
+    }
   }
+  return filled;
 }
 
 const NUMERIC = /(quantity|unitPrice|netAmount|vatRate|prepaidAmount|totals\.\w+)$/;
@@ -200,10 +210,26 @@ function renderLines(): HTMLElement {
     remove.onclick = () => {
       lines.splice(i, 1);
       state.touched.add('lines.removed');
+      // The lines below move up by one, and what is still to be checked moves with them.
+      state.toCheck = new Map(
+        [...state.toCheck].flatMap(([path, why]): [string, 'suggested' | 'model'][] => {
+          const at = /^lines\.(\d+)(.*)$/.exec(path);
+          if (!at || Number(at[1]) < i) return [[path, why]];
+          return Number(at[1]) === i ? [] : [[`lines.${Number(at[1]) - 1}${at[2]}`, why]];
+        }),
+      );
       renderForm();
     };
     list.append(
-      el('fieldset', { className: 'line' }, el('legend', {}, String(i + 1)), ...LINE_FIELDS.map((field) => control(field, `lines.${i}.${field.path}`)), remove),
+      el(
+        'fieldset',
+        { className: 'line' },
+        el('legend', {}, String(i + 1)),
+        ...LINE_FIELDS.map((field) => control(field, `lines.${i}.${field.path}`)),
+        remove,
+        // Says something about the line as a whole, e.g. that a model added it.
+        el('p', { className: 'hint', dataset: { hint: `lines.${i}` } }),
+      ),
     );
   });
   const add = el('button', { type: 'button', className: 'quiet' }, t('l.add'));
@@ -259,22 +285,48 @@ function fieldLabel(path: string): string {
   return path.startsWith('totals') ? t('s.totals') : path === 'lines' ? t('s.lines') : '';
 }
 
+/** The field of a path, or the first field of a line item for the path of the whole line. */
+const fieldOf = (path: string) => document.querySelector<HTMLElement>(`[data-path="${path}"], [data-path="${path}.name"]`);
+
 function validate(): void {
   const result = (state.result = check(state.draft, state.pdf ? { pdfText: state.pdfText } : {}));
-  // A suggestion is not on the PDF; it is listed until the user has looked at it and changed or kept it by typing.
-  const suggestions: Finding[] = [...state.suggested]
-    .filter((path) => !state.touched.has(path))
-    .map((path) => ({ path, severity: 'warning', code: 'suggested', message: t('hint.suggested') }));
-  const findings = [...result.findings, ...state.fileFindings, ...suggestions];
+  // What nobody has looked at yet is said at its field. A model may have read a value the form has no field for: that one is not counted.
+  const unchecked: Finding[] = [...state.toCheck]
+    .filter(([path]) => document.querySelector(`[data-hint="${path}"]`))
+    .map(([path, why]) => ({
+      path,
+      severity: 'warning',
+      code: why,
+      message: t(why === 'suggested' ? 'hint.suggested' : /^lines\.\d+$/.test(path) ? 'hint.model.line' : 'hint.model'),
+    }));
+  const findings = [...result.findings, ...state.fileFindings, ...unchecked];
 
   for (const hint of document.querySelectorAll<HTMLElement>('[data-hint]')) {
-    const own = findings.filter((f) => f.path === hint.dataset.hint);
+    const path = hint.dataset.hint!;
+    const own = findings.filter((f) => f.path === path);
     const worst = own.find((f) => f.severity === 'error') ?? own[0];
     hint.textContent = worst ? describe(worst) : '';
     hint.className = `hint${worst ? ` hint--${worst.severity}` : ''}`;
-    const input = document.querySelector<HTMLElement>(`[data-path="${hint.dataset.hint}"]`);
+    const input = document.querySelector<HTMLElement>(`[data-path="${path}"]`);
     input?.toggleAttribute('aria-invalid', worst?.severity === 'error');
     input?.classList.toggle('warned', worst?.severity === 'warning');
+    // The hint of a whole line item: its frame says so too.
+    if (hint.parentElement?.matches('.line'))
+      hint.parentElement.classList.toggle(
+        'line--check',
+        unchecked.some((f) => f.path === path),
+      );
+    // A value that is still to be checked can be ticked off where it stands, without typing it again.
+    if (worst && unchecked.includes(worst) && state.mode === 'create') {
+      const ok = el('button', { type: 'button', className: 'ok' }, t('hint.ok'));
+      ok.setAttribute('aria-label', t('hint.ok.label', { f: fieldLabel(path) || `${t('s.lines')} ${Number(path.split('.')[1]) + 1}` }));
+      ok.onclick = () => {
+        state.toCheck.delete(path);
+        validate();
+        fieldOf(path)?.focus();
+      };
+      hint.append(' ', ok);
+    }
   }
 
   const totals = $('#totals');
@@ -305,7 +357,10 @@ function validate(): void {
   } else totals.append(el('p', { className: 'muted' }, t('t.empty')));
 
   const errors = findings.filter((f) => f.severity === 'error');
-  const warnings = findings.filter((f) => f.severity === 'warning');
+  // What a model added is one thing to check, however many values it is: the form shows each of them.
+  const added = unchecked.filter((f) => f.code === 'model');
+  const warnings = findings.filter((f) => f.severity === 'warning' && !added.includes(f));
+  if (added.length) warnings.push({ ...added[0]!, message: t(added.length === 1 ? 'sum.model.one' : 'sum.model', { n: added.length }) });
   const summary = $('#summary');
   summary.replaceChildren();
   summary.className = `summary summary--${errors.length ? 'error' : warnings.length ? 'warning' : 'ok'}`;
@@ -316,9 +371,10 @@ function validate(): void {
   summary.append(el('p', { className: 'summary__title' }, headline || t(state.mode === 'validate' ? 'sum.valid' : 'sum.ok')));
   const list = el('ul');
   for (const finding of [...errors, ...warnings]) {
-    const where = fieldLabel(finding.path);
+    // The sentence about what a model added speaks for all those values; it leads to the first of them.
+    const where = finding.code === 'model' ? '' : fieldLabel(finding.path);
     const text = `${where ? `${where}: ` : ''}${describe(finding)}`;
-    const target = document.querySelector<HTMLElement>(`[data-path="${finding.path}"]`);
+    const target = fieldOf(finding.path);
     const item = el('li', { className: finding.severity });
     if (target) {
       const jump = el('button', { type: 'button', className: 'link' }, text);
@@ -347,6 +403,9 @@ $('#form').addEventListener('input', (event) => {
   const number = (input as HTMLInputElement).type === 'number';
   setPath(state.draft, path, number ? (input.value === '' ? undefined : Number(input.value)) : input.value.trim());
   state.touched.add(path);
+  // Whoever changes a value has looked at it, and whoever changes a cell of a line has looked at the line.
+  state.toCheck.delete(path);
+  state.toCheck.delete(path.replace(/^(lines\.\d+)\..*$/, '$1'));
   validate();
 });
 
@@ -541,7 +600,7 @@ const USUAL_PAYMENT_TERMS = { de: 'Zahlbar innerhalb von 14 Tagen ab Rechnungsda
 function suggestPaymentTerms(): void {
   if (!isEmpty(state.draft.dueDate) || !isEmpty(state.draft.paymentTerms)) return;
   state.draft.paymentTerms = USUAL_PAYMENT_TERMS[languageOf(state.pdfText)];
-  state.suggested.add('paymentTerms');
+  state.toCheck.set('paymentTerms', 'suggested');
 }
 
 /** Findings that are about the file, not about a field of the form. */
@@ -568,7 +627,7 @@ async function open(pdf: Uint8Array, fileName: string): Promise<void> {
       draft: {},
       touched: new Set(),
       fileFindings: [],
-      suggested: new Set(),
+      toCheck: new Map(),
       mode: info.embeddedXml === null ? 'create' : 'validate',
     });
     if (state.mode === 'validate') {
@@ -671,8 +730,9 @@ $('#ai-run').onclick = async () => {
     const answer = await read;
     // Another PDF was opened while the model read: its answer is about the invoice that is gone.
     if (state.pdf !== pdf) return;
-    // A small model translates names and makes up identifiers. Only what the PDF shows is taken over.
-    merge(keepWhatThePdfShows(normaliseDraft(answer), state.pdfText), true);
+    // A small model translates names and makes up identifiers. Only what the PDF shows is taken over, and even of
+    // that a good part is wrong: every value the model added is marked until the user has looked at it.
+    for (const path of merge(keepWhatThePdfShows(normaliseDraft(answer), state.pdfText), true)) state.toCheck.set(path, 'model');
     renderForm();
     status.textContent = t('ai.done');
   } catch (error) {
