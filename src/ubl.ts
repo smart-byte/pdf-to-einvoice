@@ -33,21 +33,23 @@ function contact(p: Party): Bag | undefined {
 /**
  * Maps the invoice to the input format of @e-invoice-eu/core (UBL element
  * names as JSON keys), which writes the XML. Amounts come from `totals`;
- * nothing is calculated here.
+ * nothing is calculated here. With `xrechnung` the result also meets what
+ * the XRechnung rules ask of the XML; what they ask of the data, `check`
+ * reports.
  */
-export function toUbl(invoice: Invoice, totals: Totals): EInvoiceEuInvoice {
+export function toUbl(invoice: Invoice, totals: Totals, xrechnung = false): EInvoiceEuInvoice {
   const { seller, buyer, currency } = invoice;
   const money = (key: string, n: number) => ({ [key]: amount(n), [`${key}@currencyID`]: currency });
   const categories = new Set(invoice.lines.map((l) => l.vatCategory));
   // BR-O-02: an invoice that is not subject to VAT must not carry VAT identifiers.
   const vatIdsAllowed = !categories.has('O');
 
-  const taxCategory = (category: string, rate: number, withReason: boolean) =>
+  const taxCategory = (category: string, rate: number, breakdown: boolean) =>
     compact({
       'cbc:ID': category,
-      // BR-O-05: no rate at all where VAT does not apply.
-      'cbc:Percent': category === 'O' ? undefined : decimal(rate),
-      'cbc:TaxExemptionReason': withReason && category !== 'S' && category !== 'Z' ? invoice.vatExemptionReason : undefined,
+      // BR-O-05: no rate at all where VAT does not apply. XRechnung wants one in every VAT breakdown all the same (BR-DE-14).
+      'cbc:Percent': category === 'O' && !(xrechnung && breakdown) ? undefined : decimal(rate),
+      'cbc:TaxExemptionReason': breakdown && category !== 'S' && category !== 'Z' ? invoice.vatExemptionReason : undefined,
       'cac:TaxScheme': VAT,
     });
 
@@ -62,8 +64,10 @@ export function toUbl(invoice: Invoice, totals: Totals): EInvoiceEuInvoice {
   // The country of supply follows from the VAT treatment: where VAT is charged (or exempt) at home it is the
   // seller's country, otherwise the buyer's. It is stated for intra-community supplies (BR-IC-12) and whenever
   // there is no delivery date (ZUGFeRD rule BR-FX-DE-04; it also keeps the mandatory delivery element from being empty).
+  // Not so in an XRechnung: a place of delivery there needs its city and postal code (BR-DE-10, BR-DE-11), which the
+  // data does not have. `check` refuses an intra-community supply for that reason.
   const suppliedAtHome = !categories.has('K') && ['S', 'Z', 'E'].some((c) => categories.has(c as 'S'));
-  const stateCountry = categories.has('K') || !invoice.deliveryDate;
+  const stateCountry = !xrechnung && (categories.has('K') || !invoice.deliveryDate);
   const delivery = compact({
     'cbc:ActualDeliveryDate': invoice.deliveryDate,
     'cac:DeliveryLocation': stateCountry
@@ -106,7 +110,7 @@ export function toUbl(invoice: Invoice, totals: Totals): EInvoiceEuInvoice {
         'cac:Contact': contact(buyer),
       }),
     },
-    'cac:Delivery': delivery,
+    'cac:Delivery': Object.keys(delivery).length ? delivery : undefined,
     'cac:PaymentMeans': invoice.iban
       ? [
           {
@@ -117,8 +121,13 @@ export function toUbl(invoice: Invoice, totals: Totals): EInvoiceEuInvoice {
             }),
           },
         ]
+      : xrechnung
+        ? [{ 'cbc:PaymentMeansCode': '1' }] // BR-DE-1 wants payment instructions in every XRechnung; without an account they say "instrument not defined"
+        : undefined,
+    // XRechnung reads a line that starts with # as a cash discount and wants a line break after it (BR-DE-18).
+    'cac:PaymentTerms': invoice.paymentTerms
+      ? { 'cbc:Note': xrechnung && /^\s*#/m.test(invoice.paymentTerms) ? `${invoice.paymentTerms}\n` : invoice.paymentTerms }
       : undefined,
-    'cac:PaymentTerms': invoice.paymentTerms ? { 'cbc:Note': invoice.paymentTerms } : undefined,
     'cac:TaxTotal': [
       {
         ...money('cbc:TaxAmount', totals.vat),
