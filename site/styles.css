@@ -355,8 +355,18 @@ body[data-view='done'] .done {
 body:not([data-view='start']) .hero {
   display: none;
 }
+/* Looking at an existing e-invoice: the verdict comes first. */
+body[data-mode='validate'] .work__data {
+  display: flex;
+  flex-direction: column;
+}
+body[data-mode='validate'] .finish {
+  order: -1;
+  padding: 0 0 0.5rem;
+}
 /* Looking at an existing e-invoice: nothing to read or create. */
 body[data-mode='validate'] .reader details,
+body[data-mode='validate'] #form button,
 body[data-mode='validate'] #create {
   display: none;
 }

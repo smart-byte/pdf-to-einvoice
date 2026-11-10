@@ -35,8 +35,10 @@ interface State {
   fileFindings: Finding[];
   /** `validate` shows what an existing e-invoice says; nothing can be edited or created then. */
   mode: 'create' | 'validate';
+  /** Fields filled with a suggestion that is not on the PDF, until the user changes them. */
+  suggested: Set<string>;
 }
-const state: State = { fileName: '', pdfText: '', draft: {}, touched: new Set(), fileFindings: [], mode: 'create' };
+const state: State = { fileName: '', pdfText: '', draft: {}, touched: new Set(), fileFindings: [], mode: 'create', suggested: new Set() };
 
 // ---------------------------------------------------------------------------------------------------------------
 // Paths into the draft, e.g. "seller.name" or "lines.0.unitPrice"
@@ -122,6 +124,8 @@ const SECTIONS: { title: string; fields: Field[]; collapsed?: boolean }[] = [
       { path: 'issueDate', label: 'f.issueDate', type: 'date' },
       { path: 'deliveryDate', label: 'f.deliveryDate', type: 'date' },
       { path: 'currency', label: 'f.currency' },
+      { path: 'periodStart', label: 'f.periodStart', type: 'date' },
+      { path: 'periodEnd', label: 'f.periodEnd', type: 'date' },
     ],
   },
   { title: 's.seller', fields: party('seller') },
@@ -143,8 +147,6 @@ const SECTIONS: { title: string; fields: Field[]; collapsed?: boolean }[] = [
       { path: 'typeCode', label: 'f.typeCode', type: 'select', options: Object.keys(INVOICE_TYPES).map((code) => [code, `type.${code}`]) },
       { path: 'precedingInvoiceNumber', label: 'f.precedingInvoiceNumber' },
       { path: 'precedingInvoiceDate', label: 'f.precedingInvoiceDate', type: 'date' },
-      { path: 'periodStart', label: 'f.periodStart', type: 'date' },
-      { path: 'periodEnd', label: 'f.periodEnd', type: 'date' },
       { path: 'orderReference', label: 'f.orderReference' },
       { path: 'buyerReference', label: 'f.buyerReference' },
       { path: 'prepaidAmount', label: 'f.prepaidAmount', type: 'number' },
@@ -235,7 +237,12 @@ function renderForm(): void {
 // ---------------------------------------------------------------------------------------------------------------
 // Findings and totals
 
-const describe = (finding: Finding) => (lang === 'de' && t(`e.${finding.code}`) !== `e.${finding.code}` ? t(`e.${finding.code}`) : finding.message);
+function describe(finding: Finding): string {
+  // A suggested value is not on the PDF by definition; say where it comes from instead of just flagging it.
+  if (finding.code === 'not-in-pdf' && state.suggested.has(finding.path) && !state.touched.has(finding.path))
+    return t('hint.suggested', { n: USUAL_PAYMENT_DAYS });
+  return lang === 'de' && t(`e.${finding.code}`) !== `e.${finding.code}` ? t(`e.${finding.code}`) : finding.message;
+}
 const money = (n: number) =>
   new Intl.NumberFormat(lang, {
     style: 'currency',
@@ -286,7 +293,8 @@ function validate(): void {
   const summary = $('#summary');
   summary.replaceChildren();
   summary.className = `summary summary--${errors.length ? 'error' : warnings.length ? 'warning' : 'ok'}`;
-  const headline = [errors.length ? t('sum.errors', { n: errors.length }) : '', warnings.length ? t('sum.warnings', { n: warnings.length }) : '']
+  const count = (key: string, n: number) => (n ? t(n === 1 ? `${key}.one` : key, { n }) : '');
+  const headline = [count(state.mode === 'validate' ? 'valid.errors' : 'sum.errors', errors.length), count('sum.warnings', warnings.length)]
     .filter(Boolean)
     .join(' · ');
   summary.append(el('p', { className: 'summary__title' }, headline || t(state.mode === 'validate' ? 'sum.valid' : 'sum.ok')));
@@ -340,6 +348,20 @@ function show(view: 'start' | 'work' | 'done'): void {
   window.scrollTo({ top: 0 });
 }
 
+/** Days until payment is due, suggested when the PDF states neither a due date nor payment terms. */
+const USUAL_PAYMENT_DAYS = 14;
+
+/** EN 16931 wants a due date or payment terms. Where the PDF has none, the usual span is put in as a visible suggestion. */
+function suggestDueDate(): void {
+  const { issueDate, dueDate, paymentTerms } = state.draft;
+  if (!isEmpty(dueDate) || !isEmpty(paymentTerms) || typeof issueDate !== 'string') return;
+  const due = new Date(`${issueDate}T00:00:00Z`);
+  if (Number.isNaN(due.getTime())) return;
+  due.setUTCDate(due.getUTCDate() + USUAL_PAYMENT_DAYS);
+  state.draft.dueDate = due.toISOString().slice(0, 10);
+  state.suggested.add('dueDate');
+}
+
 /** Findings that are about the file, not about a field of the form. */
 const FILE_CODES = new Set(['no-xml', 'xml-syntax', 'profile', 'pdf-a', 'pdf-fonts']);
 
@@ -362,6 +384,7 @@ async function open(pdf: Uint8Array, fileName: string): Promise<void> {
       draft: {},
       touched: new Set(),
       fileFindings: [],
+      suggested: new Set(),
       mode: info.embeddedXml === null ? 'create' : 'validate',
     });
     if (state.mode === 'validate') {
@@ -370,9 +393,10 @@ async function open(pdf: Uint8Array, fileName: string): Promise<void> {
       const result = await validateEInvoice(pdf, { pdfText: text });
       state.draft = result.invoice ?? {};
       state.fileFindings = result.findings.filter((finding) => FILE_CODES.has(finding.code));
-      $('#read-status').textContent = result.profile ?? '';
+      $('#read-status').textContent = result.profile ? t('valid.profile', { p: result.profile }) : '';
     } else {
       merge(guessFromText(text));
+      suggestDueDate();
       const found = JSON.stringify(state.draft).match(/":("|\d|-)/g)?.length ?? 0;
       $('#read-status').textContent = text.trim() ? t('read.found', { n: found }) : t('read.none');
     }
@@ -382,6 +406,8 @@ async function open(pdf: Uint8Array, fileName: string): Promise<void> {
     $('#file-name').textContent = fileName;
     $('#ai-status').textContent = '';
     renderForm();
+    // Reading with a model is offered openly when the patterns left a lot to fill in.
+    $<HTMLDetailsElement>('.reader details').open = (state.result?.findings.filter((finding) => finding.severity === 'error').length ?? 0) > 2;
     show('work');
     await preview(pdf);
     status.textContent = '';
