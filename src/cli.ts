@@ -159,8 +159,8 @@ const OPTIONS = {
   version: { type: 'boolean', short: 'v' },
 } as const;
 
-/** The options that take one of a few words. */
-const CHOICES = { profile: ['en16931', 'xrechnung'], syntax: ['ubl', 'cii'], rules: ['xrechnung'] } as const;
+/** The options that take one of a few words, here and as arguments of the MCP tools. */
+export const CHOICES = { profile: ['en16931', 'xrechnung'], syntax: ['ubl', 'cii'], rules: ['xrechnung'] } as const;
 
 type Values = { output?: string; force?: boolean; pdf?: string; json?: boolean } & { [K in keyof typeof CHOICES]?: (typeof CHOICES)[K][number] };
 type Command = { args: number; run: (args: string[], values: Values, io: Io) => Promise<number> };

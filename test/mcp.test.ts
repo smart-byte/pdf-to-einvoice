@@ -36,9 +36,16 @@ async function call(name: string, args: Record<string, unknown>) {
 }
 
 describe('MCP server', () => {
-  it('offers the five tools', async () => {
+  it('offers the six tools', async () => {
     const { tools } = await (await connect()).listTools();
-    expect(tools.map((t) => t.name)).toEqual(['read_invoice_pdf', 'check_invoice', 'create_einvoice', 'read_einvoice_xml', 'validate_einvoice']);
+    expect(tools.map((t) => t.name)).toEqual([
+      'read_invoice_pdf',
+      'check_invoice',
+      'create_einvoice',
+      'create_xrechnung',
+      'read_einvoice_xml',
+      'validate_einvoice',
+    ]);
   });
 
   it('shows the model every invoice field in the tool input', async () => {
@@ -198,5 +205,133 @@ describe('validate_einvoice', () => {
     const result = await call('validate_einvoice', { pdf_path: SAMPLE_PDF });
     expect(result.isError).toBe(false);
     expect(JSON.parse(result.text)).toMatchObject({ isEInvoice: false, findings: [{ severity: 'error', code: 'no-xml' }] });
+  });
+});
+
+describe('XRechnung', () => {
+  const XRECHNUNG_3_0 = 'urn:cen.eu:en16931:2017#compliant#urn:xeinkauf.de:kosit:xrechnung_3.0';
+  /** The sample with what XRechnung asks for on top. */
+  const xrechnung = () =>
+    sample((d) => {
+      d.buyerReference = '99000000-BEISPIEL-00';
+      Object.assign(d.seller, { contactName: 'Erika Muster', phone: '+49 30 1234567' });
+      d.buyer.email = 'einkauf@beispiel.example';
+    });
+
+  it('tells the model when XRechnung is asked for and what it takes', async () => {
+    const instructions = (await connect()).getInstructions();
+    expect(instructions).toContain('create_xrechnung');
+    expect(instructions).toMatch(/Leitweg-ID/);
+  });
+
+  it('names the choices of the new options in the tool inputs', async () => {
+    const { tools } = await (await connect()).listTools();
+    const properties = (name: string) => tools.find((t) => t.name === name)!.inputSchema.properties as any;
+    expect(properties('check_invoice').rules.enum).toEqual(['xrechnung']);
+    expect(properties('create_einvoice').profile.enum).toEqual(['en16931', 'xrechnung']);
+    expect(properties('create_xrechnung').syntax.enum).toEqual(['ubl', 'cii']);
+    const create = tools.find((t) => t.name === 'create_xrechnung')!;
+    expect(create.inputSchema.required).toEqual(['invoice', 'output_path']);
+    expect(create.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: false, openWorldHint: false });
+  });
+
+  describe('check_invoice with rules', () => {
+    it('reports what XRechnung asks for on top', async () => {
+      const output = JSON.parse((await call('check_invoice', { invoice: sample(), rules: 'xrechnung' })).text);
+      expect(output.ok).toBe(false);
+      expect(output.findings.map((f: { code: string }) => f.code)).toEqual([
+        'xrechnung-buyer-reference',
+        'xrechnung-seller-contact',
+        'xrechnung-seller-phone',
+        'xrechnung-buyer-email',
+      ]);
+    });
+
+    it('accepts data that has it', async () => {
+      const output = JSON.parse((await call('check_invoice', { invoice: xrechnung(), rules: 'xrechnung' })).text);
+      expect(output).toMatchObject({ ok: true, findings: [] });
+    });
+
+    it('refuses rules it does not know', async () => {
+      const result = await call('check_invoice', { invoice: sample(), rules: 'peppol' });
+      expect(result.isError).toBe(true);
+      expect(result.text).toContain('rules');
+    });
+  });
+
+  describe('create_einvoice with profile', () => {
+    it('writes a PDF whose XML declares XRechnung 3.0', async () => {
+      const out = join(tmp(), 'out.pdf');
+      const result = await call('create_einvoice', { pdf_path: SAMPLE_PDF, invoice: xrechnung(), output_path: out, profile: 'xrechnung' });
+      expect(result.isError).toBe(false);
+      expect(await readEmbeddedXml(new Uint8Array(readFileSync(out)))).toContain(`<ram:ID>${XRECHNUNG_3_0}</ram:ID>`);
+    });
+
+    it('returns what XRechnung lacks as a tool error and writes nothing', async () => {
+      const out = join(tmp(), 'out.pdf');
+      const result = await call('create_einvoice', { pdf_path: SAMPLE_PDF, invoice: sample(), output_path: out, profile: 'xrechnung' });
+      expect(result.isError).toBe(true);
+      expect(JSON.parse(result.text)).toMatchObject({
+        error: 'invalid-invoice',
+        findings: [{ path: 'buyerReference', code: 'xrechnung-buyer-reference' }, {}, {}, {}],
+      });
+      expect(existsSync(out)).toBe(false);
+    });
+
+    it('refuses a profile it does not know', async () => {
+      const out = join(tmp(), 'out.pdf');
+      const result = await call('create_einvoice', { pdf_path: SAMPLE_PDF, invoice: sample(), output_path: out, profile: 'extended' });
+      expect(result.isError).toBe(true);
+      expect(result.text).toContain('profile');
+      expect(existsSync(out)).toBe(false);
+    });
+  });
+
+  describe('create_xrechnung', () => {
+    it('writes the XML file and returns where', async () => {
+      const out = join(tmp(), 'out.xml');
+      const result = await call('create_xrechnung', { invoice: xrechnung(), output_path: out });
+      expect(result.isError).toBe(false);
+      expect(JSON.parse(result.text)).toEqual({ output_path: out, findings: [], totals: expect.objectContaining({ due: 1783.81 }) });
+      const xml = readFileSync(out, 'utf8');
+      expect(xml).toContain('<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"');
+      expect(xml).toContain(`<cbc:CustomizationID>${XRECHNUNG_3_0}</cbc:CustomizationID>`);
+    });
+
+    it('writes a Cross Industry Invoice when asked for the syntax cii', async () => {
+      const out = join(tmp(), 'out.xml');
+      await call('create_xrechnung', { invoice: xrechnung(), output_path: out, syntax: 'cii' });
+      expect(readFileSync(out, 'utf8')).toContain('<rsm:CrossIndustryInvoice');
+    });
+
+    it('returns the findings as a tool error for data XRechnung does not accept and writes nothing', async () => {
+      const out = join(tmp(), 'out.xml');
+      const result = await call('create_xrechnung', { invoice: sample(), output_path: out });
+      expect(result.isError).toBe(true);
+      expect(JSON.parse(result.text)).toMatchObject({ error: 'invalid-invoice', findings: [{ path: 'buyerReference', severity: 'error' }, {}, {}, {}] });
+      expect(existsSync(out)).toBe(false);
+    });
+
+    it('leaves an existing file alone unless asked to overwrite it', async () => {
+      const out = join(tmp(), 'out.xml');
+      writeFileSync(out, 'keep me');
+      const refused = await call('create_xrechnung', { invoice: xrechnung(), output_path: out });
+      expect(refused.isError).toBe(true);
+      expect(refused.text).toContain('overwrite');
+      expect(readFileSync(out, 'utf8')).toBe('keep me');
+      const forced = await call('create_xrechnung', { invoice: xrechnung(), output_path: out, overwrite: true });
+      expect(forced.isError).toBe(false);
+      expect(readFileSync(out, 'utf8')).toContain('<cbc:ID>RE-2026-0042</cbc:ID>');
+    });
+
+    it('refuses a relative output path, a missing one and a syntax it does not know', async () => {
+      expect((await call('create_xrechnung', { invoice: xrechnung(), output_path: 'out.xml' })).text).toContain('absolute');
+      expect((await call('create_xrechnung', { invoice: xrechnung() })).isError).toBe(true);
+      const out = join(tmp(), 'out.xml');
+      const result = await call('create_xrechnung', { invoice: xrechnung(), output_path: out, syntax: 'edifact' });
+      expect(result.isError).toBe(true);
+      expect(result.text).toContain('syntax');
+      expect(existsSync(out)).toBe(false);
+    });
   });
 });
