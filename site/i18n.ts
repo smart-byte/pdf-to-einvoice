@@ -154,8 +154,8 @@ export const STRINGS: Record<string, Entry> = {
   'sum.errors.one': { de: '1 Angabe fehlt oder ist fehlerhaft', en: '1 value is missing or wrong' },
   'sum.warnings.one': { de: '1 Hinweis', en: '1 thing to check' },
   'hint.suggested': {
-    de: 'Auf Ihrem PDF steht keine Zahlungsfrist. Vorschlag: {n} Tage ab Rechnungsdatum. Bitte prüfen oder ändern.',
-    en: 'Your PDF states no payment term. Suggested: {n} days from the invoice date. Please check or change it.',
+    de: 'Auf Ihrem PDF steht keine Zahlungsfrist, die E-Rechnung braucht aber eine. Dies ist ein Vorschlag: Bitte prüfen oder ändern.',
+    en: 'Your PDF states no payment term, but an e-invoice needs one. This is a suggestion: please check or change it.',
   },
   'sum.errors': { de: '{n} Angaben fehlen oder sind fehlerhaft', en: '{n} values are missing or wrong' },
   'sum.warnings': { de: '{n} Hinweise', en: '{n} things to check' },

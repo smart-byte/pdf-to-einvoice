@@ -218,6 +218,14 @@ function readPeriod(text: string): { periodStart?: string; periodEnd?: string } 
   return {};
 }
 
+const GERMAN_WORDS = /\b(rechnung\w*|mwst|ust|umsatzsteuer|mehrwertsteuer|netto|brutto|gesamt\w*|betrag|datum|menge|zahlbar|leistung\w*|lieferung)\b/gi;
+const ENGLISH_WORDS = /\b(invoice|vat|tax|subtotal|total|amount|date|quantity|payable|payment|due|delivery)\b/gi;
+
+/** The language an invoice is written in, judged by the words invoices use. English when nothing tells. */
+export function languageOf(text: string): 'de' | 'en' {
+  return (text.match(GERMAN_WORDS)?.length ?? 0) > (text.match(ENGLISH_WORDS)?.length ?? 0) ? 'de' : 'en';
+}
+
 /** Removes undefined values and objects that end up empty. */
 function prune<T extends object>(object: T): T {
   if (Array.isArray(object)) return object.map((item) => prune(item)) as T;

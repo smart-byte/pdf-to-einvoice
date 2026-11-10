@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { guessFromText } from '../src/guess.js';
+import { guessFromText, languageOf } from '../src/guess.js';
 
 // The shape of a real invoice, with made-up data: sender line, address block next to a block of labels,
 // a table without quantity and unit price, a row that wraps, a date written with slashes.
@@ -106,5 +106,19 @@ describe('guessFromText on the layout of a German invoice', () => {
 
   it('does not take a month without a label for a service period', () => {
     expect(guessFromText('Oktober 2026\nMonat 13/2026')).toEqual({});
+  });
+});
+
+describe('languageOf', () => {
+  it('recognises a German invoice, even with English headings in it', () => {
+    expect(languageOf(royalties)).toBe('de');
+  });
+
+  it('recognises an English invoice', () => {
+    expect(languageOf('Invoice No: INV-7\nInvoice date: November 3, 2026\nSubtotal $1,499.00\nTotal amount due $1,499.00')).toBe('en');
+  });
+
+  it('falls back to English when the text gives no clue', () => {
+    expect(languageOf('2617 351,41')).toBe('en');
   });
 });

@@ -3,7 +3,7 @@ import pdfWorkerUrl from 'pdfjs-dist/legacy/build/pdf.worker.mjs?url';
 import sampleUrl from '../examples/sample-invoice.pdf?url';
 import { check, type CheckResult, type Finding } from '../src/check.js';
 import { keepWhatThePdfShows } from '../src/ground.js';
-import { guessFromText } from '../src/guess.js';
+import { guessFromText, languageOf } from '../src/guess.js';
 import { INVOICE_TYPES, VAT_CATEGORIES, type InvoiceDraft } from '../src/model.js';
 import { inspectPdf } from '../src/pdf.js';
 import { extractText } from '../src/text.js';
@@ -237,12 +237,7 @@ function renderForm(): void {
 // ---------------------------------------------------------------------------------------------------------------
 // Findings and totals
 
-function describe(finding: Finding): string {
-  // A suggested value is not on the PDF by definition; say where it comes from instead of just flagging it.
-  if (finding.code === 'not-in-pdf' && state.suggested.has(finding.path) && !state.touched.has(finding.path))
-    return t('hint.suggested', { n: USUAL_PAYMENT_DAYS });
-  return lang === 'de' && t(`e.${finding.code}`) !== `e.${finding.code}` ? t(`e.${finding.code}`) : finding.message;
-}
+const describe = (finding: Finding) => (lang === 'de' && t(`e.${finding.code}`) !== `e.${finding.code}` ? t(`e.${finding.code}`) : finding.message);
 const money = (n: number) =>
   new Intl.NumberFormat(lang, {
     style: 'currency',
@@ -259,7 +254,11 @@ function fieldLabel(path: string): string {
 
 function validate(): void {
   const result = (state.result = check(state.draft, state.pdf ? { pdfText: state.pdfText } : {}));
-  const findings = [...result.findings, ...state.fileFindings];
+  // A suggestion is not on the PDF; it is listed until the user has looked at it and changed or kept it by typing.
+  const suggestions: Finding[] = [...state.suggested]
+    .filter((path) => !state.touched.has(path))
+    .map((path) => ({ path, severity: 'warning', code: 'suggested', message: t('hint.suggested') }));
+  const findings = [...result.findings, ...state.fileFindings, ...suggestions];
 
   for (const hint of document.querySelectorAll<HTMLElement>('[data-hint]')) {
     const own = findings.filter((f) => f.path === hint.dataset.hint);
@@ -316,6 +315,8 @@ function validate(): void {
   }
   if (list.children.length) summary.append(list);
   $<HTMLButtonElement>('#create').disabled = errors.length > 0 || !state.pdf;
+  // An existing e-invoice that passes the check gets its stamp on the preview.
+  $('#work-stamp').hidden = !(state.mode === 'validate' && errors.length === 0);
 }
 
 $('#form').addEventListener('input', (event) => {
@@ -348,18 +349,14 @@ function show(view: 'start' | 'work' | 'done'): void {
   window.scrollTo({ top: 0 });
 }
 
-/** Days until payment is due, suggested when the PDF states neither a due date nor payment terms. */
-const USUAL_PAYMENT_DAYS = 14;
+/** Payment terms suggested when the PDF states neither a due date nor terms, in the language of the invoice. */
+const USUAL_PAYMENT_TERMS = { de: 'Zahlbar innerhalb von 14 Tagen ab Rechnungsdatum.', en: 'Payable within 14 days of the invoice date.' };
 
-/** EN 16931 wants a due date or payment terms. Where the PDF has none, the usual span is put in as a visible suggestion. */
-function suggestDueDate(): void {
-  const { issueDate, dueDate, paymentTerms } = state.draft;
-  if (!isEmpty(dueDate) || !isEmpty(paymentTerms) || typeof issueDate !== 'string') return;
-  const due = new Date(`${issueDate}T00:00:00Z`);
-  if (Number.isNaN(due.getTime())) return;
-  due.setUTCDate(due.getUTCDate() + USUAL_PAYMENT_DAYS);
-  state.draft.dueDate = due.toISOString().slice(0, 10);
-  state.suggested.add('dueDate');
+/** EN 16931 wants a due date or payment terms. Where the PDF has neither, the usual terms are put in as a visible suggestion. */
+function suggestPaymentTerms(): void {
+  if (!isEmpty(state.draft.dueDate) || !isEmpty(state.draft.paymentTerms)) return;
+  state.draft.paymentTerms = USUAL_PAYMENT_TERMS[languageOf(state.pdfText)];
+  state.suggested.add('paymentTerms');
 }
 
 /** Findings that are about the file, not about a field of the form. */
@@ -396,7 +393,7 @@ async function open(pdf: Uint8Array, fileName: string): Promise<void> {
       $('#read-status').textContent = result.profile ? t('valid.profile', { p: result.profile }) : '';
     } else {
       merge(guessFromText(text));
-      suggestDueDate();
+      suggestPaymentTerms();
       const found = JSON.stringify(state.draft).match(/":("|\d|-)/g)?.length ?? 0;
       $('#read-status').textContent = text.trim() ? t('read.found', { n: found }) : t('read.none');
     }
@@ -512,6 +509,10 @@ $('#create').onclick = async () => {
     notes.replaceChildren(...result.findings.map((finding) => el('li', {}, describe(finding))));
     notes.hidden = result.findings.length === 0;
     status.textContent = '';
+    // The finished page shows the same preview, with the stamp landing on it.
+    const [from, to] = [$<HTMLCanvasElement>('#preview'), $<HTMLCanvasElement>('#done-preview')];
+    Object.assign(to, { width: from.width, height: from.height });
+    to.getContext('2d')!.drawImage(from, 0, 0);
     show('done');
   } catch (error) {
     status.textContent = t('create.failed', { m: error instanceof Error ? error.message : String(error) });

@@ -66,6 +66,7 @@ It works the same in a browser: `pdf` is a `Uint8Array` in and out.
 | `extractText(pdf)`                 | the text of a PDF, row by row                                                                          |
 | `guessFromText(text)`              | reads an invoice by pattern matching: labelled values, seller and buyer, table rows that add up        |
 | `keepWhatThePdfShows(draft, text)` | drops every value the PDF does not show: a guard for data read by a small language model               |
+| `languageOf(text)`                 | `'de'` or `'en'`: the language an invoice is written in                                                |
 | `validateEInvoice(pdf)`            | looks at an existing e-invoice: profile, embedded data, and whether the XML matches the visible page   |
 | `readEmbeddedXml(pdf)`             | the XML of an existing e-invoice, or `null`                                                            |
 | `calculate(invoice)`               | the totals, following the EN 16931 rounding rules                                                      |
