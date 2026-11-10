@@ -1,0 +1,725 @@
+/* Fonts ship with the site: no third-party requests. */
+@import '@fontsource-variable/schibsted-grotesk';
+@import '@fontsource-variable/jetbrains-mono';
+
+/* A desk with paper on it. The one accent is the royal blue of fountain-pen ink; red and green are what a
+   bookkeeper's stamps look like. */
+:root {
+  color-scheme: light dark;
+  --desk: #e8ebef;
+  --paper: #fdfdfb;
+  --ink: #171a21;
+  --text: #3a404b;
+  --muted: #677080;
+  --line: #cdd3db;
+  --blue: #2440b3;
+  --blue-wash: #e6eafb;
+  --red: #b3302a;
+  --red-wash: #fbe9e7;
+  --green: #1d7347;
+  --green-wash: #e3f3ea;
+  --amber: #8f5300;
+  --amber-wash: #fbf0dc;
+  --shadow: 0 1px 1px #1b25400f, 0 18px 40px -22px #1b254059;
+  --sans: 'Schibsted Grotesk Variable', 'Helvetica Neue', Arial, sans-serif;
+  --mono: 'JetBrains Mono Variable', ui-monospace, Menlo, Consolas, monospace;
+  --measure: 66ch;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --desk: #121419;
+    --paper: #1c1f26;
+    --ink: #f0f2f5;
+    --text: #c5cad3;
+    --muted: #8d95a3;
+    --line: #333945;
+    --blue: #93a6ff;
+    --blue-wash: #232a45;
+    --red: #ff9289;
+    --red-wash: #3a2220;
+    --green: #7fd3a4;
+    --green-wash: #1a3226;
+    --amber: #f0b660;
+    --amber-wash: #382b14;
+    --shadow: 0 1px 1px #0006, 0 18px 40px -22px #000c;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+body {
+  margin: 0;
+  background: var(--desk);
+  color: var(--text);
+  font: 1rem/1.55 var(--sans);
+  -webkit-font-smoothing: antialiased;
+}
+h1,
+h2,
+h3 {
+  color: var(--ink);
+  line-height: 1.12;
+  margin: 0;
+  text-wrap: balance;
+}
+h1 {
+  font-size: clamp(2.2rem, 4.6vw, 3.6rem);
+  font-weight: 760;
+  letter-spacing: -0.028em;
+}
+h2 {
+  font-size: clamp(1.5rem, 2.4vw, 2rem);
+  font-weight: 720;
+  letter-spacing: -0.02em;
+}
+h3 {
+  font-size: 1.0625rem;
+  font-weight: 680;
+}
+p {
+  margin: 0;
+  max-width: var(--measure);
+}
+a {
+  color: var(--blue);
+  text-underline-offset: 0.18em;
+}
+code,
+pre {
+  font-family: var(--mono);
+  font-size: 0.86em;
+}
+[hidden] {
+  display: none !important;
+}
+:focus-visible {
+  outline: 3px solid var(--blue);
+  outline-offset: 2px;
+}
+.muted {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+/* Navigation ------------------------------------------------------------------------------------------------- */
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 1.1rem clamp(1rem, 4vw, 3.5rem);
+}
+.wordmark {
+  font: 600 1rem var(--mono);
+  color: var(--ink);
+  text-decoration: none;
+  letter-spacing: -0.02em;
+}
+.nav nav {
+  display: flex;
+  gap: 1.4rem;
+  margin-left: auto;
+  font-size: 0.9375rem;
+}
+.nav nav a {
+  color: var(--text);
+  text-decoration: none;
+}
+.nav nav a:hover {
+  color: var(--blue);
+}
+.langs {
+  display: flex;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.langs button {
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: 600 0.8125rem var(--sans);
+  padding: 0.3rem 0.6rem;
+  cursor: pointer;
+}
+.langs button[aria-pressed='true'] {
+  background: var(--ink);
+  color: var(--desk);
+}
+
+/* Hero: the words on the left, the sheet you drop your PDF on at the right ------------------------------------- */
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  gap: clamp(2rem, 6vw, 6rem);
+  align-items: center;
+  padding: clamp(2rem, 6vw, 5rem) clamp(1rem, 4vw, 3.5rem) clamp(3rem, 7vw, 6rem);
+  max-width: 82rem;
+  margin: 0 auto;
+}
+.lead {
+  font-size: clamp(1.1rem, 1.6vw, 1.3rem);
+  margin-top: 1.4rem;
+  max-width: 34rem;
+}
+.private {
+  margin-top: 1.1rem;
+  padding-left: 0.9rem;
+  border-left: 3px solid var(--green);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.stack {
+  position: relative;
+  justify-self: center;
+  width: min(100%, 21rem);
+  padding-top: 1.6rem;
+  margin-right: 4rem;
+}
+.sheet {
+  display: block;
+  aspect-ratio: 210 / 262;
+  border-radius: 2px;
+  box-shadow: var(--shadow);
+}
+/* The XML that travels behind the page: same sheet, blue ink, slid out far enough to be read. */
+.sheet--xml {
+  position: absolute;
+  inset: 0 0 auto 0;
+  margin-top: 1.6rem;
+  background: var(--blue-wash);
+  color: var(--blue);
+  transform: translate(4.4rem, -1.2rem) rotate(5deg);
+  transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+  overflow: hidden;
+}
+.sheet--xml pre {
+  margin: 0;
+  padding: 1.1rem 0 1.1rem 17.3rem;
+  font-size: 0.62rem;
+  line-height: 1.9;
+}
+.stack:hover .sheet--xml,
+.stack:focus-within .sheet--xml,
+.stack.is-over .sheet--xml {
+  transform: translate(6rem, -1.8rem) rotate(7.5deg);
+}
+.sheet--pdf {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: 0.15rem;
+  padding: 1.6rem;
+  background: var(--paper);
+  color: var(--muted);
+  cursor: pointer;
+  border: 2px dashed transparent;
+  transition: border-color 0.15s;
+}
+.stack.is-over .sheet--pdf,
+.sheet--pdf:hover {
+  border-color: var(--blue);
+}
+.sheet--pdf strong {
+  color: var(--ink);
+  font-size: 1.35rem;
+  font-weight: 720;
+  letter-spacing: -0.015em;
+}
+.sheet--pdf input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+/* The faint skeleton of an invoice: letterhead, address, table rows. */
+.sheet__lines {
+  position: absolute;
+  inset: 1.6rem 1.6rem auto;
+  display: grid;
+  gap: 0.7rem;
+}
+.sheet__lines i {
+  height: 0.5rem;
+  background: var(--line);
+  opacity: 0.55;
+  border-radius: 1px;
+}
+.sheet__lines i:nth-child(1) {
+  width: 42%;
+  height: 0.9rem;
+  background: var(--ink);
+  opacity: 0.8;
+  margin-bottom: 1.4rem;
+}
+.sheet__lines i:nth-child(2) {
+  width: 34%;
+}
+.sheet__lines i:nth-child(3) {
+  width: 27%;
+  margin-bottom: 1.4rem;
+}
+.sheet__lines i:nth-child(5) {
+  width: 88%;
+}
+.sheet__lines i:nth-child(6) {
+  width: 30%;
+  justify-self: end;
+}
+.stack .link {
+  margin-top: 1.1rem;
+}
+.status {
+  min-height: 1.5rem;
+  margin-top: 0.4rem;
+  font-size: 0.9375rem;
+  color: var(--ink);
+}
+
+/* Buttons ---------------------------------------------------------------------------------------------------- */
+button,
+.primary,
+.quiet {
+  font: inherit;
+}
+.primary,
+.quiet {
+  display: inline-block;
+  border-radius: 4px;
+  padding: 0.7rem 1.25rem;
+  font-weight: 650;
+  text-decoration: none;
+  cursor: pointer;
+}
+.primary {
+  background: var(--blue);
+  color: var(--paper);
+  border: 1px solid var(--blue);
+}
+.primary:disabled {
+  background: var(--line);
+  border-color: var(--line);
+  color: var(--muted);
+  cursor: not-allowed;
+}
+.quiet {
+  background: none;
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+.quiet:hover {
+  border-color: var(--ink);
+}
+.link {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--blue);
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+  text-align: left;
+  cursor: pointer;
+}
+.icon {
+  background: none;
+  border: 0;
+  color: var(--muted);
+  font-size: 1.3rem;
+  line-height: 1;
+  padding: 0.3rem 0.5rem;
+  cursor: pointer;
+}
+.icon:hover {
+  color: var(--red);
+}
+
+/* The workbench: your PDF on the left, its data on the right ---------------------------------------------------- */
+.work,
+.done {
+  display: none;
+  padding: clamp(2rem, 5vw, 4rem) clamp(1rem, 4vw, 3.5rem);
+  max-width: 82rem;
+  margin: 0 auto;
+}
+body[data-view='work'] .work,
+body[data-view='done'] .done {
+  display: block;
+}
+body:not([data-view='start']) .hero {
+  display: none;
+}
+/* Looking at an existing e-invoice: nothing to read or create. */
+body[data-mode='validate'] .reader details,
+body[data-mode='validate'] #create {
+  display: none;
+}
+input:disabled,
+select:disabled {
+  opacity: 1;
+  color: var(--ink);
+  -webkit-text-fill-color: var(--ink);
+}
+.work__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 2rem;
+}
+.work__head p {
+  margin-top: 0.5rem;
+}
+.work__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  gap: clamp(1.5rem, 3.5vw, 3.5rem);
+  align-items: start;
+}
+.work__pdf {
+  position: sticky;
+  top: 1rem;
+}
+.work__pdf canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: #fff;
+  border-radius: 2px;
+  box-shadow: var(--shadow);
+}
+.work__pdf p {
+  margin-top: 0.6rem;
+}
+.work__data {
+  background: var(--paper);
+  border-radius: 2px;
+  box-shadow: var(--shadow);
+  padding: clamp(1.1rem, 2.5vw, 2rem);
+}
+.reader {
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid var(--line);
+}
+.reader details {
+  margin-top: 0.6rem;
+}
+.reader details > * + * {
+  margin-top: 0.8rem;
+}
+summary {
+  cursor: pointer;
+  color: var(--blue);
+  font-weight: 650;
+}
+.group {
+  padding: 1.5rem 0;
+  border-bottom: 1px solid var(--line);
+}
+.group > h3,
+.group > summary {
+  margin-bottom: 1rem;
+}
+details.group:not([open]) > summary {
+  margin-bottom: 0;
+}
+.fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem 1rem;
+}
+.field--wide {
+  grid-column: 1 / -1;
+}
+label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 0.3rem;
+}
+input,
+select {
+  width: 100%;
+  font: inherit;
+  color: var(--ink);
+  background: var(--desk);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 0.5rem 0.65rem;
+  min-height: 2.6rem;
+}
+input:hover,
+select:hover {
+  border-color: var(--muted);
+}
+input[aria-invalid],
+select[aria-invalid] {
+  border-color: var(--red);
+  background: var(--red-wash);
+}
+input.warned,
+select.warned {
+  border-color: var(--amber);
+  background: var(--amber-wash);
+}
+.hint {
+  font-size: 0.8125rem;
+  margin-top: 0.3rem;
+  color: var(--muted);
+}
+.hint:empty {
+  display: none;
+}
+.hint--error {
+  color: var(--red);
+}
+.hint--warning {
+  color: var(--amber);
+}
+
+.lines {
+  display: grid;
+  gap: 1rem;
+  justify-items: start;
+}
+.line {
+  position: relative;
+  display: grid;
+  grid-template-columns: 5.5rem 1fr 1fr 1.6fr 5rem;
+  align-items: end;
+  gap: 0.7rem 0.8rem;
+  width: 100%;
+  margin: 0;
+  padding: 0.9rem 2.6rem 0.9rem 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+.line legend {
+  padding: 0 0.4rem;
+  font: 600 0.8125rem var(--mono);
+  color: var(--muted);
+}
+.line .icon {
+  position: absolute;
+  top: 0.2rem;
+  right: 0.2rem;
+}
+
+.totals {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0;
+  max-width: 24rem;
+  margin-left: auto;
+}
+.total {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0 1.5rem;
+  font-variant-numeric: tabular-nums;
+}
+.total dd {
+  margin: 0;
+  text-align: right;
+  color: var(--ink);
+}
+.total--main {
+  font-weight: 720;
+  font-size: 1.15rem;
+  color: var(--ink);
+  border-top: 1px solid var(--ink);
+  padding-top: 0.4rem;
+}
+.total--off dd {
+  color: var(--red);
+}
+.total__printed {
+  grid-column: 1 / -1;
+  font-size: 0.8125rem;
+}
+
+.finish {
+  padding-top: 1.5rem;
+}
+.summary {
+  border-left: 3px solid var(--green);
+  background: var(--green-wash);
+  padding: 0.9rem 1.1rem;
+  margin-bottom: 1.2rem;
+}
+.summary--error {
+  border-color: var(--red);
+  background: var(--red-wash);
+}
+.summary--warning {
+  border-color: var(--amber);
+  background: var(--amber-wash);
+}
+.summary__title {
+  font-weight: 680;
+  color: var(--ink);
+}
+.summary ul {
+  margin: 0.5rem 0 0;
+  padding-left: 1.1rem;
+  font-size: 0.9375rem;
+}
+.summary li + li {
+  margin-top: 0.25rem;
+}
+.summary li.error,
+.summary li.error .link {
+  color: var(--red);
+}
+.summary li.warning,
+.summary li.warning .link {
+  color: var(--amber);
+}
+
+/* Done: the stamp is the one moment of celebration ------------------------------------------------------------- */
+.done > * + * {
+  margin-top: 1rem;
+}
+.stamp {
+  display: inline-block;
+  font: 700 1.05rem var(--mono);
+  letter-spacing: 0.08em;
+  color: var(--green);
+  border: 3px solid var(--green);
+  border-radius: 4px;
+  padding: 0.35rem 0.8rem;
+  transform: rotate(-4deg);
+  animation: stamp 0.45s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+@keyframes stamp {
+  from {
+    opacity: 0;
+    transform: rotate(-11deg) scale(1.7);
+  }
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.8rem 1.2rem;
+  max-width: none;
+  margin-top: 1.6rem;
+}
+.notes {
+  border-left: 3px solid var(--amber);
+  background: var(--amber-wash);
+  margin: 1rem 0 0;
+  padding: 0.9rem 1.1rem 0.9rem 2.1rem;
+  max-width: var(--measure);
+}
+#checksum {
+  word-break: break-all;
+}
+
+/* Reading sections --------------------------------------------------------------------------------------------- */
+.info {
+  padding: clamp(2.5rem, 6vw, 4.5rem) clamp(1rem, 4vw, 3.5rem);
+  max-width: 82rem;
+  margin: 0 auto;
+  border-top: 1px solid var(--line);
+}
+.info > * + * {
+  margin-top: 1rem;
+}
+.info > h2:not(:first-child) {
+  margin-top: 3rem;
+}
+.info ul {
+  max-width: var(--measure);
+  padding-left: 1.1rem;
+}
+.info li + li {
+  margin-top: 0.6rem;
+}
+.steps {
+  list-style: none;
+  counter-reset: step;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 2rem;
+  padding: 0;
+  margin-top: 1.6rem;
+}
+.steps li {
+  counter-increment: step;
+  border-top: 2px solid var(--ink);
+  padding-top: 0.9rem;
+}
+.steps li::before {
+  content: counter(step);
+  display: block;
+  font: 700 1.6rem var(--sans);
+  color: var(--blue);
+  margin-bottom: 0.4rem;
+}
+.steps p {
+  margin-top: 0.4rem;
+}
+.info pre {
+  background: var(--paper);
+  border-radius: 2px;
+  box-shadow: var(--shadow);
+  padding: 1rem 1.2rem;
+  overflow-x: auto;
+  max-width: 46rem;
+  color: var(--ink);
+}
+.foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem 1.6rem;
+  padding: 2rem clamp(1rem, 4vw, 3.5rem) 3rem;
+  max-width: 82rem;
+  margin: 0 auto;
+  border-top: 1px solid var(--line);
+  font-size: 0.9375rem;
+  color: var(--muted);
+}
+
+@media (max-width: 60rem) {
+  .hero,
+  .work__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .work__pdf {
+    position: static;
+    max-width: 26rem;
+  }
+  .steps {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .nav nav {
+    display: none;
+  }
+  .langs {
+    margin-left: auto;
+  }
+}
+@media (max-width: 40rem) {
+  .line {
+    grid-template-columns: 1fr 1fr;
+  }
+  .fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}

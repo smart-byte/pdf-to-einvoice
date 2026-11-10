@@ -1,0 +1,35 @@
+# pdf-to-einvoice
+
+> Turns an existing invoice PDF into a valid EN 16931 e-invoice (ZUGFeRD / Factur-X, German "E-Rechnung") without changing how the PDF looks: the invoice data is attached as CII XML and the file becomes a PDF/A-3. TypeScript library, CLI, MCP server and a browser app. Everything runs locally; no API key, no upload. MIT licence.
+
+Install with `npm install pdf-to-einvoice`, or run without installing: `npx pdf-to-einvoice <command>`.
+
+```ts
+import { check, createEInvoice, extractText, guessFromText } from 'pdf-to-einvoice';
+
+const text = await extractText(pdfBytes); // text of the PDF, row by row
+const draft = { ...guessFromText(text) /* number, dates, IBAN, tax IDs, totals */ };
+const { findings } = check(draft, { pdfText: text }); // what is missing, wrong, or not on the PDF
+const { pdf, xml } = await createEInvoice({ pdf: pdfBytes, invoice: draft }); // throws InvoiceError while errors are open
+```
+
+Command line: `read <pdf> --json`, `schema`, `check <data.json> --pdf <pdf>`, `create <pdf> <data.json> [-o out.pdf]`, `validate <einvoice.pdf>`, `xml <einvoice.pdf>`, `mcp`.
+
+MCP server: `npx -y pdf-to-einvoice mcp` (stdio). Tools: `read_invoice_pdf`, `check_invoice`, `create_einvoice`, `validate_einvoice`, `read_einvoice_xml`.
+
+Rules for an assistant converting an invoice:
+
+- You act for the invoice issuer. A recipient cannot turn a received PDF into a valid e-invoice.
+- Copy values exactly as printed on the PDF. Never invent a missing value: ask the user.
+- The XML is the legally binding part. Show the findings and get the user's confirmation before creating the file.
+- Required: `number`, `issueDate` (YYYY-MM-DD), `seller` and `buyer` with `name` and `country` (two-letter code), `seller.vatId` or `seller.taxNumber`, at least one line with `name`, `quantity`, `unitPrice` (net) and `vatRate`, and `dueDate` or `paymentTerms` when an amount is due.
+- `vatCategory`: `S` VAT charged; `AE` reverse charge (EU business customer, needs `buyer.vatId`); `K` intra-community supply of goods (needs `buyer.vatId`); `G` export of goods outside the EU; `O` not subject to VAT (e.g. service for a business outside the EU); `E` exempt (e.g. German small business, § 19 UStG); `Z` zero rated. Every category except `S` and `Z` has `vatRate` 0 and needs `vatExemptionReason`, the sentence printed on the invoice.
+- `totals` (`net`, `vat`, `gross`, `due`) are the sums printed on the PDF. A contradiction with the calculated totals is an error: fix the data, do not drop the totals.
+- No discounts on document level yet: enter them as a line with a negative quantity.
+- Output profile: Factur-X / ZUGFeRD EN 16931 (CII). Not tax advice.
+
+## Docs
+
+- [README](https://github.com/smart-byte/pdf-to-einvoice#readme): API, CLI, MCP setup, data model, limits
+- [Skill for agents](https://github.com/smart-byte/pdf-to-einvoice/blob/main/skills/pdf-to-einvoice/SKILL.md)
+- [Changelog](https://github.com/smart-byte/pdf-to-einvoice/blob/main/CHANGELOG.md)
