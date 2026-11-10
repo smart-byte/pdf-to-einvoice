@@ -249,6 +249,11 @@ describe('check against the PDF text', () => {
     ).toEqual(['warning:not-in-pdf']);
   });
 
+  it.each(['09.08.23', '9.8.23', '09/08/23', '08/09/23'])('finds a date the PDF prints with a two-digit year, as %s', (printed) => {
+    const draft = withChange((d) => (d.dueDate = '2023-08-09'));
+    expect(codesAt(draft, 'dueDate', { pdfText: `${pdfText}\nFällig ${printed}` })).toEqual([]);
+  });
+
   it('warns about a unit price the PDF does not show', () => {
     const draft = withChange((d) => {
       d.lines[1].unitPrice = 249.4;

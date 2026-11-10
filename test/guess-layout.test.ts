@@ -104,8 +104,12 @@ describe('guessFromText on the layout of a German invoice', () => {
     expect(guessFromText('Leistungsdatum 31.10.2026')).toEqual({ deliveryDate: '2026-10-31' });
   });
 
-  it('does not take a month without a label for a service period', () => {
-    expect(guessFromText('Oktober 2026\nMonat 13/2026')).toEqual({});
+  it('reads a row that holds nothing but a month as the service period', () => {
+    expect(guessFromText('Beispiel AG\nDecember 2024\nInvoice 2410')).toMatchObject({ periodStart: '2024-12-01', periodEnd: '2024-12-31' });
+  });
+
+  it('does not take a month inside a sentence, or one that does not exist, for a service period', () => {
+    expect(guessFromText('Unser Angebot vom Oktober 2026 liegt bei\nMonat 13/2026')).toEqual({});
   });
 });
 

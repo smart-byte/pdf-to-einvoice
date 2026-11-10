@@ -1,48 +1,51 @@
 import { isIban } from './check.js';
-import type { InvoiceDraft, Line, Party } from './model.js';
+import type { InvoiceDraft, Line, Party, VatCategory } from './model.js';
 
 // ponytail: patterns for German and English invoices, no model. They read what carries a label (number, dates, bank
 // details, tax IDs, totals) and what sits where convention puts it: the seller in a sender line ("Name · Street ·
-// 12345 City"), the buyer in the address block, the items in table rows that end with an amount. An invoice laid out
-// differently yields less, never something invented: table rows are only kept when they add up to the printed net
-// total. Add labels and layouts here before reaching for anything smarter.
+// 12345 City"), the buyer in the address block, the items in the rows of the table. An invoice laid out differently
+// yields less, never something invented: table rows are only kept when they add up to the printed total, and a date
+// that can be read two ways stays unread. Add labels and layouts here before reaching for anything smarter.
 
 const MONTHS = ['jan', 'feb', 'm[aä]r', 'apr', 'ma[iy]', 'jun', 'jul', 'aug', 'sep', 'o[ck]t', 'nov', 'de[cz]'];
 const MONTH = `(${MONTHS.join('|')})[a-zä]*\\.?`;
 const SEPARATOR = '^\\s*[:#.]?\\s*';
 
-/** ISO, 3.11.2026, 3 November 2026, November 3, 2026, and 08/10/2026 where it can be read in one way only. */
+/** ISO, 3.11.2026, 3.11.26, 3 November 2026, November 3, 2026, and 08/10/2026 where it can be read in one way only. */
 const DATE = new RegExp(
-  `${SEPARATOR}(?:(\\d{4})-(\\d{2})-(\\d{2})|(\\d{1,2})\\.\\s?(\\d{1,2})\\.\\s?(\\d{4})|(\\d{1,2})\\.?\\s+${MONTH}\\s+(\\d{4})|${MONTH}\\s+(\\d{1,2}),?\\s+(\\d{4})|(\\d{1,2})/(\\d{1,2})/(\\d{4}))`,
+  `${SEPARATOR}(?:(\\d{4})-(\\d{2})-(\\d{2})|(\\d{1,2})\\.\\s?(\\d{1,2})\\.\\s?(\\d{4}|\\d{2})(?!\\d)|(\\d{1,2})\\.?\\s+${MONTH}\\s+(\\d{4})|${MONTH}\\s+(\\d{1,2}),?\\s+(\\d{4})|(\\d{1,2})/(\\d{1,2})/(\\d{4}|\\d{2})(?!\\d))`,
   'i',
 );
 const MONEY = "(-?\\d{1,3}(?:[.,' ]\\d{3})*[.,]\\d{2}|-?\\d+[.,]\\d{2})";
 const AMOUNT = new RegExp(`${SEPARATOR}(?:\\d{1,2}(?:[.,]\\d+)?\\s*%\\s*)?[€$£]?\\s*${MONEY}(?!\\d)`);
 
 const pad = (n: string | number) => String(n).padStart(2, '0');
+const century = (year: string) => (year.length === 2 ? `20${year}` : year);
 const monthNumber = (name: string) => MONTHS.findIndex((m) => new RegExp(`^${m}`, 'i').test(name)) + 1;
+const cents = (n: number) => Math.round(n * 100);
 
 function toIsoDate(m: RegExpExecArray, dayFirst: boolean): string | undefined {
   if (m[1]) return `${m[1]}-${m[2]}-${m[3]}`;
-  if (m[4]) return `${m[6]}-${pad(m[5]!)}-${pad(m[4])}`;
+  if (m[4]) return `${century(m[6]!)}-${pad(m[5]!)}-${pad(m[4])}`;
   if (m[7]) return `${m[9]}-${pad(monthNumber(m[8]!))}-${pad(m[7])}`;
   if (m[10]) return `${m[12]}-${pad(monthNumber(m[10]))}-${pad(m[11]!)}`;
   // With slashes, day and month can be told apart when one is above 12, or when a German label says who wrote it.
   const [a, b] = [Number(m[13]), Number(m[14])];
-  if (b > 12 && a <= 12) return `${m[15]}-${pad(a)}-${pad(b)}`;
-  if ((a > 12 || dayFirst) && b <= 12) return `${m[15]}-${pad(b)}-${pad(a)}`;
+  if (b > 12 && a <= 12) return `${century(m[15]!)}-${pad(a)}-${pad(b)}`;
+  if ((a > 12 || dayFirst) && b <= 12) return `${century(m[15]!)}-${pad(b)}-${pad(a)}`;
   return undefined;
 }
 
 /** "1.499,00" and "1,499.00" both mean 1499: the last separator is the decimal one. */
 const toNumber = (printed: string) => Number(printed.replace(/[^\d-]/g, '')) / 100;
+const decimal = (printed: string) => Number(printed.replace(',', '.'));
 
-/** Applies `value` to what follows each occurrence of `label` on the same line. */
+/** Applies `value` to what follows each occurrence of `label`: on the same line, or on the next one when the label stands alone. */
 function after(text: string, label: RegExp, value: RegExp): { hit: RegExpExecArray; label: string }[] {
   const hits: { hit: RegExpExecArray; label: string }[] = [];
   for (const match of text.matchAll(new RegExp(label.source, 'gi'))) {
-    const rest = text.slice(match.index + match[0].length).split('\n', 1)[0]!;
-    const hit = value.exec(rest.slice(0, 60));
+    const [rest = '', below = ''] = text.slice(match.index + match[0].length).split('\n', 2);
+    const hit = value.exec((/^[\s:]*$/.test(rest) ? below : rest).slice(0, 60));
     if (hit) hits.push({ hit, label: match[0] });
   }
   return hits;
@@ -73,9 +76,14 @@ function findCurrency(text: string): string | undefined {
 // Layout: extractText() writes three spaces between columns, so a row splits into cells.
 
 const cells = (row: string) => row.split(/\s{3,}/).map((cell) => cell.trim());
-const isSenderLine = (row: string) => row.split(/\s[·|•]\s/).length >= 3;
+/** "Name · Street 1 · 12345 City", also written with dashes or bars. */
+const SENDER_SEPARATOR = /\s[·|•–—-]\s/;
+const isSenderLine = (row: string) => row.split(SENDER_SEPARATOR).length >= 3;
 /** "12345 Musterstadt", "DE-12345 Musterstadt", "D-12345 Musterstadt". */
 const POSTAL = /^(?:([A-Z]{1,2})-)?(\d{4,5})\s+(\p{L}.*)$/u;
+/** "Dover, DE 19901", with the country in front ("USA – Dover, DE 19901") or behind ("Dover, DE 19901, USA"). */
+const US_PLACE =
+  /^(?:(?:USA|United States(?: of America)?)\s[–—-]\s)?([\p{L} .'-]+),\s[A-Z]{2}\s(\d{5}(?:-\d{4})?)(?:,\s(?:USA|United States(?: of America)?))?$/u;
 const COUNTRY_PREFIX: Record<string, string> = {
   D: 'DE',
   DE: 'DE',
@@ -90,35 +98,43 @@ const COUNTRY_PREFIX: Record<string, string> = {
   L: 'LU',
   LU: 'LU',
 };
+const EU = new Set('AT BE BG CY CZ DE DK EE ES FI FR GR HR HU IE IT LT LU LV MT NL PL PT RO SE SI SK'.split(' '));
 /** VAT IDs start with the country code, except that Greece writes EL. */
 const countryOfVatId = (vatId: string | undefined) => (vatId ? vatId.slice(0, 2).replace('EL', 'GR') : undefined);
 
-function postalPart(cell: string): Partial<Party> | undefined {
-  const m = POSTAL.exec(cell);
-  return m ? { postalCode: m[2], city: m[3], country: COUNTRY_PREFIX[m[1] ?? ''] } : undefined;
+/** Postal code, city and country, from the last line of an address. */
+function placeOf(cell: string): Partial<Party> | undefined {
+  const german = POSTAL.exec(cell);
+  if (german) return { postalCode: german[2], city: german[3], country: COUNTRY_PREFIX[german[1] ?? ''] };
+  const american = US_PLACE.exec(cell);
+  return american ? { postalCode: american[2], city: american[1]!.trim(), country: 'US' } : undefined;
 }
 
 /** The seller, from a line like "Name · Street 1 · 12345 City" in the letterhead or footer. */
 function readSender(rows: string[]): Partial<Party> {
   for (const row of rows.filter(isSenderLine)) {
-    const segments = row.split(/\s[·|•]\s|,\s/).map((segment) => segment.trim());
+    const segments = row.split(new RegExp(`${SENDER_SEPARATOR.source}|,\\s`)).map((segment) => segment.trim());
     const i = segments.findIndex((segment) => POSTAL.test(segment));
-    if (i >= 1) return { name: segments[0], street: i >= 2 ? segments[i - 1] : undefined, ...postalPart(segments[i]!) };
+    if (i >= 1) return { name: segments[0], street: i >= 2 ? segments[i - 1] : undefined, ...placeOf(segments[i]!) };
   }
   return {};
 }
 
-/** The buyer, from the address block: up to three lines above a line that starts with postal code and city. */
-function readRecipient(rows: string[]): Partial<Party> {
+/**
+ * The buyer, from an address block: up to three lines above a line with postal code and city. A letterhead is an
+ * address block too, so a block that carries the seller's name is passed over.
+ */
+function readRecipient(rows: string[], sellerName: string | undefined): Partial<Party> {
   const first = (row: string) => cells(row)[0]!;
   const endsBlock = (row: string) =>
     isSenderLine(row) || /:|^(bill to|invoice to|rechnung an|rechnungsempfänger|rechnungsadresse|kunde|customer|empfänger)\b/i.test(first(row));
   for (let i = 0; i < rows.length; i++) {
-    const place = isSenderLine(rows[i]!) ? undefined : postalPart(first(rows[i]!));
+    const place = isSenderLine(rows[i]!) ? undefined : placeOf(first(rows[i]!));
     if (!place) continue;
     const above: string[] = [];
     for (let j = i - 1; j >= 0 && above.length < 3 && first(rows[j]!) && !endsBlock(rows[j]!); j--) above.unshift(first(rows[j]!));
-    if (above.length >= 2) return { name: above[0], contactName: above.length === 3 ? above[1] : undefined, street: above.at(-1), ...place };
+    if (above.length >= 2 && above[0] !== sellerName)
+      return { name: above[0], contactName: above.length === 3 ? above[1] : undefined, street: above.at(-1), ...place };
   }
   return {};
 }
@@ -130,42 +146,64 @@ const UNITS: [RegExp, string][] = [
   [/^kg\.?$/i, 'KGM'],
   [/^(pauschal|psch)\.?$/i, 'LS'],
 ];
-const MONEY_CELL = new RegExp(`^[€$£]?\\s*${MONEY}\\s*(?:€|EUR|\\$|USD|£|GBP|CHF)?$`);
+const MONEY_CELL = new RegExp(`^[€$£]?\\s*${MONEY}\\s*(?:€|EUR|US\\$|\\$|USD|£|GBP|CHF)?$`);
 const RATE_CELL = /^(\d{1,2}(?:[.,]\d+)?)\s?%$/;
 const QUANTITY_CELL = /^(-?\d+(?:[.,]\d+)?)\s*(\p{L}+\.?)?$/u;
-const TOTALS_ROW = /^(netto|zwischensumme|summe|mwst|ust|umsatzsteuer|mehrwertsteuer|gesamt|brutto|rechnungsbetrag|total|subtotal|vat|tax)/i;
-const decimal = (printed: string) => Number(printed.replace(',', '.'));
+const TOTALS_ROW =
+  /^(?:\d{1,2}(?:[.,]\d+)?\s?%\s*)?(netto|zwischensumme|summe|mwst|ust|umsatzsteuer|mehrwertsteuer|gesamt|brutto|rechnungsbetrag|endbetrag|zzgl|total|subtotal|vat|tax)/i;
+const NAME_HEADER = /^(pos\.?|nr\.?|no\.?|#|beschreibung(?:en)?|bezeichnung|leistung(?:en)?|artikel|description|item|service)$/i;
+const AMOUNT_HEADER = /^(betrag|gesamt(?:preis)?|summe|preis|amount|total|price)$/i;
+/** How many rows a description may wrap into. */
+const MAX_WRAPPED = 4;
+
+type Item = Partial<Line> & { total: number };
 
 /**
- * The line items, from table rows that start with a position number and end with an amount. Rows are only believed
- * when they add up to the printed net total; otherwise nothing is returned and a person fills the lines in.
+ * The line items, from the rows of the table: below a header such as "Description … Amount" every row that ends
+ * with an amount, elsewhere only rows that start with a position number. A description may wrap into the rows
+ * around it. Rows are only believed when they add up to the printed total; otherwise nothing is returned and a
+ * person fills the lines in.
  */
-function readItems(rows: string[], netTotal: number | undefined): Partial<Line>[] | undefined {
-  const items: (Partial<Line> & { total: number })[] = [];
-  let open = false;
-  for (const row of rows) {
+function readItems(rows: string[], totals: { net?: number; vat?: number; gross?: number }): Partial<Line>[] | undefined {
+  const header = rows.findIndex((row) => cells(row).some((cell) => NAME_HEADER.test(cell)) && cells(row).some((cell) => AMOUNT_HEADER.test(cell)));
+  const items: Item[] = [];
+  /** Rows of text between items: the end of the description above, or the start of the one below. */
+  let loose: string[] = [];
+  const closeLoose = () => {
+    if (items.length && loose.length <= MAX_WRAPPED) items.at(-1)!.name = [items.at(-1)!.name, ...loose].filter(Boolean).join(' ');
+    loose = [];
+  };
+  for (const row of rows.slice(header + 1)) {
+    if (TOTALS_ROW.test(row)) {
+      if (items.length) break;
+      continue;
+    }
     const parts = cells(row);
     const last = MONEY_CELL.exec(parts.at(-1)!);
-    if (/^\d{1,3}\.?$/.test(parts[0]!) && parts.length >= 3 && last) {
-      const item: Partial<Line> & { total: number } = { name: parts[1], total: toNumber(last[1]!) };
-      for (const cell of parts.slice(2, -1)) {
+    const numbered = /^\d{1,3}\.?$/.test(parts[0]!);
+    if (last && parts.length >= 2 && (numbered || header >= 0)) {
+      const item: Item = { total: toNumber(last[1]!) };
+      for (const cell of parts.slice(numbered ? 1 : 0, -1)) {
         const [rate, money, quantity] = [RATE_CELL.exec(cell), MONEY_CELL.exec(cell), QUANTITY_CELL.exec(cell)];
         if (rate) item.vatRate = decimal(rate[1]!);
         else if (money) item.unitPrice = toNumber(money[1]!);
         else if (quantity) {
           item.quantity = decimal(quantity[1]!);
           item.unit = UNITS.find(([pattern]) => pattern.test(quantity[2] ?? ''))?.[1];
-        }
+        } else item.name ??= cell;
       }
+      // A row with only number and amount takes its description from the text above it; other text above belongs to the previous item.
+      if (item.name === undefined) item.name = loose.splice(0).slice(-MAX_WRAPPED).join(' ');
+      closeLoose();
       items.push(item);
-      open = true;
-    } else if (open && parts.length === 1 && !/:/.test(row) && !TOTALS_ROW.test(row)) {
-      // A description that wraps continues on the next row, in a single cell.
-      items.at(-1)!.name += ` ${parts[0]}`;
-    } else open = false;
+    } else if (parts.length === 1 && !/:/.test(row)) loose.push(parts[0]!);
+    else loose = [];
   }
-  const cents = (n: number) => Math.round(n * 100);
-  if (!items.length || netTotal === undefined || cents(items.reduce((sum, item) => sum + item.total, 0)) !== cents(netTotal)) return undefined;
+  closeLoose();
+
+  // Without VAT the rows add up to the total itself.
+  const expected = totals.net ?? (totals.vat === undefined ? totals.gross : undefined);
+  if (!items.length || expected === undefined || cents(items.reduce((sum, item) => sum + item.total, 0)) !== cents(expected)) return undefined;
 
   // A rate that the rows do not carry is the one the totals name, if they name exactly one.
   const totalRates = new Set(
@@ -175,14 +213,31 @@ function readItems(rows: string[], netTotal: number | undefined): Partial<Line>[
   return items.map(({ total, ...item }) => {
     const quantity = item.quantity ?? 1;
     return {
-      name: item.name,
+      name: item.name || undefined,
       quantity,
       unit: item.unit ?? 'C62',
       unitPrice: item.unitPrice ?? (quantity === 1 ? total : undefined),
-      vatCategory: 'S' as const,
+      vatCategory: 'S' as VatCategory,
       vatRate: item.vatRate ?? onlyRate,
     };
   });
+}
+
+/** The printed sentence that says why no VAT is charged, joined over the rows it wraps into. */
+function readVatNote(rows: string[]): string | undefined {
+  const start = rows.findIndex(
+    (row) =>
+      /\b(vat|umsatzsteuer|mehrwertsteuer|steuerschuld\w*|reverse[- ]charge|steuerfrei\w*|steuerbefreit\w*|nicht steuerbar)\b|§\s?\d+\w*\s.*ustg/i.test(row) &&
+      !TOTALS_ROW.test(row) &&
+      !isSenderLine(row) &&
+      !/\b[A-Z]{2} ?\d[\d ]{7,}/.test(row),
+  );
+  if (start < 0) return undefined;
+  const note = [rows[start]!.replace(/^\s*(note|hinweis|anmerkung)\s*:\s*/i, '')];
+  // The sentence goes on while a row starts in lower case and the one before it did not end.
+  for (let i = start + 1; i < rows.length && note.length <= MAX_WRAPPED && !/[.!?]$/.test(note.at(-1)!) && /^[\p{Ll}\d§(]/u.test(rows[i]!); i++)
+    note.push(rows[i]!);
+  return note.join(' ').replace(/\s+/g, ' ').trim();
 }
 
 const PERIOD_LABEL =
@@ -192,12 +247,14 @@ const PERIOD = new RegExp(
   `${SEPARATOR}(?:Q([1-4])[ /]?(\\d{4})|([1-4])\\.\\s?Quartal\\s+(\\d{4})|${DOTTED}\\s*(?:-|–|bis|to)\\s*${DOTTED}|${MONTH}\\s+(\\d{4})|(\\d{1,2})[./-](\\d{4})(?!\\d)|(\\d{4})-(\\d{2})(?![-\\d]))`,
   'i',
 );
+const MONTH_ROW = new RegExp(`^${MONTH}\\s+(\\d{4})$`, 'i');
 
 /**
- * A service period given as a quarter ("Q2 2026"), a month ("Oktober 2026", "10/2026") or two dates. German VAT
- * law accepts the calendar month as the date of supply (§ 31 (4) UStDV); the XML needs its first and last day.
+ * A service period given as a quarter ("Q2 2026"), a month ("Oktober 2026", "10/2026") or two dates, after its
+ * label or as a row that holds nothing but a month. German VAT law accepts the calendar month as the date of supply
+ * (§ 31 (4) UStDV); the XML needs its first and last day.
  */
-function readPeriod(text: string): { periodStart?: string; periodEnd?: string } {
+function readPeriod(text: string, rows: string[]): { periodStart?: string; periodEnd?: string } {
   const months = (year: string, from: number, to: number) => {
     if (from < 1 || to > 12) return undefined;
     return { periodStart: `${year}-${pad(from)}-01`, periodEnd: `${year}-${pad(to)}-${new Date(Date.UTC(Number(year), to, 0)).getUTCDate()}` };
@@ -214,6 +271,29 @@ function readPeriod(text: string): { periodStart?: string; periodEnd?: string } 
             ? months(m[14]!, Number(m[13]), Number(m[13]))
             : months(m[15]!, Number(m[16]), Number(m[16]));
     if (period) return period;
+  }
+  const alone = rows.map((row) => MONTH_ROW.exec(row.trim())).find(Boolean);
+  return (alone && months(alone[2]!, monthNumber(alone[1]!), monthNumber(alone[1]!))) || {};
+}
+
+/** The invoice number: after its label, or straight after the word "Rechnung" / "Invoice". Also the date in the same row. */
+function readNumber(text: string, rows: string[]): { number?: string; dateBeside?: string } {
+  const labelled = after(
+    text,
+    // A bare "Nr.:" counts only at the start of a cell: "IBAN Nr.: DE02 …" is not an invoice number.
+    /rechnungs?-?\s?(?:nummer|nr\.?)|invoice\s*(?:number|no\.?|#)|(?<=^|\n|\s{3})(?:nr|no)\.?\s*:/,
+    new RegExp(`${SEPARATOR}([A-Za-z0-9][\\w/.-]*\\d[\\w/-]*)`),
+  )[0]?.hit[1];
+  if (labelled) return { number: labelled };
+  for (const row of rows) {
+    const parts = cells(row);
+    const named = parts.map((cell) => /^(?:Rechnung|Invoice)[ \t]+([A-Z]{0,3}[-/]?\d{2,}[\w/-]*)$/i.exec(cell)).find(Boolean);
+    if (!named) continue;
+    const dateBeside = parts
+      .map((cell) => DATE.exec(cell))
+      .map((hit) => hit && toIsoDate(hit, false))
+      .find(Boolean);
+    return { number: named[1], dateBeside: dateBeside ?? undefined };
   }
   return {};
 }
@@ -251,31 +331,44 @@ export function guessFromText(text: string): InvoiceDraft {
 
   const vatIdLabel =
     /ust\.?-?\s?id\.?-?\s?(?:nr\.?)?|umsatzsteuer-?\s?id(?:entifikationsnummer)?|uid(?:-nr\.?)?|vat\s*(?:id|reg(?:istration)?\.?)?\s*(?:no\.?|number)?/;
-  const vatIds = [...new Set(after(text, vatIdLabel, new RegExp(`${SEPARATOR}([A-Z]{2} ?[A-Z0-9]{8,12})\\b`)).map(({ hit }) => hit[1]!.replace(/ /g, '')))];
+  // "DE123456789" and "DE 123 456 789".
+  const vatIds = [...new Set(after(text, vatIdLabel, new RegExp(`${SEPARATOR}([A-Z]{2}(?: ?[A-Z0-9]){8,12})\\b`)).map(({ hit }) => hit[1]!.replace(/ /g, '')))];
   const totals = {
     net: amount(/nettobetrag|nettosumme|summe\s+netto|zwischensumme|netto|subtotal|net\s+(?:amount|total)/),
     vat: amount(/umsatzsteuer|mehrwertsteuer|mwst\.?|ust\.?|\bvat\b|sales\s+tax/),
     gross: amount(/gesamt(?:betrag|summe)?|rechnungsbetrag|bruttobetrag|endbetrag|brutto|grand\s+total|amount\s+due|total(?:\s+amount)?(?:\s+due)?/),
   };
-  const lines = readItems(rows, totals.net);
   const seller: Partial<Party> = { ...readSender(rows), vatId: vatIds[0] };
   seller.country ??= countryOfVatId(seller.vatId);
-  const buyer: Partial<Party> = { ...readRecipient(rows), vatId: vatIds[1] };
+  const buyer: Partial<Party> = { ...readRecipient(rows, seller.name), vatId: vatIds[1] };
+  const lines = readItems(rows, totals);
   // An address without a country is at home when VAT is charged: that is the ordinary domestic invoice.
   buyer.country ??= countryOfVatId(buyer.vatId) ?? (buyer.postalCode && lines?.some((line) => (line.vatRate ?? 0) > 0) ? seller.country : undefined);
 
+  // An invoice that shows no VAT at all charges none. Why, the country of the buyer tells: outside the EU the sale is
+  // not subject to VAT, elsewhere in the EU the buyer owes it, at home the seller is exempt. A person confirms this.
+  const showsNoVat =
+    totals.vat === undefined &&
+    lines?.every((line) => line.vatRate === undefined) &&
+    (totals.net === undefined || totals.gross === undefined || cents(totals.net) === cents(totals.gross));
+  if (lines && showsNoVat && buyer.country) {
+    const vatCategory: VatCategory = !EU.has(buyer.country) ? 'O' : buyer.country !== seller.country ? 'AE' : 'E';
+    for (const line of lines) Object.assign(line, { vatCategory, vatRate: 0 });
+  }
+
+  const { number, dateBeside } = readNumber(text, rows);
+  const iban = findIban(text);
   return prune({
-    number: first(
-      /rechnungs?-?\s?(?:nummer|nr\.?)|invoice\s*(?:number|no\.?|#)|(?<![\wäöü.-])nr\.?\s*:/,
-      new RegExp(`${SEPARATOR}([A-Za-z0-9][\\w/.-]*\\d[\\w/-]*)`),
-    ),
-    issueDate: date(/rechnungsdatum|invoice\s+date|date\s+of\s+issue|issue\s+date/) ?? date(/(?<![a-zäöü])datum|(?<![a-z] ?)date/),
+    number,
+    issueDate: date(/rechnungsdatum|invoice\s+date|date\s+of\s+issue|issue\s+date/) ?? date(/(?<![a-zäöü])datum|(?<![a-z] ?)date/) ?? dateBeside,
     deliveryDate: date(/leistungsdatum|lieferdatum|date\s+of\s+(?:supply|delivery)|delivery\s+date|service\s+date/),
-    ...readPeriod(text),
+    ...readPeriod(text, rows),
     dueDate: date(/fällig(?:keitsdatum|\s+am|\s+bis)?|zahlbar\s+bis|due(?:\s+date|\s+by|\s+on)?|payable\s+by/),
     currency: findCurrency(text),
-    iban: findIban(text),
-    bic: first(/\b(?:bic|swift)(?:[-/ ]?code)?/, new RegExp(`${SEPARATOR}([A-Z]{6}[A-Z0-9]{2}(?:[A-Z0-9]{3})?)\\b`)),
+    iban,
+    // A BIC belongs to an IBAN; with another kind of account it has no place in the invoice data.
+    bic: iban ? first(/\b(?:bic|swift)(?:[-/ ]?code)?/, new RegExp(`${SEPARATOR}([A-Z]{6}[A-Z0-9]{2}(?:[A-Z0-9]{3})?)\\b`)) : undefined,
+    vatExemptionReason: lines?.some((line) => line.vatRate === 0) ? readVatNote(rows) : undefined,
     seller: {
       ...seller,
       taxNumber: first(/steuernummer|steuer-?nr\.?|st\.?-?nr\.?|tax\s+(?:number|no\.?)/, new RegExp(`${SEPARATOR}(\\d{2,3}/\\d{3,4}/\\d{4,5}|\\d{10,13})`)),
