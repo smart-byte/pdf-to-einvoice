@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>pdf-to-einvoice: turn an invoice PDF into an e-invoice (ZUGFeRD / Factur-X)</title>
+    <meta
+      name="description"
+      content="Turn the invoice PDF you already have into a valid EN 16931 e-invoice (ZUGFeRD / Factur-X, E-Rechnung). Your layout stays; the data is added as XML. Free, open source, and everything happens in your browser."
+    />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+    <script type="module" src="./main.ts"></script>
+  </head>
+  <body data-view="start">
+    <header class="nav">
+      <a class="wordmark" href="./">pdf-to-einvoice</a>
+      <nav>
+        <a href="#how" data-i18n="nav.how">How it works</a>
+        <a href="#limits" data-i18n="nav.limits">Limits</a>
+        <a href="#dev" data-i18n="nav.dev">For developers</a>
+        <a href="https://github.com/smart-byte/pdf-to-einvoice">GitHub</a>
+      </nav>
+      <div class="langs" role="group" aria-label="Language">
+        <button type="button" data-lang="de">DE</button>
+        <button type="button" data-lang="en">EN</button>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero" id="start">
+        <div class="hero__text">
+          <h1 data-i18n="hero.title">Turn the invoice PDF you already have into an e-invoice.</h1>
+          <p class="lead" data-i18n="hero.lead">
+            Your layout stays exactly as it is. The invoice data is added as XML, following EN 16931 (ZUGFeRD / Factur-X).
+          </p>
+          <p class="private" data-i18n="hero.private">Nothing is uploaded. Everything happens in your browser.</p>
+        </div>
+
+        <div class="stack" id="drop">
+          <div class="sheet sheet--xml" aria-hidden="true">
+            <pre>
+&lt;rsm:CrossIndustryInvoice&gt;
+  &lt;rsm:ExchangedDocument&gt;
+    &lt;ram:ID&gt;RE-2026-0042&lt;/ram:ID&gt;
+    &lt;ram:TypeCode&gt;380&lt;/ram:TypeCode&gt;
+  &lt;/rsm:ExchangedDocument&gt;
+  &lt;ram:SellerTradeParty&gt;
+    &lt;ram:Name&gt;Muster Software GmbH
+  &lt;ram:GrandTotalAmount&gt;1783.81
+&lt;/rsm:CrossIndustryInvoice&gt;</pre>
+          </div>
+          <label class="sheet sheet--pdf" for="file">
+            <span class="sheet__lines" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span>
+            <strong data-i18n="drop.title">Drop your PDF here</strong>
+            <span data-i18n="drop.or">or choose a file</span>
+            <input id="file" type="file" accept="application/pdf,.pdf" />
+          </label>
+          <button type="button" class="link" id="sample" data-i18n="drop.sample">Try it with a sample invoice</button>
+          <p class="status" id="drop-status" role="status"></p>
+        </div>
+      </section>
+
+      <section class="work" id="work" aria-labelledby="work-title">
+        <header class="work__head">
+          <div>
+            <h2 id="work-title" data-i18n="work.title">Check and complete the data</h2>
+            <p id="work-lead" data-i18n="work.lead">The XML is the legally binding part of an e-invoice. Compare every value with your PDF.</p>
+          </div>
+          <button type="button" class="quiet" id="other" data-i18n="work.other">Choose another PDF</button>
+        </header>
+
+        <div class="work__grid">
+          <aside class="work__pdf">
+            <canvas id="preview" role="img" data-i18n-label="work.preview" aria-label="Preview of your invoice, page 1"></canvas>
+            <p class="muted" id="file-name"></p>
+          </aside>
+
+          <div class="work__data">
+            <div class="reader">
+              <p id="read-status" role="status"></p>
+              <details>
+                <summary data-i18n="ai.title">Read with AI</summary>
+                <p data-i18n="ai.lead">
+                  A language model reads names, addresses and line items from the text of your invoice. It runs on your device; your invoice does not leave the
+                  browser.
+                </p>
+                <div class="fields">
+                  <div class="field field--wide">
+                    <label for="ai-model" data-i18n="ai.model">Model</label>
+                    <select id="ai-model"></select>
+                    <p class="hint" data-i18n="ai.download">The model is downloaded from huggingface.co on first use and kept in the browser.</p>
+                  </div>
+                </div>
+                <div class="fields" id="ai-endpoint" hidden>
+                  <div class="field field--wide">
+                    <label for="ai-url" data-i18n="ai.endpoint.url">Address</label>
+                    <input id="ai-url" type="url" value="http://localhost:11434/v1" />
+                    <p class="hint hint--warning" data-i18n="ai.endpoint.warn">
+                      The text of your invoice is sent to this address. If it is not on your device, the text leaves the browser.
+                    </p>
+                  </div>
+                  <div class="field">
+                    <label for="ai-name" data-i18n="ai.endpoint.model">Model name</label>
+                    <input id="ai-name" type="text" value="qwen3:8b" />
+                  </div>
+                  <div class="field">
+                    <label for="ai-key" data-i18n="ai.endpoint.key">Key (if needed)</label>
+                    <input id="ai-key" type="password" autocomplete="off" />
+                  </div>
+                </div>
+                <button type="button" class="quiet" id="ai-run" data-i18n="ai.run">Read invoice</button>
+                <p class="status" id="ai-status" role="status"></p>
+              </details>
+            </div>
+
+            <form id="form" novalidate onsubmit="return false;"></form>
+
+            <section class="group">
+              <h3 data-i18n="s.totals">Totals</h3>
+              <dl class="totals" id="totals"></dl>
+            </section>
+
+            <div class="finish">
+              <div class="summary" id="summary" role="status"></div>
+              <button type="button" class="primary" id="create" disabled data-i18n="create.run">Create e-invoice</button>
+              <p class="status" id="create-status" role="status"></p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="done" id="done" aria-labelledby="done-title">
+        <div class="stamp" aria-hidden="true">EN 16931</div>
+        <h2 id="done-title" data-i18n="done.title">Your e-invoice is ready.</h2>
+        <p data-i18n="done.lead">The same invoice as before, now a PDF/A-3 that carries its data as XML (ZUGFeRD / Factur-X, profile EN 16931).</p>
+        <ul class="notes" id="done-notes" hidden></ul>
+        <p class="actions">
+          <a class="primary" id="download-pdf" data-i18n="done.pdf">Download e-invoice</a>
+          <a class="quiet" id="download-xml" data-i18n="done.xml">Download the XML only</a>
+          <button type="button" class="link" id="again" data-i18n="done.again">Change the data again</button>
+        </p>
+        <p class="muted">SHA-256 <code id="checksum"></code></p>
+      </section>
+
+      <section class="info" id="how">
+        <h2 data-i18n="how.title">How it works</h2>
+        <ol class="steps">
+          <li>
+            <h3 data-i18n="how.1.title">Choose your PDF</h3>
+            <p data-i18n="how.1.text">The invoice as you write it today: from Word, your invoicing tool or a template.</p>
+          </li>
+          <li>
+            <h3 data-i18n="how.2.title">Check the data</h3>
+            <p data-i18n="how.2.text">The data is read from the PDF. You see what is missing or does not match the PDF, and complete it.</p>
+          </li>
+          <li>
+            <h3 data-i18n="how.3.title">Download the e-invoice</h3>
+            <p data-i18n="how.3.text">You get the same PDF, which now carries its data as XML. Send it the way you always do.</p>
+          </li>
+        </ol>
+        <h2 data-i18n="kinds.title">For every kind of invoice</h2>
+        <p data-i18n="kinds.text">
+          Domestic with VAT, several VAT rates, small businesses, reverse charge within the EU, intra-community supplies, exports, services to the USA without
+          VAT, credit notes and corrections. Each of these is tested with the reference validator of the ZUGFeRD community.
+        </p>
+      </section>
+
+      <section class="info" id="limits">
+        <h2 data-i18n="limits.title">What you should know</h2>
+        <ul>
+          <li data-i18n="limits.1">Only the issuer can issue an e-invoice. A PDF you received does not become a valid e-invoice by converting it yourself.</li>
+          <li data-i18n="limits.2">In an e-invoice the XML counts, not the picture. You are responsible for the data being right.</li>
+          <li data-i18n="limits.3">A strict PDF/A-3 requires your PDF to embed its fonts. If they are missing, the page tells you.</li>
+          <li data-i18n="limits.4">Discounts on the whole invoice have no field of their own yet: enter them as a line with a negative quantity.</li>
+          <li data-i18n="limits.5">This page is a tool, not tax advice.</li>
+        </ul>
+        <h2 data-i18n="privacy.title">Privacy</h2>
+        <p data-i18n="privacy.text">
+          There is no server that sees your invoice, no cookies and no tracking. Only if you choose “Read with AI” does the browser download a model from
+          huggingface.co, once; your invoice is not transmitted.
+        </p>
+      </section>
+
+      <section class="info" id="dev">
+        <h2 data-i18n="dev.title">For developers and AI assistants</h2>
+        <p data-i18n="dev.text">
+          The same core runs as a library, as a command line tool and as an MCP server that lets assistants like Claude convert invoices.
+        </p>
+        <pre><code>npm install pdf-to-einvoice</code></pre>
+        <pre><code>import { createEInvoice } from 'pdf-to-einvoice';
+
+const { pdf, xml, findings } = await createEInvoice({ pdf: bytes, invoice });</code></pre>
+        <pre><code>npx pdf-to-einvoice create invoice.pdf invoice.json
+npx pdf-to-einvoice mcp        # MCP server on stdio</code></pre>
+      </section>
+    </main>
+
+    <footer class="foot">
+      <a href="https://github.com/smart-byte/pdf-to-einvoice" data-i18n="foot.source">Source on GitHub</a>
+      <a href="https://github.com/smart-byte/pdf-to-einvoice/blob/main/LICENSE" data-i18n="foot.licence">MIT licence</a>
+      <span>Smart-Byte GmbH</span>
+    </footer>
+  </body>
+</html>
