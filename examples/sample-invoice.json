@@ -1,0 +1,50 @@
+{
+  "number": "RE-2026-0042",
+  "issueDate": "2026-11-03",
+  "dueDate": "2026-11-17",
+  "deliveryDate": "2026-10-31",
+  "currency": "EUR",
+  "paymentTerms": "Zahlbar innerhalb von 14 Tagen ohne Abzug.",
+  "iban": "DE02120300000000202051",
+  "bic": "BYLADEM1001",
+  "seller": {
+    "name": "Muster Software GmbH",
+    "street": "Beispielweg 1",
+    "postalCode": "12345",
+    "city": "Musterstadt",
+    "country": "DE",
+    "vatId": "DE123456789",
+    "email": "rechnung@muster-software.example"
+  },
+  "buyer": {
+    "name": "Beispiel AG",
+    "street": "Hauptstraße 5",
+    "postalCode": "54321",
+    "city": "Beispielstadt",
+    "country": "DE"
+  },
+  "lines": [
+    {
+      "name": "Beratung E-Rechnung",
+      "quantity": 10,
+      "unit": "HUR",
+      "unitPrice": 100,
+      "vatCategory": "S",
+      "vatRate": 19
+    },
+    {
+      "name": "Softwarelizenz (Jahr)",
+      "quantity": 2,
+      "unit": "C62",
+      "unitPrice": 249.5,
+      "vatCategory": "S",
+      "vatRate": 19
+    }
+  ],
+  "totals": {
+    "net": 1499,
+    "vat": 284.81,
+    "gross": 1783.81,
+    "due": 1783.81
+  }
+}
