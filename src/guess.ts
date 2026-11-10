@@ -1,7 +1,7 @@
 import { isIban } from './check.js';
 import type { InvoiceDraft, Line, Party, VatCategory } from './model.js';
 
-// ponytail: patterns for German, English and French invoices, no model. A value is believed for what it fits to, not
+// Known limit: patterns for German, English and French invoices, no model. A value is believed for what it fits to, not
 // for where it stands: the totals are three printed amounts with net + VAT = gross, the items are rows that add up to
 // them, quantity and price are two numbers that multiply to the row total, the seller is the party under a seller
 // label, in a sender line or beside its register entry, and the buyer is the address that is left. What does not fit
@@ -312,7 +312,7 @@ const TOTALS_ROW =
 const TOTALS_CELL = /(?:summe|betrag)(?![\p{L}])|\btotal\b/iu;
 /** An amount that stands on its own: not part of a date, a longer number or a percentage. */
 const PRINTED_AMOUNT = new RegExp(`(?<![\\d.,])${MONEY}(?![.,]?\\d)(?!\\s?%)`, 'g');
-// ponytail: the standard and reduced rates of the EU and Switzerland as of 2026; a rate that is not listed reads as no rate.
+// Known limit: the standard and reduced rates of the EU and Switzerland as of 2026; a rate that is not listed reads as no rate.
 const RATES = [0, 2.1, 2.6, 3.8, 4, 4.8, 5, 5.5, 6, 7, 8, 8.1, 9, 9.5, 10, 12, 13, 13.5, 14, 15, 17, 18, 19, 20, 21, 22, 23, 24, 25, 25.5, 27];
 /** No invoice carries more VAT than the highest rate; one with several rates carries less. */
 const MAX_VAT_SHARE = 0.3;
@@ -437,7 +437,7 @@ function itemOf(parts: string[], table: number): Item {
   for (const [i, a] of others.entries()) {
     for (const b of others.slice(i + 1)) {
       if (Math.round(a.value * b.value * 100) !== cents(item.total)) continue;
-      // ponytail: where neither a currency nor a unit nor a whole number tells, the quantity is taken to come first.
+      // Known limit: where neither a currency nor a unit nor a whole number tells, the quantity is taken to come first.
       const swap = isPrice(a) || hasUnit(b) || (!hasUnit(a) && !isPrice(b) && !Number.isInteger(a.value) && Number.isInteger(b.value));
       const [quantity, price] = swap ? [b, a] : [a, b];
       return { ...item, quantity: quantity.value, unit: UNITS.find(([pattern]) => pattern.test(quantity.mark))?.[1], unitPrice: price.value };
