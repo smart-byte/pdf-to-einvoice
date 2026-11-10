@@ -6,7 +6,7 @@ import { keepWhatThePdfShows } from '../src/ground.js';
 import { guessFromText, languageOf } from '../src/guess.js';
 import { INVOICE_TYPES, VAT_CATEGORIES, type InvoiceDraft } from '../src/model.js';
 import { inspectPdf } from '../src/pdf.js';
-import { extractText } from '../src/text.js';
+import { extractLayout } from '../src/text.js';
 import { lang, setLang, t } from './i18n.js';
 import { DEFAULT_MODEL, MODELS, hasWebGpu, readWithBrowserModel, readWithEndpoint } from './llm.js';
 import './styles.css';
@@ -373,7 +373,7 @@ async function open(pdf: Uint8Array, fileName: string): Promise<void> {
   status.textContent = t('drop.reading');
   try {
     const info = await inspectPdf(pdf);
-    const text = await extractText(pdf);
+    const { text, blocks } = await extractLayout(pdf);
     Object.assign(state, {
       pdf,
       fileName,
@@ -392,7 +392,7 @@ async function open(pdf: Uint8Array, fileName: string): Promise<void> {
       state.fileFindings = result.findings.filter((finding) => FILE_CODES.has(finding.code));
       $('#read-status').textContent = result.profile ? t('valid.profile', { p: result.profile }) : '';
     } else {
-      merge(guessFromText(text));
+      merge(guessFromText(text, { blocks }));
       suggestPaymentTerms();
       const found = JSON.stringify(state.draft).match(/":("|\d|-)/g)?.length ?? 0;
       $('#read-status').textContent = text.trim() ? t('read.found', { n: found }) : t('read.none');
