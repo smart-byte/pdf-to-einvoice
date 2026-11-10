@@ -31,7 +31,7 @@
     "type": "git",
     "url": "git+https://github.com/smart-byte/pdf-to-einvoice.git"
   },
-  "homepage": "https://smart-byte.github.io/pdf-to-einvoice/",
+  "homepage": "https://pdf-to-einvoice.app/",
   "bugs": {
     "url": "https://github.com/smart-byte/pdf-to-einvoice/issues"
   },
