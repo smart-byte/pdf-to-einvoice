@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import type { Totals } from './calculate.js';
 import { check, type Finding } from './check.js';
-import { createEInvoice, InvoiceError } from './create.js';
+import { createEInvoice, createXRechnung, InvoiceError, type CreateOptions, type XRechnungOptions } from './create.js';
 import { guessFromText } from './guess.js';
 import { invoiceJsonSchema, type InvoiceDraft } from './model.js';
 import { inspectPdf, readEmbeddedXml } from './pdf.js';
@@ -18,13 +18,18 @@ export interface Io {
   stderr: (text: string) => void;
 }
 
-const USAGE = `Turn an invoice PDF into an EN 16931 e-invoice (ZUGFeRD / Factur-X).
+const USAGE = `Turn an invoice PDF into an EN 16931 e-invoice (ZUGFeRD / Factur-X), or invoice data into an XRechnung.
 
 Usage:
-  pdf-to-einvoice create <invoice.pdf> <data.json> [-o out.pdf] [--force]
+  pdf-to-einvoice create <invoice.pdf> <data.json> [-o out.pdf] [--profile en16931|xrechnung] [--force]
       Write the e-invoice. Default output: <invoice>.einvoice.pdf next to the input.
-  pdf-to-einvoice check <data.json> [--pdf invoice.pdf] [--json]
-      Check the invoice data; with --pdf also compare it with the text of the PDF.
+      With --profile xrechnung the data has to meet the XRechnung rules, and the XML in the PDF declares XRechnung 3.0.
+  pdf-to-einvoice xrechnung <data.json> [--syntax ubl|cii] [-o out.xml] [--force]
+      Write the invoice data as an XRechnung 3.0: XML without a PDF, in UBL (default) or CII.
+      Without -o the XML goes to standard output.
+  pdf-to-einvoice check <data.json> [--pdf invoice.pdf] [--rules xrechnung] [--json]
+      Check the invoice data; with --pdf also compare it with the text of the PDF, with --rules xrechnung also
+      with what XRechnung asks for.
   pdf-to-einvoice read <invoice.pdf> [--json]
       Print the text of the PDF; with --json also guessed values and facts about the PDF.
   pdf-to-einvoice xml <einvoice.pdf>
@@ -91,13 +96,14 @@ export async function createFile(
   invoice: InvoiceDraft,
   outputPath = defaultOutput(pdfPath),
   overwrite = false,
+  profile?: CreateOptions['profile'],
 ): Promise<{ outputPath: string; findings: Finding[]; totals: Totals }> {
   const output = resolve(outputPath);
   if (sameFile(output, pdfPath)) throw new Error('The output path is the input PDF. Choose another output path; the input is never overwritten.');
   if (!overwrite && existsSync(output)) throw Object.assign(new Error(`${output} already exists.`), { code: 'EEXIST' });
 
   const pdf = await readPdf(pdfPath);
-  const result = await createEInvoice({ pdf, invoice });
+  const result = await createEInvoice({ pdf, invoice, profile });
   await writeFile(output, result.pdf, { flag: overwrite ? 'w' : 'wx' });
 
   // A PDF whose text cannot be read is reported as one, not as a failure: the file is written.
@@ -105,6 +111,23 @@ export async function createFile(
   const seen = new Set(result.findings.map((f) => `${f.path}|${f.code}`));
   const compared = check(invoice, { pdfText }).findings.filter((f) => !seen.has(`${f.path}|${f.code}`));
   return { outputPath: output, findings: [...result.findings, ...compared], totals: result.totals };
+}
+
+/**
+ * Writes the invoice as an XRechnung XML file, over an existing file only when `overwrite` is set (the error then
+ * carries the code `EEXIST`).
+ */
+export async function createXRechnungFile(
+  invoice: InvoiceDraft,
+  outputPath: string,
+  syntax?: XRechnungOptions['syntax'],
+  overwrite = false,
+): Promise<{ outputPath: string; findings: Finding[]; totals: Totals }> {
+  const output = resolve(outputPath);
+  if (!overwrite && existsSync(output)) throw Object.assign(new Error(`${output} already exists.`), { code: 'EEXIST' });
+  const result = await createXRechnung({ invoice, syntax });
+  await writeFile(output, result.xml, { flag: overwrite ? 'w' : 'wx' });
+  return { outputPath: output, findings: result.findings, totals: result.totals };
 }
 
 /**
@@ -129,20 +152,42 @@ const OPTIONS = {
   force: { type: 'boolean' },
   pdf: { type: 'string' },
   json: { type: 'boolean' },
+  profile: { type: 'string' },
+  syntax: { type: 'string' },
+  rules: { type: 'string' },
   help: { type: 'boolean', short: 'h' },
   version: { type: 'boolean', short: 'v' },
 } as const;
 
-type Values = { output?: string; force?: boolean; pdf?: string; json?: boolean };
+/** The options that take one of a few words. */
+const CHOICES = { profile: ['en16931', 'xrechnung'], syntax: ['ubl', 'cii'], rules: ['xrechnung'] } as const;
+
+type Values = { output?: string; force?: boolean; pdf?: string; json?: boolean } & { [K in keyof typeof CHOICES]?: (typeof CHOICES)[K][number] };
 type Command = { args: number; run: (args: string[], values: Values, io: Io) => Promise<number> };
 
 const COMMANDS: Record<string, Command> = {
   create: {
     args: 2,
     async run([pdfPath, dataPath], values, io) {
-      const result = await createFile(pdfPath!, await readJson(dataPath!), values.output, values.force);
+      const result = await createFile(pdfPath!, await readJson(dataPath!), values.output, values.force, values.profile);
       for (const finding of result.findings) io.stderr(`${formatFinding(finding)}\n`);
       io.stdout(`${result.outputPath}\n`);
+      return 0;
+    },
+  },
+  xrechnung: {
+    args: 1,
+    async run([dataPath], values, io) {
+      const invoice = await readJson(dataPath!);
+      if (values.output !== undefined && sameFile(values.output, dataPath!)) {
+        throw new Error('The output path is the data file. Choose another output path; the input is never overwritten.');
+      }
+      const result =
+        values.output === undefined
+          ? await createXRechnung({ invoice, syntax: values.syntax })
+          : await createXRechnungFile(invoice, values.output, values.syntax, values.force);
+      for (const finding of result.findings) io.stderr(`${formatFinding(finding)}\n`);
+      io.stdout(`${'xml' in result ? result.xml.replace(/\n$/, '') : result.outputPath}\n`);
       return 0;
     },
   },
@@ -151,7 +196,7 @@ const COMMANDS: Record<string, Command> = {
     async run([dataPath], values, io) {
       const data = await readJson(dataPath!);
       const pdfText = values.pdf === undefined ? undefined : await extractText(await readPdf(values.pdf));
-      const { findings, totals } = check(data, { pdfText });
+      const { findings, totals } = check(data, { pdfText, rules: values.rules });
       if (values.json) io.stdout(`${JSON.stringify({ findings, totals }, null, 2)}\n`);
       else printFindings({ findings, totals }, io);
       return findings.some((f) => f.severity === 'error') ? 1 : 0;
@@ -217,7 +262,12 @@ export async function run(argv: string[], io: Io): Promise<number> {
   } catch (e) {
     return misuse(reason(e));
   }
-  const { values, positionals } = parsed;
+  const { positionals } = parsed;
+  for (const [option, choices] of Object.entries(CHOICES)) {
+    const value = parsed.values[option as keyof typeof CHOICES];
+    if (value !== undefined && !(choices as readonly string[]).includes(value)) return misuse(`--${option} takes ${choices.join(' or ')}, not ${value}.`);
+  }
+  const values = parsed.values as Values & { help?: boolean; version?: boolean };
   const [name, ...args] = positionals;
   if (values.version) {
     io.stdout(`${packageVersion()}\n`);
