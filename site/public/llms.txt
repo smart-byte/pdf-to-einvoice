@@ -30,6 +30,7 @@ Rules for an assistant converting an invoice:
 
 ## Docs
 
+- [The whole documentation in one file](llms-full.txt)
 - [README](https://github.com/smart-byte/pdf-to-einvoice#readme): API, CLI, MCP setup, data model, limits
 - [Skill for agents](https://github.com/smart-byte/pdf-to-einvoice/blob/main/skills/pdf-to-einvoice/SKILL.md)
 - [Changelog](https://github.com/smart-byte/pdf-to-einvoice/blob/main/CHANGELOG.md)
