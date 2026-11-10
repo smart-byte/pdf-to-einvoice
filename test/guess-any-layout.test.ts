@@ -421,12 +421,49 @@ describe('guessFromText on totals', () => {
   });
 });
 
+describe('guessFromText on payment terms', () => {
+  const terms = (...rows: string[]) => guessFromText(['Rechnung RE-1', ...rows].join('\n')).paymentTerms;
+
+  it('reads the sentence that says when to pay, as it is printed', () => {
+    expect(terms('Zahlbar innerhalb von 14 Tagen ohne Abzug.')).toBe('Zahlbar innerhalb von 14 Tagen ohne Abzug.');
+    expect(terms('Payment is due within 30 days of the invoice date.')).toBe('Payment is due within 30 days of the invoice date.');
+    expect(terms('Paiement à 30 jours fin de mois.')).toBe('Paiement à 30 jours fin de mois.');
+  });
+
+  it('reads the terms after their label', () => {
+    expect(terms('Zahlungsbedingungen: 30 Tage netto')).toBe('30 Tage netto');
+    expect(terms('Payment terms   Net 30')).toBe('Net 30');
+  });
+
+  it('joins a sentence that wraps into the next row', () => {
+    expect(terms('Bitte überweisen Sie den Rechnungsbetrag innerhalb von 14 Tagen', 'auf das unten genannte Konto.', 'Vielen Dank.')).toBe(
+      'Bitte überweisen Sie den Rechnungsbetrag innerhalb von 14 Tagen auf das unten genannte Konto.',
+    );
+  });
+
+  it('joins a row that ends in the middle of the terms with the next one, also where that starts with a capital', () => {
+    expect(terms('Zahlbar innerhalb 30 Tagen netto bis 04.12.2026, 3%', 'Skonto innerhalb 10 Tagen bis 14.11.2026', 'Zu- und Abschläge:')).toBe(
+      'Zahlbar innerhalb 30 Tagen netto bis 04.12.2026, 3% Skonto innerhalb 10 Tagen bis 14.11.2026',
+    );
+    expect(terms('Zahlbar sofort rein netto', 'Vielen Dank für Ihren Auftrag')).toBe('Zahlbar sofort rein netto');
+  });
+
+  it('takes the cell with the sentence, not the column beside it', () => {
+    expect(terms('Zahlbar sofort ohne Abzug   Bank: Musterbank')).toBe('Zahlbar sofort ohne Abzug');
+  });
+
+  it('takes neither an amount to pay nor the way of paying for payment terms', () => {
+    expect(terms('Zahlbetrag   1.190,00 €', 'Zahlungsart: Überweisung', 'Zahlungseingang 03.11.2026')).toBeUndefined();
+  });
+});
+
 describe('guessFromText on table rows', () => {
   it('reads rows without a table heading it knows, the quantity in front, and a price with three decimals', () => {
     expect(guessFromText(balloons)).toEqual({
       number: 'RE-2026/417',
       issueDate: '2026-10-21',
       deliveryDate: '2026-10-14',
+      paymentTerms: 'Please remit until 2026-11-11 .',
       currency: 'EUR',
       seller: { vatId: 'DE123456789', country: 'DE' },
       lines: [

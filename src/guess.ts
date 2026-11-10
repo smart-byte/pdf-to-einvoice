@@ -636,6 +636,40 @@ const PERIOD = new RegExp(
   'i',
 );
 const MONTH_ROW = new RegExp(`^${MONTH}\\s+(\\d{4})$`, 'i');
+/** The label of payment terms: what follows it is the terms, whatever words they use. */
+const TERMS_LABEL =
+  /^(?:zahlungs(?:bedingung(?:en)?|ziel|frist|konditionen)|payment\s+terms?|terms\s+of\s+payment|conditions\s+de\s+(?:paiement|règlement))\s*:?\s*/i;
+/** How a sentence starts that says when to pay. "Zahlbetrag" and "Zahlungsart" say something else. */
+const TERMS_START =
+  /^(?:zahlbar\b|zahlung\s+(?:innerhalb|bis|sofort|ohne|erfolgt|fällig)|bitte\s+(?:überweisen|zahlen|begleichen)|der\s+(?:rechnungs|gesamt)betrag\s+ist|sofort\s+(?:fällig|zahlbar)|payable\b|payment\s+(?:is\s+)?(?:due|within|upon)|please\s+(?:pay|remit|transfer)|net\s+\d+|due\s+(?:on|upon)\s+receipt|paiement\s+(?:à|sous|dans|comptant))/i;
+
+/**
+ * The payment terms as printed: what stands after their label, or the sentence that says when to pay, joined over
+ * the rows it wraps into. They are taken over word for word; when the due date is, is read separately.
+ */
+function readPaymentTerms(rows: string[]): string | undefined {
+  for (const [i, row] of rows.entries()) {
+    const all = cells(row);
+    for (const [k, cell] of all.entries()) {
+      // "Payment terms   Net 30": the label in one cell, the terms in the next.
+      const labelled = TERMS_LABEL.test(cell) ? cell.replace(TERMS_LABEL, '') || all[k + 1] : undefined;
+      if (labelled) return labelled;
+      if (!TERMS_START.test(cell)) continue;
+      const terms = [cell];
+      // Alone in its row, the sentence goes on into the next one while it has not ended: where that row starts in
+      // lower case, or where this one stops in the middle ("… netto bis 04.12.2026, 3%").
+      for (let j = i + 1; all.length === 1 && j < rows.length && terms.length <= MAX_WRAPPED; j++) {
+        const [last, next] = [terms.at(-1)!, rows[j]!];
+        if (/[.!?]$/.test(last) || cells(next).length > 1 || KEY_VALUE.test(next) || next.endsWith(':')) break;
+        if (!/^\p{Ll}/u.test(next) && !/[,;%]$/.test(last)) break;
+        terms.push(next);
+      }
+      return terms.join(' ');
+    }
+  }
+  return undefined;
+}
+
 /** "im September 2026", "für Oktober 2026", "for March 2026". */
 const MONTH_NAMED = new RegExp(`\\b(?:im|für|for|in)\\s+${MONTH}\\s+(\\d{4})\\b`, 'i');
 
@@ -777,6 +811,7 @@ export function guessFromText(text: string, options: GuessOptions = {}): Invoice
     deliveryDate: date(/leistungsdatum|lieferdatum|date\s+of\s+(?:supply|delivery)|delivery\s+date|service\s+date/),
     ...readPeriod(searched, rows),
     dueDate: date(/fällig(?:keit(?:s(?:datum|tag|termin))?|\s+am|\s+bis)?|zahlbar\s+bis|due(?:\s+date|\s+by|\s+on)?|payable\s+by|date\s+d['’]échéance/),
+    paymentTerms: readPaymentTerms(rows),
     currency: findCurrency(text),
     iban,
     // A BIC belongs to an IBAN; with another kind of account it has no place in the invoice data.
