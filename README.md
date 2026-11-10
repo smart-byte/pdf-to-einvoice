@@ -33,6 +33,9 @@ in their format. This one starts from the PDF you already produce with Word, you
 e-invoice. Reading works without any AI by pattern matching; optionally a small language model that runs in your
 browser (WebGPU) fills in what the patterns did not find. The page is available in English and German.
 
+For an invoice to a public body, choose XRechnung above the form. The page then asks for what XRechnung needs on top
+and gives you two files: the XRechnung as XML (UBL) for the portal of the public body, and the PDF that carries it.
+
 ### Compared with online converters
 
 Many services convert PDF invoices too. The main difference is where your invoice is processed.
