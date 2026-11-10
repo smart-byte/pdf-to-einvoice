@@ -5,6 +5,8 @@ PDF, text extraction), and this repository adds the data model, the checks and t
 
 Coding agents find the commands, a map of the code and the rules in short form in [AGENTS.md](AGENTS.md).
 
+Everyone who takes part is expected to follow the [code of conduct](CODE_OF_CONDUCT.md).
+
 ## Setup
 
 ```bash
