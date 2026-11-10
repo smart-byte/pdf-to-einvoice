@@ -11,6 +11,9 @@ are. Everything runs locally; nothing is uploaded.
 
 Your job is to read the data off the PDF, have the tool check it, let the user confirm it, and create the file.
 
+To use this skill, copy the folder `skills/pdf-to-einvoice` into the skills folder of your agent; the npm package
+ships it under `node_modules/pdf-to-einvoice/skills/`.
+
 ## Rules
 
 - You act for the invoice **issuer** (the seller). A recipient cannot turn a received PDF into a valid e-invoice: it has

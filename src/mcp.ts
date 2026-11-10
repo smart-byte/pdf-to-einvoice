@@ -29,31 +29,50 @@ Rules:
 - This is not tax advice. Which VAT category applies is the user's decision; ask when the PDF does not say.`;
 
 const { $schema: _dialect, ...INVOICE_SCHEMA } = invoiceJsonSchema;
+/** The same schema for a draft: nothing is required, so an incomplete invoice can be sent to learn what it lacks. */
+const optional = (schema: any): any =>
+  Array.isArray(schema)
+    ? schema.map(optional)
+    : schema && typeof schema === 'object'
+      ? Object.fromEntries(
+          Object.entries(schema)
+            .filter(([key]) => key !== 'required' && key !== 'minItems')
+            .map(([key, value]) => [key, optional(value)]),
+        )
+      : schema;
+const DRAFT_SCHEMA = optional(INVOICE_SCHEMA);
+// No tool reaches beyond this machine: files are read and written locally, nothing is sent anywhere.
+const READS = { readOnlyHint: true, openWorldHint: false };
 const pathSchema = (description: string) => ({ type: 'string', description: `${description} Absolute path.` });
 
 const TOOLS = [
   {
     name: 'read_invoice_pdf',
+    title: 'Read an invoice PDF',
     description:
       'Reads an invoice PDF from disk. Returns its text row by row, values guessed from labels (number, dates, bank details, tax IDs, totals; a starting point, not a result) and facts about the PDF: page count, fonts that are not embedded, and whether it already is an e-invoice.',
-    annotations: { readOnlyHint: true },
+    annotations: READS,
     inputSchema: { type: 'object', properties: { pdf_path: pathSchema('The invoice PDF.') }, required: ['pdf_path'] },
   },
   {
     name: 'check_invoice',
+    title: 'Check invoice data',
     description:
       'Checks invoice data against the main EN 16931 rules (required fields, formats, arithmetic, VAT categories) and the particulars German VAT law asks for. It is not a full validator. Returns { ok, findings, totals }: errors block the e-invoice, warnings need a second look, totals are calculated from the lines. The data may be incomplete; what is missing is reported. With pdf_path, values that do not occur in the text of the PDF are reported too.',
-    annotations: { readOnlyHint: true },
+    annotations: READS,
     inputSchema: {
       type: 'object',
-      properties: { invoice: INVOICE_SCHEMA, pdf_path: pathSchema('The invoice PDF to compare the data with. Optional.') },
+      properties: { invoice: DRAFT_SCHEMA, pdf_path: pathSchema('The invoice PDF to compare the data with. Optional.') },
       required: ['invoice'],
     },
   },
   {
     name: 'create_einvoice',
+    title: 'Create the e-invoice',
     description:
       'Writes the e-invoice: a copy of the PDF as PDF/A-3 with the invoice attached as factur-x.xml (Factur-X / ZUGFeRD, profile EN 16931). The input PDF is never changed. Call it only after check_invoice reports no errors and the user has confirmed the data. Returns { output_path, findings, totals }; with errors in the data nothing is written and the findings say what to fix.',
+    // It writes one new file and replaces nothing unless `overwrite` is set.
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     inputSchema: {
       type: 'object',
       properties: {
@@ -67,15 +86,17 @@ const TOOLS = [
   },
   {
     name: 'read_einvoice_xml',
+    title: 'Read the XML of an e-invoice',
     description: 'Returns the invoice XML embedded in a ZUGFeRD / Factur-X PDF. Fails if the PDF carries none.',
-    annotations: { readOnlyHint: true },
+    annotations: READS,
     inputSchema: { type: 'object', properties: { pdf_path: pathSchema('The e-invoice PDF.') }, required: ['pdf_path'] },
   },
   {
     name: 'validate_einvoice',
+    title: 'Check an existing e-invoice',
     description:
       'Checks an existing e-invoice PDF (ZUGFeRD / Factur-X), issued or received. Returns { isEInvoice, profile, invoice, totals, findings }: whether the PDF carries invoice XML in an EN 16931 profile, the data read from that XML, the totals calculated from its lines, and findings on missing data, arithmetic, PDF/A-3 and values of the XML that the text of the PDF does not show ("not-in-pdf"). A plausibility check, not a full EN 16931 Schematron or PDF/A validation.',
-    annotations: { readOnlyHint: true },
+    annotations: READS,
     inputSchema: { type: 'object', properties: { pdf_path: pathSchema('The e-invoice PDF.') }, required: ['pdf_path'] },
   },
 ];

@@ -1,0 +1,19 @@
+{
+  "$schema": "https://context7.com/schema/context7.json",
+  "projectTitle": "pdf-to-einvoice",
+  "description": "Turns an existing invoice PDF into an EN 16931 e-invoice (ZUGFeRD / Factur-X) without changing how it looks. TypeScript library, CLI, MCP server and browser app; runs locally.",
+  "excludeFolders": ["src", "site", "test", "scripts", "dist", "examples"],
+  "excludeFiles": ["CHANGELOG.md", "CONTRIBUTING.md", "SECURITY.md", "THIRD_PARTY_NOTICES.md", "AGENTS.md"],
+  "rules": [
+    "Act for the invoice issuer only: a recipient cannot turn a received PDF into a valid e-invoice.",
+    "Copy values exactly as the PDF prints them and never invent a missing one; ask the user instead.",
+    "Call check(draft, { pdfText }) before createEInvoice and show the findings: errors block the file, warnings need a second look. createEInvoice throws an InvoiceError with the findings while errors are open.",
+    "Read the text with extractLayout(pdf) and get a first draft with guessFromText(text, { blocks }); it is a starting point, not a result.",
+    "Data read by a language model goes through keepWhatThePdfShows(draft, text) before it is used.",
+    "The XML is the binding part of the e-invoice and must not contradict the visible PDF; the user confirms the data before the file is created.",
+    "Every VAT category except S has vatRate 0; all of those except Z need vatExemptionReason. AE and K need buyer.vatId.",
+    "Document-level discounts are not modelled: enter them as a line with a negative quantity.",
+    "Node 22.13 or newer. In a browser the bundler needs an alias from @e-invoice-eu/core to its browser bundle and the pdf.js worker; see site/vite.config.ts and site/main.ts.",
+    "validateEInvoice is a plausibility check, not a full EN 16931 validation."
+  ]
+}

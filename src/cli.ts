@@ -38,7 +38,11 @@ Usage:
       Start the MCP server on stdio.
 
   -h, --help       Show this help.
-  -v, --version    Show the version.`;
+  -v, --version    Show the version.
+
+Results go to standard output, with --json as JSON that includes the findings; otherwise findings and errors
+go to standard error.
+Exit codes: 0 done, 1 failed or the data has errors, 2 used wrongly.`;
 
 const reason = (e: unknown) => (e instanceof Error ? e.message : String(e));
 const readPdf = async (path: string) => new Uint8Array(await readFile(path));

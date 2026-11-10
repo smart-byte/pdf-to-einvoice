@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import { Ajv } from 'ajv';
 import { describe, expect, it } from 'vitest';
 import { createServer } from '../src/mcp.js';
 import { readEmbeddedXml } from '../src/pdf.js';
@@ -45,6 +46,32 @@ describe('MCP server', () => {
     const invoice = (tools.find((t) => t.name === 'create_einvoice')!.inputSchema.properties as any).invoice;
     expect(invoice.properties.seller.properties.vatId.type).toBe('string');
     expect(invoice.required).toContain('number');
+  });
+
+  it('lets a client send an incomplete invoice to check_invoice, which is there to say what is missing', async () => {
+    const { tools } = await (await connect()).listTools();
+    const accepts = (tool: string, input: unknown) => new Ajv({ strict: false }).validate(tools.find((t) => t.name === tool)!.inputSchema, input);
+    expect(accepts('check_invoice', { invoice: { number: 'RE-1', lines: [] } })).toBe(true);
+    expect(accepts('create_einvoice', { pdf_path: '/tmp/a.pdf', invoice: { number: 'RE-1', lines: [] } })).toBe(false);
+  });
+
+  it('tells clients what each tool is called and that none of them reaches beyond this machine', async () => {
+    const { tools } = await (await connect()).listTools();
+    for (const tool of tools) {
+      expect(tool.title, tool.name).toBeTruthy();
+      expect(tool.annotations?.openWorldHint, tool.name).toBe(false);
+    }
+    const create = tools.find((t) => t.name === 'create_einvoice')!;
+    expect(create.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: false });
+  });
+
+  it('is described for the MCP Registry under the name and version of the package', () => {
+    const read = (name: string) => JSON.parse(readFileSync(new URL(`../${name}`, import.meta.url), 'utf8'));
+    const [manifest, entry] = [read('package.json'), read('server.json')];
+    expect(entry.name).toBe(manifest.mcpName);
+    expect(entry.version).toBe(manifest.version);
+    expect(entry.packages).toEqual([expect.objectContaining({ registryType: 'npm', identifier: manifest.name, version: manifest.version })]);
+    expect(entry.description.length).toBeLessThanOrEqual(100);
   });
 
   it('tells the model to act for the issuer and not to invent values', async () => {

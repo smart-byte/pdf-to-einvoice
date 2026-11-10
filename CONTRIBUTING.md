@@ -3,6 +3,8 @@
 Thanks for helping out. The project stays small on purpose: established libraries do the heavy lifting (XML,
 PDF, text extraction), and this repository adds the data model, the checks and the front ends.
 
+Coding agents find the commands, a map of the code and the rules in short form in [AGENTS.md](AGENTS.md).
+
 ## Setup
 
 ```bash
