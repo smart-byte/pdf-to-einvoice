@@ -18,12 +18,10 @@ name repository `smart-byte/pdf-to-einvoice` and workflow file `release.yml` as 
 ## The website
 
 The "Deploy site" workflow builds `site/` and publishes it to Cloudflare. It runs only when started by hand on main
-(Actions → Deploy site → Run workflow): a merge does not change the live site. The site is a Worker that serves static files only
-(`site/wrangler.jsonc`) at https://pdf-to-einvoice.app; the domain lives in the same Cloudflare account. The workflow
-needs two repository secrets: `CLOUDFLARE_API_TOKEN` (template "Edit Cloudflare Workers", limited to the account and
-the zone) and `CLOUDFLARE_ACCOUNT_ID`. Response headers are set in `site/public/_headers`.
-
-Model downloads are cached per address: after a move to another domain, users load their model once more.
+(Actions → Deploy site → Run workflow): a merge does not change the live site. The site is a Worker that serves
+static files only (`site/wrangler.jsonc`) at https://pdf-to-einvoice.app; response headers are set in
+`site/public/_headers`. The workflow needs two repository secrets: `CLOUDFLARE_API_TOKEN` (template "Edit Cloudflare
+Workers", limited to the account and the zone) and `CLOUDFLARE_ACCOUNT_ID`.
 
 ## Repository settings the project relies on
 
@@ -35,6 +33,3 @@ Model downloads are cached per address: after a move to another domain, users lo
 - The environment `production` deploys from main only.
 - Private vulnerability reporting is switched on (`SECURITY.md` sends reporters there).
 - Dependabot waits 14 days before it proposes a new release (`.github/dependabot.yml`).
-- Description and topics make the project findable: e-invoice, einvoice, e-rechnung, zugferd, factur-x, en16931,
-  invoice, pdf, pdf-a, electronic-invoicing, mcp, mcp-server, llm, ai-tools, typescript, browser, privacy, webgpu,
-  cli.
