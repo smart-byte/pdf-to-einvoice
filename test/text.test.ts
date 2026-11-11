@@ -16,6 +16,10 @@ describe('extractText', () => {
     expect(lines).toContain('1   Beratung E-Rechnung   10 Std.   100,00 €   1.000,00 €');
   });
 
+  it('reads a PDF given as a Node Buffer', async () => {
+    expect(await extractText(file('sample-invoice.pdf'))).toContain('RE-2026-0042');
+  });
+
   it('leaves the bytes it was given usable', async () => {
     const pdf = samplePdf();
     await extractText(pdf);

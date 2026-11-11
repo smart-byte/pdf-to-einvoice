@@ -91,8 +91,9 @@ function blocksOf(cells: Cell[]): string[][] {
  * text layer yields empty text and no pieces.
  */
 export async function extractLayout(pdf: Uint8Array): Promise<Layout> {
-  // pdf.js takes ownership of the buffer it is given, so it gets a copy.
-  const task = getDocument({ data: pdf.slice(), verbosity: 0, useSystemFonts: true });
+  // pdf.js takes ownership of the bytes it is given, so it gets a copy: a plain Uint8Array, which is what it accepts,
+  // also when the caller passed a Node Buffer (whose slice() would be a Buffer on the same memory).
+  const task = getDocument({ data: new Uint8Array(pdf), verbosity: 0, useSystemFonts: true });
   const doc = await task.promise;
   try {
     const layout: Layout = { text: '', blocks: [], pieces: [], pages: [] };
