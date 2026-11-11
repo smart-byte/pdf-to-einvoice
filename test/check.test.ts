@@ -29,6 +29,31 @@ describe('check', () => {
     expect(check(withChange((d) => delete d.number)).invoice).toBeUndefined();
   });
 
+  it('asks where the goods of an intra-community supply went, unless the data says so', () => {
+    const supply = (change: (d: any) => void = () => {}) =>
+      withChange((d) => {
+        Object.assign(d.buyer, { country: 'AT', vatId: 'ATU12345678' });
+        for (const line of d.lines) Object.assign(line, { vatCategory: 'K', vatRate: 0 });
+        d.vatExemptionReason = 'Steuerfreie innergemeinschaftliche Lieferung';
+        delete d.totals;
+        change(d);
+      });
+    expect(codesAt(supply(), 'deliveryCountry')).toEqual(['warning:delivery-country']);
+    expect(
+      codesAt(
+        supply((d) => (d.deliveryCountry = 'it')),
+        'deliveryCountry',
+      ),
+    ).toEqual([]);
+    expect(
+      codesAt(
+        supply((d) => (d.deliveryCountry = 'Italien')),
+        'deliveryCountry',
+      ),
+    ).toEqual(['error:format']);
+    expect(codesAt(sample(), 'deliveryCountry')).toEqual([]);
+  });
+
   it('reports an amount that is not a number instead of failing', () => {
     expect(
       codesAt(

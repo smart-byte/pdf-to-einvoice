@@ -61,17 +61,19 @@ export function toUbl(invoice: Invoice, totals: Totals, xrechnung = false): EInv
   // (or allowed), the tax identifier the invoice prints is passed on as the plain seller identifier.
   const sellerIdentifier = vatIdsAllowed && seller.vatId ? undefined : (seller.vatId ?? seller.taxNumber);
 
-  // The country of supply follows from the VAT treatment: where VAT is charged (or exempt) at home it is the
-  // seller's country, otherwise the buyer's. It is stated for intra-community supplies (BR-IC-12) and whenever
-  // there is no delivery date (ZUGFeRD rule BR-FX-DE-04; it also keeps the mandatory delivery element from being empty).
+  // The country of supply. Where the data does not state it, it is assumed from the VAT treatment: where VAT is
+  // charged (or exempt) at home it is the seller's country, otherwise the buyer's. That is an assumption, not a fact:
+  // `check` asks about it where a rule relies on the country, the intra-community supply (BR-IC-12). The country is
+  // also written whenever there is no delivery date (ZUGFeRD rule BR-FX-DE-04; it keeps the mandatory delivery
+  // element from being empty).
   // Not so in an XRechnung: a place of delivery there needs its city and postal code (BR-DE-10, BR-DE-11), which the
   // data does not have. `check` refuses an intra-community supply for that reason.
   const suppliedAtHome = !categories.has('K') && ['S', 'Z', 'E'].some((c) => categories.has(c as 'S'));
-  const stateCountry = !xrechnung && (categories.has('K') || !invoice.deliveryDate);
+  const stateCountry = !xrechnung && (categories.has('K') || !invoice.deliveryDate || invoice.deliveryCountry !== undefined);
   const delivery = compact({
     'cbc:ActualDeliveryDate': invoice.deliveryDate,
     'cac:DeliveryLocation': stateCountry
-      ? { 'cac:Address': { 'cac:Country': { 'cbc:IdentificationCode': suppliedAtHome ? seller.country : buyer.country } } }
+      ? { 'cac:Address': { 'cac:Country': { 'cbc:IdentificationCode': invoice.deliveryCountry ?? (suppliedAtHome ? seller.country : buyer.country) } } }
       : undefined,
   });
 

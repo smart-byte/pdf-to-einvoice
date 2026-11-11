@@ -140,6 +140,11 @@ export const STRINGS: Record<string, Entry> = {
   'f.currency': { de: 'Währung', en: 'Currency' },
   'f.typeCode': { de: 'Art des Dokuments', en: 'Document type' },
   'f.orderReference': { de: 'Bestellnummer des Kunden', en: 'Purchase order number' },
+  'f.deliveryCountry': { de: 'Land der Lieferung (z.\u00a0B. AT)', en: 'Country of delivery (e.g. AT)' },
+  'f.deliveryCountry.help': {
+    de: 'Nur nötig, wenn die Ware in ein anderes Land ging als das Ihres Kunden.',
+    en: 'Only needed if the goods went to another country than that of your customer.',
+  },
   'f.buyerReference': { de: 'Leitweg-ID oder Referenz des Kunden', en: 'Leitweg-ID or buyer reference' },
   'f.buyerReference.help': {
     de: 'Nennt Ihnen Ihr Kunde. Bei einer Behörde ist es die Leitweg-ID, z.\u00a0B. 12345678-0001-14',
@@ -295,6 +300,14 @@ export const STRINGS: Record<string, Entry> = {
     en: '',
   },
   'e.address': { de: 'Dieser Teil der Anschrift fehlt. §\u00a014 UStG verlangt die vollständige Anschrift.', en: '' },
+  'e.delivery-country': {
+    de: 'Bei einer innergemeinschaftlichen Lieferung nennt das XML das Land, in das die Ware ging. Eingetragen wird das Land Ihres Kunden. Ging die Ware in ein anderes Land, tragen Sie es unter „Weitere Angaben“ als Land der Lieferung ein.',
+    en: '',
+  },
+  'e.delivery-country.xml': {
+    de: 'Das XML nennt nicht, in welches Land die Ware ging. Bei einer innergemeinschaftlichen Lieferung ist das Pflicht.',
+    en: 'The XML does not say which country the goods went to. An intra-community supply has to state it.',
+  },
   'e.delivery-date': {
     de: 'Das Leistungs- oder Lieferdatum (oder ein Leistungszeitraum) fehlt. Es ist Pflicht, auch wenn es dem Rechnungsdatum entspricht.',
     en: '',

@@ -114,6 +114,7 @@ export function readInvoiceXml(xml: string): { profile?: string; invoice: Invoic
       currency,
       dueDate: date(terms, 'DueDateDateTime'),
       deliveryDate: date(transaction, 'ApplicableHeaderTradeDelivery', 'ActualDeliverySupplyChainEvent', 'OccurrenceDateTime'),
+      deliveryCountry: text(transaction, 'ApplicableHeaderTradeDelivery', 'ShipToTradeParty', 'PostalTradeAddress', 'CountryID'),
       periodStart: date(settlement, 'BillingSpecifiedPeriod', 'StartDateTime'),
       periodEnd: date(settlement, 'BillingSpecifiedPeriod', 'EndDateTime'),
       buyerReference: text(agreement, 'BuyerReference'),

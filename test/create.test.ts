@@ -162,6 +162,16 @@ describe('createEInvoice for sales without VAT', () => {
     expect(xml).toContain('<ram:ID>DE123456789</ram:ID>');
   });
 
+  it('names the country the goods went to where the data states it', async () => {
+    const invoice = withoutVat('K', (d) => {
+      Object.assign(d.buyer, { country: 'AT', vatId: 'ATU12345678' });
+      d.deliveryCountry = 'IT';
+    });
+    const { xml, findings } = await createEInvoice({ pdf: samplePdf(), invoice });
+    expect(xml).toMatch(/<ram:ShipToTradeParty>[\s\S]*<ram:CountryID>IT<\/ram:CountryID>[\s\S]*<\/ram:ShipToTradeParty>/);
+    expect(findings.filter((finding) => finding.code === 'delivery-country')).toEqual([]);
+  });
+
   it('names the buyer country as the place of delivery of an intra-community supply', async () => {
     const invoice = withoutVat('K', (d) => Object.assign(d.buyer, { country: 'AT', vatId: 'ATU12345678' }));
     const { xml } = await createEInvoice({ pdf: samplePdf(), invoice });

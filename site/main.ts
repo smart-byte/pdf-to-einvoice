@@ -180,6 +180,7 @@ const SECTIONS: { title: string; fields: Field[]; collapsed?: boolean }[] = [
       { path: 'precedingInvoiceDate', label: 'f.precedingInvoiceDate', type: 'date' },
       { path: 'orderReference', label: 'f.orderReference' },
       { ...BUYER_REFERENCE, only: 'pdf' },
+      { path: 'deliveryCountry', label: 'f.deliveryCountry', help: 'f.deliveryCountry.help' },
       { path: 'prepaidAmount', label: 'f.prepaidAmount', type: 'number' },
       { path: 'note', label: 'f.note', type: 'textarea', wide: true },
     ],

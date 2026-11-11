@@ -49,6 +49,7 @@ function withDefaults(draft: InvoiceDraft): Bag {
   d.currency = upper(d.currency ?? 'EUR');
   d.iban = compact(d.iban);
   d.bic = compact(d.bic);
+  d.deliveryCountry = upper(d.deliveryCountry);
   for (const who of ['seller', 'buyer']) {
     d[who] = { ...d[who] };
     d[who].country = upper(d[who].country);
@@ -163,6 +164,17 @@ export function check(draft: InvoiceDraft, options: CheckOptions = {}): CheckRes
   }
   if ((categories.has('AE') || categories.has('K')) && d.buyer.vatId === undefined) {
     error('buyer.vatId', 'buyer-vat-id', 'Reverse charge and intra-community supplies need the VAT ID of the buyer.');
+  }
+  if (d.deliveryCountry !== undefined && !/^[A-Z]{2}$/.test(d.deliveryCountry)) {
+    error('deliveryCountry', 'format', 'Use the two-letter country code, e.g. DE.');
+  }
+  // BR-IC-12 wants the country an intra-community supply went to. As an XRechnung it is refused anyway.
+  if (categories.has('K') && d.deliveryCountry === undefined && d.buyer.country !== undefined && options.rules !== 'xrechnung') {
+    warn(
+      'deliveryCountry',
+      'delivery-country',
+      `An intra-community supply names the country the goods went to. The country of the buyer (${d.buyer.country}) is written; state the country of delivery if they went elsewhere.`,
+    );
   }
   if ((categories.has('K') || categories.has('G')) && d.seller.vatId === undefined && d.seller.taxNumber !== undefined) {
     error('seller.vatId', 'seller-tax-id', 'Intra-community supplies and exports need the VAT ID of the seller.');

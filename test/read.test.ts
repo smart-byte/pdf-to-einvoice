@@ -132,6 +132,11 @@ describe('readInvoiceXml', () => {
     expect(invoice.lines?.[1]).toMatchObject({ quantity: 2, unitPrice: 249.5, netAmount: 499, vatRate: 19 });
   });
 
+  it('reads the country of delivery', async () => {
+    const { xml } = await createEInvoice({ pdf: samplePdf(), invoice: sample((d) => (d.deliveryCountry = 'IT')) });
+    expect(readInvoiceXml(xml).invoice.deliveryCountry).toBe('IT');
+  });
+
   it('reads the purchase order number', async () => {
     const order = '<ram:BuyerOrderReferencedDocument><ram:IssuerAssignedID>PO-0007</ram:IssuerAssignedID></ram:BuyerOrderReferencedDocument>';
     const xml = (await xmlOf(sample())).replace('</ram:BuyerTradeParty>', `</ram:BuyerTradeParty>${order}`);

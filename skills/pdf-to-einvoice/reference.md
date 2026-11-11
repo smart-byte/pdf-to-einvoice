@@ -50,6 +50,9 @@ prints about it.
 | `G`  | Export                 | Goods to a country outside the EU; needs `seller.vatId`                      |
 | `O`  | Not subject to VAT     | Service for a business outside the EU (e.g. USA), not taxable in the country |
 
+An intra-community supply states the country the goods went to. Without `deliveryCountry` the buyer's country is
+written and the check asks about it: confirm it with the user, or give `deliveryCountry`.
+
 VAT is calculated per rate on the summed lines. If the PDF rounds VAT per line and ends up a cent apart, the check
 reports `totals-mismatch`; then the PDF has to be corrected, not the data.
 

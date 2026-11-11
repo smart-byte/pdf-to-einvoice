@@ -80,6 +80,8 @@ export interface Invoice {
   dueDate?: string;
   /** Date of delivery / service (BT-72). */
   deliveryDate?: string;
+  /** Country the goods or services went to, ISO 3166-1 alpha-2 (BT-80). Without it the country is assumed from the VAT treatment. */
+  deliveryCountry?: string;
   /** Service period, alternative to deliveryDate (BT-73, BT-74). */
   periodStart?: string;
   periodEnd?: string;
@@ -166,6 +168,12 @@ export const invoiceJsonSchema = {
     },
     dueDate: date('Payment due date.'),
     deliveryDate: date('Date of delivery or service.'),
+    deliveryCountry: {
+      type: 'string',
+      pattern: '^[A-Z]{2}$',
+      description:
+        'Country the goods went to, as ISO 3166-1 alpha-2 code. State it for an intra-community supply (category K) that did not go to the country of the buyer.',
+    },
     periodStart: date('Start of the service period, if a period is given instead of a single date.'),
     periodEnd: date('End of the service period.'),
     buyerReference: text('Reference given by the buyer (Leitweg-ID for German public bodies).'),
