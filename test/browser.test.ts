@@ -297,6 +297,25 @@ describe.skipIf(!asked)('the web app in a browser', () => {
     expect(await page.$('[data-optout]')).toBeNull();
   }, 120_000);
 
+  it('never gets wider than a phone while the stamp lands on the finished page', async () => {
+    problems = [];
+    const page = await (await browser.newContext({ viewport: { width: 390, height: 844 } })).newPage();
+    await page.goto(`${base}?lang=de`);
+    await read(page);
+    // Looks at every frame from now on: the stamp is larger than it ends up for a moment.
+    await page.evaluate(() => {
+      const widest = ((window as any).widest = { value: 0 });
+      const look = () => {
+        if (document.body.dataset.view === 'done') widest.value = Math.max(widest.value, document.documentElement.scrollWidth - innerWidth);
+        requestAnimationFrame(look);
+      };
+      look();
+    });
+    await create(page);
+    await page.waitForTimeout(1500);
+    expect(await page.evaluate(() => (window as any).widest.value)).toBe(0);
+  }, 120_000);
+
   it('offers the next invoice after the download, in the language of the page', async () => {
     const page = await open('en');
     await read(page);
