@@ -85,6 +85,9 @@ describe('MCP server', () => {
     const instructions = (await connect()).getInstructions();
     expect(instructions).toMatch(/issuer/i);
     expect(instructions).toMatch(/never invent/i);
+    // The tools send nothing, but the assistant that reads through them may: it must not promise more than holds for it.
+    expect(instructions).not.toMatch(/everything runs locally/i);
+    expect(instructions).toMatch(/if your model runs elsewhere, the content of the invoice goes there/i);
   });
 
   it('rejects a tool it does not have', async () => {
