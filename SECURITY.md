@@ -14,8 +14,8 @@ Include the version, the front end (web app, CLI, library, MCP server) and the s
 
 - Supported: the latest released version.
 - The web app is static: no server component, no cookies, no tracking. On its own it only downloads a language model,
-  from huggingface.co and raw.githubusercontent.com, and only after the user chooses "Read with AI". A model
-  endpoint the user configures receives the invoice text, and the page says so.
+  from Hugging Face (huggingface.co, hf.co) and raw.githubusercontent.com, and only after the user chooses "Read with
+  AI". A model endpoint the user configures receives the invoice text, and the page says so.
 - The built pages carry a Content-Security-Policy; `site/vite.config.ts` holds it and says why each exception is
   there.
 - The CLI and the MCP server read and write local files only and make no network requests.
