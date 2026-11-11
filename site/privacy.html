@@ -87,7 +87,13 @@
           line tool and MCP server run on your own machine; this policy covers only the website.
         </p>
         <ul>
+          <!-- without-counter -->
           <li>No cookies, accounts, contact forms, analytics or advertising.</li>
+          <!-- /without-counter -->
+          <!-- with-counter -->
+          <li>No cookies, accounts, contact forms or advertising.</li>
+          <li>Our own Umami server counts page views and created files without cookies or stored IP addresses, and you can opt out.</li>
+          <!-- /with-counter -->
           <li>Invoices you open are processed in your browser. They are never uploaded.</li>
           <li>Cloudflare delivers the site and processes connection data to do so.</li>
           <li>If you choose “Read with AI”, your browser downloads a language model from Hugging Face and GitHub. Your invoice is not sent there.</li>
@@ -138,6 +144,36 @@
           control; the page says so next to the field.
         </p>
 
+        <!-- with-counter -->
+        <h2>Analytics with Umami</h2>
+        <p>
+          We count page views with Umami, open-source analytics that we run ourselves at analytics.smart-byte.com on a server of Hetzner Online GmbH,
+          Industriestr. 25, 91710 Gunzenhausen, Germany, located in Finland. Hetzner processes this data on our behalf under a data processing agreement (Art.
+          28 GDPR); nobody else receives it. When a page loads, and when you create a file, a small script sends:
+        </p>
+        <ul>
+          <li>the page's address, without query string or fragment, and its title;</li>
+          <li>the website you came from, which browsers usually share only as a domain;</li>
+          <li>that a file was created and whether it is an e-invoice or an XRechnung, but never anything of your invoice, its name or its content;</li>
+          <li>your browser, operating system, device type, screen size, and language;</li>
+          <li>your approximate location (country, region, and city), looked up from your IP address on our server.</li>
+        </ul>
+        <p>
+          Umami sets no cookies and stores nothing on your device. It does not store your IP address: to tell visits apart, it derives a pseudonymous identifier
+          from your IP address, your browser's user agent, and a salt that changes every day, so visits cannot be linked across days. We look at the results
+          only in aggregate, to see whether and how the site is used. We don't build profiles or combine this data with anything else.
+        </p>
+        <ul>
+          <li><strong>Legal basis:</strong> our legitimate interest in understanding how the site is used (Art. 6(1)(f) GDPR).</li>
+          <li><strong>Retention:</strong> analytics records are deleted after 13 months.</li>
+          <li><strong>Your choice:</strong> Umami doesn't count browsers that send Do Not Track, and you can turn it off for this browser here.</li>
+        </ul>
+        <div class="optout" data-optout hidden>
+          <p data-optout-state></p>
+          <button type="button" class="quiet" data-optout-toggle></button>
+        </div>
+        <!-- /with-counter -->
+
         <h2>Data stored in your browser</h2>
         <p>
           The site remembers your language and, once you have switched it, the light or dark theme in your browser's local storage under <code>lang</code> and
@@ -145,6 +181,9 @@
           never sent to us. They are strictly necessary for functions you use (§ 25(2) No. 2 TDDDG), so no consent is needed; you can delete them at any time in
           your browser settings.
         </p>
+        <!-- with-counter -->
+        <p>If you turn the counting of your visits off, the site notes that in the same place under <code>umami.disabled</code>.</p>
+        <!-- /with-counter -->
 
         <h2>Email</h2>
         <p>
@@ -179,7 +218,7 @@
           You do not have to provide personal data. Without the connection data your browser sends, the site cannot be delivered. We do not use automated
           decision-making or profiling (Art. 22 GDPR). We update this policy when the site or the law changes.
         </p>
-        <p>Last updated: 10 November 2026</p>
+        <p>Last updated: 11 November 2026</p>
       </section>
 
       <section class="info legal" lang="de" id="de">
@@ -190,7 +229,15 @@
           Website.
         </p>
         <ul>
+          <!-- without-counter -->
           <li>Keine Cookies, Konten, Kontaktformulare, Analyse-Dienste oder Werbung.</li>
+          <!-- /without-counter -->
+          <!-- with-counter -->
+          <li>Keine Cookies, Konten, Kontaktformulare oder Werbung.</li>
+          <li>
+            Unser eigener Umami-Server zählt Seitenaufrufe und erstellte Dateien, ohne Cookies und ohne gespeicherte IP-Adressen; Sie können das abschalten.
+          </li>
+          <!-- /with-counter -->
           <li>Rechnungen, die Sie öffnen, werden in Ihrem Browser verarbeitet. Sie werden nie hochgeladen.</li>
           <li>Cloudflare liefert die Website aus und verarbeitet dafür Verbindungsdaten.</li>
           <li>
@@ -244,6 +291,42 @@
           Entscheidung und liegt in Ihrer Hand; die Seite weist neben dem Feld darauf hin.
         </p>
 
+        <!-- with-counter -->
+        <h2>Reichweitenmessung mit Umami</h2>
+        <p>
+          Wir zählen Seitenaufrufe mit Umami, einer Open-Source-Software, die wir selbst unter analytics.smart-byte.com betreiben, auf einem Server der Hetzner
+          Online GmbH, Industriestr. 25, 91710 Gunzenhausen, Deutschland, am Standort Finnland. Hetzner verarbeitet diese Daten in unserem Auftrag auf Grundlage
+          eines Auftragsverarbeitungsvertrags (Art. 28 DSGVO); niemand sonst erhält sie. Beim Laden einer Seite und wenn Sie eine Datei erstellen, sendet ein
+          kleines Skript:
+        </p>
+        <ul>
+          <li>die Adresse der Seite, ohne Abfrageteil und Fragment, und ihren Titel;</li>
+          <li>die Website, von der Sie kommen; Browser nennen meist nur deren Domain;</li>
+          <li>
+            dass eine Datei erstellt wurde und ob es eine E-Rechnung oder eine XRechnung ist, aber nie etwas von Ihrer Rechnung, ihrem Namen oder ihrem Inhalt;
+          </li>
+          <li>Browser, Betriebssystem, Gerätetyp, Bildschirmgröße und Sprache;</li>
+          <li>Ihren ungefähren Standort (Land, Region und Stadt), auf unserem Server aus Ihrer IP-Adresse ermittelt.</li>
+        </ul>
+        <p>
+          Umami setzt keine Cookies und speichert nichts auf Ihrem Gerät. Ihre IP-Adresse wird nicht gespeichert: Um Besuche zu unterscheiden, bildet Umami aus
+          IP-Adresse, Browserkennung und einem täglich wechselnden Zufallswert eine pseudonyme Kennung; Besuche lassen sich so nicht über mehrere Tage
+          verknüpfen. Wir sehen uns die Ergebnisse nur zusammengefasst an, um zu erkennen, ob und wie die Website genutzt wird. Wir bilden keine Profile und
+          führen die Daten mit nichts anderem zusammen.
+        </p>
+        <ul>
+          <li><strong>Rechtsgrundlage:</strong> unser berechtigtes Interesse zu verstehen, wie die Website genutzt wird (Art. 6 Abs. 1 lit. f DSGVO).</li>
+          <li><strong>Speicherdauer:</strong> Die Einträge werden nach 13 Monaten gelöscht.</li>
+          <li>
+            <strong>Ihre Wahl:</strong> Umami zählt keine Browser, die „Do Not Track“ senden, und Sie können die Zählung für diesen Browser hier abschalten.
+          </li>
+        </ul>
+        <div class="optout" data-optout hidden>
+          <p data-optout-state></p>
+          <button type="button" class="quiet" data-optout-toggle></button>
+        </div>
+        <!-- /with-counter -->
+
         <h2>In Ihrem Browser gespeicherte Daten</h2>
         <p>
           Die Website merkt sich Ihre Sprache und, sobald Sie das Design umgeschaltet haben, das helle oder dunkle Design im lokalen Speicher des Browsers unter
@@ -251,6 +334,9 @@
           bleibt auf Ihrem Gerät und wird nie an uns gesendet. Beides ist für von Ihnen genutzte Funktionen unbedingt erforderlich (§ 25 Abs. 2 Nr. 2 TDDDG),
           eine Einwilligung ist daher nicht nötig; Sie können es jederzeit in den Browser-Einstellungen löschen.
         </p>
+        <!-- with-counter -->
+        <p>Schalten Sie die Zählung Ihrer Besuche ab, merkt sich die Website das an derselben Stelle unter <code>umami.disabled</code>.</p>
+        <!-- /with-counter -->
 
         <h2>E-Mail</h2>
         <p>
@@ -290,7 +376,7 @@
           ausgeliefert werden. Wir setzen keine automatisierte Entscheidungsfindung und kein Profiling ein (Art. 22 DSGVO). Wir aktualisieren diese Erklärung,
           wenn sich die Website oder die Rechtslage ändert.
         </p>
-        <p>Stand: 10. November 2026</p>
+        <p>Stand: 11. November 2026</p>
       </section>
     </main>
     <footer class="foot">
