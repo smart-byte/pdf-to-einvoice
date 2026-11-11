@@ -47,5 +47,5 @@ All notable changes to this project are documented here. The format follows
 - VAT categories S, Z, E, AE, K, G and O; invoices, credit notes, corrected, partial and prepayment invoices.
 - Command line tool `pdf-to-einvoice` and an MCP server (`pdf-to-einvoice mcp`).
 - Web app in English and German that runs entirely in the browser, with optional in-browser language models.
-  It reads service periods given as a month, a quarter or two dates, suggests a due date where the PDF states no
-  payment term, and shows a verdict when an existing e-invoice is dropped.
+  It reads service periods given as a month, a quarter or two dates, suggests payment terms where the PDF states
+  neither a due date nor payment terms, and shows a verdict when an existing e-invoice is dropped.

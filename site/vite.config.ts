@@ -4,8 +4,9 @@ import { defineConfig } from 'vite';
 const page = (name: string) => fileURLToPath(new URL(name, import.meta.url));
 
 /**
- * What the built pages may load and run. The host cannot send headers, so the policy is a meta tag; it is put in by
- * the build only, because the development server works with inline scripts.
+ * What the built pages may load and run. The policy is a meta tag, so that it travels with the pages to any host;
+ * `public/_headers` adds what a meta tag cannot say. It is put in by the build only, because the development server
+ * works with inline scripts.
  */
 const POLICY = [
   "default-src 'self'",

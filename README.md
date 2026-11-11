@@ -17,7 +17,8 @@ in their format. This one starts from the PDF you already produce with Word, you
   PDF/A-3.
 - **It tells you what is missing.** Required fields, sums that do not add up, and values that do not appear on
   your PDF are listed before anything is created.
-- **Nothing is uploaded.** The web app has no server; the library and CLI run on your machine.
+- **Nothing is uploaded.** The web app works in your browser; its host only delivers the page. The library and CLI
+  run on your machine.
 - **The common kinds of invoice.** Domestic with VAT, several rates, small businesses, reverse charge, intra-community
   supplies, exports, services to non-EU customers, credit notes and corrections.
 - **XRechnung for public bodies.** The same data can be written as an [XRechnung](#xrechnung), as plain XML or
@@ -31,7 +32,9 @@ in their format. This one starts from the PDF you already produce with Word, you
 
 **[Open the web app](https://pdf-to-einvoice.app/)**, or start it locally with `npm run site`. Drop a PDF, check the data that was read from it, download the
 e-invoice. Reading works without any AI by pattern matching; optionally a small language model that runs in your
-browser (WebGPU) fills in what the patterns did not find. The page is available in English and German.
+browser (WebGPU) fills in what the patterns did not find. The model is downloaded once from huggingface.co and
+raw.githubusercontent.com; if you point the page at a model service of your own, the invoice text goes to that
+service. The page is available in English and German.
 
 For an invoice to a public body, choose XRechnung above the form. The page then asks for what XRechnung needs on top
 and gives you two files: the XRechnung as XML (UBL) for the portal of the public body, and the PDF that carries it.
@@ -92,7 +95,7 @@ It works the same in a browser: `pdf` is a `Uint8Array` in and out. A bundler ne
 | `guessFromText(text, { blocks })`            | reads an invoice without a model: totals that add up, items that add up to them, seller and buyer, labelled values |
 | `keepWhatThePdfShows(draft, text)`           | drops every value the PDF does not show: a guard for data read by a small language model                           |
 | `languageOf(text)`                           | `'de'` or `'en'`: the language an invoice is written in                                                            |
-| `validateEInvoice(pdf)`                      | looks at an existing e-invoice: profile, embedded data, and whether the XML matches the visible page               |
+| `validateEInvoice(pdf, { pdfText? })`        | looks at an existing e-invoice: profile and embedded data; with `pdfText` also whether the XML matches the page    |
 | `readEmbeddedXml(pdf)`                       | the XML of an existing e-invoice, or `null`                                                                        |
 | `calculate(invoice)`                         | the totals, following the EN 16931 rounding rules                                                                  |
 | `invoiceJsonSchema`                          | JSON Schema of the invoice data, for forms, validation and language models                                         |
@@ -155,8 +158,8 @@ contrast, is made for one invoice at a time, with the user confirming the data.
 
 ## For AI assistants
 
-The MCP server lets an AI assistant do the whole job on your machine: read the PDF, fill in the data,
-show you what is missing, and create the file after you confirm.
+The MCP server lets an AI assistant do the whole job: read the PDF, fill in the data, show you what is missing, and
+create the file after you confirm.
 
 ```json
 {
@@ -171,7 +174,8 @@ Tools: `read_invoice_pdf`, `check_invoice`, `create_einvoice`, `create_xrechnung
 [skills/pdf-to-einvoice/SKILL.md](skills/pdf-to-einvoice/SKILL.md) describes the same workflow with the CLI. A
 summary for language models is in [llms.txt](site/public/llms.txt).
 
-The server needs no API key and calls no model itself: the assistant you already use reads the invoice.
+The server runs on your machine, needs no API key and calls no model itself: the assistant you already use reads the
+invoice. Its text therefore goes wherever that assistant runs.
 
 ## The invoice data
 
@@ -191,7 +195,7 @@ owed. Defaults: `typeCode` 380 (invoice), `currency` EUR, `unit` C62 (piece), `v
 
 Every category except `S` and `Z` needs `vatExemptionReason`: the sentence on your invoice that says why no VAT is
 charged. `totals` are the sums printed on the PDF; if they contradict the calculation, that is an error, because the
-XML must not say something else than the page. The full list of fields is in
+XML must not contradict the page. The full list of fields is in
 [`src/model.ts`](src/model.ts) and in `npx pdf-to-einvoice schema`.
 
 ## XRechnung
@@ -254,29 +258,28 @@ Only what the standard asks for: the XML attachment, XMP metadata that declares 
 output intent and a document ID. Images that ask viewers to smooth them (`/Interpolate true`) have that flag switched
 off, because PDF/A forbids it. The page content is not touched.
 
-One defect is detected and reported: fonts that are not embedded. The XML is still valid then, but the file is not a
+One defect is detected and reported: fonts that are not embedded. The XML is not affected, but the file is not a
 strict PDF/A-3; export the PDF with embedded fonts (or as PDF/A) and run it again. Other things PDF/A forbids in
 your original are neither found nor repaired. If the software of a recipient rejects the file, check it with a PDF/A
 validator.
 
 ## Limits
 
-- **Only the issuer can issue an e-invoice.** A PDF you _received_ does not become a valid e-invoice because you
-  converted it. If you sent a plain PDF where an e-invoice was required, issue a corrected invoice (type 384) that
-  refers to the original.
+- **Only the issuer can turn an invoice into an e-invoice.** Converting a PDF you _received_ does not make it one.
 - **Reading is still being broadened.** Pattern matching reads the layouts it knows well and less of others; what it
-  cannot place is left empty and shown as missing. Reading invoices of every kind is work in progress.
+  cannot place is left empty and shown as missing. Reading invoices of every kind is work in progress. What it
+  reads can still be wrong: check every value.
 - **The XML is the binding part.** The tool checks arithmetic and compares the data with the text of the PDF, but
   it cannot know what you meant. Review the data before you create the file.
-- **Profiles and syntax:** the hybrid PDF carries CII in the Factur-X / ZUGFeRD profile EN 16931 or XRECHNUNG. Plain
-  XML is written as [XRechnung](#xrechnung) only, in UBL or CII; the profiles BASIC and EXTENDED and plain EN 16931
-  XML without XRechnung are not built.
+- **Profiles and syntax:** the hybrid PDF carries CII in the Factur-X / ZUGFeRD profile EN 16931 or XRECHNUNG, and
+  its XML is also returned on its own. Plain XML for submitting is written as [XRechnung](#xrechnung), in UBL or CII.
+  The profiles BASIC and EXTENDED are not built.
 - **Not modelled yet:** discounts and charges on the whole invoice (use a line with a negative quantity), VAT in a
   second currency, several payment accounts, attachments.
 - **`validateEInvoice` is a plausibility check,** not a replacement for a full validator.
 - **No encryption or password protection:** PDF/A forbids it, so a protected file would no longer be a valid
   e-invoice.
-- **Country rules:** a hybrid PDF is how e-invoices are exchanged in Germany. Italy, Poland, Belgium and France
+- **Country rules:** in Germany a hybrid PDF is one accepted form of e-invoice. Italy, Poland, Belgium and France
   route invoices through national platforms or networks; a file alone is not enough there.
 - This is a tool, not tax or legal advice.
 
@@ -306,7 +309,7 @@ npm run site             # the web app on http://localhost:4350
 
 ## Licence
 
-MIT, see [LICENSE](LICENSE). The software implements the semantic data model of the European standard
+MIT, see [LICENSE](LICENSE). The software uses a subset of the semantic data model of the European standard
 EN 16931-1:2017; the standard itself is the property of CEN and is not part of this repository.
 
 ZUGFeRD, Factur-X and XRechnung are names of their respective owners. This project is independent: it is not
