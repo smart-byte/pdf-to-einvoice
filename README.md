@@ -170,12 +170,16 @@ create the file after you confirm.
 ```
 
 Tools: `read_invoice_pdf`, `check_invoice`, `create_einvoice`, `create_xrechnung`, `validate_einvoice`,
-`read_einvoice_xml`. For agents that work with a shell instead,
-[skills/pdf-to-einvoice/SKILL.md](skills/pdf-to-einvoice/SKILL.md) describes the same workflow with the CLI. A
-summary for language models is in [llms.txt](site/public/llms.txt).
+`read_einvoice_xml`. A summary for language models is in [llms.txt](site/public/llms.txt).
 
-The server runs on your machine, needs no API key and calls no model itself: the assistant you already use reads the
-invoice. Its text therefore goes wherever that assistant runs.
+For agents that work with a shell, such as Claude Code, the folder [skills/pdf-to-einvoice](skills/pdf-to-einvoice) is
+a skill. The agent reads the PDF itself, a scanned one too, compares its reading with what the tool found by pattern,
+and lets the tool check the data and create the file. Copy the folder into the agent's skills folder; for Claude Code
+that is `~/.claude/skills/` for all projects or `.claude/skills/` in one. The npm package ships it in
+`node_modules/pdf-to-einvoice/skills/`.
+
+The server and the skill run on your machine, need no API key and call no model themselves: the assistant you
+already use reads the invoice. Its content therefore goes wherever that assistant runs.
 
 ## The invoice data
 

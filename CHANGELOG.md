@@ -8,6 +8,8 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- The skill for agents lets the agent read the PDF itself, a scanned one too, and compare its reading with the
+  tool's; it is short, with field lists and codes in `reference.md`.
 - XRechnung, the German version of EN 16931 for invoices to public bodies, as a second output. `createXRechnung`
   returns the invoice data as XML that declares XRechnung 3.0, in UBL or CII, and `createEInvoice` takes
   `profile: 'xrechnung'` for a hybrid PDF whose XML follows XRechnung. `check` takes `rules: 'xrechnung'` and then
