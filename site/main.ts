@@ -650,13 +650,15 @@ function renderPager(): void {
  * Draws one page of the open PDF, counted from 0, and shows its marks. A page is drawn when it is turned to and kept
  * nowhere: only one drawn page is in memory at a time, however long the PDF is.
  */
-async function showPage(index: number): Promise<void> {
+async function drawPage(index: number): Promise<void> {
   const pdf = opened;
   if (!pdf || index < 0 || index >= pdf.doc.numPages) return;
   wanted = index;
   const page = await pdf.doc.getPage(index + 1);
   const canvas = $<HTMLCanvasElement>('#preview');
   const viewport = page.getViewport({ scale: (Math.min(720, canvas.parentElement!.clientWidth) / page.getViewport({ scale: 1 }).width) * devicePixelRatio });
+  // The preview is not on the screen (another view is shown): it has no width to draw a page into.
+  if (!viewport.width) return;
   // Drawn beside the stage and put on it when done: turning on while a page is still being drawn leaves no half page behind.
   const sheet = el('canvas', { width: viewport.width, height: viewport.height });
   await page.render({ canvas: sheet, viewport }).promise;
@@ -668,6 +670,9 @@ async function showPage(index: number): Promise<void> {
   canvas.getContext('2d')!.drawImage(sheet, 0, 0);
   renderMarks();
 }
+/** The page that is being drawn, for whoever needs the finished preview. */
+let drawing: Promise<void> = Promise.resolve();
+const showPage = (index: number): Promise<void> => (drawing = drawPage(index));
 $('#page-prev').onclick = () => showPage(wanted - 1);
 $('#page-next').onclick = () => showPage(wanted + 1);
 
@@ -1023,7 +1028,9 @@ $('#create').onclick = async () => {
     // The stamp reads like a seal: it lands only where neither the check nor the writing of the file found anything.
     $('#done .stamp').hidden = findings.length > 0 || document.querySelector('#summary li') !== null;
     status.textContent = '';
-    // The finished page shows the same preview, with the stamp landing on it.
+    // The finished page shows the same preview, with the stamp landing on it. A page that is still being drawn is
+    // waited for: leaving now would copy an empty sheet and leave the preview without a page to come back to.
+    await drawing.catch(() => {});
     const [from, to] = [$<HTMLCanvasElement>('#preview'), $<HTMLCanvasElement>('#done-preview')];
     Object.assign(to, { width: from.width, height: from.height });
     to.getContext('2d')!.drawImage(from, 0, 0);
