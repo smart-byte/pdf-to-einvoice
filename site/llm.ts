@@ -1,4 +1,5 @@
-import { invoiceJsonSchema, type InvoiceDraft } from '../src/model.js';
+import type { InvoiceDraft } from '../src/model.js';
+import { extractionSchema, progressOf } from './answer.js';
 
 /**
  * In-browser models offered by default: permissively licensed (Apache-2.0 / MIT) and small enough to download. The
@@ -33,36 +34,6 @@ Rules:
 - totals are the sums printed on the invoice.`;
 
 // Fields a model is not asked for: nothing on the page lets the answer be verified, so a person fills them in.
-const NOT_ASKED = new Set([
-  'typeCode',
-  'buyerReference',
-  'orderReference',
-  'precedingInvoiceNumber',
-  'precedingInvoiceDate',
-  'note',
-  'prepaidAmount',
-  'periodStart',
-  'periodEnd',
-  'contactName',
-  'phone',
-  'description',
-  'netAmount',
-]);
-
-/** The invoice schema as a grammar for the model: every key present, every value nullable, nothing a small grammar engine may not know. */
-function extractionSchema(schema: any = invoiceJsonSchema): any {
-  if (schema.type === 'object') {
-    const properties = Object.fromEntries(
-      Object.entries(schema.properties)
-        .filter(([key]) => !NOT_ASKED.has(key))
-        .map(([key, value]) => [key, extractionSchema(value)]),
-    );
-    return { type: 'object', properties, required: Object.keys(properties), additionalProperties: false };
-  }
-  if (schema.type === 'array') return { type: 'array', items: extractionSchema(schema.items) };
-  return schema.enum ? { enum: [...schema.enum, null] } : { type: [schema.type, 'null'] };
-}
-
 const prompt = (text: string) => `${RULES}\n\nInvoice text:\n"""\n${text.slice(0, MAX_TEXT)}\n"""`;
 
 function parse(json: string | null | undefined): InvoiceDraft {
@@ -100,7 +71,13 @@ function unlessAborted<T>(work: Promise<T>, signal?: AbortSignal): Promise<T> {
  * Reads the invoice with a model running in this browser (WebGPU). The model is downloaded once and cached. When
  * `signal` fires, loading or reading stops at once and the promise rejects with an AbortError.
  */
-export async function readWithBrowserModel(text: string, modelId: string, onProgress: (fraction: number) => void, signal?: AbortSignal): Promise<InvoiceDraft> {
+export async function readWithBrowserModel(
+  text: string,
+  modelId: string,
+  onProgress: (fraction: number) => void,
+  signal?: AbortSignal,
+  onWriting: (written: ReturnType<typeof progressOf>) => void = () => {},
+): Promise<InvoiceDraft> {
   const { CreateWebWorkerMLCEngine } = await import('@mlc-ai/web-llm');
   signal?.throwIfAborted();
   if (engine?.id !== modelId) {
@@ -119,8 +96,10 @@ export async function readWithBrowserModel(text: string, modelId: string, onProg
   try {
     const instance = await unlessAborted(mine.ready!, signal);
     onProgress(1);
-    const reply = await unlessAborted<any>(
-      instance.chat.completions.create({
+    // The answer comes piece by piece, which tells how far it is. A reading that is cancelled leaves the pieces be.
+    const answer = (async () => {
+      const pieces = await instance.chat.completions.create({
+        stream: true,
         messages: [{ role: 'user', content: prompt(text) }],
         temperature: 0,
         // Room for an invoice with many lines; what really limits the answer is the context of the model.
@@ -128,10 +107,15 @@ export async function readWithBrowserModel(text: string, modelId: string, onProg
         response_format: { type: 'json_object', schema: JSON.stringify(extractionSchema()) },
         // A model that can think aloud first would spend the answer on it: the data is wanted, nothing else.
         extra_body: { enable_thinking: false },
-      }),
-      signal,
-    );
-    return parse(reply.choices[0]?.message.content);
+      });
+      let written = '';
+      for await (const piece of pieces) {
+        written += piece.choices[0]?.delta?.content ?? '';
+        if (engine === mine && !signal?.aborted) onWriting(progressOf(written));
+      }
+      return written;
+    })();
+    return parse(await unlessAborted(answer, signal));
   } finally {
     signal?.removeEventListener('abort', cancel);
   }

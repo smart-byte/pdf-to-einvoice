@@ -6,6 +6,7 @@ import { PDFDocument, PDFName, PDFString, StandardFonts } from '@cantoo/pdf-lib'
 import { chromium, type Browser, type Download, type Page } from 'playwright-core';
 import { preview, type PreviewServer } from 'vite';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { extractionSchema } from '../site/answer.js';
 import { createEInvoice } from '../src/create.js';
 import type { InvoiceDraft } from '../src/model.js';
 import { validateEInvoice } from '../src/validate.js';
@@ -199,6 +200,50 @@ describe.skipIf(!asked)('the web app in a browser', () => {
     await page.keyboard.type('X');
     expect(await page.inputValue('[data-path="number"]')).toBe('RE-2026-0042');
     expect(await page.isVisible('#create')).toBe(false);
+  }, 120_000);
+
+  it('shows how far a language model has come with its answer', async () => {
+    // What a model answers for the sample: every key of the schema in its order, with the one value the patterns do not read.
+    const filled = (schema: any, key = ''): unknown =>
+      schema.type === 'object'
+        ? Object.fromEntries(Object.entries(schema.properties).map(([name, value]) => [name, filled(value, name)]))
+        : schema.type === 'array'
+          ? [filled(schema.items), filled(schema.items)]
+          : key === 'email'
+            ? 'rechnung@muster-software.example'
+            : null;
+    // Stands in for the library that runs the model: no model is loaded, and the answer comes piece by piece.
+    const library = `
+      const answer = ${JSON.stringify(JSON.stringify(filled(extractionSchema())))};
+      export async function CreateWebWorkerMLCEngine(worker, id, { initProgressCallback }) {
+        initProgressCallback({ progress: 1 });
+        const pieces = async function* () {
+          for (const piece of answer.match(/[\\s\\S]{1,24}/g)) {
+            await new Promise((done) => setTimeout(done, 15));
+            yield { choices: [{ delta: { content: piece } }] };
+          }
+        };
+        return { unload: async () => {}, chat: { completions: { create: async () => pieces() } } };
+      }`;
+    const page = await open();
+    await page.route(/\/assets\/lib-[^/]+\.js$/, (route) => route.fulfill({ contentType: 'text/javascript', body: library }));
+    await read(page);
+    if (!(await page.isVisible('#ai-run'))) await page.click('.reader summary');
+    await page.evaluate(() => {
+      const seen: [string, number][] = ((window as any).seen = []);
+      const note = () => seen.push([document.querySelector('#ai-status')!.textContent!, document.querySelector<HTMLProgressElement>('#ai-progress')!.value]);
+      new MutationObserver(note).observe(document.querySelector('#ai-status')!, { childList: true, characterData: true, subtree: true });
+    });
+    await page.click('#ai-run');
+    await page.waitForFunction(() => document.querySelector('#ai-status')!.textContent!.startsWith('Fertig'), null, { timeout: 60_000 });
+    const seen: [string, number][] = await page.evaluate(() => (window as any).seen);
+    const writing = seen.filter(([status]) => status.startsWith('Das Modell schreibt'));
+    expect(writing.some(([status]) => /^Das Modell schreibt die Angaben\s… \d+\s%$/.test(status))).toBe(true);
+    expect(writing.some(([status]) => /^Das Modell schreibt Position 2\s…$/.test(status))).toBe(true);
+    expect(writing.every(([, value], i) => i === 0 || value >= writing[i - 1]![1])).toBe(true);
+    expect(writing.at(-1)![1]).toBeGreaterThan(0.9);
+    expect(await page.textContent('#ai-status')).toBe('Fertig. Die KI hat 1 Angabe ergänzt: Bitte prüfen Sie sie.');
+    expect(await page.isVisible('#ai-loading')).toBe(false);
   }, 120_000);
 
   it('offers the next invoice after the download, in the language of the page', async () => {
