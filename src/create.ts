@@ -10,7 +10,10 @@ export interface CreateOptions {
   pdf: Uint8Array;
   /** The invoice data. Checked first; nothing is created while an error is open. */
   invoice: InvoiceDraft;
-  /** Language of the canned texts in the PDF metadata. */
+  /**
+   * The language the PDF declares as its own, default `en`. The library that writes the XML also looks for its
+   * translations in it, and ships none: in a browser that is a request to `assets/locale/` on your host.
+   */
   lang?: string;
   /** `xrechnung`: the data has to meet the XRechnung rules as well, and the XML declares XRechnung 3.0. Default `en16931`. */
   profile?: 'en16931' | 'xrechnung';
@@ -31,7 +34,7 @@ export interface XRechnungOptions {
   invoice: InvoiceDraft;
   /** The XML syntax: `ubl` (default) or `cii`, UN/CEFACT Cross Industry Invoice. XRechnung allows both. */
   syntax?: 'ubl' | 'cii';
-  /** Language of the messages of the library that writes the XML. */
+  /** Language in which the library that writes the XML looks for its translations, default `en`. It ships none. */
   lang?: string;
 }
 

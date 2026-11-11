@@ -37,6 +37,9 @@ export default defineConfig({
   ],
   root: page('.'),
   base: './',
+  // Several pages, no router: the local server answers an address that does not exist with 404, as the host does,
+  // instead of with the start page. A request for a file the site does not ship then shows up while testing.
+  appType: 'mpa',
   // The package's default entry is its Node build, which pulls in modules a browser does not have. Its browser
   // bundle is the one the upstream README points browsers to.
   resolve: { alias: { '@e-invoice-eu/core': page('../node_modules/@e-invoice-eu/core/dist/e-invoice-eu.min.js') } },
