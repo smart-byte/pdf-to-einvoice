@@ -3,6 +3,7 @@ import type { Totals } from './calculate.js';
 import { check, type Finding } from './check.js';
 import type { Invoice, InvoiceDraft } from './model.js';
 import { inspectPdf, readEmbeddedXml, repairForPdfA, type PdfInfo } from './pdf.js';
+import { extractText } from './text.js';
 import { toUbl } from './ubl.js';
 
 export interface CreateOptions {
@@ -17,6 +18,8 @@ export interface CreateOptions {
   lang?: string;
   /** `xrechnung`: the data has to meet the XRechnung rules as well, and the XML declares XRechnung 3.0. Default `en16931`. */
   profile?: 'en16931' | 'xrechnung';
+  /** The text of the PDF, from `extractText`, if you have read it already. The data is compared with it; without it the text is read here. */
+  pdfText?: string;
 }
 
 export interface CreateResult {
@@ -63,8 +66,8 @@ export class InvoiceError extends Error {
 const reason = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 /** The data, cleaned and with its totals; throws what is wrong with it. */
-function checked(draft: InvoiceDraft, rules?: 'xrechnung') {
-  const { findings, invoice, totals } = check(draft, { rules });
+function checked(draft: InvoiceDraft, rules?: 'xrechnung', pdfText?: string) {
+  const { findings, invoice, totals } = check(draft, { rules, pdfText });
   if (!invoice || !totals) {
     const errors = findings.filter((f) => f.severity === 'error');
     throw new InvoiceError('invalid-invoice', `The invoice data has ${errors.length} error(s): ${errors.map((f) => f.message).join(' ')}`, findings);
@@ -129,8 +132,6 @@ function reportNotWritten(invoice: Invoice, xml: string, findings: Finding[]): v
  */
 export async function createEInvoice(options: CreateOptions): Promise<CreateResult> {
   const xrechnung = options.profile === 'xrechnung';
-  const { findings, invoice, totals } = checked(options.invoice, xrechnung ? 'xrechnung' : undefined);
-
   let info: PdfInfo;
   try {
     info = await inspectPdf(options.pdf);
@@ -138,12 +139,24 @@ export async function createEInvoice(options: CreateOptions): Promise<CreateResu
     throw new InvoiceError('invalid-pdf', `The file could not be read as a PDF: ${reason(e)}`);
   }
   if (info.embeddedXml !== null) throw new InvoiceError('already-einvoice', 'This PDF already carries an e-invoice.');
+  // A PDF whose text cannot be read is compared with no text: that is reported, and the file is written all the same.
+  const pdfText = options.pdfText ?? (await extractText(options.pdf).catch(() => ''));
+  const { findings, invoice, totals } = checked(options.invoice, xrechnung ? 'xrechnung' : undefined, pdfText);
   if (info.unembeddedFonts.length) {
     findings.push({
       path: '',
       severity: 'warning',
       code: 'pdf-fonts',
       message: `The PDF does not embed these fonts: ${info.unembeddedFonts.join(', ')}. The XML is not affected, but the file is not a strict PDF/A-3. Export the PDF again with fonts embedded (or as PDF/A) to fix this.`,
+    });
+  }
+
+  if (info.forbiddenActions.length) {
+    findings.push({
+      path: '',
+      severity: 'warning',
+      code: 'pdf-actions',
+      message: `The PDF carried what PDF/A forbids a file to run: ${info.forbiddenActions.join(', ')}. It was left out of the e-invoice; the pages are unchanged.`,
     });
   }
 

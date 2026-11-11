@@ -9,6 +9,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
+import { PDFDocument, PDFName, PDFString } from '@cantoo/pdf-lib';
 import { describe, expect, it } from 'vitest';
 import { createEInvoice, createXRechnung } from '../src/create.js';
 import type { InvoiceDraft } from '../src/model.js';
@@ -117,14 +118,27 @@ describe.skipIf(!jar)('reference validation with Mustang', () => {
     return { pdf: status(stdout, 'pdf'), xml: status(stdout, 'xml'), problems: problems(stdout), report: stdout };
   };
 
+  // Without a delivery date and a country of delivery there is nothing to say about the delivery, and nothing is made
+  // up: the element the syntax demands stays empty, as in official samples of the standard. The validator accepts the
+  // file and remarks on the empty element.
+  const REMARKS: Record<string, unknown[]> = { 'service period instead of a delivery date': [expect.stringContaining('PEPPOL-EN16931-R008')] };
+
   it.concurrent.each(Object.entries(CASES))(
     '%s',
     async (name, invoice) => {
       const { pdf } = await createEInvoice({ pdf: samplePdf(), invoice });
-      expect(await validate(`${name}.pdf`, pdf)).toMatchObject({ pdf: 'valid', xml: 'valid', problems: [] });
+      expect(await validate(`${name}.pdf`, pdf)).toMatchObject({ pdf: 'valid', xml: 'valid', problems: REMARKS[name] ?? [] });
     },
     120_000,
   );
+
+  it('a PDF that came with a script is a valid PDF/A-3 once the script is removed', async () => {
+    const doc = await PDFDocument.load(samplePdf(), { updateMetadata: false });
+    doc.catalog.set(PDFName.of('OpenAction'), doc.context.obj({ Type: 'Action', S: 'JavaScript', JS: PDFString.of("app.alert('x')") }));
+    const { pdf, findings } = await createEInvoice({ pdf: await doc.save(), invoice: sample() });
+    expect(findings.map((finding) => finding.code)).toEqual(['pdf-actions']);
+    expect(await validate('with-script.pdf', pdf)).toMatchObject({ pdf: 'valid', xml: 'valid', problems: [] });
+  }, 120_000);
 
   describe('XRechnung', () => {
     it.concurrent.each(Object.entries(XRECHNUNG_CASES))(

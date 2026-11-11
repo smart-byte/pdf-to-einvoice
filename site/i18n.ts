@@ -84,8 +84,8 @@ export const STRINGS: Record<string, Entry> = {
   },
   'ai.model': { de: 'Modell', en: 'Model' },
   'ai.download': {
-    de: 'Das Modell (etwa {size}\u00a0GB) wird beim ersten Mal von huggingface.co und raw.githubusercontent.com geladen und im Browser gespeichert.',
-    en: 'The model (about {size}\u00a0GB) is downloaded from huggingface.co and raw.githubusercontent.com on first use and kept in the browser.',
+    de: 'Das Modell (etwa {size}\u00a0GB) wird beim ersten Mal von Hugging Face (huggingface.co, hf.co) und raw.githubusercontent.com geladen und im Browser gespeichert.',
+    en: 'The model (about {size}\u00a0GB) is downloaded from Hugging Face (huggingface.co, hf.co) and raw.githubusercontent.com on first use and kept in the browser.',
   },
   // Short, so that it fits the list on a phone; the line under the list says what kind of service it has to be.
   'ai.endpoint': { de: 'Eigener Dienst', en: 'Your own service' },
@@ -140,6 +140,11 @@ export const STRINGS: Record<string, Entry> = {
   'f.currency': { de: 'Währung', en: 'Currency' },
   'f.typeCode': { de: 'Art des Dokuments', en: 'Document type' },
   'f.orderReference': { de: 'Bestellnummer des Kunden', en: 'Purchase order number' },
+  'f.deliveryCountry': { de: 'Land der Lieferung (z.\u00a0B. AT)', en: 'Country of delivery (e.g. AT)' },
+  'f.deliveryCountry.help': {
+    de: 'Nur nötig, wenn die Ware in ein anderes Land ging als das Ihres Kunden.',
+    en: 'Only needed if the goods went to another country than that of your customer.',
+  },
   'f.buyerReference': { de: 'Leitweg-ID oder Referenz des Kunden', en: 'Leitweg-ID or buyer reference' },
   'f.buyerReference.help': {
     de: 'Nennt Ihnen Ihr Kunde. Bei einer Behörde ist es die Leitweg-ID, z.\u00a0B. 12345678-0001-14',
@@ -224,8 +229,8 @@ export const STRINGS: Record<string, Entry> = {
   'sum.errors.one': { de: '1 Angabe fehlt oder ist fehlerhaft', en: '1 value is missing or wrong' },
   'sum.warnings.one': { de: '1 Hinweis', en: '1 thing to check' },
   'hint.suggested': {
-    de: 'Auf Ihrem PDF steht weder ein Fälligkeitsdatum noch Zahlungsbedingungen; die E-Rechnung braucht eines davon. Dies ist ein Vorschlag: Bitte prüfen oder ändern Sie ihn.',
-    en: 'Your PDF states neither a due date nor payment terms; the e-invoice needs one of them. This is a suggestion: please check or change it.',
+    de: 'Auf Ihrem PDF steht weder ein Fälligkeitsdatum noch Zahlungsbedingungen; die E-Rechnung braucht eines davon. Dies ist ein Vorschlag, der nicht auf Ihrem PDF steht: Bestätigen Sie ihn mit „Passt“ oder ändern Sie ihn.',
+    en: 'Your PDF states neither a due date nor payment terms; the e-invoice needs one of them. This is a suggestion that is not on your PDF: confirm it with “Correct” or change it.',
   },
   'hint.inferred': {
     de: 'Das PDF weist keine Umsatzsteuer aus; die Umsatzsteuer-Art ist aus dem Land des Kunden abgeleitet. Bitte prüfen.',
@@ -286,11 +291,27 @@ export const STRINGS: Record<string, Entry> = {
     de: 'Die im XML angegebene Summe passt nicht zu seinen Positionen. Bitten Sie den Rechnungssteller um eine korrigierte E-Rechnung.',
     en: 'The total stated in the XML does not match its lines. Ask the issuer for a corrected e-invoice.',
   },
+  'e.line-net': {
+    de: 'Menge mal Preis ergibt {a}, auf Ihrer Rechnung steht als Betrag dieser Position aber {b}. Beides muss bis auf Rundung übereinstimmen. Passen Sie Menge oder Preis an; bei einem Rabatt auf die Position tragen Sie den Preis nach Abzug des Rabatts ein.',
+    en: '',
+  },
+  'e.line-net.xml': {
+    de: 'Das XML nennt für diese Position {b}, Menge mal Preis ergibt aber {a}, und es nennt keinen Rabatt oder Zuschlag auf die Position, der das erklärt.',
+    en: 'The XML states {b} for this line item, but quantity times price is {a}, and it names no discount or surcharge on the line that explains the difference.',
+  },
   'e.totals-mismatch': {
     de: 'Die Summe im PDF weicht von der Summe der Positionen ab. Die E-Rechnung darf dem PDF nicht widersprechen: Bitte prüfen Sie Mengen und Preise.',
     en: '',
   },
   'e.address': { de: 'Dieser Teil der Anschrift fehlt. §\u00a014 UStG verlangt die vollständige Anschrift.', en: '' },
+  'e.delivery-country': {
+    de: 'Bei einer innergemeinschaftlichen Lieferung nennt das XML das Land, in das die Ware ging. Eingetragen wird das Land Ihres Kunden. Ging die Ware in ein anderes Land, tragen Sie es unter „Weitere Angaben“ als Land der Lieferung ein.',
+    en: '',
+  },
+  'e.delivery-country.xml': {
+    de: 'Das XML nennt nicht, in welches Land die Ware ging. Bei einer innergemeinschaftlichen Lieferung ist das Pflicht.',
+    en: 'The XML does not say which country the goods went to. An intra-community supply has to state it.',
+  },
   'e.delivery-date': {
     de: 'Das Leistungs- oder Lieferdatum (oder ein Leistungszeitraum) fehlt. Es ist Pflicht, auch wenn es dem Rechnungsdatum entspricht.',
     en: '',
@@ -319,12 +340,12 @@ export const STRINGS: Record<string, Entry> = {
     en: '',
   },
   'e.xrechnung-address': { de: 'Dieser Teil der Anschrift fehlt. Für eine XRechnung ist er Pflicht.', en: '' },
-  'e.xrechnung-line-net': {
-    de: 'Menge mal Preis ergibt {a}, auf Ihrer Rechnung steht als Betrag dieser Position aber {b}. Bei einer XRechnung muss beides bis auf Rundung übereinstimmen. Passen Sie Menge oder Preis an; einen Rabatt auf einzelne Positionen kann diese Seite noch nicht angeben.',
-    en: '',
-  },
   'e.xrechnung-payment-terms': {
     de: 'Beginnen die Zahlungsbedingungen mit #, liest die XRechnung sie als Skonto. Das muss genau so geschrieben sein: #SKONTO#TAGE=14#PROZENT=2.00# (Tage, dann Prozent mit zwei Nachkommastellen). Schreiben Sie es so, oder lassen Sie das # weg.',
+    en: '',
+  },
+  'e.xrechnung-delivery-address.deliveryCountry': {
+    de: 'Eine XRechnung nimmt einen Lieferort nur mit Postleitzahl und Ort an, und dafür gibt es hier noch kein Feld. Lassen Sie das Land der Lieferung leer.',
     en: '',
   },
   'e.xrechnung-delivery-address': {
@@ -340,6 +361,14 @@ export const STRINGS: Record<string, Entry> = {
   'e.pdf-fonts': {
     de: 'Im PDF sind nicht alle Schriften eingebettet. Das XML ist davon nicht betroffen, die Datei ist aber kein strenges PDF/A-3. Abhilfe: das PDF mit eingebetteten Schriften (oder als PDF/A) exportieren und die E-Rechnung daraus neu erstellen.',
     en: '',
+  },
+  'e.pdf-actions': {
+    de: 'Ihr PDF enthielt Skripte oder automatische Aktionen, die eine E-Rechnung (PDF/A) nicht enthalten darf. In der E-Rechnung sind sie weggelassen; das Aussehen der Seiten ändert sich dadurch nicht.',
+    en: '',
+  },
+  'e.pdf-actions.xml': {
+    de: 'Die Datei enthält Skripte oder automatische Aktionen. PDF/A verbietet sie: Die Datei ist kein strenges PDF/A-3, und Programme können sie ablehnen oder davor warnen.',
+    en: 'The file carries scripts or automatic actions. PDF/A forbids them: the file is not a strict PDF/A-3, and software may refuse it or warn about it.',
   },
   'e.generator': { de: 'Beim Schreiben des XML kam diese Meldung: {m}', en: '' },
   'e.not-written': { de: '„{v}“ ließ sich nicht in das XML schreiben. Bitte melden Sie das als Fehler auf GitHub.', en: '' },
@@ -384,14 +413,14 @@ export const STRINGS: Record<string, Entry> = {
     en: 'Depending on the provider, an AI service in the cloud, also outside the EU, or you type everything in.',
   },
   'cmp.2.us': {
-    de: 'Regeln auf Ihrem Gerät; auf Wunsch zusätzlich ein Sprachmodell, das ebenfalls in Ihrem Browser läuft.',
-    en: 'Rules on your device; on request also a language model that runs in your browser too.',
+    de: 'Regeln auf Ihrem Gerät; auf Wunsch zusätzlich ein Sprachmodell, das ebenfalls in Ihrem Browser läuft, oder ein Dienst, dessen Adresse Sie selbst eintragen.',
+    en: 'Rules on your device; on request also a language model that runs in your browser too, or a service whose address you enter yourself.',
   },
   'cmp.3': { de: 'Woher stammt jede Angabe?', en: 'Where does each value come from?' },
   'cmp.3.them': { de: 'Sie sehen ein Formular zum Korrigieren.', en: 'You get a form to correct.' },
   'cmp.3.us': {
-    de: 'Jede Angabe ist im PDF markiert, und das XML wird mit dem PDF abgeglichen.',
-    en: 'Each value is marked on the PDF, and the XML is compared with the PDF.',
+    de: 'Was aus dem PDF gelesen wurde, ist dort markiert. Nummern, Namen, Anschriften, Daten, Preise und Summen werden mit seinem Text abgeglichen: ob sie dort stehen, nicht an welcher Stelle.',
+    en: 'What was read from the PDF is marked on it. Numbers, names, addresses, dates, prices and totals are compared with its text: whether they are there, not where.',
   },
   'cmp.4': { de: 'Konto, Werbung, Tracking', en: 'Account, ads, tracking' },
   'cmp.4.them': { de: 'Je nach Anbieter Anmeldung, Werbung oder Abo.', en: 'Depending on the provider, sign-up, ads or a subscription.' },
@@ -447,8 +476,8 @@ export const STRINGS: Record<string, Entry> = {
     en: 'In an e-invoice the XML counts, not the picture. Check the data before you create the file.',
   },
   'limits.3': {
-    de: 'Ihre Rechnung verlässt den Browser nicht: nichts wird hochgeladen, keine Cookies, kein Tracking. Nur für „Mit KI auslesen“ lädt der Browser einmalig ein Modell von huggingface.co und raw.githubusercontent.com.',
-    en: 'Your invoice does not leave the browser: nothing is uploaded, no cookies, no tracking. Only for “Read with AI” does the browser download a model from huggingface.co and raw.githubusercontent.com, once.',
+    de: 'Ihre Rechnung verlässt den Browser nicht: nichts wird hochgeladen, keine Cookies, kein Tracking. Für „Mit KI auslesen“ lädt der Browser einmalig ein Modell von Hugging Face (huggingface.co, hf.co) und raw.githubusercontent.com; gelesen wird die Rechnung auf Ihrem Gerät. Die einzige Ausnahme bestimmen Sie selbst: Tragen Sie dort einen eigenen KI-Dienst ein, geht der Text der Rechnung an dessen Adresse.',
+    en: 'Your invoice does not leave the browser: nothing is uploaded, no cookies, no tracking. For “Read with AI” the browser downloads a model once, from Hugging Face (huggingface.co, hf.co) and raw.githubusercontent.com; the invoice is read on your device. The one exception is yours to make: if you enter an AI service of your own there, the text of the invoice goes to its address.',
   },
   'limits.4': { de: 'Diese Seite ist ein Werkzeug und keine Steuer- oder Rechtsberatung.', en: 'This page is a tool, not tax or legal advice.' },
   'limits.5': {

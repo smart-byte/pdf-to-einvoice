@@ -23,6 +23,12 @@ export interface CheckOptions {
   pdfText?: string;
   /** `xrechnung` adds what XRechnung 3.0 asks for beyond EN 16931: an error where it demands, a warning where it recommends. */
   rules?: 'xrechnung';
+  /**
+   * For data read from an existing e-invoice (`readInvoiceXml`): the lines, counted from 0, whose total its XML
+   * explains by a discount, a surcharge or a price for several units. A line total that is not quantity times price
+   * is then a warning, since the standard does not forbid it, and none at all for these lines.
+   */
+  adjustedLines?: number[];
 }
 
 type Bag = Record<string, any>;
@@ -49,6 +55,7 @@ function withDefaults(draft: InvoiceDraft): Bag {
   d.currency = upper(d.currency ?? 'EUR');
   d.iban = compact(d.iban);
   d.bic = compact(d.bic);
+  d.deliveryCountry = upper(d.deliveryCountry);
   for (const who of ['seller', 'buyer']) {
     d[who] = { ...d[who] };
     d[who].country = upper(d[who].country);
@@ -131,7 +138,8 @@ export function check(draft: InvoiceDraft, options: CheckOptions = {}): CheckRes
   }
 
   if (d.lines.length === 0) error('lines', 'required', 'The invoice needs at least one line.');
-  let calculable = d.lines.length > 0;
+  // An amount that is not a number was reported above; nothing can be calculated with it.
+  let calculable = d.lines.length > 0 && (d.prepaidAmount === undefined || isNumber(d.prepaidAmount));
   d.lines.forEach((line: Bag, i: number) => {
     const at = (field: string) => `lines.${i}.${field}`;
     if (line.name === undefined) error(at('name'), 'required', 'The line needs a description.');
@@ -163,6 +171,17 @@ export function check(draft: InvoiceDraft, options: CheckOptions = {}): CheckRes
   if ((categories.has('AE') || categories.has('K')) && d.buyer.vatId === undefined) {
     error('buyer.vatId', 'buyer-vat-id', 'Reverse charge and intra-community supplies need the VAT ID of the buyer.');
   }
+  if (d.deliveryCountry !== undefined && !/^[A-Z]{2}$/.test(d.deliveryCountry)) {
+    error('deliveryCountry', 'format', 'Use the two-letter country code, e.g. DE.');
+  }
+  // BR-IC-12 wants the country an intra-community supply went to. As an XRechnung it is refused anyway.
+  if (categories.has('K') && d.deliveryCountry === undefined && d.buyer.country !== undefined && options.rules !== 'xrechnung') {
+    warn(
+      'deliveryCountry',
+      'delivery-country',
+      `An intra-community supply names the country the goods went to. The country of the buyer (${d.buyer.country}) is written; state the country of delivery if they went elsewhere.`,
+    );
+  }
   if ((categories.has('K') || categories.has('G')) && d.seller.vatId === undefined && d.seller.taxNumber !== undefined) {
     error('seller.vatId', 'seller-tax-id', 'Intra-community supplies and exports need the VAT ID of the seller.');
   }
@@ -179,6 +198,28 @@ export function check(draft: InvoiceDraft, options: CheckOptions = {}): CheckRes
     if (totals.due > 0 && d.dueDate === undefined && d.paymentTerms === undefined) {
       error('dueDate', 'payment-terms', 'An invoice with an amount due needs a due date or payment terms.');
     }
+    // The data has no discount on a line that could explain a difference between its total and quantity times price.
+    // Two cents are allowed for rounding, half a forint where a currency has no cents (PEPPOL-EN16931-R120).
+    const slack = d.currency === 'HUF' ? 0.5 : 0.02;
+    d.lines.forEach((line: Bag, i: number) => {
+      if (!isNumber(line.netAmount)) return;
+      const apart = micro(line.quantity) * micro(line.unitPrice) - micro(totals.lineNet[i]!) * 10n ** 6n;
+      if ((apart < 0n ? -apart : apart) <= micro(slack) * 10n ** 6n) return;
+      const [product, stated] = [(line.quantity * line.unitPrice).toFixed(2), totals.lineNet[i]!.toFixed(2)];
+      if (!options.adjustedLines) {
+        error(
+          `lines.${i}.netAmount`,
+          'line-net',
+          `Quantity times unit price is ${product}, but the line states ${stated}. Correct the quantity or the price; if the line carries a discount, enter the unit price after the discount.`,
+        );
+      } else if (!options.adjustedLines.includes(i)) {
+        warn(
+          `lines.${i}.netAmount`,
+          'line-net',
+          `The XML states ${stated} as the total of this line, but its quantity times its price is ${product}, and it names no discount or surcharge on the line that explains the difference.`,
+        );
+      }
+    });
     for (const key of ['net', 'vat', 'gross', 'due'] as const) {
       const printed = d.totals?.[key];
       if (printed === undefined) continue;
@@ -193,7 +234,7 @@ export function check(draft: InvoiceDraft, options: CheckOptions = {}): CheckRes
     }
   }
 
-  if (options.rules === 'xrechnung') findings.push(...xrechnungFindings(d, totals));
+  if (options.rules === 'xrechnung') findings.push(...xrechnungFindings(d));
   if (options.pdfText !== undefined) findings.push(...compareWithPdf(d, totals, options.pdfText));
 
   const ok = !findings.some((f) => f.severity === 'error');
@@ -209,7 +250,7 @@ const SKONTO = /^#SKONTO#TAGE=\d+#PROZENT=\d+\.\d{2}(#BASISBETRAG=-?\d+\.\d{2})?
  * for it: an error where the rule says "must" and the validator rejects the file, a warning where it says "should".
  * What the rules ask of the XML alone (payment instructions, a VAT rate in every breakdown) is the job of `toUbl`.
  */
-function xrechnungFindings(d: Bag, totals: Totals | undefined): Finding[] {
+function xrechnungFindings(d: Bag): Finding[] {
   const findings: Finding[] = [];
   const add = (severity: Finding['severity'], path: string, code: string, message: string) =>
     findings.push({ path, severity, code: `xrechnung-${code}`, message });
@@ -245,21 +286,6 @@ function xrechnungFindings(d: Bag, totals: Totals | undefined): Finding[] {
     need(`${who}.postalCode`, 'address', `XRechnung needs the postal code of the ${who}.`);
   }
 
-  // PEPPOL-EN16931-R120. The validator applies it to UBL only; the specification states it for both syntaxes.
-  const slack = d.currency === 'HUF' ? 0.5 : 0.02;
-  d.lines.forEach((line: Bag, i: number) => {
-    if (!totals || !isNumber(line.netAmount)) return;
-    const apart = micro(line.quantity) * micro(line.unitPrice) - micro(totals.lineNet[i]!) * 10n ** 6n;
-    if ((apart < 0n ? -apart : apart) > micro(slack) * 10n ** 6n) {
-      add(
-        'error',
-        `lines.${i}.netAmount`,
-        'line-net',
-        `XRechnung wants the total of a line to be quantity times unit price, here ${(line.quantity * line.unitPrice).toFixed(2)}, at most ${slack.toFixed(2)} apart. This line states ${totals.lineNet[i]!.toFixed(2)}. Correct the quantity, the price or the total; a discount on a line cannot be stated yet.`,
-      );
-    }
-  });
-
   // BR-DE-18. The validator also wants a line break right after the last "#...#" of the text; `toUbl` ends the text with one.
   if (typeof d.paymentTerms === 'string') {
     const marked = d.paymentTerms.split(/\r?\n/).filter((line: string) => line.trim().startsWith('#'));
@@ -271,6 +297,17 @@ function xrechnungFindings(d: Bag, totals: Totals | undefined): Finding[] {
         'XRechnung reads a line of the payment terms that starts with # as a cash discount, which has to be written exactly like #SKONTO#TAGE=14#PROZENT=2.00# on a line of its own (days, then percent with two decimals). Write the line that way, or do not start it with #.',
       );
     }
+  }
+
+  // A place of delivery needs its city and postal code in an XRechnung (BR-DE-10, BR-DE-11), which the data cannot hold.
+  // A country alone would be left out of the XML without a word, so it is refused.
+  if (d.deliveryCountry !== undefined) {
+    add(
+      'error',
+      'deliveryCountry',
+      'delivery-address',
+      'XRechnung takes a place of delivery with its city and postal code only, which this tool cannot state yet. Leave the country of delivery empty.',
+    );
   }
 
   // BR-IC-12 asks for the country of delivery of an intra-community supply, and BR-DE-10 and BR-DE-11 then for its city and postal code.
@@ -358,7 +395,10 @@ export function amountSpellings(n: number): string[] {
   return frac === '00' ? [...spellings, int, grouped('.'), grouped(',')] : spellings;
 }
 
-/** Reports values that the text of the PDF does not contain. */
+/**
+ * Reports values that the text of the PDF does not contain. Known limit: it tells whether a value stands in the text,
+ * not where. An address entered for the wrong party passes, because each of its words stands somewhere on the page.
+ */
 function compareWithPdf(d: Bag, totals: Totals | undefined, pdfText: string): Finding[] {
   const haystack = pdfText.replace(/\s+/g, '').toLowerCase();
   if (!haystack) {
@@ -387,8 +427,9 @@ function compareWithPdf(d: Bag, totals: Totals | undefined, pdfText: string): Fi
   const expectWords = (path: string, value: unknown) => {
     if (typeof value === 'string' && !value.split(/\s+/).every((word) => haystack.includes(word.toLowerCase()))) expect(path, [value], value);
   };
-  expectWords('seller.name', get('seller.name'));
-  expectWords('buyer.name', get('buyer.name'));
+  for (const who of ['seller', 'buyer']) {
+    for (const part of ['name', 'street', 'postalCode', 'city']) expectWords(`${who}.${part}`, get(`${who}.${part}`));
+  }
   for (const path of ['issueDate', 'dueDate', 'deliveryDate']) {
     const value = get(path);
     if (isDate(value)) expect(path, dateSpellings(value), value);

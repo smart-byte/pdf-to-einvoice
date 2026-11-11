@@ -71,13 +71,19 @@ function line(item: Node) {
   };
 }
 
+/** Whether a line states what the invoice model cannot hold and what changes its total: a discount, a surcharge, or a price for several units. */
+const adjusted = (item: Node) =>
+  all(at(item, 'SpecifiedLineTradeSettlement'), 'SpecifiedTradeAllowanceCharge').length > 0 ||
+  ![undefined, 1].includes(number(item, 'SpecifiedLineTradeAgreement', 'NetPriceProductTradePrice', 'BasisQuantity'));
+
 /**
  * Reads a UN/CEFACT Cross Industry Invoice (the XML inside a ZUGFeRD 2 / Factur-X PDF) into the invoice model: the
  * inverse of what `createEInvoice` writes. `profile` is the specification identifier (BT-24). `totals` holds the
- * totals the XML states, so `check` reports them when they contradict the lines. Throws if the XML is not
- * well-formed or not a Cross Industry Invoice.
+ * totals the XML states, so `check` reports them when they contradict the lines. `adjustedLines` counts from 0 the
+ * lines whose total the XML explains by a discount, a surcharge or a price for several units, which the model does
+ * not hold. Throws if the XML is not well-formed or not a Cross Industry Invoice.
  */
-export function readInvoiceXml(xml: string): { profile?: string; invoice: InvoiceDraft } {
+export function readInvoiceXml(xml: string): { profile?: string; invoice: InvoiceDraft; adjustedLines: number[] } {
   let root: Node;
   try {
     root = parser.parse(xml, true).CrossIndustryInvoice;
@@ -102,11 +108,13 @@ export function readInvoiceXml(xml: string): { profile?: string; invoice: Invoic
   // The VAT total may be given a second time in the accounting currency (BT-111); the one in the invoice currency counts.
   const vatTotals = all(sums, 'TaxTotalAmount');
   const notes = all(document, 'IncludedNote').map((note) => text(note, 'Content'));
+  const items = all(transaction, 'IncludedSupplyChainTradeLineItem');
 
   // Known limit: document-level allowances and charges (BG-20, BG-21) are not in the model, so an invoice that has them
   // shows up in `check` as totals-mismatch. Add them to the model and to `calculate` when such invoices matter.
   return {
     profile: text(root, 'ExchangedDocumentContext', 'GuidelineSpecifiedDocumentContextParameter', 'ID'),
+    adjustedLines: items.flatMap((item, i) => (adjusted(item) ? [i] : [])),
     invoice: {
       number: text(document, 'ID'),
       issueDate: date(document, 'IssueDateTime'),
@@ -114,6 +122,7 @@ export function readInvoiceXml(xml: string): { profile?: string; invoice: Invoic
       currency,
       dueDate: date(terms, 'DueDateDateTime'),
       deliveryDate: date(transaction, 'ApplicableHeaderTradeDelivery', 'ActualDeliverySupplyChainEvent', 'OccurrenceDateTime'),
+      deliveryCountry: text(transaction, 'ApplicableHeaderTradeDelivery', 'ShipToTradeParty', 'PostalTradeAddress', 'CountryID'),
       periodStart: date(settlement, 'BillingSpecifiedPeriod', 'StartDateTime'),
       periodEnd: date(settlement, 'BillingSpecifiedPeriod', 'EndDateTime'),
       buyerReference: text(agreement, 'BuyerReference'),
@@ -131,7 +140,7 @@ export function readInvoiceXml(xml: string): { profile?: string; invoice: Invoic
       prepaidAmount: number(sums, 'TotalPrepaidAmount'),
       seller: party(at(agreement, 'SellerTradeParty')),
       buyer: party(at(agreement, 'BuyerTradeParty')),
-      lines: all(transaction, 'IncludedSupplyChainTradeLineItem').map(line),
+      lines: items.map(line),
       totals: {
         net: number(sums, 'TaxBasisTotalAmount'),
         vat: number(vatTotals.find((total) => attribute(total, 'currencyID') === currency) ?? vatTotals[0]),

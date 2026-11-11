@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { existsSync, readFileSync, realpathSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -79,10 +79,12 @@ export async function describePdf(pdfPath: string) {
 /** Where the e-invoice goes when no output is named: invoice.pdf becomes invoice.einvoice.pdf. */
 export const defaultOutput = (pdfPath: string) => pdfPath.replace(/(\.pdf)?$/i, '.einvoice.pdf');
 
-/** True if both paths name one file, also through a symlink or different letter case. */
+/** True if both paths name one file, also through a symlink, a hard link or different letter case. */
 function sameFile(a: string, b: string): boolean {
   if (resolve(a) === resolve(b)) return true;
-  return existsSync(a) && existsSync(b) && realpathSync.native(a) === realpathSync.native(b);
+  if (!existsSync(a) || !existsSync(b)) return false;
+  const [one, other] = [statSync(a, { bigint: true }), statSync(b, { bigint: true })];
+  return one.dev === other.dev && one.ino === other.ino;
 }
 
 /**
@@ -102,15 +104,9 @@ export async function createFile(
   if (sameFile(output, pdfPath)) throw new Error('The output path is the input PDF. Choose another output path; the input is never overwritten.');
   if (!overwrite && existsSync(output)) throw Object.assign(new Error(`${output} already exists.`), { code: 'EEXIST' });
 
-  const pdf = await readPdf(pdfPath);
-  const result = await createEInvoice({ pdf, invoice, profile });
+  const result = await createEInvoice({ pdf: await readPdf(pdfPath), invoice, profile });
   await writeFile(output, result.pdf, { flag: overwrite ? 'w' : 'wx' });
-
-  // A PDF whose text cannot be read is reported as one, not as a failure: the file is written.
-  const pdfText = await extractText(pdf).catch(() => '');
-  const seen = new Set(result.findings.map((f) => `${f.path}|${f.code}`));
-  const compared = check(invoice, { pdfText }).findings.filter((f) => !seen.has(`${f.path}|${f.code}`));
-  return { outputPath: output, findings: [...result.findings, ...compared], totals: result.totals };
+  return { outputPath: output, findings: result.findings, totals: result.totals };
 }
 
 /**
@@ -136,7 +132,7 @@ export async function createXRechnungFile(
  */
 export async function validateFile(pdfPath: string): Promise<Omit<ValidationResult, 'xml'>> {
   const pdf = await readPdf(pdfPath);
-  // As in createFile: a PDF whose text cannot be read is reported as one, not as a failure.
+  // As in createEInvoice: a PDF whose text cannot be read is reported as one, not as a failure.
   const pdfText = await extractText(pdf).catch(() => '');
   const { xml: _xml, ...result } = await validateEInvoice(pdf, { pdfText });
   return result;

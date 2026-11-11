@@ -1,4 +1,4 @@
-import { copyFileSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, linkSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -60,6 +60,17 @@ describe('create', () => {
     writeFileSync(out, 'replace me');
     expect((await cli('create', SAMPLE_PDF, SAMPLE_JSON, '-o', out, '--force')).code).toBe(0);
     expect(await embeddedXml(out)).toContain('RE-2026-0042');
+  });
+
+  it('never writes over the input PDF through a hard link to it, even with --force', async () => {
+    const dir = tmp();
+    const input = join(dir, 'invoice.pdf');
+    const link = join(dir, 'other-name.pdf');
+    copyFileSync(SAMPLE_PDF, input);
+    linkSync(input, link);
+    const result = await cli('create', input, SAMPLE_JSON, '-o', link, '--force');
+    expect(result.code).toBe(1);
+    expect(readFileSync(input).equals(readFileSync(SAMPLE_PDF))).toBe(true);
   });
 
   it('never writes over the input PDF, even with --force', async () => {

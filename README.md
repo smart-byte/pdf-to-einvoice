@@ -15,8 +15,8 @@ in their format. This one starts from the PDF you already produce with Word, you
 
 - **Your layout stays.** The pages are not redrawn. The data is attached as `factur-x.xml` and the file becomes a
   PDF/A-3.
-- **It tells you what is missing.** Required fields, sums that do not add up, and values that do not appear on
-  your PDF are listed before anything is created.
+- **It tells you what is missing.** Required fields, sums that do not add up, and numbers, names, addresses, dates
+  and amounts that do not appear on your PDF are listed before anything is created.
 - **Nothing is uploaded.** The web app works in your browser; the library and the command line tool run on your
   machine.
 - **The common kinds of invoice.** Domestic with VAT, several rates, small businesses, reverse charge, intra-community
@@ -32,22 +32,23 @@ in their format. This one starts from the PDF you already produce with Word, you
 data that was read from it, download the e-invoice. The page is in English and German.
 
 Reading works by pattern matching, without any AI. On request a small language model fills in what the patterns did
-not find. It runs in your browser (WebGPU) and is downloaded once from huggingface.co and raw.githubusercontent.com;
-if you point the page at a model service of your own, the invoice text goes to that service.
+not find. It runs in your browser (WebGPU) and is downloaded once from Hugging Face (huggingface.co, hf.co) and
+raw.githubusercontent.com; if you point the page at a model service of your own, the invoice text goes to that
+service.
 
 ### Compared with online converters
 
 Many services convert PDF invoices too. The main difference is where your invoice is processed.
 
-|                                         | typical online converter                                                                               | pdf-to-einvoice                                                                       |
-| --------------------------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
-| Where is your invoice processed?        | On the provider's servers: the file is uploaded.                                                       | On your device, in the browser. Nothing is uploaded.                                  |
-| Who reads the data?                     | Depending on the provider, an AI service in the cloud, also outside the EU, or you type everything in. | Rules on your device; on request also a language model that runs in your browser too. |
-| Where does each value come from?        | You get a form to correct.                                                                             | Each value is marked on the PDF, and the XML is compared with the PDF.                |
-| Account, ads, tracking                  | Depending on the provider, sign-up, ads or a subscription.                                             | No sign-up, no ads, no cookies.                                                       |
-| Source code                             | Mostly closed.                                                                                         | Open (MIT licence): anyone can check what the page does.                              |
-| For software and AI assistants          | Mostly an API that invoices are sent to.                                                               | Library, command line tool and MCP server, all on your own machine.                   |
-| Checking against the official rule sets | Some offer their own validator.                                                                        | Its own plausibility check; not a complete check against the official rule sets.      |
+|                                         | typical online converter                                                                               | pdf-to-einvoice                                                                                                                                                |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Where is your invoice processed?        | On the provider's servers: the file is uploaded.                                                       | On your device, in the browser. Nothing is uploaded.                                                                                                           |
+| Who reads the data?                     | Depending on the provider, an AI service in the cloud, also outside the EU, or you type everything in. | Rules on your device; on request also a language model that runs in your browser too, or a service whose address you enter yourself.                           |
+| Where does each value come from?        | You get a form to correct.                                                                             | What was read from the PDF is marked on it. Numbers, names, addresses, dates, prices and totals are compared with its text: whether they are there, not where. |
+| Account, ads, tracking                  | Depending on the provider, sign-up, ads or a subscription.                                             | No sign-up, no ads, no cookies.                                                                                                                                |
+| Source code                             | Mostly closed.                                                                                         | Open (MIT licence): anyone can check what the page does.                                                                                                       |
+| For software and AI assistants          | Mostly an API that invoices are sent to.                                                               | Library, command line tool and MCP server, all on your own machine.                                                                                            |
+| Checking against the official rule sets | Some offer their own validator.                                                                        | Its own plausibility check; not a complete check against the official rule sets.                                                                               |
 
 ## As a library
 
@@ -119,6 +120,9 @@ data on instead of reading it back from the PDF. Reading is a first draft for a 
 unattended over a batch.
 
 ```ts
+import { readFile, writeFile } from 'node:fs/promises';
+import { createEInvoice, InvoiceError } from 'pdf-to-einvoice';
+
 for (const { pdfPath, invoice } of invoicesToConvert) {
   try {
     const { pdf } = await createEInvoice({ pdf: await readFile(pdfPath), invoice });
@@ -181,8 +185,9 @@ owed. Defaults: `typeCode` 380 (invoice), `currency` EUR, `unit` C62 (piece), `v
 
 Every category except `S` and `Z` needs `vatExemptionReason`: the sentence on your invoice that says why no VAT is
 charged. `totals` are the sums printed on the PDF; if they contradict the calculation, that is an error, because the
-XML must not contradict the page. The full list of fields is in [`src/model.ts`](src/model.ts) and in
-`npx pdf-to-einvoice schema`.
+XML must not contradict the page. A line's `netAmount` may differ from quantity x unit price by rounding only (0.02);
+with a discount on a line, give the unit price after the discount. The full list of fields is in
+[`src/model.ts`](src/model.ts) and in `npx pdf-to-einvoice schema`.
 
 ## XRechnung
 
@@ -201,13 +206,12 @@ missing, under codes that start with `xrechnung-`, and both ways of creating run
 - a contact at the seller: `seller.contactName`, `seller.phone`, `seller.email`
 - `buyer.email`, which is written as the buyer's electronic address
 - `city` and `postalCode` of seller and buyer
-- a line's `netAmount` at most 0.02 away from quantity x unit price
 - a line of `paymentTerms` that starts with `#` in the form of a cash discount: `#SKONTO#TAGE=14#PROZENT=2.00#`
 
 The XML declares XRechnung 3.0. What it cannot do yet:
 
-- An intra-community supply (`K`) is refused: XRechnung wants its place of delivery, and the data has no delivery
-  address.
+- An intra-community supply (`K`) and a `deliveryCountry` are refused: XRechnung wants a place of delivery with city
+  and postal code, and the data has no delivery address.
 - The electronic address of seller and buyer is always an e-mail address, not a Leitweg-ID or a Peppol ID.
 - The extension of XRechnung (sub-lines, payments by a third party) is not written.
 - The file is not sent anywhere. How a public body takes invoices in (portal, e-mail, Peppol) is for it to say.
@@ -216,22 +220,27 @@ The XML declares XRechnung 3.0. What it cannot do yet:
 ## What changes in your PDF
 
 Only what the standard asks for: the XML attachment, XMP metadata that declares PDF/A-3 and Factur-X, an sRGB
-output intent and a document ID. Images that ask viewers to smooth them (`/Interpolate true`) have that flag switched
-off, because PDF/A forbids it. The page content is not touched.
+output intent and a document ID. Two things PDF/A forbids are taken out: the flag of images that ask viewers to smooth
+them (`/Interpolate true`), and scripts and actions the file would run (JavaScript, starting a program and the like),
+which you are told about. The page content is not touched.
 
-One defect is detected and reported: fonts that are not embedded. The XML is not affected, but the file is not a
-strict PDF/A-3; export the PDF with embedded fonts (or as PDF/A) and run it again. Other things PDF/A forbids in
-your original are neither found nor repaired. If the software of a recipient rejects the file, check it with a PDF/A
-validator.
+One defect is detected and reported, but not repaired: fonts that are not embedded. The XML is not affected, but the
+file is not a strict PDF/A-3; export the PDF with embedded fonts (or as PDF/A) and run it again. Other things PDF/A
+forbids in your original are neither found nor repaired. If the software of a recipient rejects the file, check it
+with a PDF/A validator.
 
 ## Limits
 
 - **Only the issuer can turn an invoice into an e-invoice.** Converting a PDF you _received_ does not make it one.
 - **Check every value.** Reading is a first draft: it knows some layouts well and others less, leaves empty what it
-  cannot place, and can be wrong. A scanned PDF has no text to read at all. The XML is the part that counts legally,
-  and the tool cannot know what you meant.
+  cannot place, and can be wrong. A scanned PDF has no text to read at all. The comparison with the PDF tells whether
+  a value stands in its text, not where: an address entered for the wrong party passes. The XML is the part that
+  counts legally, and the tool cannot know what you meant.
 - **Not modelled yet:** discounts and charges on the whole invoice (use a line with a negative quantity), VAT in a
   second currency, several payment accounts, attachments, the profiles BASIC and EXTENDED.
+- **Nothing is assumed about the delivery.** Without a delivery date and a `deliveryCountry` the delivery part of the
+  XML is empty, as in official samples of the standard; a validator may remark on the empty element. Only an
+  intra-community supply names the buyer's country there, and the check asks about it.
 - **`validateEInvoice` is a plausibility check,** not a replacement for a full validator.
 - **No encryption or password protection:** PDF/A forbids it.
 - **Country rules:** in Germany a hybrid PDF is one accepted form of e-invoice. Italy, Poland, Belgium and France

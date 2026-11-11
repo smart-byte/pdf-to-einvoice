@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { PDFArray, PDFBool, PDFDict, PDFDocument, PDFName, PDFRawStream, StandardFonts, decodePDFRawStream } from '@cantoo/pdf-lib';
+import { PDFArray, PDFBool, PDFDict, PDFDocument, PDFName, PDFRawStream, PDFString, StandardFonts, decodePDFRawStream } from '@cantoo/pdf-lib';
 import { describe, expect, it } from 'vitest';
 import { createEInvoice, createXRechnung, InvoiceError } from '../src/create.js';
 import { readEmbeddedXml } from '../src/pdf.js';
@@ -35,6 +35,17 @@ const failure = (promise: Promise<unknown>) =>
   );
 
 describe('createEInvoice', () => {
+  it('compares the data with the text of the PDF it is given', async () => {
+    const { findings } = await createEInvoice({ pdf: samplePdf(), invoice: sample((d) => (d.buyer.city = 'Anderswo')) });
+    expect(findings).toMatchObject([{ path: 'buyer.city', severity: 'warning', code: 'not-in-pdf' }]);
+    expect((await createEInvoice({ pdf: samplePdf(), invoice: sample() })).findings).toEqual([]);
+  });
+
+  it('takes the text of the PDF from a caller who has read it already', async () => {
+    const { findings } = await createEInvoice({ pdf: samplePdf(), invoice: sample(), pdfText: '' });
+    expect(findings.map((f) => f.code)).toEqual(['no-pdf-text']);
+  });
+
   it('embeds the invoice data as XML into the PDF', async () => {
     const result = await createEInvoice({ pdf: samplePdf(), invoice: sample() });
     expect(result.xml).toContain('<ram:ID>RE-2026-0042</ram:ID>');
@@ -105,8 +116,10 @@ describe('createEInvoice', () => {
 
   it('warns when the PDF uses fonts it does not embed', async () => {
     const result = await createEInvoice({ pdf: await pdfWithoutEmbeddedFont(), invoice: sample() });
-    expect(result.findings).toMatchObject([{ severity: 'warning', code: 'pdf-fonts' }]);
-    expect(result.findings[0]!.message).toContain('Helvetica');
+    // The page says nothing but "Invoice": what the comparison with it reports is not the point here.
+    const aboutTheFile = result.findings.filter((finding) => finding.code !== 'not-in-pdf');
+    expect(aboutTheFile).toMatchObject([{ severity: 'warning', code: 'pdf-fonts' }]);
+    expect(aboutTheFile[0]!.message).toContain('Helvetica');
   });
 
   it('refuses a file that is not a PDF', async () => {
@@ -149,6 +162,16 @@ describe('createEInvoice for sales without VAT', () => {
     expect(xml).toContain('<ram:ID>DE123456789</ram:ID>');
   });
 
+  it('names the country the goods went to where the data states it', async () => {
+    const invoice = withoutVat('K', (d) => {
+      Object.assign(d.buyer, { country: 'AT', vatId: 'ATU12345678' });
+      d.deliveryCountry = 'IT';
+    });
+    const { xml, findings } = await createEInvoice({ pdf: samplePdf(), invoice });
+    expect(xml).toMatch(/<ram:ShipToTradeParty>[\s\S]*<ram:CountryID>IT<\/ram:CountryID>[\s\S]*<\/ram:ShipToTradeParty>/);
+    expect(findings.filter((finding) => finding.code === 'delivery-country')).toEqual([]);
+  });
+
   it('names the buyer country as the place of delivery of an intra-community supply', async () => {
     const invoice = withoutVat('K', (d) => Object.assign(d.buyer, { country: 'AT', vatId: 'ATU12345678' }));
     const { xml } = await createEInvoice({ pdf: samplePdf(), invoice });
@@ -169,6 +192,48 @@ describe('createEInvoice repairs what PDF/A forbids', () => {
       .filter(Boolean);
   };
 
+  /** The sample with a script at every place a PDF can hold one, and a link that is allowed. */
+  const withScripts = async () => {
+    const doc = await PDFDocument.load(samplePdf(), { updateMetadata: false });
+    const script = doc.context.register(doc.context.obj({ Type: 'Action', S: 'JavaScript', JS: PDFString.of("app.alert('x')") }));
+    doc.catalog.set(PDFName.of('OpenAction'), script);
+    doc.catalog.set(PDFName.of('AA'), doc.context.obj({ WC: script }));
+    doc.catalog.set(PDFName.of('Names'), doc.context.obj({ JavaScript: { Names: [PDFString.of('start'), script] } }));
+    const page = doc.getPage(0).node;
+    page.set(PDFName.of('AA'), doc.context.obj({ O: { S: 'Launch', F: PDFString.of('calc.exe') } }));
+    const link = (action: PDFDict) => doc.context.register(doc.context.obj({ Type: 'Annot', Subtype: 'Link', Rect: [0, 0, 10, 10], F: 4, A: action }));
+    const allowed = doc.context.obj({ S: 'URI', URI: PDFString.of('https://example.com') });
+    const forbidden = doc.context.obj({ S: 'JavaScript', JS: PDFString.of('1') });
+    page.set(PDFName.of('Annots'), doc.context.obj([link(allowed), link(forbidden)]));
+    return doc.save();
+  };
+  /** The type of every action left anywhere in the file, and every key that holds additional actions or scripts. */
+  const actionsIn = async (pdf: Uint8Array) => {
+    const doc = await PDFDocument.load(pdf, { updateMetadata: false });
+    const found: string[] = [];
+    const visit = (object: unknown): void => {
+      const dict = object instanceof PDFRawStream ? object.dict : object;
+      if (dict instanceof PDFArray) return dict.asArray().forEach(visit);
+      if (!(dict instanceof PDFDict)) return;
+      for (const [key, value] of dict.entries()) {
+        if (['/AA', '/OpenAction', '/JavaScript', '/JS'].includes(key.toString())) found.push(key.toString());
+        if (key.toString() === '/S' && dict.has(PDFName.of('URI'))) found.push('URI action');
+        visit(value);
+      }
+    };
+    for (const [, object] of doc.context.enumerateIndirectObjects()) visit(object);
+    return found.sort();
+  };
+
+  it('removes scripts and actions that PDF/A forbids, keeps links, and says so', async () => {
+    const pdf = await withScripts();
+    expect(await actionsIn(pdf)).toEqual(['/AA', '/AA', '/JS', '/JS', '/JavaScript', '/OpenAction', 'URI action']);
+    const result = await createEInvoice({ pdf, invoice: sample() });
+    expect(await actionsIn(result.pdf)).toEqual(['URI action']);
+    expect(result.findings).toMatchObject([{ path: '', severity: 'warning', code: 'pdf-actions' }]);
+    expect(result.findings[0]!.message).toContain('JavaScript, Launch');
+  });
+
   it('switches off image interpolation', async () => {
     const doc = await PDFDocument.create();
     const image = await doc.embedPng(PNG);
@@ -183,19 +248,19 @@ describe('createEInvoice repairs what PDF/A forbids', () => {
   });
 });
 
-describe('createEInvoice without a delivery date', () => {
+describe('createEInvoice states no place of supply that nobody named', () => {
   const shipToCountry = (xml: string) => /<ram:ShipToTradeParty>[\s\S]*?<ram:CountryID>(\w+)<\/ram:CountryID>/.exec(xml)?.[1];
   const withPeriod = (d: any) => {
     delete d.deliveryDate;
     Object.assign(d, { periodStart: '2026-10-01', periodEnd: '2026-10-31' });
   };
 
-  it('names the seller country as place of supply when VAT is charged', async () => {
+  it('none without a delivery date, where VAT is charged at home', async () => {
     const { xml } = await createEInvoice({ pdf: samplePdf(), invoice: sample(withPeriod) });
-    expect(shipToCountry(xml)).toBe('DE');
+    expect(shipToCountry(xml)).toBeUndefined();
   });
 
-  it('names the buyer country as place of supply when the VAT is owed abroad', async () => {
+  it('none without a delivery date, where the VAT is owed abroad', async () => {
     const invoice = sample((d) => {
       withPeriod(d);
       for (const line of d.lines) Object.assign(line, { vatCategory: 'AE', vatRate: 0 });
@@ -204,12 +269,12 @@ describe('createEInvoice without a delivery date', () => {
       delete d.totals;
     });
     const { xml } = await createEInvoice({ pdf: samplePdf(), invoice });
-    expect(shipToCountry(xml)).toBe('AT');
+    expect(shipToCountry(xml)).toBeUndefined();
   });
 
-  it('adds no place of supply when the delivery date is given', async () => {
-    const { xml } = await createEInvoice({ pdf: samplePdf(), invoice: sample() });
-    expect(shipToCountry(xml)).toBeUndefined();
+  it('the one the data states', async () => {
+    const { xml } = await createEInvoice({ pdf: samplePdf(), invoice: sample((d) => (d.deliveryCountry = 'FR')) });
+    expect(shipToCountry(xml)).toBe('FR');
   });
 });
 

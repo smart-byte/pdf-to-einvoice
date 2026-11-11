@@ -45,6 +45,8 @@ interface State {
    * until the user changes the value or says it is right.
    */
   toCheck: Map<string, 'suggested' | 'inferred' | 'model'>;
+  /** Of an existing e-invoice: the lines whose total its XML explains by a discount, a surcharge or a price for several units. */
+  adjustedLines?: number[];
 }
 type Format = 'pdf' | 'xrechnung';
 const state: State = { fileName: '', pdfText: '', draft: {}, touched: new Set(), fileFindings: [], mode: 'create', format: 'pdf', toCheck: new Map() };
@@ -180,6 +182,7 @@ const SECTIONS: { title: string; fields: Field[]; collapsed?: boolean }[] = [
       { path: 'precedingInvoiceDate', label: 'f.precedingInvoiceDate', type: 'date' },
       { path: 'orderReference', label: 'f.orderReference' },
       { ...BUYER_REFERENCE, only: 'pdf' },
+      { path: 'deliveryCountry', label: 'f.deliveryCountry', help: 'f.deliveryCountry.help' },
       { path: 'prepaidAmount', label: 'f.prepaidAmount', type: 'number' },
       { path: 'note', label: 'f.note', type: 'textarea', wide: true },
     ],
@@ -355,13 +358,15 @@ function validate(): void {
   const result = (state.result = check(state.draft, {
     ...(state.pdf ? { pdfText: state.pdfText } : {}),
     ...(shownFormat() === 'xrechnung' ? { rules: 'xrechnung' as const } : {}),
+    ...(state.mode === 'validate' ? { adjustedLines: state.adjustedLines ?? [] } : {}),
   }));
   // What nobody has looked at yet is said at its field. A model may have read a value the form has no field for: that one is not counted.
+  // A suggestion is not on the PDF at all: it stands in the way of creating until it is confirmed or changed.
   const unchecked: Finding[] = [...state.toCheck]
     .filter(([path]) => document.querySelector(`[data-hint="${path}"]`))
     .map(([path, why]) => ({
       path,
-      severity: 'warning',
+      severity: why === 'suggested' ? 'error' : 'warning',
       code: why,
       message: t(why === 'model' && /^lines\.\d+$/.test(path) ? 'hint.model.line' : `hint.${why}`),
     }));
@@ -643,7 +648,7 @@ function renderPager(): void {
 
 /**
  * Draws one page of the open PDF, counted from 0, and shows its marks. A page is drawn when it is turned to and kept
- * nowhere: a long PDF costs no more memory than a short one.
+ * nowhere: only one drawn page is in memory at a time, however long the PDF is.
  */
 async function showPage(index: number): Promise<void> {
   const pdf = opened;
@@ -691,7 +696,7 @@ function show(view: 'start' | 'work' | 'done'): void {
 /** Payment terms suggested when the PDF states neither a due date nor terms, in the language of the invoice. */
 const USUAL_PAYMENT_TERMS = { de: 'Zahlbar innerhalb von 14 Tagen ab Rechnungsdatum.', en: 'Payable within 14 days of the invoice date.' };
 
-/** EN 16931 wants a due date or payment terms. Where the PDF has neither, the usual terms are put in as a visible suggestion. */
+/** EN 16931 wants a due date or payment terms. Where the PDF has neither, the usual terms are put in as a suggestion the user has to confirm. */
 function suggestPaymentTerms(): void {
   if (!isEmpty(state.draft.dueDate) || !isEmpty(state.draft.paymentTerms)) return;
   state.draft.paymentTerms = USUAL_PAYMENT_TERMS[languageOf(state.pdfText)];
@@ -699,7 +704,7 @@ function suggestPaymentTerms(): void {
 }
 
 /** Findings that are about the file, not about a field of the form. */
-const FILE_CODES = new Set(['no-xml', 'xml-syntax', 'profile', 'pdf-a', 'pdf-fonts']);
+const FILE_CODES = new Set(['no-xml', 'xml-syntax', 'profile', 'pdf-a', 'pdf-fonts', 'pdf-actions']);
 
 function setText(selector: string, key: string): void {
   const node = $(selector);
@@ -730,6 +735,7 @@ async function open(pdf: Uint8Array, fileName: string): Promise<void> {
       const { validateEInvoice } = await import('../src/validate.js');
       const result = await validateEInvoice(pdf, { pdfText: text });
       state.draft = result.invoice ?? {};
+      state.adjustedLines = result.adjustedLines ?? [];
       state.fileFindings = result.findings.filter((finding) => FILE_CODES.has(finding.code));
       $('#read-status').textContent = result.profile ? t('valid.profile', { p: result.profile }) : '';
     } else {
@@ -964,6 +970,17 @@ const link = (id: string, bytes: BlobPart, type: string, name: string) => {
   Object.assign($<HTMLAnchorElement>(id), { href: url, download: name });
 };
 
+/** What the last file was created with: the notes of the finished page, kept to be said again in the other language. */
+let noted: Finding[] = [];
+
+/** The notes of the finished page. A note about a value names its field, as the verdict above the form does. */
+function renderNotes(): void {
+  const notes = $('#done-notes');
+  const where = (finding: Finding) => (finding.path && fieldLabel(finding.path) ? `${fieldLabel(finding.path)}: ` : '');
+  notes.replaceChildren(...noted.map((finding) => el('li', {}, `${where(finding)}${describe(finding)}`)));
+  notes.hidden = noted.length === 0;
+}
+
 $('#create').onclick = async () => {
   const button = $<HTMLButtonElement>('#create');
   const status = $('#create-status');
@@ -976,7 +993,7 @@ $('#create').onclick = async () => {
     // No language is passed on. The library that writes the XML asks the server for a catalogue of translations in
     // whatever language it is given, and ships none: for English, its default here, the site answers with an empty
     // one (public/assets/locale).
-    const result = await createEInvoice({ pdf: state.pdf!, invoice: state.draft, ...(xr ? { profile: 'xrechnung' as const } : {}) });
+    const result = await createEInvoice({ pdf: state.pdf!, invoice: state.draft, pdfText: state.pdfText, ...(xr ? { profile: 'xrechnung' as const } : {}) });
     // A public body takes the XRechnung as a file of its own; the PDF that carries it too is the copy that keeps the look.
     const plain = xr ? await createXRechnung({ invoice: state.draft }) : undefined;
     downloads.forEach((url) => URL.revokeObjectURL(url));
@@ -1001,9 +1018,8 @@ $('#create').onclick = async () => {
     const findings = [...result.findings, ...(plain?.findings ?? [])].filter(
       (finding, i, all) => all.findIndex((other) => other.code === finding.code && other.path === finding.path && other.message === finding.message) === i,
     );
-    const notes = $('#done-notes');
-    notes.replaceChildren(...findings.map((finding) => el('li', {}, describe(finding))));
-    notes.hidden = findings.length === 0;
+    noted = findings;
+    renderNotes();
     // The stamp reads like a seal: it lands only where neither the check nor the writing of the file found anything.
     $('#done .stamp').hidden = findings.length > 0 || document.querySelector('#summary li') !== null;
     status.textContent = '';
@@ -1053,6 +1069,7 @@ function applyLang(next: 'de' | 'en'): void {
   for (const button of document.querySelectorAll<HTMLButtonElement>('[data-lang]')) button.setAttribute('aria-pressed', String(button.dataset.lang === next));
   renderModels();
   if (state.pdf) renderForm();
+  renderNotes();
 }
 for (const button of document.querySelectorAll<HTMLButtonElement>('[data-lang]')) button.onclick = () => applyLang(button.dataset.lang as 'de' | 'en');
 applyLang(lang);

@@ -29,6 +29,65 @@ describe('check', () => {
     expect(check(withChange((d) => delete d.number)).invoice).toBeUndefined();
   });
 
+  it('asks where the goods of an intra-community supply went, unless the data says so', () => {
+    const supply = (change: (d: any) => void = () => {}) =>
+      withChange((d) => {
+        Object.assign(d.buyer, { country: 'AT', vatId: 'ATU12345678' });
+        for (const line of d.lines) Object.assign(line, { vatCategory: 'K', vatRate: 0 });
+        d.vatExemptionReason = 'Steuerfreie innergemeinschaftliche Lieferung';
+        delete d.totals;
+        change(d);
+      });
+    expect(codesAt(supply(), 'deliveryCountry')).toEqual(['warning:delivery-country']);
+    expect(
+      codesAt(
+        supply((d) => (d.deliveryCountry = 'it')),
+        'deliveryCountry',
+      ),
+    ).toEqual([]);
+    expect(
+      codesAt(
+        supply((d) => (d.deliveryCountry = 'Italien')),
+        'deliveryCountry',
+      ),
+    ).toEqual(['error:format']);
+    expect(codesAt(sample(), 'deliveryCountry')).toEqual([]);
+  });
+
+  it('reports an amount that is not a number instead of failing', () => {
+    expect(
+      codesAt(
+        withChange((d) => (d.prepaidAmount = 'abc')),
+        'prepaidAmount',
+      ),
+    ).toEqual(['error:format']);
+    expect(
+      codesAt(
+        withChange((d) => (d.prepaidAmount = Number.NaN)),
+        'prepaidAmount',
+      ),
+    ).toEqual(['error:format']);
+  });
+
+  it('wants a line total to be quantity times price, two cents apart at most', () => {
+    const lineTotal = (netAmount: number, currency = 'EUR') =>
+      codesAt(
+        withChange((d) => {
+          Object.assign(d, { currency });
+          d.lines[1].netAmount = netAmount;
+          delete d.totals;
+        }),
+        'lines.1.netAmount',
+      );
+    expect(lineTotal(499.03)).toEqual(['error:line-net']);
+    expect(lineTotal(499.02)).toEqual([]);
+    expect(lineTotal(498.98)).toEqual([]);
+    expect(lineTotal(498.97)).toEqual(['error:line-net']);
+    // Forint has no cents in practice: there half a forint is allowed.
+    expect(lineTotal(499.5, 'HUF')).toEqual([]);
+    expect(lineTotal(499.51, 'HUF')).toEqual(['error:line-net']);
+  });
+
   it('treats null and blank strings as missing', () => {
     expect(
       codesAt(
@@ -253,6 +312,15 @@ describe('check against the PDF text', () => {
     ).toEqual(['warning:not-in-pdf']);
   });
 
+  it.each(['seller.street', 'seller.postalCode', 'seller.city', 'buyer.street', 'buyer.postalCode', 'buyer.city'])(
+    'warns about a part of an address the PDF does not show: %s',
+    (path) => {
+      const [who, field] = path.split('.') as [string, string];
+      const draft = withChange((d) => (d[who][field] = field === 'postalCode' ? '99999' : 'Anderswo 7'));
+      expect(codesAt(draft, path, { pdfText })).toEqual(['warning:not-in-pdf']);
+    },
+  );
+
   it('warns about a date the PDF does not show', () => {
     expect(
       codesAt(
@@ -354,22 +422,14 @@ describe('check with the XRechnung rules', () => {
     }
   });
 
-  it('wants a line total to be quantity times price, two cents apart at most', () => {
-    const lineTotal = (netAmount: number, currency = 'EUR') =>
-      found(
-        xrechnung((d) => {
-          Object.assign(d, { currency });
-          d.lines[1].netAmount = netAmount;
-          delete d.totals;
-        }),
-      );
-    expect(lineTotal(499.03)).toEqual(['error lines.1.netAmount: xrechnung-line-net']);
-    expect(lineTotal(499.02)).toEqual([]);
-    expect(lineTotal(498.98)).toEqual([]);
-    expect(lineTotal(498.97)).toEqual(['error lines.1.netAmount: xrechnung-line-net']);
-    // Forint has no cents in practice: there the rule allows half a forint.
-    expect(lineTotal(499.5, 'HUF')).toEqual([]);
-    expect(lineTotal(499.51, 'HUF')).toEqual(['error lines.1.netAmount: xrechnung-line-net']);
+  it('reports a line total that is not quantity times price once, as every profile does', () => {
+    const findings = found(
+      xrechnung((d) => {
+        d.lines[1].netAmount = 499.03;
+        delete d.totals;
+      }),
+    );
+    expect(findings).toEqual(['error lines.1.netAmount: line-net']);
   });
 
   it('reads a payment terms line that starts with # as a cash discount in the fixed form', () => {
@@ -382,6 +442,10 @@ describe('check with the XRechnung rules', () => {
     // After the last #...# of the text the validator wants a line break, whatever that line is.
     expect(terms('#SKONTO#TAGE=14#PROZENT=2.00#\nRechnungen #42 und #43 zahlbar in 30 Tagen')).toEqual(['error paymentTerms: xrechnung-payment-terms']);
     expect(terms('Rechnungen #42 und #43 zahlbar in 30 Tagen\n  #SKONTO#TAGE=14#PROZENT=2.00#')).toEqual([]);
+  });
+
+  it('refuses a country of delivery, which XRechnung takes with city and postal code only', () => {
+    expect(found(xrechnung((d) => (d.deliveryCountry = 'AT')))).toEqual(['error deliveryCountry: xrechnung-delivery-address']);
   });
 
   it('refuses an intra-community supply, which needs a delivery address the data cannot hold', () => {

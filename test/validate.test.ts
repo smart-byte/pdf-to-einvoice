@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { PDFDocument, StandardFonts } from '@cantoo/pdf-lib';
+import { PDFDocument, PDFName, PDFString, StandardFonts } from '@cantoo/pdf-lib';
 import { describe, expect, it } from 'vitest';
 import { createEInvoice } from '../src/create.js';
 import type { InvoiceDraft } from '../src/model.js';
@@ -28,6 +28,14 @@ async function pdfCarrying(xml: string, drawText = false): Promise<Uint8Array> {
 const codes = (findings: { code: string }[]) => findings.map((f) => f.code);
 
 describe('validateEInvoice', () => {
+  it('reports a script in the file, which PDF/A forbids', async () => {
+    const doc = await PDFDocument.load((await create()).pdf, { updateMetadata: false });
+    doc.catalog.set(PDFName.of('OpenAction'), doc.context.obj({ S: 'JavaScript', JS: PDFString.of("app.alert('x')") }));
+    const result = await validateEInvoice(await doc.save());
+    expect(result.findings).toMatchObject([{ severity: 'warning', code: 'pdf-actions' }]);
+    expect(result.findings[0]!.message).toContain('JavaScript');
+  });
+
   it('accepts a created e-invoice without findings', async () => {
     const created = await create();
     const result = await validateEInvoice(created.pdf, { pdfText: await extractText(created.pdf) });
@@ -75,6 +83,32 @@ describe('validateEInvoice', () => {
     const result = await validateEInvoice(await pdfCarrying((await create()).xml));
     expect(result.isEInvoice).toBe(true);
     expect(result.findings).toMatchObject([{ severity: 'warning', code: 'pdf-a' }]);
+  });
+
+  describe('a line total that is not quantity times price', () => {
+    // The sample bills 10 hours at 100.00. Here the price is 115.00, and a discount of 150.00 on the line explains the total.
+    const discount =
+      '<ram:SpecifiedTradeAllowanceCharge><ram:ChargeIndicator><udt:Indicator>false</udt:Indicator></ram:ChargeIndicator><ram:ActualAmount>150.00</ram:ActualAmount></ram:SpecifiedTradeAllowanceCharge>';
+    const priced = async (extra = '') => {
+      const xml = (await create()).xml;
+      const changed = xml
+        .replace(/<ram:ChargeAmount>100(\.0+)?<\/ram:ChargeAmount>/, '<ram:ChargeAmount>115.00</ram:ChargeAmount>')
+        .replace('<ram:SpecifiedTradeSettlementLineMonetarySummation>', `${extra}<ram:SpecifiedTradeSettlementLineMonetarySummation>`);
+      expect(changed).not.toBe(xml);
+      return validateEInvoice(await pdfCarrying(changed));
+    };
+    const aboutLines = (findings: { code: string; severity: string; path: string }[]) =>
+      findings.filter((f) => f.code === 'line-net').map((f) => `${f.severity} ${f.path}`);
+
+    it('is accepted where the XML states a discount on the line', async () => {
+      expect(aboutLines((await priced(discount)).findings)).toEqual([]);
+    });
+
+    it('is a warning where nothing in the XML explains it: the standard does not forbid it', async () => {
+      const result = await priced();
+      expect(aboutLines(result.findings)).toEqual(['warning lines.0.netAmount']);
+      expect(result.findings.find((f) => f.code === 'line-net')!.message).toContain('1150.00');
+    });
   });
 
   it('warns about fonts that are not embedded', async () => {
