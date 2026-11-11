@@ -1228,6 +1228,18 @@ textarea.warned {
 .done__text > * + * {
   margin-top: 1rem;
 }
+/* The privacy policy of a build with the page counter: whether visits are counted, and the button that changes it. */
+.optout {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem 1.25rem;
+  margin-top: 1rem;
+}
+.optout p {
+  margin: 0;
+}
+
 /* What to do after the download: two quiet choices side by side, one under the other where the column is narrow. */
 .next {
   display: flex;

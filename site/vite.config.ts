@@ -1,7 +1,12 @@
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
+import { COUNTER_ORIGIN, counterTag, forBuild } from './counter.js';
 
 const page = (name: string) => fileURLToPath(new URL(name, import.meta.url));
+
+// The ID of the website for the page counter. Only the deployment of the project's own site gives it to the build
+// (see docs/releasing.md); without it no page gets the counter, and the pages say so.
+const COUNTER_ID = process.env.ANALYTICS_WEBSITE_ID || undefined;
 
 /**
  * What the built pages may load and run. The policy is a meta tag, so that it travels with the pages to any host;
@@ -13,7 +18,8 @@ const POLICY = [
   // Only the page's own files run as script: nothing inline, nothing from elsewhere. WebAssembly is what the language
   // models are made of. 'unsafe-eval' is there for one reason: the library that writes the XML compiles its checks
   // of the invoice data from text when it is first used. It can go when that library ships them compiled.
-  "script-src 'self' 'wasm-unsafe-eval' 'unsafe-eval'",
+  // A build with the page counter may run that one script from its server besides.
+  `script-src 'self' 'wasm-unsafe-eval' 'unsafe-eval'${COUNTER_ID ? ` ${COUNTER_ORIGIN}` : ''}`,
   "worker-src 'self' blob:",
   "style-src 'self'",
   "font-src 'self'",
@@ -29,6 +35,13 @@ const POLICY = [
 // The site is static: no server sees an invoice. It is built from src/, so the page runs the same code as the package.
 export default defineConfig({
   plugins: [
+    {
+      name: 'page-counter',
+      transformIndexHtml: {
+        order: 'pre',
+        handler: (html: string) => ({ html: forBuild(html, Boolean(COUNTER_ID)), tags: counterTag(COUNTER_ID, 'pdf-to-einvoice.app') }),
+      },
+    },
     {
       name: 'content-security-policy',
       apply: 'build',

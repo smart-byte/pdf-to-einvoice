@@ -15,6 +15,13 @@ import './theme-switch.js';
 
 pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
+declare global {
+  interface Window {
+    /** The page counter, where a build has one (see counter.ts). */
+    umami?: { track(name: string, data?: Record<string, string>): void };
+  }
+}
+
 const $ = <T extends HTMLElement>(selector: string) => document.querySelector<T>(selector)!;
 /** Creates an element. `props` are assigned as properties; `dataset` entries become data attributes. */
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, props: Record<string, unknown> = {}, ...children: (Node | string)[]): HTMLElementTagNameMap[K] {
@@ -1050,6 +1057,8 @@ $('#create').onclick = async () => {
     Object.assign(to, { width: from.width, height: from.height });
     to.getContext('2d')!.drawImage(from, 0, 0);
     show('done');
+    // The project's own site counts that a file was created and of which kind, nothing of the invoice. Any other build has no counter.
+    window.umami?.track('created', { format: xr ? 'xrechnung' : 'pdf' });
   } catch (error) {
     status.textContent = t('create.failed', { m: reasonOf(error) });
   } finally {

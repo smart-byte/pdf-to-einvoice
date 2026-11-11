@@ -283,6 +283,20 @@ describe.skipIf(!asked)('the web app in a browser', () => {
     expect(await page.isVisible('#ai-loading')).toBe(false);
   }, 120_000);
 
+  it('has no page counter in a build that is not given one, and says so', async () => {
+    const page = await open('en');
+    for (const address of ['', 'privacy.html', 'legal-notice.html']) {
+      await page.goto(`${base}${address}?lang=en`);
+      const origins = await page.$$eval('script[src]', (scripts) => scripts.map((script) => new URL((script as HTMLScriptElement).src).origin));
+      expect(new Set(origins)).toEqual(new Set([new URL(base).origin]));
+    }
+    await page.goto(`${base}privacy.html?lang=en`);
+    const policy = await page.textContent('main');
+    expect(policy).toContain('No cookies, accounts, contact forms, analytics or advertising.');
+    expect(policy).not.toMatch(/Umami|with-counter/);
+    expect(await page.$('[data-optout]')).toBeNull();
+  }, 120_000);
+
   it('offers the next invoice after the download, in the language of the page', async () => {
     const page = await open('en');
     await read(page);

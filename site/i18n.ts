@@ -480,8 +480,8 @@ export const STRINGS: Record<string, Entry> = {
     en: 'In an e-invoice the XML counts, not the picture. Check the data before you create the file.',
   },
   'limits.3': {
-    de: 'Ihre Rechnung verlässt den Browser nicht: nichts wird hochgeladen, keine Cookies, kein Tracking. Für „Mit KI auslesen“ lädt der Browser einmalig ein Modell von Hugging Face (huggingface.co, hf.co) und raw.githubusercontent.com; gelesen wird die Rechnung auf Ihrem Gerät. Die einzige Ausnahme bestimmen Sie selbst: Tragen Sie dort einen eigenen KI-Dienst ein, geht der Text der Rechnung an dessen Adresse.',
-    en: 'Your invoice does not leave the browser: nothing is uploaded, no cookies, no tracking. For “Read with AI” the browser downloads a model once, from Hugging Face (huggingface.co, hf.co) and raw.githubusercontent.com; the invoice is read on your device. The one exception is yours to make: if you enter an AI service of your own there, the text of the invoice goes to its address.',
+    de: 'Ihre Rechnung verlässt den Browser nicht: nichts wird hochgeladen, und es gibt keine Cookies. Für „Mit KI auslesen“ lädt der Browser einmalig ein Modell von Hugging Face (huggingface.co, hf.co) und raw.githubusercontent.com; gelesen wird die Rechnung auf Ihrem Gerät. Die einzige Ausnahme bestimmen Sie selbst: Tragen Sie dort einen eigenen KI-Dienst ein, geht der Text der Rechnung an dessen Adresse.',
+    en: 'Your invoice does not leave the browser: nothing is uploaded, and there are no cookies. For “Read with AI” the browser downloads a model once, from Hugging Face (huggingface.co, hf.co) and raw.githubusercontent.com; the invoice is read on your device. The one exception is yours to make: if you enter an AI service of your own there, the text of the invoice goes to its address.',
   },
   'limits.4': { de: 'Diese Seite ist ein Werkzeug und keine Steuer- oder Rechtsberatung.', en: 'This page is a tool, not tax or legal advice.' },
   'limits.5': {
@@ -502,6 +502,19 @@ export const STRINGS: Record<string, Entry> = {
   'dev.tab.lib': { de: 'Bibliothek', en: 'Library' },
   'dev.tab.cli': { de: 'Kommandozeile', en: 'Command line' },
   'dev.tab.mcp': { de: 'MCP-Server', en: 'MCP server' },
+  // The privacy policy of a build with the page counter: whether visits are counted in this browser.
+  'optout.on': { de: 'Ihre Besuche werden gezählt, ohne Cookies.', en: 'Your visits are counted, without cookies.' },
+  'optout.off': { de: 'Ihre Besuche werden in diesem Browser nicht gezählt.', en: 'Your visits are not counted in this browser.' },
+  'optout.dnt': {
+    de: 'Ihr Browser sendet „Do Not Track“: Ihre Besuche werden nicht gezählt.',
+    en: 'Your browser sends Do Not Track, so your visits are not counted.',
+  },
+  'optout.blocked': {
+    de: 'Dieser Browser sperrt den lokalen Speicher. Schalten Sie „Do Not Track“ ein, um die Zählung abzustellen.',
+    en: 'This browser blocks local storage. Turn on Do Not Track to stop the counting.',
+  },
+  'optout.stop': { de: 'Meine Besuche nicht zählen', en: "Don't count my visits" },
+  'optout.start': { de: 'Meine Besuche wieder zählen', en: 'Count my visits again' },
   'foot.source': { de: 'Quelltext auf GitHub', en: 'Source on GitHub' },
   'foot.legal': { de: 'Impressum', en: 'Legal notice' },
   'foot.privacy': { de: 'Datenschutz', en: 'Privacy' },
