@@ -1,10 +1,13 @@
 import { invoiceJsonSchema, type InvoiceDraft } from '../src/model.js';
 
-/** In-browser models offered by default: permissively licensed (Apache-2.0 / MIT) and small enough to download. */
+/**
+ * In-browser models offered by default: permissively licensed (Apache-2.0 / MIT) and small enough to download. The
+ * note is short enough to stand beside the name in the list on a phone; `gigabytes` is the size of the download.
+ */
 export const MODELS = [
-  { id: 'Qwen2.5-1.5B-Instruct-q4f16_1-MLC', note: { de: 'schnell, ca. 1 GB', en: 'fast, about 1 GB' } },
-  { id: 'Qwen3.5-4B-q4f16_1-MLC', note: { de: 'genauer, ca. 2,4 GB', en: 'more accurate, about 2.4 GB' } },
-  { id: 'Phi-3.5-mini-instruct-q4f16_1-MLC', note: { de: 'Alternative, ca. 2,2 GB', en: 'alternative, about 2.2 GB' } },
+  { id: 'Qwen2.5-1.5B-Instruct-q4f16_1-MLC', note: { de: 'schnell', en: 'fast' }, gigabytes: 1 },
+  { id: 'Qwen3.5-4B-q4f16_1-MLC', note: { de: 'genauer', en: 'more accurate' }, gigabytes: 2.4 },
+  { id: 'Phi-3.5-mini-instruct-q4f16_1-MLC', note: { de: 'Alternative', en: 'alternative' }, gigabytes: 2.2 },
 ] as const;
 export const DEFAULT_MODEL = MODELS[0].id;
 

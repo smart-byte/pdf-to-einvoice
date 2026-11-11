@@ -110,7 +110,7 @@ const normaliseDraft = (draft: any): InvoiceDraft => ({
 // ---------------------------------------------------------------------------------------------------------------
 // The form
 
-type FieldType = 'text' | 'date' | 'number' | 'select' | 'email' | 'tel';
+type FieldType = 'text' | 'date' | 'number' | 'select' | 'email' | 'tel' | 'textarea';
 interface Field {
   path: string;
   label: string;
@@ -135,13 +135,14 @@ const party = (who: 'seller' | 'buyer'): Field[] => [
   { path: `${who}.vatId`, label: 'f.vatId' },
   ...(who === 'seller'
     ? ([
-        { path: 'seller.taxNumber', label: 'f.taxNumber' },
-        { path: 'seller.email', label: 'f.email', type: 'email' },
+        // An e-mail address does not break: it gets a row of its own, and so does the field before it.
+        { path: 'seller.taxNumber', label: 'f.taxNumber', wide: true },
+        { path: 'seller.email', label: 'f.email', type: 'email', wide: true },
         { path: 'seller.contactName', label: 'f.contactName', only: 'xrechnung' },
         { path: 'seller.phone', label: 'f.phone', type: 'tel', only: 'xrechnung' },
       ] satisfies Field[])
     : ([
-        { path: 'buyer.email', label: 'f.email', type: 'email', only: 'xrechnung' },
+        { path: 'buyer.email', label: 'f.email', type: 'email', wide: true, only: 'xrechnung' },
         { ...BUYER_REFERENCE, only: 'xrechnung' },
       ] satisfies Field[])),
 ];
@@ -164,23 +165,23 @@ const SECTIONS: { title: string; fields: Field[]; collapsed?: boolean }[] = [
     title: 's.payment',
     fields: [
       { path: 'dueDate', label: 'f.dueDate', type: 'date' },
-      { path: 'paymentTerms', label: 'f.paymentTerms', wide: true },
+      { path: 'paymentTerms', label: 'f.paymentTerms', type: 'textarea', wide: true },
       { path: 'iban', label: 'f.iban' },
       { path: 'bic', label: 'f.bic' },
-      { path: 'vatExemptionReason', label: 'f.vatExemptionReason', wide: true },
+      { path: 'vatExemptionReason', label: 'f.vatExemptionReason', type: 'textarea', wide: true },
     ],
   },
   {
     title: 's.more',
     collapsed: true,
     fields: [
-      { path: 'typeCode', label: 'f.typeCode', type: 'select', options: Object.keys(INVOICE_TYPES).map((code) => [code, `type.${code}`]) },
+      { path: 'typeCode', label: 'f.typeCode', type: 'select', options: Object.keys(INVOICE_TYPES).map((code) => [code, `type.${code}`]), wide: true },
       { path: 'precedingInvoiceNumber', label: 'f.precedingInvoiceNumber' },
       { path: 'precedingInvoiceDate', label: 'f.precedingInvoiceDate', type: 'date' },
       { path: 'orderReference', label: 'f.orderReference' },
       { ...BUYER_REFERENCE, only: 'pdf' },
       { path: 'prepaidAmount', label: 'f.prepaidAmount', type: 'number' },
-      { path: 'note', label: 'f.note', wide: true },
+      { path: 'note', label: 'f.note', type: 'textarea', wide: true },
     ],
   },
 ];
@@ -200,10 +201,13 @@ function control(field: Field, path: string): HTMLElement {
   // An empty choice shows what will be used, not whichever option happens to come first.
   const value = getPath(state.draft, path) ?? SELECT_DEFAULTS[field.path] ?? '';
   const id = `in-${path.replace(/\./g, '-')}`;
-  let input: HTMLInputElement | HTMLSelectElement;
+  let input: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
   if (field.type === 'select') {
     input = el('select', { id });
     for (const [code, label] of field.options!) input.append(el('option', { value: code, selected: String(value) === code }, t(label)));
+  } else if (field.type === 'textarea') {
+    // A sentence wraps and the field grows with it, where one line would cut it off on a phone.
+    input = el('textarea', { id, rows: 2, value: String(value) });
   } else {
     input = el('input', { id, type: field.type ?? 'text', value: String(value), autocomplete: 'off' });
     if (field.type === 'number') (input as HTMLInputElement).step = 'any';
@@ -282,7 +286,7 @@ function renderForm(): void {
   form.append(invoice!, seller!, buyer!, section('s.lines', renderLines()), payment!, more!);
   if (state.mode === 'validate') {
     // Read only rather than disabled: a field can still take the focus, which shows where its value stands on the page.
-    for (const field of form.querySelectorAll('input')) field.readOnly = true;
+    for (const field of form.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('input, textarea')) field.readOnly = true;
     for (const field of form.querySelectorAll<HTMLSelectElement | HTMLButtonElement>('select, button')) field.disabled = true;
     for (const details of form.querySelectorAll('details')) details.open = true;
   }
@@ -464,7 +468,7 @@ function validate(): void {
 // The form is never sent anywhere: Enter in a field must not reload the page.
 $('#form').addEventListener('submit', (event) => event.preventDefault());
 $('#form').addEventListener('input', (event) => {
-  const input = event.target as HTMLInputElement | HTMLSelectElement;
+  const input = event.target as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
   const path = input.dataset.path;
   if (!path) return;
   const number = (input as HTMLInputElement).type === 'number';
@@ -550,7 +554,7 @@ function renderMarks(): void {
   };
   const on = pagePieces[shown] ?? [];
   // Dropdowns hold codes, which are not printed; everything else is looked for.
-  for (const input of $('#form').querySelectorAll<HTMLInputElement>('input[data-path]')) {
+  for (const input of $('#form').querySelectorAll<HTMLElement>('[data-path]:not(select)')) {
     const path = input.dataset.path!;
     place(path, fieldLabel(path), placesOf(path, on));
   }
@@ -577,7 +581,7 @@ function turnTo(path: string): void {
 $('#form').addEventListener('focusin', (event) => {
   const field = event.target as HTMLElement;
   // Dropdowns hold codes, which are printed nowhere: they turn no page.
-  if (field.dataset.path && field instanceof HTMLInputElement) turnTo(field.dataset.path);
+  if (field.dataset.path && !(field instanceof HTMLSelectElement)) turnTo(field.dataset.path);
   highlight(field.dataset.path);
 });
 $('#form').addEventListener('focusout', () => highlight());
@@ -783,16 +787,24 @@ $('#other').onclick = () => show('start');
 // Reading with a language model
 
 const modelSelect = $<HTMLSelectElement>('#ai-model');
+/** Under the list: how large the chosen model is and where it comes from, or for an own service what it has to be, with its fields. */
+function showModel(): void {
+  const model = MODELS.find((candidate) => candidate.id === modelSelect.value);
+  $('#ai-model-note').textContent = model ? t('ai.download', { size: new Intl.NumberFormat(lang).format(model.gigabytes) }) : t('ai.endpoint.note');
+  $('#ai-endpoint').hidden = model !== undefined;
+}
 function renderModels(): void {
+  // The choice stays when the language changes.
+  const chosen = modelSelect.value || DEFAULT_MODEL;
   modelSelect.replaceChildren(
     ...MODELS.map((model) =>
-      el('option', { value: model.id, selected: model.id === DEFAULT_MODEL }, `${model.id.replace(/-q4f16_1-MLC$/, '')} (${model.note[lang]})`),
+      el('option', { value: model.id, selected: model.id === chosen }, `${model.id.replace(/-q4f16_1-MLC$/, '')} (${model.note[lang]})`),
     ),
-    el('option', { value: 'endpoint' }, t('ai.endpoint')),
+    el('option', { value: 'endpoint', selected: chosen === 'endpoint' }, t('ai.endpoint')),
   );
-  $('#ai-endpoint').hidden = true;
+  showModel();
 }
-modelSelect.onchange = () => ($('#ai-endpoint').hidden = modelSelect.value !== 'endpoint');
+modelSelect.onchange = showModel;
 
 /**
  * Shows how far reading with a model is: below 1 the model is still loading and a bar says how much of it is there,

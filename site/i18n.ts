@@ -84,10 +84,15 @@ export const STRINGS: Record<string, Entry> = {
   },
   'ai.model': { de: 'Modell', en: 'Model' },
   'ai.download': {
-    de: 'Das Modell wird beim ersten Mal von huggingface.co und raw.githubusercontent.com geladen und im Browser gespeichert.',
-    en: 'The model is downloaded from huggingface.co and raw.githubusercontent.com on first use and kept in the browser.',
+    de: 'Das Modell (etwa {size}\u00a0GB) wird beim ersten Mal von huggingface.co und raw.githubusercontent.com geladen und im Browser gespeichert.',
+    en: 'The model (about {size}\u00a0GB) is downloaded from huggingface.co and raw.githubusercontent.com on first use and kept in the browser.',
   },
-  'ai.endpoint': { de: 'Eigener Dienst (OpenAI-kompatibel)', en: 'Your own service (OpenAI-compatible)' },
+  // Short, so that it fits the list on a phone; the line under the list says what kind of service it has to be.
+  'ai.endpoint': { de: 'Eigener Dienst', en: 'Your own service' },
+  'ai.endpoint.note': {
+    de: 'Ein Dienst mit OpenAI-kompatibler Schnittstelle, den Sie selbst betreiben oder dem Sie vertrauen.',
+    en: 'A service with an OpenAI-compatible interface that you run yourself or trust.',
+  },
   'ai.endpoint.url': { de: 'Adresse', en: 'Address' },
   'ai.endpoint.model': { de: 'Modellname', en: 'Model name' },
   'ai.endpoint.key': { de: 'Schlüssel (falls nötig)', en: 'Key (if needed)' },
@@ -185,10 +190,11 @@ export const STRINGS: Record<string, Entry> = {
   'vat.S': { de: 'mit Umsatzsteuer', en: 'with VAT' },
   'vat.Z': { de: '0\u00a0% (Nullsatz)', en: '0% (zero-rated)' },
   'vat.E': { de: 'steuerfrei (z.\u00a0B. Kleinunternehmer)', en: 'exempt (e.g. small business)' },
-  'vat.AE': { de: 'Reverse Charge (EU-Unternehmen)', en: 'reverse charge (EU business)' },
+  // The closed list shows the whole text of the chosen one, also on a phone: they are kept short.
+  'vat.AE': { de: 'Reverse Charge (EU)', en: 'reverse charge (EU business)' },
   'vat.K': { de: 'innergemeinschaftliche Lieferung', en: 'intra-community supply' },
   'vat.G': { de: 'Ausfuhr (außerhalb der EU)', en: 'export of goods outside the EU' },
-  'vat.O': { de: 'nicht steuerbar (z.\u00a0B. Leistung in die USA)', en: 'not subject to VAT (e.g. service to the USA)' },
+  'vat.O': { de: 'nicht steuerbar (z.\u00a0B. USA)', en: 'not subject to VAT (e.g. USA)' },
 
   't.net': { de: 'Netto', en: 'Net' },
   't.vat': { de: 'Umsatzsteuer', en: 'VAT' },

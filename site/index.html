@@ -217,9 +217,10 @@
                 <div class="fields">
                   <div class="field field--wide">
                     <label for="ai-model" data-i18n="ai.model">Model</label>
-                    <select id="ai-model"></select>
-                    <p class="hint" data-i18n="ai.download">
-                      The model is downloaded from huggingface.co and raw.githubusercontent.com on first use and kept in the browser.
+                    <select id="ai-model" aria-describedby="ai-model-note"></select>
+                    <!-- How large the chosen model is, or what an own service has to be. -->
+                    <p class="hint" id="ai-model-note">
+                      The model (about 1 GB) is downloaded from huggingface.co and raw.githubusercontent.com on first use and kept in the browser.
                     </p>
                   </div>
                 </div>
