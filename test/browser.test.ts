@@ -202,6 +202,35 @@ describe.skipIf(!asked)('the web app in a browser', () => {
     expect(await page.isVisible('#create')).toBe(false);
   }, 120_000);
 
+  it('gives a long text the room it needs: the field grows with it and can be drawn larger', async () => {
+    const page = await open();
+    await read(page);
+    const box = (path: string) =>
+      page.$eval(`[data-path="${path}"]`, (field) => ({
+        tag: field.tagName,
+        height: field.clientHeight,
+        cut: field.scrollHeight > field.clientHeight + 1,
+        resize: getComputedStyle(field).resize,
+      }));
+    const short = await box('lines.0.name');
+    expect(short).toMatchObject({ tag: 'TEXTAREA', cut: false, resize: 'vertical' });
+    // One line high while the text is short, like the fields beside it.
+    expect(short.height).toBeLessThanOrEqual((await page.$eval('[data-path="lines.0.quantity"]', (field) => field.clientHeight)) + 2);
+    await page.fill(
+      '[data-path="lines.0.name"]',
+      'Beratung E-Rechnung: Analyse der bestehenden Rechnungsstellung, Einrichtung der Schnittstelle und Schulung der Mitarbeitenden vor Ort',
+    );
+    const long = await box('lines.0.name');
+    expect(long.cut).toBe(false);
+    expect(long.height).toBeGreaterThan(short.height);
+    for (const path of ['paymentTerms', 'vatExemptionReason']) expect(await box(path)).toMatchObject({ tag: 'TEXTAREA', resize: 'vertical' });
+    // The description is still one value: it goes into the XML as it was typed.
+    await page.click('#xml > summary');
+    await page.waitForSelector('#xml-pair:not([hidden])');
+    await page.click('#xml-whole > summary');
+    expect(await page.textContent('#xml-code')).toContain('Schulung der Mitarbeitenden vor Ort</ram:Name>');
+  }, 120_000);
+
   it('shows how far a language model has come with its answer', async () => {
     // What a model answers for the sample: every key of the schema in its order, with the one value the patterns do not read.
     const filled = (schema: any, key = ''): unknown =>
