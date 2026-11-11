@@ -89,7 +89,15 @@ describe.skipIf(!asked)('the web app in a browser', () => {
     const page = await open();
     await page.evaluate(() => fetch('./', { method: 'POST', body: 'RE-2026-0042' }).catch(() => {}));
     await page.evaluate(() => fetch('./llms.txt?number=RE-2026-0042').catch(() => {}));
-    expect(problems).toEqual(expect.arrayContaining([expect.stringMatching(/^POST with data to /), expect.stringMatching(/^data in the address /)]));
+    // Data in the path of an address asks for a file the site does not have: that request fails, which is noticed.
+    await page.evaluate(() => fetch('./RE-2026-0042').catch(() => {}));
+    expect(problems).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/^POST with data to /),
+        expect.stringMatching(/^data in the address /),
+        expect.stringMatching(/^404 .*\/RE-2026-0042$/),
+      ]),
+    );
     // These two were made on purpose.
     problems = [];
   }, 120_000);
