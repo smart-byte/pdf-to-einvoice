@@ -277,19 +277,27 @@ function renderForm(): void {
   const expanded = new Set([...form.querySelectorAll('details[open]')].map((d) => (d as HTMLElement).dataset.section));
   const focused = focusedPath();
   form.replaceChildren();
-  const section = (title: string, body: HTMLElement, collapsed = false) => {
-    if (!collapsed) return el('section', { className: 'group' }, el('h3', {}, t(title)), body);
-    const details = el('details', { className: 'group', dataset: { section: title }, open: expanded.has(title) }, el('summary', {}, t(title)), body);
+  /** `unfolded` is given for a group that can be folded: whether it starts open. */
+  const section = (title: string, body: HTMLElement, unfolded?: boolean) => {
+    if (unfolded === undefined) return el('section', { className: 'group' }, el('h3', {}, t(title)), body);
+    const details = el(
+      'details',
+      { className: 'group', dataset: { section: title }, open: unfolded || expanded.has(title) },
+      el('summary', {}, t(title)),
+      body,
+    );
     return details;
   };
   const format = shownFormat();
-  const [invoice, seller, buyer, payment, more] = SECTIONS.map(({ title, fields, collapsed }) =>
-    section(
-      title,
-      el('div', { className: 'fields' }, ...fields.filter((field) => (field.only ?? format) === format).map((field) => control(field, field.path))),
-      collapsed,
-    ),
-  );
+  // Nothing goes into the file unseen: a field the format does not ask for is shown while it holds a value, and a
+  // group of further fields is open while one of them does.
+  const asked = (field: Field) => (field.only ?? format) === format;
+  const paths = new Set(SECTIONS.flatMap(({ fields }) => fields.filter(asked).map((field) => field.path)));
+  const filled = (field: Field) => !isEmpty(getPath(state.draft, field.path));
+  const [invoice, seller, buyer, payment, more] = SECTIONS.map(({ title, fields, collapsed }) => {
+    const shown = fields.filter((field) => asked(field) || (filled(field) && !paths.has(field.path)));
+    return section(title, el('div', { className: 'fields' }, ...shown.map((field) => control(field, field.path))), collapsed ? shown.some(filled) : undefined);
+  });
   form.append(invoice!, seller!, buyer!, section('s.lines', renderLines()), payment!, more!);
   if (state.mode === 'validate') {
     // Read only rather than disabled: a field can still take the focus, which shows where its value stands on the page.

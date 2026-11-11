@@ -45,6 +45,8 @@ describe('guessFromText on the layout of a German invoice', () => {
       city: 'Musterstadt',
       country: 'DE',
       vatId: 'DE123456789',
+      // The phone number in the sender line has no label: digits alone may be anything.
+      email: 'rechnung@muster-software.example',
     });
   });
 

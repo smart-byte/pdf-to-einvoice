@@ -92,7 +92,7 @@ describe('guessFromText on a letterhead layout', () => {
   const guess = guessFromText(letterhead);
 
   it('reads the seller from a sender line written with dashes, and a VAT ID written with spaces', () => {
-    expect(guess.seller).toEqual(SELLER);
+    expect(guess.seller).toEqual({ ...SELLER, phone: '030 / 12 34 567' });
   });
 
   it('takes the address block that is not the seller’s own for the buyer', () => {

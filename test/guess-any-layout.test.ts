@@ -298,7 +298,7 @@ describe('guessFromText on parties under their labels', () => {
 
   it('takes the first line under a heading for the name, also above a person and a department', () => {
     const text = ['Verkäufer:', 'Muster Software GmbH', 'Max Mustermann', 'Einkauf', 'Beispielweg 1', 'DE 12345 Musterstadt', 'Telefon : +49301234567'];
-    expect(guessFromText(text.join('\n')).seller).toEqual({ ...MUSTER, contactName: 'Max Mustermann', country: 'DE' });
+    expect(guessFromText(text.join('\n')).seller).toEqual({ ...MUSTER, contactName: 'Max Mustermann', country: 'DE', phone: '+49301234567' });
   });
 
   it('does not take a line that holds an identifier for the name', () => {

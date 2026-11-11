@@ -21,7 +21,8 @@ The first release.
   amounts with the text of the PDF; with `rules: 'xrechnung'` also what XRechnung asks for on top.
 - `extractText`, `extractLayout` and `guessFromText`: the text and layout of a PDF, and reading an invoice from them
   without a model: totals by arithmetic, items that add up to them, also over several pages, seller and buyer,
-  identifiers by their shape; labels in German, English and French.
+  identifiers by their shape, and contact data and the buyer reference where the page leaves no doubt whose they
+  are; labels in German, English and French.
 - `keepWhatThePdfShows`: drops what a language model returned but the PDF does not show.
 - `validateEInvoice` and `readEmbeddedXml` for existing e-invoices.
 - VAT categories S, Z, E, AE, K, G and O; invoices, credit notes, corrected, partial, prepayment and self-billed
