@@ -36,6 +36,9 @@ browser (WebGPU) fills in what the patterns did not find. The model is downloade
 raw.githubusercontent.com; if you point the page at a model service of your own, the invoice text goes to that
 service. The page is available in English and German.
 
+For an invoice to a public body, choose XRechnung above the form. The page then asks for what XRechnung needs on top
+and gives you two files: the XRechnung as XML (UBL) for the portal of the public body, and the PDF that carries it.
+
 ### Compared with online converters
 
 Many services convert PDF invoices too. The main difference is where your invoice is processed.

@@ -195,6 +195,17 @@
           </aside>
 
           <div class="work__data">
+            <fieldset class="format">
+              <legend data-i18n="format.title">Create as</legend>
+              <div class="segments">
+                <label><input type="radio" name="format" value="pdf" checked /><span data-i18n="format.pdf">E-invoice (PDF)</span></label>
+                <label><input type="radio" name="format" value="xrechnung" /><span data-i18n="format.xrechnung">XRechnung (public sector)</span></label>
+              </div>
+              <p class="hint" id="format-note" data-i18n="format.note" hidden>
+                For invoices to public bodies. It also needs the Leitweg-ID or another buyer reference, a contact person with phone and e-mail, and your
+                customer's e-mail address.
+              </p>
+            </fieldset>
             <div class="reader">
               <p id="read-status" role="status"></p>
               <details>
@@ -230,7 +241,11 @@
                   </div>
                 </div>
                 <button type="button" class="quiet" id="ai-run" data-i18n="ai.run">Read invoice</button>
-                <p class="status" id="ai-status" role="status"></p>
+                <div class="busy">
+                  <p class="status" id="ai-status" role="status"></p>
+                  <!-- Shown while a model loads or reads. -->
+                  <button type="button" class="quiet" id="ai-cancel" data-i18n="ai.cancel" hidden>Cancel</button>
+                </div>
                 <div class="loading" id="ai-loading" hidden>
                   <progress id="ai-progress" max="1" value="0" data-i18n-label="ai.progress" aria-label="Progress of loading the model"></progress>
                   <p class="hint" data-i18n="ai.wait">You can keep working while the model loads; it is kept for next time.</p>
@@ -280,18 +295,20 @@
           <!-- The stamp lands on the preview only; the file itself is not marked. -->
           <div class="page">
             <canvas id="done-preview" aria-hidden="true"></canvas>
-            <div class="stamp" aria-hidden="true">EN 16931<small data-i18n="stamp.note">plausibility checked</small></div>
+            <div class="stamp" aria-hidden="true"><span id="done-stamp">EN 16931</span><small data-i18n="stamp.note">plausibility checked</small></div>
           </div>
           <div class="done__text">
             <h2 id="done-title" data-i18n="done.title">Your e-invoice is ready.</h2>
-            <p data-i18n="done.lead">The same invoice as before, now a PDF/A-3 that carries its data as XML (ZUGFeRD / Factur-X, profile EN 16931).</p>
+            <p id="done-lead" data-i18n="done.lead">
+              The same invoice as before, now a PDF/A-3 that carries its data as XML (ZUGFeRD / Factur-X, profile EN 16931).
+            </p>
             <ul class="notes" id="done-notes" hidden></ul>
             <p class="actions">
               <a class="primary" id="download-pdf" data-i18n="done.pdf">Download e-invoice</a>
               <a class="quiet" id="download-xml" data-i18n="done.xml">Download the XML only</a>
-              <button type="button" class="link" id="again" data-i18n="done.again">Change the data again</button>
             </p>
-            <p class="muted">SHA-256 <code id="checksum"></code></p>
+            <p><button type="button" class="link" id="again" data-i18n="done.again">Change the data again</button></p>
+            <p class="muted">SHA-256 (<span id="checksum-file"></span>) <code id="checksum"></code></p>
           </div>
         </div>
       </section>
@@ -332,6 +349,100 @@
               <td>Gesamtbetrag <mark>1.783,81 €</mark></td>
               <td>
                 <code>&lt;ram:GrandTotalAmount&gt;<wbr /><b>1783.81</b><wbr />&lt;/ram:GrandTotalAmount&gt;</code>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="info" id="compare" aria-labelledby="compare-title">
+        <div class="info__head">
+          <h2 id="compare-title" data-i18n="cmp.title">Compared</h2>
+          <p data-i18n="cmp.lead">Many services convert PDF invoices too. The main difference is where your invoice is processed.</p>
+        </div>
+        <!-- A plain comparison without names: the column of this tool is set apart by its ink and a thin rule. On a phone
+             each row lies stacked, and every answer names its side. -->
+        <table class="compare">
+          <thead>
+            <tr>
+              <td></td>
+              <th scope="col" data-i18n="cmp.them">Typical online converter</th>
+              <th scope="col">pdf-to-einvoice</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row" data-i18n="cmp.1">Where is your invoice processed?</th>
+              <td>
+                <span class="compare__who" data-i18n="cmp.them">Typical online converter</span
+                ><span data-i18n="cmp.1.them">On the provider's servers: the file is uploaded.</span>
+              </td>
+              <td><span class="compare__who">pdf-to-einvoice</span><span data-i18n="cmp.1.us">On your device, in the browser. Nothing is uploaded.</span></td>
+            </tr>
+            <tr>
+              <th scope="row" data-i18n="cmp.2">Who reads the data?</th>
+              <td>
+                <span class="compare__who" data-i18n="cmp.them">Typical online converter</span
+                ><span data-i18n="cmp.2.them">Depending on the provider, an AI service in the cloud, also outside the EU, or you type everything in.</span>
+              </td>
+              <td>
+                <span class="compare__who">pdf-to-einvoice</span
+                ><span data-i18n="cmp.2.us">Rules on your device; on request also a language model that runs in your browser too.</span>
+              </td>
+            </tr>
+            <tr>
+              <th scope="row" data-i18n="cmp.3">Where does each value come from?</th>
+              <td>
+                <span class="compare__who" data-i18n="cmp.them">Typical online converter</span><span data-i18n="cmp.3.them">You get a form to correct.</span>
+              </td>
+              <td>
+                <span class="compare__who">pdf-to-einvoice</span
+                ><span data-i18n="cmp.3.us">Each value is marked on the PDF, and the XML is compared with the PDF.</span>
+              </td>
+            </tr>
+            <tr>
+              <th scope="row" data-i18n="cmp.4">Account, ads, tracking</th>
+              <td>
+                <span class="compare__who" data-i18n="cmp.them">Typical online converter</span
+                ><span data-i18n="cmp.4.them">Depending on the provider, sign-up, ads or a subscription.</span>
+              </td>
+              <td><span class="compare__who">pdf-to-einvoice</span><span data-i18n="cmp.4.us">No sign-up, no ads, no cookies.</span></td>
+            </tr>
+            <tr>
+              <th scope="row" data-i18n="cmp.5">Source code</th>
+              <td><span class="compare__who" data-i18n="cmp.them">Typical online converter</span><span data-i18n="cmp.5.them">Mostly closed.</span></td>
+              <td>
+                <span class="compare__who">pdf-to-einvoice</span><span data-i18n="cmp.5.us">Open (MIT licence): anyone can check what the page does.</span>
+              </td>
+            </tr>
+            <tr>
+              <th scope="row" data-i18n="cmp.6">For software and AI assistants</th>
+              <td>
+                <span class="compare__who" data-i18n="cmp.them">Typical online converter</span
+                ><span data-i18n="cmp.6.them">Mostly an API that invoices are sent to.</span>
+              </td>
+              <td>
+                <span class="compare__who">pdf-to-einvoice</span
+                ><span data-i18n="cmp.6.us">Library, command line tool and MCP server, all on your own machine.</span>
+              </td>
+            </tr>
+            <tr>
+              <th scope="row" data-i18n="cmp.7">Formats</th>
+              <td>
+                <span class="compare__who" data-i18n="cmp.them">Typical online converter</span
+                ><span data-i18n="cmp.7.them">ZUGFeRD, often XRechnung and more.</span>
+              </td>
+              <td><span class="compare__who">pdf-to-einvoice</span><span data-i18n="cmp.7.us">ZUGFeRD / Factur-X and XRechnung, following EN 16931.</span></td>
+            </tr>
+            <tr>
+              <th scope="row" data-i18n="cmp.8">Checking against the official rule sets</th>
+              <td>
+                <span class="compare__who" data-i18n="cmp.them">Typical online converter</span
+                ><span data-i18n="cmp.8.them">Some offer their own validator.</span>
+              </td>
+              <td>
+                <span class="compare__who">pdf-to-einvoice</span
+                ><span data-i18n="cmp.8.us">Its own plausibility check; not a complete check against the official rule sets.</span>
               </td>
             </tr>
           </tbody>

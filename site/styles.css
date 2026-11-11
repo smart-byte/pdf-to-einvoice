@@ -658,6 +658,7 @@ body[data-mode='validate'] .finish {
   padding: 0 0 0.5rem;
 }
 /* Looking at an existing e-invoice: nothing to read or create. */
+body[data-mode='validate'] .format,
 body[data-mode='validate'] .reader details,
 body[data-mode='validate'] #form button,
 body[data-mode='validate'] #xml,
@@ -825,6 +826,69 @@ select:disabled {
   box-shadow: var(--shadow);
   padding: clamp(1.1rem, 2.5vw, 2.1rem);
 }
+/* What is created: one of two, drawn like the language switch. The radios inside take the clicks and the keys. */
+.format {
+  min-width: 0;
+  margin: 0 0 1.25rem;
+  padding: 0 0 1.25rem;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+}
+.format legend {
+  padding: 0;
+  margin-bottom: 0.35rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+.segments {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid var(--edge);
+  border-radius: var(--radius);
+  background: var(--field);
+}
+.segments label {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.5rem;
+  margin: 0;
+  padding: 0.35rem 0.75rem;
+  border-radius: 4px;
+  color: var(--text);
+  font-size: 0.9375rem;
+  line-height: 1.3;
+  text-align: center;
+  cursor: pointer;
+}
+.segments label:hover {
+  color: var(--ink);
+}
+.segments input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.segments label:has(:checked) {
+  background: var(--ink);
+  color: var(--paper);
+}
+.segments label:has(:focus-visible) {
+  outline: 3px solid var(--blue);
+  outline-offset: 2px;
+}
+.format .hint {
+  margin-top: 0.6rem;
+}
 .reader {
   padding-bottom: 1.25rem;
   border-bottom: 1px solid var(--line);
@@ -834,6 +898,21 @@ select:disabled {
 }
 .reader details > * + * {
   margin-top: 0.8rem;
+}
+/* While a model loads or reads, the button that cancels stands at the end of the line that says how far it is. */
+.busy {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+}
+.busy .status {
+  margin: 0;
+}
+.busy .quiet {
+  flex: none;
+  padding: 0.3rem 0.8rem;
+  font-size: 0.875rem;
 }
 /* Loading a model takes minutes the first time: a bar shows how much of it is there. */
 .reader .loading {
@@ -1314,6 +1393,47 @@ select.warned {
   font-weight: 600;
 }
 
+/* Compared with typical online converters: a plain table. This tool's column has the ink and a thin rule, nothing more. */
+.compare {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+.compare th,
+.compare td {
+  padding: 0.6rem 1.25rem 0.65rem 0;
+  text-align: left;
+  vertical-align: top;
+  border-top: 1px solid var(--line);
+}
+.compare thead :is(th, td) {
+  padding-top: 0;
+  border-top: 0;
+  font-size: 0.875rem;
+  font-weight: 650;
+  color: var(--muted);
+}
+.compare tbody tr:first-child :is(th, td) {
+  border-top-color: var(--line-strong);
+}
+.compare tbody th {
+  width: 28%;
+  color: var(--ink);
+  font-weight: 600;
+}
+.compare :is(th, td):last-child {
+  width: 36%;
+  padding-left: 1.25rem;
+  padding-right: 0;
+  border-left: 1px solid var(--ink);
+  color: var(--ink);
+}
+/* On a phone the rows are stacked, and every answer names its side. */
+.compare__who {
+  display: none;
+}
+
 /* For developers: where to get it, and one listing at a time. */
 .links {
   display: grid;
@@ -1548,6 +1668,47 @@ html[lang='en']:has([data-lang][aria-pressed='true']) .legal[lang='de'] {
   }
   .kinds tr:not(:first-child) td:first-child {
     padding-bottom: 0.1rem;
+  }
+  .compare,
+  .compare tbody,
+  .compare tr,
+  .compare th,
+  .compare td {
+    display: block;
+    width: auto;
+  }
+  .compare thead {
+    display: none;
+  }
+  .compare tbody tr {
+    padding: 0.85rem 0 0.9rem;
+    border-top: 1px solid var(--line);
+  }
+  .compare tbody tr:first-child {
+    border-top-color: var(--line-strong);
+  }
+  .compare tbody :is(th, td) {
+    padding: 0;
+    border-top: 0;
+  }
+  .compare td {
+    margin-top: 0.5rem;
+  }
+  .compare tbody th,
+  .compare :is(th, td):last-child {
+    width: auto;
+  }
+  .compare :is(th, td):last-child {
+    padding-left: 0.8rem;
+  }
+  .compare__who {
+    display: block;
+    font-size: 0.8125rem;
+    font-weight: 650;
+    color: var(--muted);
+  }
+  .compare td:last-child .compare__who {
+    color: var(--ink);
   }
   .line {
     grid-template-columns: 1fr 1fr;

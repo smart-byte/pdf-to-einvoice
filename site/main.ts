@@ -7,7 +7,7 @@ import { guessFromText, languageOf } from '../src/guess.js';
 import { INVOICE_TYPES, VAT_CATEGORIES, type InvoiceDraft } from '../src/model.js';
 import { inspectPdf } from '../src/pdf.js';
 import { extractLayout } from '../src/text.js';
-import { lang, setLang, t } from './i18n.js';
+import { lang, setLang, STRINGS, t } from './i18n.js';
 import { DEFAULT_MODEL, MODELS, hasWebGpu, readWithBrowserModel, readWithEndpoint } from './llm.js';
 import { locate, pageToShow, type Piece, type Rect } from './locate.js';
 import './styles.css';
@@ -37,13 +37,18 @@ interface State {
   fileFindings: Finding[];
   /** `validate` shows what an existing e-invoice says; nothing can be edited or created then. */
   mode: 'create' | 'validate';
+  /** What "Create" makes: the hybrid PDF, or an XRechnung for a public body. It stays when another PDF is opened. */
+  format: Format;
   /**
    * Values nobody has looked at yet, by the path of their field or of a whole line item ("lines.2"): a suggestion that
    * is not on the PDF, or what a language model read. Each stays until the user changes the value or says it is right.
    */
   toCheck: Map<string, 'suggested' | 'model'>;
 }
-const state: State = { fileName: '', pdfText: '', draft: {}, touched: new Set(), fileFindings: [], mode: 'create', toCheck: new Map() };
+type Format = 'pdf' | 'xrechnung';
+const state: State = { fileName: '', pdfText: '', draft: {}, touched: new Set(), fileFindings: [], mode: 'create', format: 'pdf', toCheck: new Map() };
+/** The format the form is shown and checked for. An existing e-invoice is looked at as it is. */
+const shownFormat = (): Format => (state.mode === 'validate' ? 'pdf' : state.format);
 
 // ---------------------------------------------------------------------------------------------------------------
 // Paths into the draft, e.g. "seller.name" or "lines.0.unitPrice"
@@ -104,14 +109,21 @@ const normaliseDraft = (draft: any): InvoiceDraft => ({
 // ---------------------------------------------------------------------------------------------------------------
 // The form
 
-type FieldType = 'text' | 'date' | 'number' | 'select';
+type FieldType = 'text' | 'date' | 'number' | 'select' | 'email' | 'tel';
 interface Field {
   path: string;
   label: string;
   type?: FieldType;
   options?: [value: string, label: string][];
   wide?: boolean;
+  /** A line under the field that says what goes in it. */
+  help?: string;
+  /** Shown for this format only. */
+  only?: Format;
 }
+
+// XRechnung asks for the buyer reference up front, beside the buyer; for the hybrid PDF it is one of the further fields.
+const BUYER_REFERENCE: Field = { path: 'buyerReference', label: 'f.buyerReference', help: 'f.buyerReference.help' };
 
 const party = (who: 'seller' | 'buyer'): Field[] => [
   { path: `${who}.name`, label: 'f.name', wide: true },
@@ -121,11 +133,16 @@ const party = (who: 'seller' | 'buyer'): Field[] => [
   { path: `${who}.country`, label: 'f.country' },
   { path: `${who}.vatId`, label: 'f.vatId' },
   ...(who === 'seller'
-    ? [
+    ? ([
         { path: 'seller.taxNumber', label: 'f.taxNumber' },
-        { path: 'seller.email', label: 'f.email' },
-      ]
-    : []),
+        { path: 'seller.email', label: 'f.email', type: 'email' },
+        { path: 'seller.contactName', label: 'f.contactName', only: 'xrechnung' },
+        { path: 'seller.phone', label: 'f.phone', type: 'tel', only: 'xrechnung' },
+      ] satisfies Field[])
+    : ([
+        { path: 'buyer.email', label: 'f.email', type: 'email', only: 'xrechnung' },
+        { ...BUYER_REFERENCE, only: 'xrechnung' },
+      ] satisfies Field[])),
 ];
 
 const SECTIONS: { title: string; fields: Field[]; collapsed?: boolean }[] = [
@@ -160,7 +177,7 @@ const SECTIONS: { title: string; fields: Field[]; collapsed?: boolean }[] = [
       { path: 'precedingInvoiceNumber', label: 'f.precedingInvoiceNumber' },
       { path: 'precedingInvoiceDate', label: 'f.precedingInvoiceDate', type: 'date' },
       { path: 'orderReference', label: 'f.orderReference' },
-      { path: 'buyerReference', label: 'f.buyerReference' },
+      { ...BUYER_REFERENCE, only: 'pdf' },
       { path: 'prepaidAmount', label: 'f.prepaidAmount', type: 'number' },
       { path: 'note', label: 'f.note', wide: true },
     ],
@@ -191,12 +208,13 @@ function control(field: Field, path: string): HTMLElement {
     if (field.type === 'number') (input as HTMLInputElement).step = 'any';
   }
   input.dataset.path = path;
-  input.setAttribute('aria-describedby', `${id}-hint`);
+  input.setAttribute('aria-describedby', field.help ? `${id}-help ${id}-hint` : `${id}-hint`);
   return el(
     'div',
     { className: `field${field.wide ? ' field--wide' : ''}` },
     el('label', { htmlFor: id }, t(field.label)),
     input,
+    ...(field.help ? [el('p', { className: 'hint', id: `${id}-help` }, t(field.help))] : []),
     el('p', { className: 'hint', id: `${id}-hint`, dataset: { hint: path } }),
   );
 }
@@ -252,8 +270,13 @@ function renderForm(): void {
     const details = el('details', { className: 'group', dataset: { section: title }, open: expanded.has(title) }, el('summary', {}, t(title)), body);
     return details;
   };
+  const format = shownFormat();
   const [invoice, seller, buyer, payment, more] = SECTIONS.map(({ title, fields, collapsed }) =>
-    section(title, el('div', { className: 'fields' }, ...fields.map((field) => control(field, field.path))), collapsed),
+    section(
+      title,
+      el('div', { className: 'fields' }, ...fields.filter((field) => (field.only ?? format) === format).map((field) => control(field, field.path))),
+      collapsed,
+    ),
   );
   form.append(invoice!, seller!, buyer!, section('s.lines', renderLines()), payment!, more!);
   if (state.mode === 'validate') {
@@ -270,7 +293,33 @@ function renderForm(): void {
 // ---------------------------------------------------------------------------------------------------------------
 // Findings and totals
 
-const describe = (finding: Finding) => (lang === 'de' && t(`e.${finding.code}`) !== `e.${finding.code}` ? t(`e.${finding.code}`) : finding.message);
+/**
+ * A finding, or an error of the library, in the language of the page: in German the text for its code, worded for its
+ * field where there is one (`e.format.iban`), else the English message of the library. What a German text names, it
+ * takes from the data rather than from the English sentence; only the value a message quotes and a message of the
+ * library that writes the XML are passed on as they are.
+ */
+function describe(finding: { code: string; message: string; path?: string }): string {
+  const path = finding.path ?? '';
+  const key = [`e.${finding.code}.${path.split('.').at(-1)}`, `e.${finding.code}`].find((candidate) => candidate in STRINGS);
+  if (lang !== 'de' || !key) return finding.message;
+  const line = state.draft.lines?.[Number(/^lines\.(\d+)\./.exec(path)?.[1])];
+  return t(key, {
+    a: line ? money(Number(line.quantity) * Number(line.unitPrice)) : '',
+    b: line ? money(Number(line.netAmount)) : '',
+    // Known limit: the value that could not be written is read from the quotes of the English message. Give the finding
+    // the value itself if that message is ever worded differently.
+    v: /"(.*)"/.exec(finding.message)?.[1] ?? '',
+    m: finding.message,
+  });
+}
+/** Why creating failed. An error of the library carries a code, and the page has a sentence for each. */
+const reasonOf = (error: unknown) =>
+  error instanceof Error && error.name === 'InvoiceError'
+    ? describe(error as Error & { code: string })
+    : error instanceof Error
+      ? error.message
+      : String(error);
 const money = (n: number) =>
   new Intl.NumberFormat(lang, {
     style: 'currency',
@@ -280,16 +329,23 @@ const money = (n: number) =>
 function fieldLabel(path: string): string {
   const input = document.querySelector<HTMLElement>(`[data-path="${path}"]`);
   const label = input && document.querySelector(`label[for="${input.id}"]`)?.textContent;
-  const line = /^lines\.(\d+)\./.exec(path);
-  if (label) return line ? `${t('s.lines')} ${Number(line[1]) + 1}, ${label}` : label;
-  return path.startsWith('totals') ? t('s.totals') : path === 'lines' ? t('s.lines') : '';
+  // A line item is named by its number, also for a value of it the form does not show, such as its total.
+  const line = /^lines\.(\d+)(\.|$)/.exec(path);
+  if (line) return `${t('s.lines')} ${Number(line[1]) + 1}${label ? `, ${label}` : ''}`;
+  if (label) return label;
+  return path.startsWith('totals.') ? t(`t.${path.slice(7)}`) : path === 'lines' ? t('s.lines') : '';
 }
 
-/** The field of a path, or the first field of a line item for the path of the whole line. */
-const fieldOf = (path: string) => document.querySelector<HTMLElement>(`[data-path="${path}"], [data-path="${path}.name"]`);
+/** The field of a path; the first field of a line item for the path of the whole line, or of a value of it the form does not show. */
+const fieldOf = (path: string) =>
+  document.querySelector<HTMLElement>(`[data-path="${path}"], [data-path="${path}.name"]`) ??
+  document.querySelector<HTMLElement>(`[data-path="${path.replace(/^(lines\.\d+)\..*$/, '$1')}.name"]`);
 
 function validate(): void {
-  const result = (state.result = check(state.draft, state.pdf ? { pdfText: state.pdfText } : {}));
+  const result = (state.result = check(state.draft, {
+    ...(state.pdf ? { pdfText: state.pdfText } : {}),
+    ...(shownFormat() === 'xrechnung' ? { rules: 'xrechnung' as const } : {}),
+  }));
   // What nobody has looked at yet is said at its field. A model may have read a value the form has no field for: that one is not counted.
   const unchecked: Finding[] = [...state.toCheck]
     .filter(([path]) => document.querySelector(`[data-hint="${path}"]`))
@@ -299,7 +355,10 @@ function validate(): void {
       code: why,
       message: t(why === 'suggested' ? 'hint.suggested' : /^lines\.\d+$/.test(path) ? 'hint.model.line' : 'hint.model'),
     }));
-  const findings = [...result.findings, ...state.fileFindings, ...unchecked];
+  // Where XRechnung demands a part of the address, the warning that it is missing would only say the same again.
+  const demanded = (finding: Finding) =>
+    finding.code === 'address' && result.findings.some((other) => other.code === 'xrechnung-address' && other.path === finding.path);
+  const findings = [...result.findings.filter((finding) => !demanded(finding)), ...state.fileFindings, ...unchecked];
 
   for (const hint of document.querySelectorAll<HTMLElement>('[data-hint]')) {
     const path = hint.dataset.hint!;
@@ -409,6 +468,22 @@ $('#form').addEventListener('input', (event) => {
   validate();
 });
 
+// What "Create" makes. Switching keeps every value: the form shows and checks what the chosen format asks for.
+const formats = [...document.querySelectorAll<HTMLInputElement>('input[name="format"]')];
+function showFormat(): void {
+  for (const radio of formats) radio.checked = radio.value === state.format;
+  $('#format-note').hidden = state.format !== 'xrechnung';
+  setText('#create', state.format === 'xrechnung' ? 'create.run.xr' : 'create.run');
+}
+for (const radio of formats) {
+  radio.onchange = () => {
+    state.format = radio.value as Format;
+    showFormat();
+    renderForm();
+  };
+}
+showFormat();
+
 // ---------------------------------------------------------------------------------------------------------------
 // Where the values stand on the page
 
@@ -451,6 +526,7 @@ function placesOf(path: string, on: Piece[]): Rect[] {
 function renderMarks(): void {
   marks.replaceChildren();
   const taken = new Set<string>();
+  const placed: { mark: HTMLElement; rect: Rect }[] = [];
   const place = (path: string, label: string, rects: Rect[]) => {
     for (const rect of rects) {
       const box = { left: `${rect.x}%`, top: `${rect.y}%`, width: `${rect.width}%`, height: `${rect.height}%` };
@@ -461,6 +537,7 @@ function renderMarks(): void {
       // How far down the page the mark is: the band of light uncovers it when it gets there.
       mark.style.setProperty('--y', String(rect.y / 100));
       marks.append(mark);
+      placed.push({ mark, rect });
     }
   };
   const on = pagePieces[shown] ?? [];
@@ -470,6 +547,13 @@ function renderMarks(): void {
     place(path, fieldLabel(path), placesOf(path, on));
   }
   for (const key of ['net', 'vat', 'gross'] as const) place(`totals.${key}`, t(`t.${key}`), placesOf(`totals.${key}`, on));
+  // A value printed inside another one, such as the due date in the sentence of the payment terms, lies on top of it:
+  // both marks can be pointed at.
+  const inside = (inner: Rect, outer: Rect) =>
+    inner.width * inner.height < outer.width * outer.height &&
+    Math.abs(inner.x + inner.width / 2 - outer.x - outer.width / 2) < outer.width / 2 &&
+    Math.abs(inner.y + inner.height / 2 - outer.y - outer.height / 2) < outer.height / 2;
+  for (const { mark, rect } of placed) if (placed.some((other) => inside(rect, other.rect))) mark.style.zIndex = '1';
   $('#marks-note').hidden = marks.children.length === 0;
   renderPager();
   highlight(pointed ?? focusedPath());
@@ -479,8 +563,7 @@ function renderMarks(): void {
 function turnTo(path: string): void {
   const page = pageToShow(pagePieces, shown, (on) => placesOf(path, on).length > 0);
   if (page === undefined || page === shown) return;
-  const label = path.startsWith('totals.') ? t(`t.${path.slice(7)}`) : fieldLabel(path);
-  void showPage(page).then(() => ($('#page-live').textContent = t('page.turned', { n: page + 1, f: label })));
+  void showPage(page).then(() => ($('#page-live').textContent = t('page.turned', { n: page + 1, f: fieldLabel(path) })));
 }
 
 $('#form').addEventListener('focusin', (event) => {
@@ -706,40 +789,53 @@ modelSelect.onchange = () => ($('#ai-endpoint').hidden = modelSelect.value !== '
 function reading(fraction?: number): void {
   const loading = fraction !== undefined && fraction < 1;
   $('#ai-loading').hidden = !loading;
+  $('#ai-cancel').hidden = fraction === undefined;
   $<HTMLProgressElement>('#ai-progress').value = fraction ?? 0;
   if (fraction !== undefined) $('#ai-status').textContent = loading ? t('ai.loading', { p: Math.round(fraction * 100) }) : t('ai.reading');
   scan(fraction !== undefined && !loading ? 'on' : 'off');
 }
 
+/** Each reading has a number: only the last one may fill in the form, and one that was cancelled fills in nothing. */
+let reads = 0;
+let cancelRead: AbortController | undefined;
+$('#ai-cancel').onclick = () => cancelRead?.abort();
+
 $('#ai-run').onclick = async () => {
   const status = $('#ai-status');
-  const button = $<HTMLButtonElement>('#ai-run');
+  const [button, cancel] = [$<HTMLButtonElement>('#ai-run'), $<HTMLButtonElement>('#ai-cancel')];
   const viaEndpoint = modelSelect.value === 'endpoint';
   if (!viaEndpoint && !hasWebGpu()) return void (status.textContent = t('ai.nogpu'));
+  const run = ++reads;
+  const abort = (cancelRead = new AbortController());
+  // The button waits while the model works; the focus goes on to the button that cancels.
+  const focused = document.activeElement === button;
   button.disabled = true;
   const pdf = state.pdf;
   try {
     reading(viaEndpoint ? 1 : 0);
+    if (focused) cancel.focus();
     const read = viaEndpoint
-      ? readWithEndpoint(state.pdfText, {
-          url: $<HTMLInputElement>('#ai-url').value,
-          model: $<HTMLInputElement>('#ai-name').value,
-          key: $<HTMLInputElement>('#ai-key').value,
-        })
-      : readWithBrowserModel(state.pdfText, modelSelect.value, reading);
+      ? readWithEndpoint(
+          state.pdfText,
+          { url: $<HTMLInputElement>('#ai-url').value, model: $<HTMLInputElement>('#ai-name').value, key: $<HTMLInputElement>('#ai-key').value },
+          abort.signal,
+        )
+      : readWithBrowserModel(state.pdfText, modelSelect.value, reading, abort.signal);
     const answer = await read;
-    // Another PDF was opened while the model read: its answer is about the invoice that is gone.
-    if (state.pdf !== pdf) return;
+    // Another PDF was opened, or the reading was cancelled, while the model read: the answer is not taken over.
+    if (state.pdf !== pdf || run !== reads || abort.signal.aborted) return;
     // A small model translates names and makes up identifiers. Only what the PDF shows is taken over, and even of
     // that a good part is wrong: every value the model added is marked until the user has looked at it.
     for (const path of merge(keepWhatThePdfShows(normaliseDraft(answer), state.pdfText), true)) state.toCheck.set(path, 'model');
     renderForm();
     status.textContent = t('ai.done');
   } catch (error) {
-    status.textContent = t('ai.failed', { m: error instanceof Error ? error.message : String(error) });
+    status.textContent = abort.signal.aborted ? t('ai.cancelled') : t('ai.failed', { m: error instanceof Error ? error.message : String(error) });
   } finally {
+    const refocus = document.activeElement === cancel;
     reading();
     button.disabled = false;
+    if (refocus) button.focus();
     if (state.pdf !== pdf) status.textContent = '';
   }
 };
@@ -759,8 +855,9 @@ function fragment(xml: string, ...names: string[]): string | undefined {
 }
 
 /**
- * Shows the XML that "Create e-invoice" would embed right now. It is not put together a second time for this view:
- * the e-invoice is created and its XML is shown, and the rows of the table are cut out of that XML.
+ * Shows the XML that "Create" would write right now: the one in the PDF, or for an XRechnung the file of its own. It
+ * is not put together a second time for this view: the file is created and its XML is shown, and the rows of the
+ * table are cut out of that XML.
  */
 async function renderXml(): Promise<void> {
   const run = ++xmlRun;
@@ -773,17 +870,19 @@ async function renderXml(): Promise<void> {
   if (pair.hidden) status.textContent = t('xml.busy');
   try {
     const invoice = structuredClone(state.draft);
-    const { createEInvoice } = await import('../src/create.js');
-    const { xml, totals } = await createEInvoice({ pdf: state.pdf, invoice });
+    const { createEInvoice, createXRechnung } = await import('../src/create.js');
+    const { xml, totals } = shownFormat() === 'xrechnung' ? await createXRechnung({ invoice }) : await createEInvoice({ pdf: state.pdf, invoice });
     // The data has changed again in the meantime: the newer run shows its XML.
     if (run !== xmlRun) return;
     const date = (iso: unknown) => new Intl.DateTimeFormat(lang, { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(`${iso}T00:00:00Z`));
+    // Where a value stands in CII (the PDF) and in UBL (the XRechnung): the path that is not in the XML finds nothing.
+    const inXml = (cii: string[], ubl: string[]) => fragment(xml, ...cii) ?? fragment(xml, ...ubl);
     const rows: [label: string, value: string, written: string | undefined][] = [
-      [t('f.number'), String(invoice.number), fragment(xml, 'rsm:ExchangedDocument', 'ram:ID')],
-      [t('f.issueDate'), date(invoice.issueDate), fragment(xml, 'rsm:ExchangedDocument', 'ram:IssueDateTime', 'udt:DateTimeString')],
-      [t('xml.seller'), String(invoice.seller?.name), fragment(xml, 'ram:SellerTradeParty', 'ram:Name')],
-      [t('t.vat'), money(totals.vat), fragment(xml, 'ram:TaxTotalAmount')],
-      [t('t.gross'), money(totals.gross), fragment(xml, 'ram:GrandTotalAmount')],
+      [t('f.number'), String(invoice.number), inXml(['rsm:ExchangedDocument', 'ram:ID'], ['cbc:ID'])],
+      [t('f.issueDate'), date(invoice.issueDate), inXml(['rsm:ExchangedDocument', 'ram:IssueDateTime', 'udt:DateTimeString'], ['cbc:IssueDate'])],
+      [t('xml.seller'), String(invoice.seller?.name), inXml(['ram:SellerTradeParty', 'ram:Name'], ['cac:AccountingSupplierParty', 'cbc:RegistrationName'])],
+      [t('t.vat'), money(totals.vat), inXml(['ram:TaxTotalAmount'], ['cac:TaxTotal', 'cbc:TaxAmount'])],
+      [t('t.gross'), money(totals.gross), inXml(['ram:GrandTotalAmount'], ['cbc:TaxInclusiveAmount'])],
     ];
     // In a narrow column the XML breaks where a tag ends, not in the middle of a name.
     const code = (written: string) => el('code', {}, ...written.split(/(?<=>)(?!$)|(?=<\/)/).flatMap((part, i) => (i ? [el('wbr'), part] : [part])));
@@ -798,7 +897,7 @@ async function renderXml(): Promise<void> {
     status.textContent = '';
     pair.hidden = whole.hidden = false;
   } catch (error) {
-    if (run === xmlRun) instead(t('create.failed', { m: error instanceof Error ? error.message : String(error) }));
+    if (run === xmlRun) instead(t('create.failed', { m: reasonOf(error) }));
   }
 }
 
@@ -837,22 +936,40 @@ $('#create').onclick = async () => {
   const status = $('#create-status');
   button.disabled = true;
   status.textContent = t('create.busy');
+  const xr = state.format === 'xrechnung';
   try {
     // Loaded on demand: the XML writer is the heaviest part of the page.
-    const { createEInvoice } = await import('../src/create.js');
+    const { createEInvoice, createXRechnung } = await import('../src/create.js');
     // No language is passed on: for any other than English the library asks the server for a catalogue of
     // translations that it does not ship. It would only word the document properties of the PDF.
-    const result = await createEInvoice({ pdf: state.pdf!, invoice: state.draft });
+    const result = await createEInvoice({ pdf: state.pdf!, invoice: state.draft, ...(xr ? { profile: 'xrechnung' as const } : {}) });
+    // A public body takes the XRechnung as a file of its own; the PDF that carries it too is the copy that keeps the look.
+    const plain = xr ? await createXRechnung({ invoice: state.draft }) : undefined;
     downloads.forEach((url) => URL.revokeObjectURL(url));
     downloads = [];
     const base = state.fileName.replace(/\.pdf$/i, '');
     link('#download-pdf', result.pdf as BlobPart, 'application/pdf', `${base}.einvoice.pdf`);
-    link('#download-xml', result.xml, 'application/xml', `${base}.xml`);
-    const digest = await crypto.subtle.digest('SHA-256', result.pdf as BufferSource);
+    link('#download-xml', plain?.xml ?? result.xml, 'application/xml', plain ? `${base}.xrechnung.xml` : `${base}.xml`);
+    // The main file comes first, and the checksum is that of the main file.
+    const [main, copy] = [$<HTMLAnchorElement>(xr ? '#download-xml' : '#download-pdf'), $<HTMLAnchorElement>(xr ? '#download-pdf' : '#download-xml')];
+    main.className = 'primary';
+    copy.className = 'quiet';
+    main.parentElement!.prepend(main, copy);
+    setText('#download-pdf', xr ? 'done.xr.pdf' : 'done.pdf');
+    setText('#download-xml', xr ? 'done.xr.xml' : 'done.xml');
+    setText('#done-title', xr ? 'done.title.xr' : 'done.title');
+    setText('#done-lead', xr ? 'done.lead.xr' : 'done.lead');
+    $('#done-stamp').textContent = xr ? 'XRechnung' : 'EN 16931';
+    const digest = await crypto.subtle.digest('SHA-256', (plain ? new TextEncoder().encode(plain.xml) : result.pdf) as BufferSource);
+    $('#checksum-file').textContent = main.download;
     $('#checksum').textContent = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+    // Both files are written from the same data: what is said about it is said once.
+    const findings = [...result.findings, ...(plain?.findings ?? [])].filter(
+      (finding, i, all) => all.findIndex((other) => other.code === finding.code && other.path === finding.path && other.message === finding.message) === i,
+    );
     const notes = $('#done-notes');
-    notes.replaceChildren(...result.findings.map((finding) => el('li', {}, describe(finding))));
-    notes.hidden = result.findings.length === 0;
+    notes.replaceChildren(...findings.map((finding) => el('li', {}, describe(finding))));
+    notes.hidden = findings.length === 0;
     status.textContent = '';
     // The finished page shows the same preview, with the stamp landing on it.
     const [from, to] = [$<HTMLCanvasElement>('#preview'), $<HTMLCanvasElement>('#done-preview')];
@@ -860,7 +977,7 @@ $('#create').onclick = async () => {
     to.getContext('2d')!.drawImage(from, 0, 0);
     show('done');
   } catch (error) {
-    status.textContent = t('create.failed', { m: error instanceof Error ? error.message : String(error) });
+    status.textContent = t('create.failed', { m: reasonOf(error) });
   } finally {
     button.disabled = false;
     validate();
