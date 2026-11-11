@@ -337,6 +337,53 @@ export const STRINGS: Record<string, Entry> = {
     en: 'People read the left side, software the right one. Both have to say the same, so every value is compared with your PDF.',
   },
 
+  // Compared with typical online converters, none of them named. Each row: the question, their side, this tool.
+  'cmp.title': { de: 'Im Vergleich', en: 'Compared' },
+  'cmp.lead': {
+    de: 'Viele Dienste wandeln PDF-Rechnungen ebenfalls um. Der Unterschied liegt vor allem darin, wo Ihre Rechnung verarbeitet wird.',
+    en: 'Many services convert PDF invoices too. The main difference is where your invoice is processed.',
+  },
+  'cmp.them': { de: 'Typischer Online-Konverter', en: 'Typical online converter' },
+  'cmp.1': { de: 'Wo wird Ihre Rechnung verarbeitet?', en: 'Where is your invoice processed?' },
+  'cmp.1.them': { de: 'Auf den Servern des Anbieters: Die Datei wird hochgeladen.', en: "On the provider's servers: the file is uploaded." },
+  'cmp.1.us': { de: 'Auf Ihrem Gerät, im Browser. Nichts wird hochgeladen.', en: 'On your device, in the browser. Nothing is uploaded.' },
+  'cmp.2': { de: 'Wer liest die Angaben aus?', en: 'Who reads the data?' },
+  'cmp.2.them': {
+    de: 'Je nach Anbieter ein KI-Dienst in der Cloud, auch außerhalb der EU, oder Sie tippen alles ab.',
+    en: 'Depending on the provider, an AI service in the cloud, also outside the EU, or you type everything in.',
+  },
+  'cmp.2.us': {
+    de: 'Regeln auf Ihrem Gerät; auf Wunsch zusätzlich ein Sprachmodell, das ebenfalls in Ihrem Browser läuft.',
+    en: 'Rules on your device; on request also a language model that runs in your browser too.',
+  },
+  'cmp.3': { de: 'Woher stammt jede Angabe?', en: 'Where does each value come from?' },
+  'cmp.3.them': { de: 'Sie sehen ein Formular zum Korrigieren.', en: 'You get a form to correct.' },
+  'cmp.3.us': {
+    de: 'Jede Angabe ist im PDF markiert, und das XML wird mit dem PDF abgeglichen.',
+    en: 'Each value is marked on the PDF, and the XML is compared with the PDF.',
+  },
+  'cmp.4': { de: 'Konto, Werbung, Tracking', en: 'Account, ads, tracking' },
+  'cmp.4.them': { de: 'Je nach Anbieter Anmeldung, Werbung oder Abo.', en: 'Depending on the provider, sign-up, ads or a subscription.' },
+  'cmp.4.us': { de: 'Keine Anmeldung, keine Werbung, keine Cookies.', en: 'No sign-up, no ads, no cookies.' },
+  'cmp.5': { de: 'Quelltext', en: 'Source code' },
+  'cmp.5.them': { de: 'Meist nicht einsehbar.', en: 'Mostly closed.' },
+  'cmp.5.us': { de: 'Offen (MIT-Lizenz): Jeder kann nachprüfen, was die Seite tut.', en: 'Open (MIT licence): anyone can check what the page does.' },
+  'cmp.6': { de: 'Für Software und KI-Assistenten', en: 'For software and AI assistants' },
+  'cmp.6.them': { de: 'Meist eine Schnittstelle, an die Rechnungen geschickt werden.', en: 'Mostly an API that invoices are sent to.' },
+  'cmp.6.us': {
+    de: 'Bibliothek, Kommandozeile und MCP-Server, alles auf dem eigenen Rechner.',
+    en: 'Library, command line tool and MCP server, all on your own machine.',
+  },
+  'cmp.7': { de: 'Formate', en: 'Formats' },
+  'cmp.7.them': { de: 'ZUGFeRD, oft auch XRechnung und weitere.', en: 'ZUGFeRD, often XRechnung and more.' },
+  'cmp.7.us': { de: 'ZUGFeRD / Factur-X und XRechnung nach EN 16931.', en: 'ZUGFeRD / Factur-X and XRechnung, following EN 16931.' },
+  'cmp.8': { de: 'Prüfung gegen die offiziellen Regelwerke', en: 'Checking against the official rule sets' },
+  'cmp.8.them': { de: 'Teils mit eigenem Prüfwerkzeug.', en: 'Some offer their own validator.' },
+  'cmp.8.us': {
+    de: 'Eine eigene Plausibilitätsprüfung; keine vollständige Prüfung gegen die offiziellen Regelwerke.',
+    en: 'Its own plausibility check; not a complete check against the official rule sets.',
+  },
+
   'kinds.title': { de: 'Welche Rechnungsarten gehen?', en: 'Which kinds of invoices work?' },
   'kind.1': { de: 'Inland mit Umsatzsteuer, auch mit mehreren Steuersätzen', en: 'Domestic with VAT, also with several rates' },
   'kind.1.xml': { de: 'Kategorie S mit dem Satz je Position', en: 'Category S with the rate of each line' },

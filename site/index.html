@@ -351,6 +351,100 @@
         </table>
       </section>
 
+      <section class="info" id="compare" aria-labelledby="compare-title">
+        <div class="info__head">
+          <h2 id="compare-title" data-i18n="cmp.title">Compared</h2>
+          <p data-i18n="cmp.lead">Many services convert PDF invoices too. The main difference is where your invoice is processed.</p>
+        </div>
+        <!-- A plain comparison without names: the column of this tool is set apart by its ink and a thin rule. On a phone
+             each row lies stacked, and every answer names its side. -->
+        <table class="compare">
+          <thead>
+            <tr>
+              <td></td>
+              <th scope="col" data-i18n="cmp.them">Typical online converter</th>
+              <th scope="col">pdf-to-einvoice</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row" data-i18n="cmp.1">Where is your invoice processed?</th>
+              <td>
+                <span class="compare__who" data-i18n="cmp.them">Typical online converter</span
+                ><span data-i18n="cmp.1.them">On the provider's servers: the file is uploaded.</span>
+              </td>
+              <td><span class="compare__who">pdf-to-einvoice</span><span data-i18n="cmp.1.us">On your device, in the browser. Nothing is uploaded.</span></td>
+            </tr>
+            <tr>
+              <th scope="row" data-i18n="cmp.2">Who reads the data?</th>
+              <td>
+                <span class="compare__who" data-i18n="cmp.them">Typical online converter</span
+                ><span data-i18n="cmp.2.them">Depending on the provider, an AI service in the cloud, also outside the EU, or you type everything in.</span>
+              </td>
+              <td>
+                <span class="compare__who">pdf-to-einvoice</span
+                ><span data-i18n="cmp.2.us">Rules on your device; on request also a language model that runs in your browser too.</span>
+              </td>
+            </tr>
+            <tr>
+              <th scope="row" data-i18n="cmp.3">Where does each value come from?</th>
+              <td>
+                <span class="compare__who" data-i18n="cmp.them">Typical online converter</span><span data-i18n="cmp.3.them">You get a form to correct.</span>
+              </td>
+              <td>
+                <span class="compare__who">pdf-to-einvoice</span
+                ><span data-i18n="cmp.3.us">Each value is marked on the PDF, and the XML is compared with the PDF.</span>
+              </td>
+            </tr>
+            <tr>
+              <th scope="row" data-i18n="cmp.4">Account, ads, tracking</th>
+              <td>
+                <span class="compare__who" data-i18n="cmp.them">Typical online converter</span
+                ><span data-i18n="cmp.4.them">Depending on the provider, sign-up, ads or a subscription.</span>
+              </td>
+              <td><span class="compare__who">pdf-to-einvoice</span><span data-i18n="cmp.4.us">No sign-up, no ads, no cookies.</span></td>
+            </tr>
+            <tr>
+              <th scope="row" data-i18n="cmp.5">Source code</th>
+              <td><span class="compare__who" data-i18n="cmp.them">Typical online converter</span><span data-i18n="cmp.5.them">Mostly closed.</span></td>
+              <td>
+                <span class="compare__who">pdf-to-einvoice</span><span data-i18n="cmp.5.us">Open (MIT licence): anyone can check what the page does.</span>
+              </td>
+            </tr>
+            <tr>
+              <th scope="row" data-i18n="cmp.6">For software and AI assistants</th>
+              <td>
+                <span class="compare__who" data-i18n="cmp.them">Typical online converter</span
+                ><span data-i18n="cmp.6.them">Mostly an API that invoices are sent to.</span>
+              </td>
+              <td>
+                <span class="compare__who">pdf-to-einvoice</span
+                ><span data-i18n="cmp.6.us">Library, command line tool and MCP server, all on your own machine.</span>
+              </td>
+            </tr>
+            <tr>
+              <th scope="row" data-i18n="cmp.7">Formats</th>
+              <td>
+                <span class="compare__who" data-i18n="cmp.them">Typical online converter</span
+                ><span data-i18n="cmp.7.them">ZUGFeRD, often XRechnung and more.</span>
+              </td>
+              <td><span class="compare__who">pdf-to-einvoice</span><span data-i18n="cmp.7.us">ZUGFeRD / Factur-X and XRechnung, following EN 16931.</span></td>
+            </tr>
+            <tr>
+              <th scope="row" data-i18n="cmp.8">Checking against the official rule sets</th>
+              <td>
+                <span class="compare__who" data-i18n="cmp.them">Typical online converter</span
+                ><span data-i18n="cmp.8.them">Some offer their own validator.</span>
+              </td>
+              <td>
+                <span class="compare__who">pdf-to-einvoice</span
+                ><span data-i18n="cmp.8.us">Its own plausibility check; not a complete check against the official rule sets.</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
       <section class="info" id="limits" aria-labelledby="limits-title">
         <div class="info__head">
           <h2 id="limits-title" data-i18n="limits.title">What you should know</h2>
