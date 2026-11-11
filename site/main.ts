@@ -973,8 +973,9 @@ $('#create').onclick = async () => {
   try {
     // Loaded on demand: the XML writer is the heaviest part of the page.
     const { createEInvoice, createXRechnung } = await import('../src/create.js');
-    // No language is passed on: for any other than English the library asks the server for a catalogue of
-    // translations that it does not ship. It would only word the document properties of the PDF.
+    // No language is passed on. The library that writes the XML asks the server for a catalogue of translations in
+    // whatever language it is given, and ships none: for English, its default here, the site answers with an empty
+    // one (public/assets/locale).
     const result = await createEInvoice({ pdf: state.pdf!, invoice: state.draft, ...(xr ? { profile: 'xrechnung' as const } : {}) });
     // A public body takes the XRechnung as a file of its own; the PDF that carries it too is the copy that keeps the look.
     const plain = xr ? await createXRechnung({ invoice: state.draft }) : undefined;
