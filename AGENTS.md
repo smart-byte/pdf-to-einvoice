@@ -17,6 +17,7 @@ npm run build               # the package into dist/
 npm run site                # the web app on http://localhost:4350
 npm run site:build          # the static site into site-dist/
 npm run test:reference      # validates generated e-invoices; needs Java and the validator, see CONTRIBUTING.md
+npm run test:browser        # the web app in Chrome, on the built site
 npm run eval:reader -- <folder>   # how much the reader gets right, see CONTRIBUTING.md
 ```
 
@@ -46,6 +47,7 @@ A change is done when `npm test`, `npm run type-check`, `npm run lint` and `npm 
 - The reader must not be fitted to single layouts. A change to `src/guess.ts` or `src/text.ts` comes with the table
   of `npm run eval:reader` before and after. A wrong value is worse than a missing one.
 - A change to how files are written comes with `npm run test:reference`.
+- A change to the website comes with `npm run test:browser`; a new flow gets a test in `test/browser.test.ts`.
 - Money is calculated in whole cents (`src/calculate.ts`), never in floating point euros.
 - The website makes no request to a third party except the model download the user asks for. No scripts, styles or
   fonts from another origin, no analytics.

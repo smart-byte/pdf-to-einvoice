@@ -25,6 +25,18 @@ jobs:
       - run: npm test
       - run: npm run site:build
 
+  # The web app itself, in the Chrome of the runner: the built site with its Content-Security-Policy.
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run test:browser
+
   # Whether the generated files are valid e-invoices is decided by the reference validator, not by our own tests.
   reference:
     runs-on: ubuntu-latest
