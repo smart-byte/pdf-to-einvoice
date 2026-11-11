@@ -23,7 +23,7 @@ npm run sample         # regenerate examples/sample-invoice.pdf from its JSON
 
 ## Reference validation
 
-`npm test` checks this project's own logic. Whether a generated file really is a valid e-invoice is decided by
+`npm test` checks this project's own logic. Whether a generated file conforms is checked by
 a reference validator, the Mustang command line tool: it runs veraPDF (PDF/A-3) and the official EN 16931 /
 Factur-X Schematron rules, and the XRechnung rules on a file that declares XRechnung. It needs Java 11 or newer:
 

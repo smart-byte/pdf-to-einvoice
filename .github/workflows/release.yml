@@ -1,21 +1,22 @@
 name: Release
 
-# Pushing a version tag (v0.2.0) publishes that version to npm and creates the GitHub release from its changelog
-# section. npm trusts this workflow directly (trusted publishing over OIDC), so no token is stored: the package's
-# settings on npmjs.com must name repository smart-byte/pdf-to-einvoice and workflow file release.yml.
+# Started by hand only (Actions → Release → Run workflow, on main): publishing to npm cannot be undone. It publishes
+# the version in package.json and then creates its tag and the GitHub release from its changelog section.
+# npm trusts this workflow directly (trusted publishing over OIDC), so no token is stored: the package's settings on
+# npmjs.com must name repository smart-byte/pdf-to-einvoice and workflow file release.yml.
 on:
-  push:
-    tags: ['v*']
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
   publish:
-    if: github.repository == 'smart-byte/pdf-to-einvoice' # npm trusts only this repository
+    # npm trusts only this repository; a release is made from main only.
+    if: github.repository == 'smart-byte/pdf-to-einvoice' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
-      contents: write # create the GitHub release
+      contents: write # create the tag and the GitHub release
       id-token: write # prove to npm which workflow this is; npm signs the provenance statement with it
     env:
       MUSTANG_VERSION: 2.26.0
@@ -27,11 +28,13 @@ jobs:
           node-version-file: .nvmrc
           registry-url: https://registry.npmjs.org
           package-manager-cache: false # a release builds from scratch
-      - name: Check the tag against package.json and the changelog
+      - name: Check the version against the changelog and the existing tags
+        id: version
         run: |
           version=$(node -p "require('./package.json').version")
-          [ "v$version" = "$GITHUB_REF_NAME" ] || { echo "::error::tag $GITHUB_REF_NAME does not match package.json version $version"; exit 1; }
           grep -q "^## \[$version\] - [0-9]" CHANGELOG.md || { echo "::error::CHANGELOG.md has no dated section for $version"; exit 1; }
+          if git ls-remote --exit-code --tags origin "refs/tags/v$version" > /dev/null; then echo "::error::v$version has been released already"; exit 1; fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
       # Trusted publishing needs npm 11.5.1 or newer; Node 22 ships npm 10. A fixed version, not the newest.
       - run: npm install -g npm@11.21.1
       - run: npm ci
@@ -41,9 +44,12 @@ jobs:
           echo "$MUSTANG_SHA256  mustang.jar" | sha256sum --check
           MUSTANG_JAR="$GITHUB_WORKSPACE/mustang.jar" npm run test:reference
       - run: npm publish # prepublishOnly runs the type-check, the linter, the format check, the build and the tests first
-      - name: Create the GitHub release
+      # The tag is made here, not pushed by hand. Once it exists, the ruleset for version tags lets only admins move or
+      # delete it.
+      - name: Create the tag and the GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          awk -v heading="## [${GITHUB_REF_NAME#v}]" 'index($0, "## [") == 1 { on = index($0, heading) == 1; next } on' CHANGELOG.md > "$RUNNER_TEMP/notes.md"
-          gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/notes.md" --verify-tag
+          awk -v heading="## [$VERSION]" 'index($0, "## [") == 1 { on = index($0, heading) == 1; next } on' CHANGELOG.md > "$RUNNER_TEMP/notes.md"
+          gh release create "v$VERSION" --target "$GITHUB_SHA" --title "v$VERSION" --notes-file "$RUNNER_TEMP/notes.md"

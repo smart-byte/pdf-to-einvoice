@@ -13,7 +13,7 @@ import { extractText } from './text.js';
 const INSTRUCTIONS = `pdf-to-einvoice turns an existing invoice PDF into an EN 16931 e-invoice (ZUGFeRD / Factur-X): the invoice data is attached to the PDF as XML, the pages stay as they are. It also writes the data as an XRechnung, the XML German public bodies ask for. Everything runs locally; no file is uploaded.
 
 Workflow:
-1. read_invoice_pdf: get the text of the PDF and a first guess of the labelled values.
+1. read_invoice_pdf: get the text of the PDF and a first guess of the values (parties, line items, totals and more).
 2. Fill in the invoice data from that text (the fields are described in the input schema of check_invoice).
 3. check_invoice with pdf_path: fix every error; look at every warning.
 4. Show the user the data and the findings, and wait for their confirmation.
@@ -27,8 +27,8 @@ Rules:
 - You act for the invoice ISSUER (the seller). A recipient cannot make a received PDF a valid e-invoice; say so if that is what is asked.
 - Copy values exactly as the PDF prints them. Never invent, guess or "correct" a value. If something is missing or unclear, ask the user.
 - Always show the user the findings. A "not-in-pdf" warning means a value does not occur in the PDF text: check it.
-- The XML is the legally binding part of the e-invoice and must not contradict the PDF. The user must confirm the data before create_einvoice.
-- This is not tax advice. Which VAT category applies is the user's decision; ask when the PDF does not say.`;
+- The XML is the legally binding part of the e-invoice and must not contradict the PDF. The user must confirm the data before create_einvoice or create_xrechnung.
+- This is not tax or legal advice. Which VAT category applies is the user's decision; ask when the PDF does not say.`;
 
 const { $schema: _dialect, ...INVOICE_SCHEMA } = invoiceJsonSchema;
 /** The same schema for a draft: nothing is required, so an incomplete invoice can be sent to learn what it lacks. */
@@ -55,7 +55,7 @@ const TOOLS = [
     name: 'read_invoice_pdf',
     title: 'Read an invoice PDF',
     description:
-      'Reads an invoice PDF from disk. Returns its text row by row, values guessed from labels (number, dates, bank details, tax IDs, totals; a starting point, not a result) and facts about the PDF: page count, fonts that are not embedded, and whether it already is an e-invoice.',
+      'Reads an invoice PDF from disk. Returns its text row by row, values found by pattern (number, dates, parties, line items, totals, payment terms, bank details, tax IDs; a starting point, not a result) and facts about the PDF: page count, fonts that are not embedded, and whether it is already an e-invoice.',
     annotations: READS,
     inputSchema: { type: 'object', properties: { pdf_path: pathSchema('The invoice PDF.') }, required: ['pdf_path'] },
   },

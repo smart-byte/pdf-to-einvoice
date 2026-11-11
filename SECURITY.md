@@ -21,7 +21,8 @@ Include the version, the front end (web app, CLI, library, MCP server) and the s
   AI". If the user configures their own model endpoint,
   the invoice text is sent to that address, and the page says so.
 - The built pages carry a Content-Security-Policy: only the site's own scripts, styles and fonts load, nothing
-  inline and nothing from another origin runs. Requests to other hosts stay possible because of the model download
+  inline and nothing from another origin runs. The one exception is `'unsafe-eval'`: the library that writes the
+  XML compiles its data checks at run time. Requests to other hosts stay possible because of the model download
   and the user's own endpoint; `site/vite.config.ts` holds the policy and says why each exception is there.
 - The CLI and the MCP server read and write local files only and make no network requests.
 - Bugs in the libraries this project builds on (see THIRD_PARTY_NOTICES.md) are best reported upstream as well.
