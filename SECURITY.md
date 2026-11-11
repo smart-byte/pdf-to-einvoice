@@ -7,22 +7,16 @@ sends invoice content off the device is a security bug here.
 ## Reporting a vulnerability
 
 Please report privately through GitHub: **Security → Report a vulnerability** on
-https://github.com/smart-byte/pdf-to-einvoice (a private security advisory). Do not open a public issue for it, and
-do not attach real invoices.
-
+https://github.com/smart-byte/pdf-to-einvoice. Do not open a public issue for it, and do not attach real invoices.
 Include the version, the front end (web app, CLI, library, MCP server) and the steps that reproduce the problem.
 
 ## Scope
 
 - Supported: the latest released version.
-- The web app is static. There is no server component, no cookies and no tracking; invoices are processed in the
-  browser. The only network requests it can make on its own download a language model from
-  huggingface.co and its program code from raw.githubusercontent.com, and only after the user chooses "Read with
-  AI". If the user configures their own model endpoint,
-  the invoice text is sent to that address, and the page says so.
-- The built pages carry a Content-Security-Policy: only the site's own scripts, styles and fonts load, nothing
-  inline and nothing from another origin runs. The one exception is `'unsafe-eval'`: the library that writes the
-  XML compiles its data checks at run time. Requests to other hosts stay possible because of the model download
-  and the user's own endpoint; `site/vite.config.ts` holds the policy and says why each exception is there.
+- The web app is static: no server component, no cookies, no tracking. On its own it only downloads a language model,
+  from huggingface.co and raw.githubusercontent.com, and only after the user chooses "Read with AI". A model
+  endpoint the user configures receives the invoice text, and the page says so.
+- The built pages carry a Content-Security-Policy; `site/vite.config.ts` holds it and says why each exception is
+  there.
 - The CLI and the MCP server read and write local files only and make no network requests.
 - Bugs in the libraries this project builds on (see THIRD_PARTY_NOTICES.md) are best reported upstream as well.
