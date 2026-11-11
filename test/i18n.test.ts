@@ -61,3 +61,14 @@ describe('German texts', () => {
     vi.unstubAllGlobals();
   });
 });
+
+describe('Footer', () => {
+  it('is the same on every page and leaves the site only for the source', () => {
+    const [home, ...others] = ['index.html', 'privacy.html', 'legal-notice.html'].map((page) => {
+      const html = readFileSync(new URL(`../site/${page}`, import.meta.url), 'utf8');
+      return [...html.slice(html.indexOf('<footer')).matchAll(/<a href="([^"]+)"/g)].map((match) => match[1]!);
+    });
+    for (const links of others) expect(links).toEqual(home);
+    expect(home!.filter((href) => /^https?:/.test(href))).toEqual(['https://github.com/smart-byte/pdf-to-einvoice']);
+  });
+});

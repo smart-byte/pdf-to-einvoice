@@ -518,7 +518,6 @@ export const STRINGS: Record<string, Entry> = {
   'foot.source': { de: 'Quelltext auf GitHub', en: 'Source on GitHub' },
   'foot.legal': { de: 'Impressum', en: 'Legal notice' },
   'foot.privacy': { de: 'Datenschutz', en: 'Privacy' },
-  'foot.licence': { de: 'MIT-Lizenz', en: 'MIT licence' },
   'foot.third': { de: 'Lizenzen Dritter', en: 'Third-party licences' },
 };
 
