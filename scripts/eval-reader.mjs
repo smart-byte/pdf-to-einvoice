@@ -32,6 +32,8 @@ const walk = (dir) =>
 const text = (v) => (typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().toLowerCase() : v);
 const id = (v) => (typeof v === 'string' ? v.replace(/\s+/g, '').toUpperCase() : v);
 const cents = (v) => (typeof v === 'number' ? Math.round(v * 100) : v);
+/** A phone number is the same however it is grouped. */
+const digits = (v) => (typeof v === 'string' ? v.replace(/\D/g, '') : v);
 /** field name -> how to pick it and how to normalise it for comparison */
 const FIELDS = {
   number: [(i) => i.number, text],
@@ -46,6 +48,11 @@ const FIELDS = {
   'totals.gross': [(i) => i.totals?.gross, cents],
   'lines (count)': [(i) => i.lines?.length || undefined, (v) => v],
   iban: [(i) => i.iban, id],
+  buyerReference: [(i) => i.buyerReference, text],
+  'seller.contactName': [(i) => i.seller?.contactName, text],
+  'seller.phone': [(i) => i.seller?.phone, digits],
+  'seller.email': [(i) => i.seller?.email, text],
+  'buyer.email': [(i) => i.buyer?.email, text],
 };
 /** For every field the answer key has: whether a reading of the invoice got it. */
 const verdicts = (reading, truth) =>

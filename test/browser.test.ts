@@ -170,7 +170,9 @@ describe.skipIf(!asked)('the web app in a browser', () => {
     await read(page);
     await page.click('label:has(input[name="format"][value="xrechnung"])');
     expect(await page.isDisabled('#create')).toBe(true);
-    expect(await said(page, '#summary li.error')).toHaveLength(5);
+    // The sample prints the e-mail address of the seller, which is read; the other four the buyer or the user names.
+    expect(await page.inputValue('[data-path="seller.email"]')).toBe('rechnung@muster-software.example');
+    expect(await said(page, '#summary li.error')).toHaveLength(4);
     await page.fill('[data-path="buyerReference"]', '12345678-0001-14');
     await page.fill('[data-path="seller.contactName"]', 'Erika Beispiel');
     await page.fill('[data-path="seller.phone"]', '+49 30 1234567');
@@ -182,6 +184,52 @@ describe.skipIf(!asked)('the web app in a browser', () => {
     expect(xml).toContain('urn:xeinkauf.de:kosit:xrechnung_3.0');
     expect(xml).toContain('<cbc:BuyerReference>12345678-0001-14</cbc:BuyerReference>');
     expect(await validateEInvoice(await bytesOf(await download(page, '#download-pdf')))).toMatchObject({ isEInvoice: true, findings: [] });
+  }, 120_000);
+
+  it('fills in the contact data and the Leitweg-ID a page states, and shows them for the hybrid PDF too', async () => {
+    const doc = await PDFDocument.load(samplePdf(), { updateMetadata: false });
+    const font = await doc.embedFont(StandardFonts.Helvetica);
+    const added = doc.addPage();
+    ['Leitweg-ID: 04011000-12345-34', 'Ihr Ansprechpartner: Erika Beispiel', 'Tel.: 030 1234567'].forEach((line, i) =>
+      added.drawText(line, { x: 56, y: 760 - 16 * i, size: 10, font }),
+    );
+    const page = await open();
+    await read(page, upload('contact.pdf', await doc.save()));
+    // The hybrid PDF does not ask for these fields. What was read is shown all the same: nothing goes into the file unseen.
+    for (const [path, value] of [
+      ['seller.contactName', 'Erika Beispiel'],
+      ['seller.phone', '030 1234567'],
+      ['buyerReference', '04011000-12345-34'],
+    ]) {
+      expect(await page.isVisible(`[data-path="${path}"]`)).toBe(true);
+      expect(await page.inputValue(`[data-path="${path}"]`)).toBe(value);
+    }
+    expect(await page.locator('[data-path="buyer.email"]').count()).toBe(0);
+    await page.click('label:has(input[name="format"][value="xrechnung"])');
+    expect(await page.locator('[data-path="buyerReference"]').count()).toBe(1);
+    expect(await said(page, '#summary li.error')).toEqual([expect.stringContaining('E-Mail')]);
+  }, 120_000);
+
+  it('shows the buyer contact read from an address before writing it into the XML', async () => {
+    const doc = await PDFDocument.load(samplePdf(), { updateMetadata: false });
+    const font = await doc.embedFont(StandardFonts.Helvetica);
+    const added = doc.addPage();
+    ['Käufer:', 'Beispiel AG', 'Erika Muster', 'Hauptstraße 5', '54321 Beispielstadt'].forEach((line, i) =>
+      added.drawText(line, { x: 56, y: 760 - 18 * i, size: 11, font }),
+    );
+    const page = await open();
+    await read(page, upload('buyer-contact.pdf', await doc.save()));
+    const field = page.locator('[data-path="buyer.contactName"]');
+    expect(await field.isVisible()).toBe(true);
+    expect(await field.inputValue()).toBe('Erika Muster');
+    await page.click('label:has(input[name="format"][value="xrechnung"])');
+    expect(await field.isVisible()).toBe(true);
+    await page.click('label:has(input[name="format"][value="pdf"])');
+    await field.fill('Erika Beispiel');
+    await page.click('#create');
+    await page.waitForSelector('body[data-view="done"]', { timeout: 90_000 });
+    const xml = Buffer.from(await bytesOf(await download(page, '#download-xml'))).toString('utf8');
+    expect(xml).toContain('Erika Beispiel');
   }, 120_000);
 
   it('asks where an intra-community supply went, and refuses a country of delivery for an XRechnung', async () => {
