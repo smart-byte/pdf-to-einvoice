@@ -27,11 +27,11 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      # The project's own site counts page views; the ID of the website is a variable of this repository, not part of
-      # the code. A build without it has no counter.
+      # The project's own site may count page views; the ID of the website is kept in this repository's settings, as
+      # a variable or as a secret, not in the code. A build without it counts nothing.
       - run: npm run site:build
         env:
-          ANALYTICS_WEBSITE_ID: ${{ vars.ANALYTICS_WEBSITE_ID }}
+          ANALYTICS_WEBSITE_ID: ${{ vars.ANALYTICS_WEBSITE_ID || secrets.ANALYTICS_WEBSITE_ID }}
       - uses: cloudflare/wrangler-action@953926a2e2182532811c01a25e53647d93bf07c0 # v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}

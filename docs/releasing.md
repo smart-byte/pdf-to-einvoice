@@ -20,9 +20,10 @@ name repository `smart-byte/pdf-to-einvoice` and workflow file `release.yml` as 
 The "Deploy site" workflow builds `site/` and publishes it to Cloudflare. It runs only when started by hand on main
 (Actions → Deploy site → Run workflow): a merge does not change the live site. The site is a Worker that serves
 static files only (`site/wrangler.jsonc`) at https://pdf-to-einvoice.app; response headers are set in
-`site/public/_headers`. The page counter is part of that site only: the workflow hands the build the repository variable
-`ANALYTICS_WEBSITE_ID`, the ID of the website in our Umami. Without it a build has no counter, and its privacy policy
-does not describe one. The workflow needs two repository secrets: `CLOUDFLARE_API_TOKEN` (template "Edit Cloudflare
+`site/public/_headers`. The page counter is part of that site only: the workflow hands the build `ANALYTICS_WEBSITE_ID`, the ID of the
+website in our Umami, from the repository's variables or secrets. Without it a build counts nothing, and its privacy
+policy does not describe a counter. The page sends the counts with code of this repository (`site/count.ts`); no
+script of the counter's server runs in it. The workflow needs two repository secrets: `CLOUDFLARE_API_TOKEN` (template "Edit Cloudflare
 Workers", limited to the account and the zone) and `CLOUDFLARE_ACCOUNT_ID`.
 
 ## Repository settings the project relies on

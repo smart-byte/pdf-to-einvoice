@@ -13,9 +13,10 @@ Include the version, the front end (web app, CLI, library, MCP server) and the s
 ## Scope
 
 - Supported: the latest released version.
-- The web app is static: no server component and no cookies. The project's own site counts page views and created
-  files with a cookieless Umami it runs itself; a build that is not given the ID of a website has no counter and
-  loads no script from elsewhere. On its own the page otherwise only downloads a language model,
+- The web app is static: no server component and no cookies, and no script from elsewhere runs in any build. A
+  build that is given the ID of a website, as the project's own site may be, sends page views and the kind of a
+  created file to the cookieless Umami of the project, with code of this repository; whether the site counts, its
+  privacy policy says. On its own the page otherwise only downloads a language model,
   from Hugging Face (huggingface.co, hf.co) and raw.githubusercontent.com, and only after the user chooses "Read with
   AI". A model endpoint the user configures receives the invoice text, and the page says so.
 - The built pages carry a Content-Security-Policy; `site/vite.config.ts` holds it and says why each exception is

@@ -1,26 +1,54 @@
-// The page counter of the project's own website: a cookieless Umami that the project runs itself. A build gets it only
-// when it is given the ID of a website, as the deployment of the project is. Any other build, a local one or one of a
-// fork, loads no script from elsewhere and counts nothing. Nothing here touches the browser.
+// The page counter of the project's own website. A build counts only when it is given the ID of a website in the
+// Umami that Smart-Byte runs itself, as the deployment of the project is. Any other build, a local one or one of a
+// fork, counts nothing and asks no other host. No script from that server runs in the page: what is sent is put
+// together here, so that it can be read in the source. Nothing in this file touches the browser.
 
-/** Where the counter is served from: the only origin besides the site itself a counted page may run a script of. */
+/** The server that counts: the only host besides the site itself a counted page sends anything to. */
 export const COUNTER_ORIGIN = 'https://analytics.smart-byte.com';
 
+/** What a page knows about a visit. */
+export interface Visit {
+  website: string;
+  href: string;
+  referrer: string;
+  title: string;
+  language: string;
+  screen: string;
+}
+
+/** An address without its query string and fragment. */
+const plain = (address: string, base: string): string => {
+  try {
+    const url = new URL(address, base);
+    url.search = '';
+    url.hash = '';
+    return url.toString();
+  } catch {
+    return address;
+  }
+};
+
 /**
- * The script of the counter for a website ID, or nothing without one. It counts only on the named domain, leaves out
- * browsers that send Do Not Track, and sends neither the query string nor the fragment of an address.
+ * What is sent for a page view, or for something that happened (`name`, with its kind in `data`): where the page is
+ * and where the visitor came from, both without query string and fragment, the title, the language and the size of
+ * the screen. It is what the script of Umami sends; the server adds browser, system and country from the request.
+ * Known limit: it follows the interface of the Umami in use. If a later version asks differently, counting stops
+ * until this is brought in line; nothing else depends on it.
  */
-export function counterTag(websiteId: string | undefined, domain: string) {
-  if (!websiteId) return [];
-  const attrs = {
-    defer: true,
-    src: `${COUNTER_ORIGIN}/script.js`,
-    'data-website-id': websiteId,
-    'data-domains': domain,
-    'data-do-not-track': 'true',
-    'data-exclude-search': 'true',
-    'data-exclude-hash': 'true',
+export function visitOf(visit: Visit, name?: string, data?: Record<string, string>) {
+  const { origin, hostname } = new URL(visit.href);
+  const referrer = visit.referrer && plain(visit.referrer, visit.href);
+  return {
+    website: visit.website,
+    hostname,
+    url: plain(visit.href, visit.href),
+    // A page of the site itself is named by its path.
+    referrer: referrer === origin || referrer.startsWith(`${origin}/`) ? referrer.slice(origin.length) || '/' : referrer,
+    title: visit.title,
+    language: visit.language,
+    screen: visit.screen,
+    ...(name ? { name, data } : {}),
   };
-  return [{ tag: 'script', attrs, injectTo: 'head' as const }];
 }
 
 /**

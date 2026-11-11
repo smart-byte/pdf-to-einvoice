@@ -50,9 +50,9 @@ A change is done when `npm test`, `npm run type-check`, `npm run lint` and `npm 
 - A change to the website comes with `npm run test:browser`; a new flow gets a test in `test/browser.test.ts`.
 - Money is calculated in whole cents (`src/calculate.ts`), never in floating point euros.
 - The website makes no request to a third party except the model download the user asks for. No scripts, styles or
-  fonts from another origin. The one exception is the page counter of the project's own site (`site/counter.ts`): a
-  build gets it only when it is given `ANALYTICS_WEBSITE_ID`, and the privacy policy of that build describes it. It
-  never sees anything of an invoice.
+  fonts from another origin, in any build. One further request exists, to the page counter of the project
+  (`site/counter.ts`, `site/count.ts`): only a build that is given `ANALYTICS_WEBSITE_ID` counts, with the code in
+  this repository, and its privacy policy describes it. Nothing of an invoice is ever passed to it.
 - New dependencies only where they clearly beat a few lines of own code, and no release younger than 14 days
   (`npm install --before=<date>`; Dependabot waits as long).
 - Write the test first and watch it fail.
