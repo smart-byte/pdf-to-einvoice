@@ -247,8 +247,8 @@ export const STRINGS: Record<string, Entry> = {
   'e.format.country': { de: 'Bitte geben Sie das Land als Kürzel mit zwei Buchstaben an, z. B. DE.', en: '' },
   'e.format.currency': { de: 'Bitte geben Sie die Währung als Kürzel mit drei Buchstaben an, z. B. EUR.', en: '' },
   'e.format.iban': { de: 'Diese IBAN ist ungültig: Die Prüfziffern passen nicht. Bitte vergleichen Sie sie mit Ihrem PDF.', en: '' },
-  'e.format.periodEnd': { de: 'Der Leistungszeitraum endet vor seinem Beginn. Bitte prüfen Sie beide Daten.', en: '' },
-  'e.format.unitPrice': { de: 'Der Preis darf nicht negativ sein. Für eine Gutschrift geben Sie stattdessen eine negative Menge an.', en: '' },
+  'e.period-reversed': { de: 'Der Leistungszeitraum endet vor seinem Beginn. Bitte prüfen Sie beide Daten.', en: '' },
+  'e.negative-price': { de: 'Der Preis darf nicht negativ sein. Für eine Gutschrift geben Sie eine negative Menge ein.', en: '' },
   'e.seller-tax-id': {
     de: 'Bitte tragen Sie Ihre USt-IdNr. ein, sonst Ihre Steuernummer. Bei innergemeinschaftlichen Lieferungen und Ausfuhren ist die USt-IdNr. Pflicht.',
     en: '',

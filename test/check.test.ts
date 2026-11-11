@@ -117,6 +117,15 @@ describe('check', () => {
         withChange((d) => (d.lines[0].unitPrice = -5)),
         'lines.0.unitPrice',
       ),
+    ).toEqual(['error:negative-price']);
+  });
+
+  it('keeps the code for a malformed price apart from that of a negative one', () => {
+    expect(
+      codesAt(
+        withChange((d) => (d.lines[0].unitPrice = '12,50')),
+        'lines.0.unitPrice',
+      ),
     ).toEqual(['error:format']);
   });
 
@@ -197,6 +206,11 @@ describe('check', () => {
 
   it('rejects a service period that ends before it starts', () => {
     const draft = withChange((d) => Object.assign(d, { periodStart: '2026-10-31', periodEnd: '2026-10-01' }));
+    expect(codesAt(draft, 'periodEnd')).toEqual(['error:period-reversed']);
+  });
+
+  it('keeps the code for a malformed end of the period apart from that of a reversed one', () => {
+    const draft = withChange((d) => Object.assign(d, { periodStart: '2026-10-01', periodEnd: '31.10.2026' }));
     expect(codesAt(draft, 'periodEnd')).toEqual(['error:format']);
   });
 
