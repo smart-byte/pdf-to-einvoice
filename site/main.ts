@@ -41,9 +41,10 @@ interface State {
   format: Format;
   /**
    * Values nobody has looked at yet, by the path of their field or of a whole line item ("lines.2"): a suggestion that
-   * is not on the PDF, or what a language model read. Each stays until the user changes the value or says it is right.
+   * is not on the PDF, a VAT category inferred from the buyer's country, or what a language model read. Each stays
+   * until the user changes the value or says it is right.
    */
-  toCheck: Map<string, 'suggested' | 'model'>;
+  toCheck: Map<string, 'suggested' | 'inferred' | 'model'>;
 }
 type Format = 'pdf' | 'xrechnung';
 const state: State = { fileName: '', pdfText: '', draft: {}, touched: new Set(), fileFindings: [], mode: 'create', format: 'pdf', toCheck: new Map() };
@@ -109,7 +110,7 @@ const normaliseDraft = (draft: any): InvoiceDraft => ({
 // ---------------------------------------------------------------------------------------------------------------
 // The form
 
-type FieldType = 'text' | 'date' | 'number' | 'select' | 'email' | 'tel';
+type FieldType = 'text' | 'date' | 'number' | 'select' | 'email' | 'tel' | 'textarea';
 interface Field {
   path: string;
   label: string;
@@ -134,13 +135,14 @@ const party = (who: 'seller' | 'buyer'): Field[] => [
   { path: `${who}.vatId`, label: 'f.vatId' },
   ...(who === 'seller'
     ? ([
-        { path: 'seller.taxNumber', label: 'f.taxNumber' },
-        { path: 'seller.email', label: 'f.email', type: 'email' },
+        // An e-mail address does not break: it gets a row of its own, and so does the field before it.
+        { path: 'seller.taxNumber', label: 'f.taxNumber', wide: true },
+        { path: 'seller.email', label: 'f.email', type: 'email', wide: true },
         { path: 'seller.contactName', label: 'f.contactName', only: 'xrechnung' },
         { path: 'seller.phone', label: 'f.phone', type: 'tel', only: 'xrechnung' },
       ] satisfies Field[])
     : ([
-        { path: 'buyer.email', label: 'f.email', type: 'email', only: 'xrechnung' },
+        { path: 'buyer.email', label: 'f.email', type: 'email', wide: true, only: 'xrechnung' },
         { ...BUYER_REFERENCE, only: 'xrechnung' },
       ] satisfies Field[])),
 ];
@@ -163,23 +165,23 @@ const SECTIONS: { title: string; fields: Field[]; collapsed?: boolean }[] = [
     title: 's.payment',
     fields: [
       { path: 'dueDate', label: 'f.dueDate', type: 'date' },
-      { path: 'paymentTerms', label: 'f.paymentTerms', wide: true },
+      { path: 'paymentTerms', label: 'f.paymentTerms', type: 'textarea', wide: true },
       { path: 'iban', label: 'f.iban' },
       { path: 'bic', label: 'f.bic' },
-      { path: 'vatExemptionReason', label: 'f.vatExemptionReason', wide: true },
+      { path: 'vatExemptionReason', label: 'f.vatExemptionReason', type: 'textarea', wide: true },
     ],
   },
   {
     title: 's.more',
     collapsed: true,
     fields: [
-      { path: 'typeCode', label: 'f.typeCode', type: 'select', options: Object.keys(INVOICE_TYPES).map((code) => [code, `type.${code}`]) },
+      { path: 'typeCode', label: 'f.typeCode', type: 'select', options: Object.keys(INVOICE_TYPES).map((code) => [code, `type.${code}`]), wide: true },
       { path: 'precedingInvoiceNumber', label: 'f.precedingInvoiceNumber' },
       { path: 'precedingInvoiceDate', label: 'f.precedingInvoiceDate', type: 'date' },
       { path: 'orderReference', label: 'f.orderReference' },
       { ...BUYER_REFERENCE, only: 'pdf' },
       { path: 'prepaidAmount', label: 'f.prepaidAmount', type: 'number' },
-      { path: 'note', label: 'f.note', wide: true },
+      { path: 'note', label: 'f.note', type: 'textarea', wide: true },
     ],
   },
 ];
@@ -199,10 +201,13 @@ function control(field: Field, path: string): HTMLElement {
   // An empty choice shows what will be used, not whichever option happens to come first.
   const value = getPath(state.draft, path) ?? SELECT_DEFAULTS[field.path] ?? '';
   const id = `in-${path.replace(/\./g, '-')}`;
-  let input: HTMLInputElement | HTMLSelectElement;
+  let input: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
   if (field.type === 'select') {
     input = el('select', { id });
     for (const [code, label] of field.options!) input.append(el('option', { value: code, selected: String(value) === code }, t(label)));
+  } else if (field.type === 'textarea') {
+    // A sentence wraps and the field grows with it, where one line would cut it off on a phone.
+    input = el('textarea', { id, rows: 2, value: String(value) });
   } else {
     input = el('input', { id, type: field.type ?? 'text', value: String(value), autocomplete: 'off' });
     if (field.type === 'number') (input as HTMLInputElement).step = 'any';
@@ -230,7 +235,7 @@ function renderLines(): HTMLElement {
       state.touched.add('lines.removed');
       // The lines below move up by one, and what is still to be checked moves with them.
       state.toCheck = new Map(
-        [...state.toCheck].flatMap(([path, why]): [string, 'suggested' | 'model'][] => {
+        [...state.toCheck].flatMap(([path, why]): [string, typeof why][] => {
           const at = /^lines\.(\d+)(.*)$/.exec(path);
           if (!at || Number(at[1]) < i) return [[path, why]];
           return Number(at[1]) === i ? [] : [[`lines.${Number(at[1]) - 1}${at[2]}`, why]];
@@ -281,7 +286,7 @@ function renderForm(): void {
   form.append(invoice!, seller!, buyer!, section('s.lines', renderLines()), payment!, more!);
   if (state.mode === 'validate') {
     // Read only rather than disabled: a field can still take the focus, which shows where its value stands on the page.
-    for (const field of form.querySelectorAll('input')) field.readOnly = true;
+    for (const field of form.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('input, textarea')) field.readOnly = true;
     for (const field of form.querySelectorAll<HTMLSelectElement | HTMLButtonElement>('select, button')) field.disabled = true;
     for (const details of form.querySelectorAll('details')) details.open = true;
   }
@@ -295,14 +300,17 @@ function renderForm(): void {
 
 /**
  * A finding, or an error of the library, in the language of the page: in German the text for its code, worded for its
- * field where there is one (`e.format.iban`), else the English message of the library. What a German text names, it
- * takes from the data rather than from the English sentence; only the value a message quotes and a message of the
+ * field where there is one (`e.format.iban`), else the English message of the library. An existing e-invoice has words
+ * of its own where a finding is about its XML (`e.totals-mismatch.xml`), in English as well. What a German text names,
+ * it takes from the data rather than from the English sentence; only the value a message quotes and a message of the
  * library that writes the XML are passed on as they are.
  */
 function describe(finding: { code: string; message: string; path?: string }): string {
   const path = finding.path ?? '';
-  const key = [`e.${finding.code}.${path.split('.').at(-1)}`, `e.${finding.code}`].find((candidate) => candidate in STRINGS);
-  if (lang !== 'de' || !key) return finding.message;
+  const candidates = [`e.${finding.code}.${path.split('.').at(-1)}`, `e.${finding.code}`];
+  if (state.mode === 'validate') candidates.unshift(`e.${finding.code}.xml`);
+  const key = candidates.find((candidate) => candidate in STRINGS);
+  if (!key || (lang !== 'de' && !STRINGS[key]?.en)) return finding.message;
   const line = state.draft.lines?.[Number(/^lines\.(\d+)\./.exec(path)?.[1])];
   return t(key, {
     a: line ? money(Number(line.quantity) * Number(line.unitPrice)) : '',
@@ -331,8 +339,10 @@ function fieldLabel(path: string): string {
   const label = input && document.querySelector(`label[for="${input.id}"]`)?.textContent;
   // A line item is named by its number, also for a value of it the form does not show, such as its total.
   const line = /^lines\.(\d+)(\.|$)/.exec(path);
-  if (line) return `${t('s.lines')} ${Number(line[1]) + 1}${label ? `, ${label}` : ''}`;
-  if (label) return label;
+  if (line) return `${t('l.item', { n: Number(line[1]) + 1 })}${label ? `, ${label}` : ''}`;
+  // Seller and buyer have fields of the same name: the party is named first.
+  const who = /^(seller|buyer)\./.exec(path)?.[1];
+  if (label) return who ? `${t(who === 'seller' ? 'xml.seller' : 's.buyer')}, ${label}` : label;
   return path.startsWith('totals.') ? t(`t.${path.slice(7)}`) : path === 'lines' ? t('s.lines') : '';
 }
 
@@ -353,7 +363,7 @@ function validate(): void {
       path,
       severity: 'warning',
       code: why,
-      message: t(why === 'suggested' ? 'hint.suggested' : /^lines\.\d+$/.test(path) ? 'hint.model.line' : 'hint.model'),
+      message: t(why === 'model' && /^lines\.\d+$/.test(path) ? 'hint.model.line' : `hint.${why}`),
     }));
   // Where XRechnung demands a part of the address, the warning that it is missing would only say the same again.
   const demanded = (finding: Finding) =>
@@ -378,7 +388,7 @@ function validate(): void {
     // A value that is still to be checked can be ticked off where it stands, without typing it again.
     if (worst && unchecked.includes(worst) && state.mode === 'create') {
       const ok = el('button', { type: 'button', className: 'ok' }, t('hint.ok'));
-      ok.setAttribute('aria-label', t('hint.ok.label', { f: fieldLabel(path) || `${t('s.lines')} ${Number(path.split('.')[1]) + 1}` }));
+      ok.setAttribute('aria-label', t('hint.ok.label', { f: fieldLabel(path) }));
       ok.onclick = () => {
         state.toCheck.delete(path);
         validate();
@@ -400,7 +410,9 @@ function validate(): void {
         el('dt', {}, t(`t.${key}`)),
         el('dd', {}, money(result.totals[key])),
       );
-      if (mismatch && typeof printed[key] === 'number') row.append(el('dd', { className: 'total__printed' }, t('t.printed', { v: money(printed[key]!) })));
+      // An existing e-invoice states its totals in its XML; for a PDF they are what the page prints.
+      const printedAs = state.mode === 'validate' ? 't.printed.xml' : 't.printed';
+      if (mismatch && typeof printed[key] === 'number') row.append(el('dd', { className: 'total__printed' }, t(printedAs, { v: money(printed[key]!) })));
       // A total has no field to focus: pointing at it shows where it stands, on whichever page that is.
       row.onmouseenter = () => {
         pointed = `totals.${key}`;
@@ -447,8 +459,8 @@ function validate(): void {
   }
   if (list.children.length) summary.append(list);
   $<HTMLButtonElement>('#create').disabled = errors.length > 0 || !state.pdf;
-  // An existing e-invoice that passes the check gets its stamp on the preview.
-  $('#work-stamp').hidden = !(state.mode === 'validate' && errors.length === 0);
+  // The stamp reads like a seal: an existing e-invoice gets it only where the check found nothing at all.
+  $('#work-stamp').hidden = !(state.mode === 'validate' && errors.length === 0 && warnings.length === 0);
   renderMarks();
   refreshXml();
 }
@@ -456,7 +468,7 @@ function validate(): void {
 // The form is never sent anywhere: Enter in a field must not reload the page.
 $('#form').addEventListener('submit', (event) => event.preventDefault());
 $('#form').addEventListener('input', (event) => {
-  const input = event.target as HTMLInputElement | HTMLSelectElement;
+  const input = event.target as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
   const path = input.dataset.path;
   if (!path) return;
   const number = (input as HTMLInputElement).type === 'number';
@@ -542,7 +554,7 @@ function renderMarks(): void {
   };
   const on = pagePieces[shown] ?? [];
   // Dropdowns hold codes, which are not printed; everything else is looked for.
-  for (const input of $('#form').querySelectorAll<HTMLInputElement>('input[data-path]')) {
+  for (const input of $('#form').querySelectorAll<HTMLElement>('[data-path]:not(select)')) {
     const path = input.dataset.path!;
     place(path, fieldLabel(path), placesOf(path, on));
   }
@@ -569,7 +581,7 @@ function turnTo(path: string): void {
 $('#form').addEventListener('focusin', (event) => {
   const field = event.target as HTMLElement;
   // Dropdowns hold codes, which are printed nowhere: they turn no page.
-  if (field.dataset.path && field instanceof HTMLInputElement) turnTo(field.dataset.path);
+  if (field.dataset.path && !(field instanceof HTMLSelectElement)) turnTo(field.dataset.path);
   highlight(field.dataset.path);
 });
 $('#form').addEventListener('focusout', () => highlight());
@@ -722,9 +734,13 @@ async function open(pdf: Uint8Array, fileName: string): Promise<void> {
       $('#read-status').textContent = result.profile ? t('valid.profile', { p: result.profile }) : '';
     } else {
       merge(guessFromText(text, { blocks }));
-      suggestPaymentTerms();
+      // What was read from the PDF, before anything is suggested.
       const found = JSON.stringify(state.draft).match(/":("|\d|-)/g)?.length ?? 0;
-      $('#read-status').textContent = text.trim() ? t('read.found', { n: found }) : t('read.none');
+      // An invoice that shows no VAT gets its VAT category from the buyer's country, the same for every line: a person
+      // confirms it at the first line.
+      if ((state.draft.lines?.[0]?.vatCategory ?? 'S') !== 'S') state.toCheck.set('lines.0.vatCategory', 'inferred');
+      suggestPaymentTerms();
+      $('#read-status').textContent = text.trim() ? t(found === 1 ? 'read.found.one' : 'read.found', { n: found }) : t('read.none');
     }
     document.body.dataset.mode = state.mode;
     setText('#work-title', state.mode === 'validate' ? 'valid.title' : 'work.title');
@@ -771,16 +787,24 @@ $('#other').onclick = () => show('start');
 // Reading with a language model
 
 const modelSelect = $<HTMLSelectElement>('#ai-model');
+/** Under the list: how large the chosen model is and where it comes from, or for an own service what it has to be, with its fields. */
+function showModel(): void {
+  const model = MODELS.find((candidate) => candidate.id === modelSelect.value);
+  $('#ai-model-note').textContent = model ? t('ai.download', { size: new Intl.NumberFormat(lang).format(model.gigabytes) }) : t('ai.endpoint.note');
+  $('#ai-endpoint').hidden = model !== undefined;
+}
 function renderModels(): void {
+  // The choice stays when the language changes.
+  const chosen = modelSelect.value || DEFAULT_MODEL;
   modelSelect.replaceChildren(
     ...MODELS.map((model) =>
-      el('option', { value: model.id, selected: model.id === DEFAULT_MODEL }, `${model.id.replace(/-q4f16_1-MLC$/, '')} (${model.note[lang]})`),
+      el('option', { value: model.id, selected: model.id === chosen }, `${model.id.replace(/-q4f16_1-MLC$/, '')} (${model.note[lang]})`),
     ),
-    el('option', { value: 'endpoint' }, t('ai.endpoint')),
+    el('option', { value: 'endpoint', selected: chosen === 'endpoint' }, t('ai.endpoint')),
   );
-  $('#ai-endpoint').hidden = true;
+  showModel();
 }
-modelSelect.onchange = () => ($('#ai-endpoint').hidden = modelSelect.value !== 'endpoint');
+modelSelect.onchange = showModel;
 
 /**
  * Shows how far reading with a model is: below 1 the model is still loading and a bar says how much of it is there,
@@ -805,6 +829,12 @@ $('#ai-run').onclick = async () => {
   const [button, cancel] = [$<HTMLButtonElement>('#ai-run'), $<HTMLButtonElement>('#ai-cancel')];
   const viaEndpoint = modelSelect.value === 'endpoint';
   if (!viaEndpoint && !hasWebGpu()) return void (status.textContent = t('ai.nogpu'));
+  // Without a full address the request would go to this site itself: nothing is sent until one is given.
+  const address = $<HTMLInputElement>('#ai-url');
+  if (viaEndpoint && !address.checkValidity()) {
+    address.focus();
+    return void (status.textContent = t('ai.endpoint.missing'));
+  }
   const run = ++reads;
   const abort = (cancelRead = new AbortController());
   // The button waits while the model works; the focus goes on to the button that cancels.
@@ -817,7 +847,7 @@ $('#ai-run').onclick = async () => {
     const read = viaEndpoint
       ? readWithEndpoint(
           state.pdfText,
-          { url: $<HTMLInputElement>('#ai-url').value, model: $<HTMLInputElement>('#ai-name').value, key: $<HTMLInputElement>('#ai-key').value },
+          { url: address.value, model: $<HTMLInputElement>('#ai-name').value, key: $<HTMLInputElement>('#ai-key').value },
           abort.signal,
         )
       : readWithBrowserModel(state.pdfText, modelSelect.value, reading, abort.signal);
@@ -826,9 +856,12 @@ $('#ai-run').onclick = async () => {
     if (state.pdf !== pdf || run !== reads || abort.signal.aborted) return;
     // A small model translates names and makes up identifiers. Only what the PDF shows is taken over, and even of
     // that a good part is wrong: every value the model added is marked until the user has looked at it.
-    for (const path of merge(keepWhatThePdfShows(normaliseDraft(answer), state.pdfText), true)) state.toCheck.set(path, 'model');
+    const added = merge(keepWhatThePdfShows(normaliseDraft(answer), state.pdfText), true);
+    for (const path of added) state.toCheck.set(path, 'model');
     renderForm();
-    status.textContent = t('ai.done');
+    // Counted as the verdict counts them: a value the form has no field for is not shown, so it is not counted.
+    const counted = added.filter((path) => document.querySelector(`[data-hint="${path}"]`)).length;
+    status.textContent = counted ? t(counted === 1 ? 'ai.done.one' : 'ai.done', { n: counted }) : t('ai.done.none');
   } catch (error) {
     status.textContent = abort.signal.aborted ? t('ai.cancelled') : t('ai.failed', { m: error instanceof Error ? error.message : String(error) });
   } finally {
@@ -970,6 +1003,8 @@ $('#create').onclick = async () => {
     const notes = $('#done-notes');
     notes.replaceChildren(...findings.map((finding) => el('li', {}, describe(finding))));
     notes.hidden = findings.length === 0;
+    // The stamp reads like a seal: it lands only where neither the check nor the writing of the file found anything.
+    $('#done .stamp').hidden = findings.length > 0 || document.querySelector('#summary li') !== null;
     status.textContent = '';
     // The finished page shows the same preview, with the stamp landing on it.
     const [from, to] = [$<HTMLCanvasElement>('#preview'), $<HTMLCanvasElement>('#done-preview')];

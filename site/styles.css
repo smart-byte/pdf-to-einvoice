@@ -969,7 +969,8 @@ label {
   margin-bottom: 0.35rem;
 }
 input,
-select {
+select,
+textarea {
   width: 100%;
   font: inherit;
   color: var(--ink);
@@ -982,30 +983,40 @@ select {
 /* The arrow of a dropdown is drawn here, so that it keeps its distance from the edge in every browser. */
 select {
   appearance: none;
-  padding-right: 2.5rem;
+  padding-right: 2.25rem;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8' fill='none' stroke='%237a8494' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M1 1.5l5 5 5-5'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 0.95rem center;
   background-size: 0.7rem auto;
   text-overflow: ellipsis;
 }
+/* A sentence grows with its text; a browser that cannot do that shows two lines. */
+textarea {
+  display: block;
+  field-sizing: content;
+  resize: none;
+}
 input:hover,
-select:hover {
+select:hover,
+textarea:hover {
   border-color: var(--ink);
 }
 input:focus-visible,
-select:focus-visible {
+select:focus-visible,
+textarea:focus-visible {
   outline-width: 2px;
   outline-offset: 0;
   border-color: var(--blue);
 }
 input[aria-invalid],
-select[aria-invalid] {
+select[aria-invalid],
+textarea[aria-invalid] {
   border-color: var(--red);
   background-color: var(--red-wash);
 }
 input.warned,
-select.warned {
+select.warned,
+textarea.warned {
   border-color: var(--amber);
   background-color: var(--amber-wash);
 }
@@ -1053,9 +1064,13 @@ select.warned {
   gap: 0.8rem 0.9rem;
   width: 100%;
   margin: 0;
-  padding: 0.9rem 2.7rem 1rem 1rem;
+  padding: 0.9rem 1rem 1rem;
   border: 1px solid var(--line);
   border-radius: var(--radius);
+}
+/* The button that removes the line item stands beside its first field only: the rows below keep the full width. */
+.line > .field:first-of-type {
+  margin-right: 1.6rem;
 }
 /* Quantity, unit and price share a row; the VAT treatment gets a row with room for its wording, the rate beside it. */
 .line > .field:nth-of-type(2) {
@@ -1710,8 +1725,13 @@ html[lang='en']:has([data-lang][aria-pressed='true']) .legal[lang='de'] {
   .compare td:last-child .compare__who {
     color: var(--ink);
   }
+  /* On a phone every pixel goes to the text of the fields: the longest option of a list has to show in full. */
+  .work__data {
+    padding-inline: 0.75rem;
+  }
   .line {
     grid-template-columns: 1fr 1fr;
+    padding-inline: 0.75rem;
   }
   .line > .field:nth-of-type(n + 2) {
     grid-column: auto;

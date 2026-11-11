@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>pdf-to-einvoice: turn an invoice PDF into an e-invoice (ZUGFeRD / Factur-X)</title>
+    <title data-i18n="doc.title">pdf-to-einvoice: turn an invoice PDF into an e-invoice (ZUGFeRD / Factur-X)</title>
     <meta
       name="description"
       content="Turn the invoice PDF you already have into an EN 16931 e-invoice (ZUGFeRD / Factur-X, E-Rechnung). Your layout stays; the data is added as XML. Free, open source, and everything happens in your browser."
@@ -102,7 +102,7 @@
             ><span data-i18n="hero.z">.</span>
           </h1>
           <p class="lead" data-i18n="hero.lead">
-            Your layout stays exactly as it is. The invoice data is added as XML, following EN 16931 (ZUGFeRD / Factur-X).
+            Your invoice looks as it did. The invoice data is added in machine-readable form, as XML following EN 16931 (ZUGFeRD / Factur-X).
           </p>
           <p class="private" data-i18n="hero.private">Nothing is uploaded. Everything happens in your browser.</p>
           <ul class="facts">
@@ -164,7 +164,7 @@
         <header class="work__head">
           <div>
             <h2 id="work-title" data-i18n="work.title">Check and complete the data</h2>
-            <p id="work-lead" data-i18n="work.lead">The XML is the legally binding part of an e-invoice. Compare every value with your PDF.</p>
+            <p id="work-lead" data-i18n="work.lead">In an e-invoice the XML is what counts legally. Compare every value with your PDF.</p>
           </div>
           <button type="button" class="quiet" id="other" data-i18n="work.other">Choose another PDF</button>
         </header>
@@ -177,7 +177,7 @@
                    Both are aids for the eye: the form itself says everything to a screen reader. -->
               <div class="scan" id="scan" aria-hidden="true" hidden></div>
               <div class="marks" id="marks" aria-hidden="true"></div>
-              <div class="stamp" id="work-stamp" aria-hidden="true" hidden>EN 16931<small data-i18n="stamp.note">plausibility checked</small></div>
+              <div class="stamp" id="work-stamp" aria-hidden="true" hidden>EN 16931<small data-i18n="stamp.note">Plausibility checked</small></div>
             </div>
             <!-- Shown for a PDF with more than one page. -->
             <div class="pager" id="pager" hidden>
@@ -202,8 +202,8 @@
                 <label><input type="radio" name="format" value="xrechnung" /><span data-i18n="format.xrechnung">XRechnung (public sector)</span></label>
               </div>
               <p class="hint" id="format-note" data-i18n="format.note" hidden>
-                For invoices to public bodies. It also needs the Leitweg-ID or another buyer reference, a contact person with phone and e-mail, and your
-                customer's e-mail address.
+                For invoices to public bodies and other public-sector buyers. It also needs the Leitweg-ID or another buyer reference, a contact person with
+                phone and email, and the buyer's email address.
               </p>
             </fieldset>
             <div class="reader">
@@ -211,29 +211,30 @@
               <details>
                 <summary data-i18n="ai.title">Read with AI</summary>
                 <p data-i18n="ai.lead">
-                  A language model reads names, addresses and line items from the text of your invoice. It runs on your device; your invoice does not leave the
-                  browser.
+                  A language model reads names, addresses and line items from the text of your invoice. The models in the list run on your device; your invoice
+                  does not leave the browser.
                 </p>
                 <div class="fields">
                   <div class="field field--wide">
                     <label for="ai-model" data-i18n="ai.model">Model</label>
-                    <select id="ai-model"></select>
-                    <p class="hint" data-i18n="ai.download">
-                      The model is downloaded from huggingface.co and raw.githubusercontent.com on first use and kept in the browser.
+                    <select id="ai-model" aria-describedby="ai-model-note"></select>
+                    <!-- How large the chosen model is, or what an own service has to be. -->
+                    <p class="hint" id="ai-model-note">
+                      The model (about 1 GB) is downloaded from huggingface.co and raw.githubusercontent.com on first use and kept in the browser.
                     </p>
                   </div>
                 </div>
                 <div class="fields" id="ai-endpoint" hidden>
                   <div class="field field--wide">
                     <label for="ai-url" data-i18n="ai.endpoint.url">Address</label>
-                    <input id="ai-url" type="url" value="http://localhost:11434/v1" />
+                    <input id="ai-url" type="url" required placeholder="http://localhost:8080/v1" />
                     <p class="hint hint--warning" data-i18n="ai.endpoint.warn">
-                      The text of your invoice is sent to this address. If it is not on your device, the text leaves the browser.
+                      The text of your invoice is sent to this address. If it is not on your device, the text leaves your device.
                     </p>
                   </div>
                   <div class="field">
                     <label for="ai-name" data-i18n="ai.endpoint.model">Model name</label>
-                    <input id="ai-name" type="text" value="qwen3:8b" />
+                    <input id="ai-name" type="text" />
                   </div>
                   <div class="field">
                     <label for="ai-key" data-i18n="ai.endpoint.key">Key (if needed)</label>
@@ -295,20 +296,18 @@
           <!-- The stamp lands on the preview only; the file itself is not marked. -->
           <div class="page">
             <canvas id="done-preview" aria-hidden="true"></canvas>
-            <div class="stamp" aria-hidden="true"><span id="done-stamp">EN 16931</span><small data-i18n="stamp.note">plausibility checked</small></div>
+            <div class="stamp" aria-hidden="true"><span id="done-stamp">EN 16931</span><small data-i18n="stamp.note">Plausibility checked</small></div>
           </div>
           <div class="done__text">
             <h2 id="done-title" data-i18n="done.title">Your e-invoice is ready.</h2>
-            <p id="done-lead" data-i18n="done.lead">
-              The same invoice as before, now a PDF/A-3 that carries its data as XML (ZUGFeRD / Factur-X, profile EN 16931).
-            </p>
+            <p id="done-lead" data-i18n="done.lead">The same invoice as before, now with its data inside as XML (ZUGFeRD / Factur-X, profile EN 16931).</p>
             <ul class="notes" id="done-notes" hidden></ul>
             <p class="actions">
               <a class="primary" id="download-pdf" data-i18n="done.pdf">Download e-invoice</a>
               <a class="quiet" id="download-xml" data-i18n="done.xml">Download the XML only</a>
             </p>
             <p><button type="button" class="link" id="again" data-i18n="done.again">Change the data again</button></p>
-            <p class="muted">SHA-256 (<span id="checksum-file"></span>) <code id="checksum"></code></p>
+            <p class="muted"><span data-i18n="done.checksum">Checksum (SHA-256) of</span> <span id="checksum-file"></span>: <code id="checksum"></code></p>
           </div>
         </div>
       </section>
@@ -316,7 +315,9 @@
       <section class="info" id="how" aria-labelledby="how-title">
         <div class="info__head">
           <h2 id="how-title" data-i18n="pair.title">What is added to your file</h2>
-          <p data-i18n="pair.note">People read the left side, software the right one. Both have to say the same, so every value is compared with your PDF.</p>
+          <p data-i18n="pair.note">
+            People read the left side, software the right one. Both have to say the same, so the key values are compared with your PDF.
+          </p>
         </div>
         <!-- The printed text is that of the sample invoice, so it stays German in both languages. -->
         <table class="pair">
@@ -451,7 +452,7 @@
 
       <section class="info" id="limits" aria-labelledby="limits-title">
         <div class="info__head">
-          <h2 id="limits-title" data-i18n="limits.title">What you should know</h2>
+          <h2 id="limits-title" data-i18n="limits.title">Questions and answers</h2>
         </div>
         <div class="asks">
           <details open>

@@ -37,8 +37,13 @@ describe('German texts', () => {
       {
         ...sample(),
         paymentTerms: '#SKONTO#',
+        periodStart: '2026-10-31',
+        periodEnd: '2026-10-01',
         seller: { ...sample().seller, phone: '1', email: 'mail' },
-        lines: [{ ...sample().lines![0]!, netAmount: 1 }],
+        lines: [
+          { ...sample().lines![0]!, netAmount: 1 },
+          { ...sample().lines![0]!, unitPrice: -1 },
+        ],
         totals: { gross: 1 },
       },
       { rules: 'xrechnung', pdfText: 'Rechnung' },

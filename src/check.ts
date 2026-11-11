@@ -119,7 +119,7 @@ export function check(draft: InvoiceDraft, options: CheckOptions = {}): CheckRes
     if (d[field] !== undefined && !isDate(d[field])) error(field, 'format', 'Not a valid date. Use YYYY-MM-DD.');
   }
   if (isDate(d.periodStart) && isDate(d.periodEnd) && d.periodEnd < d.periodStart) {
-    error('periodEnd', 'format', 'The service period ends before it starts.');
+    error('periodEnd', 'period-reversed', 'The service period ends before it starts.');
   }
   if (!(d.typeCode in INVOICE_TYPES)) error('typeCode', 'format', `Unknown invoice type. Use one of ${Object.keys(INVOICE_TYPES).join(', ')}.`);
   if (!/^[A-Z]{3}$/.test(d.currency)) error('currency', 'format', 'Use the three-letter currency code, e.g. EUR.');
@@ -134,7 +134,7 @@ export function check(draft: InvoiceDraft, options: CheckOptions = {}): CheckRes
   let calculable = d.lines.length > 0;
   d.lines.forEach((line: Bag, i: number) => {
     const at = (field: string) => `lines.${i}.${field}`;
-    if (line.name === undefined) error(at('name'), 'required', 'The line needs a name.');
+    if (line.name === undefined) error(at('name'), 'required', 'The line needs a description.');
     for (const field of ['quantity', 'unitPrice', 'vatRate']) {
       if (line[field] === undefined)
         error(at(field), 'required', `The line needs a ${field === 'unitPrice' ? 'unit price' : field === 'vatRate' ? 'VAT rate' : field}.`);
@@ -146,12 +146,12 @@ export function check(draft: InvoiceDraft, options: CheckOptions = {}): CheckRes
       calculable = false;
     }
     if (isNumber(line.unitPrice) && line.unitPrice < 0) {
-      error(at('unitPrice'), 'format', 'The unit price must not be negative. Use a negative quantity for credits.');
+      error(at('unitPrice'), 'negative-price', 'The unit price must not be negative. Use a negative quantity for credits.');
     }
     if (!(line.vatCategory in VAT_CATEGORIES)) {
       error(at('vatCategory'), 'format', `Unknown VAT category. Use one of ${Object.keys(VAT_CATEGORIES).join(', ')}.`);
     } else if (isNumber(line.vatRate)) {
-      if (line.vatCategory === 'S' && line.vatRate <= 0) error(at('vatRate'), 'vat-rate', 'The standard category needs a VAT rate above 0.');
+      if (line.vatCategory === 'S' && line.vatRate <= 0) error(at('vatRate'), 'vat-rate', 'With VAT charged (category S), the rate must be above 0.');
       if (line.vatCategory !== 'S' && line.vatRate !== 0) error(at('vatRate'), 'vat-rate', `Category ${line.vatCategory} carries no VAT: the rate must be 0.`);
     }
   });
