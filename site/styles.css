@@ -990,11 +990,12 @@ select {
   background-size: 0.7rem auto;
   text-overflow: ellipsis;
 }
-/* A sentence grows with its text; a browser that cannot do that shows two lines. */
+/* A sentence grows with its text, and the field can be drawn larger by hand; a browser that cannot let it grow shows
+   its lines and leaves the rest to the hand. */
 textarea {
   display: block;
   field-sizing: content;
-  resize: none;
+  resize: vertical;
 }
 input:hover,
 select:hover,

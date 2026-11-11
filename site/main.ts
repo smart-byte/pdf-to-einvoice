@@ -121,6 +121,8 @@ interface Field {
   wide?: boolean;
   /** A line under the field that says what goes in it. */
   help?: string;
+  /** How many lines a text area shows while it is empty; 2 unless said otherwise. */
+  rows?: number;
   /** Shown for this format only. */
   only?: Format;
 }
@@ -190,7 +192,8 @@ const SECTIONS: { title: string; fields: Field[]; collapsed?: boolean }[] = [
 ];
 
 const LINE_FIELDS: Field[] = [
-  { path: 'name', label: 'l.name', wide: true },
+  // A description may be a sentence: one line while it is short, more as it grows.
+  { path: 'name', label: 'l.name', type: 'textarea', rows: 1, wide: true },
   { path: 'quantity', label: 'l.quantity', type: 'number' },
   { path: 'unit', label: 'l.unit', type: 'select', options: ['C62', 'HUR', 'DAY', 'MON', 'KGM', 'MTR', 'LTR', 'LS'].map((code) => [code, `unit.${code}`]) },
   { path: 'unitPrice', label: 'l.unitPrice', type: 'number' },
@@ -210,7 +213,7 @@ function control(field: Field, path: string): HTMLElement {
     for (const [code, label] of field.options!) input.append(el('option', { value: code, selected: String(value) === code }, t(label)));
   } else if (field.type === 'textarea') {
     // A sentence wraps and the field grows with it, where one line would cut it off on a phone.
-    input = el('textarea', { id, rows: 2, value: String(value) });
+    input = el('textarea', { id, rows: field.rows ?? 2, value: String(value) });
   } else {
     input = el('input', { id, type: field.type ?? 'text', value: String(value), autocomplete: 'off' });
     if (field.type === 'number') (input as HTMLInputElement).step = 'any';
