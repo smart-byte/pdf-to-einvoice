@@ -6,14 +6,19 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-11-11
+
+The first release.
+
 ### Added
 
 - `createEInvoice`: an existing invoice PDF plus invoice data becomes a ZUGFeRD / Factur-X e-invoice (PDF/A-3 with
-  CII XML, profile EN 16931) without redrawing the pages.
+  CII XML, profile EN 16931) without redrawing the pages. Scripts and actions PDF/A forbids are taken out of the
+  PDF, and the data is compared with its text.
 - `createXRechnung`, and `profile: 'xrechnung'` for `createEInvoice`: the same data as XRechnung 3.0 for German
   public bodies, as plain XML in UBL or CII, or inside the PDF.
-- `check`: required fields, formats, EN 16931 arithmetic and a comparison of the data with the text of the PDF; with
-  `rules: 'xrechnung'` also what XRechnung asks for on top.
+- `check`: required fields, formats, EN 16931 arithmetic and a comparison of numbers, names, addresses, dates and
+  amounts with the text of the PDF; with `rules: 'xrechnung'` also what XRechnung asks for on top.
 - `extractText`, `extractLayout` and `guessFromText`: the text and layout of a PDF, and reading an invoice from them
   without a model: totals by arithmetic, items that add up to them, also over several pages, seller and buyer,
   identifiers by their shape; labels in German, English and French.
@@ -26,5 +31,5 @@ All notable changes to this project are documented here. The format follows
 - Web app in English and German that runs entirely in the browser: marks on the preview show where each value stands
   on the page, every finding says what to do, the XML can be viewed before the file is created, XRechnung is a
   second output, and an existing e-invoice that is dropped gets a verdict.
-- Web app: on request a language model in the browser fills in what the patterns left empty. Every value it adds is
-  marked until the user has checked it, and reading can be cancelled.
+- Web app: on request a language model in the browser fills in what the patterns left empty. A bar shows how far its
+  answer has come, every value it adds is marked until the user has checked it, and reading can be cancelled.
