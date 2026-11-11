@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { existsSync, readFileSync, realpathSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -79,10 +79,12 @@ export async function describePdf(pdfPath: string) {
 /** Where the e-invoice goes when no output is named: invoice.pdf becomes invoice.einvoice.pdf. */
 export const defaultOutput = (pdfPath: string) => pdfPath.replace(/(\.pdf)?$/i, '.einvoice.pdf');
 
-/** True if both paths name one file, also through a symlink or different letter case. */
+/** True if both paths name one file, also through a symlink, a hard link or different letter case. */
 function sameFile(a: string, b: string): boolean {
   if (resolve(a) === resolve(b)) return true;
-  return existsSync(a) && existsSync(b) && realpathSync.native(a) === realpathSync.native(b);
+  if (!existsSync(a) || !existsSync(b)) return false;
+  const [one, other] = [statSync(a, { bigint: true }), statSync(b, { bigint: true })];
+  return one.dev === other.dev && one.ino === other.ino;
 }
 
 /**
