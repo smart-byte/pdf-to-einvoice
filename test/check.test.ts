@@ -29,6 +29,40 @@ describe('check', () => {
     expect(check(withChange((d) => delete d.number)).invoice).toBeUndefined();
   });
 
+  it('reports an amount that is not a number instead of failing', () => {
+    expect(
+      codesAt(
+        withChange((d) => (d.prepaidAmount = 'abc')),
+        'prepaidAmount',
+      ),
+    ).toEqual(['error:format']);
+    expect(
+      codesAt(
+        withChange((d) => (d.prepaidAmount = Number.NaN)),
+        'prepaidAmount',
+      ),
+    ).toEqual(['error:format']);
+  });
+
+  it('wants a line total to be quantity times price, two cents apart at most', () => {
+    const lineTotal = (netAmount: number, currency = 'EUR') =>
+      codesAt(
+        withChange((d) => {
+          Object.assign(d, { currency });
+          d.lines[1].netAmount = netAmount;
+          delete d.totals;
+        }),
+        'lines.1.netAmount',
+      );
+    expect(lineTotal(499.03)).toEqual(['error:line-net']);
+    expect(lineTotal(499.02)).toEqual([]);
+    expect(lineTotal(498.98)).toEqual([]);
+    expect(lineTotal(498.97)).toEqual(['error:line-net']);
+    // Forint has no cents in practice: there half a forint is allowed.
+    expect(lineTotal(499.5, 'HUF')).toEqual([]);
+    expect(lineTotal(499.51, 'HUF')).toEqual(['error:line-net']);
+  });
+
   it('treats null and blank strings as missing', () => {
     expect(
       codesAt(
@@ -354,22 +388,14 @@ describe('check with the XRechnung rules', () => {
     }
   });
 
-  it('wants a line total to be quantity times price, two cents apart at most', () => {
-    const lineTotal = (netAmount: number, currency = 'EUR') =>
-      found(
-        xrechnung((d) => {
-          Object.assign(d, { currency });
-          d.lines[1].netAmount = netAmount;
-          delete d.totals;
-        }),
-      );
-    expect(lineTotal(499.03)).toEqual(['error lines.1.netAmount: xrechnung-line-net']);
-    expect(lineTotal(499.02)).toEqual([]);
-    expect(lineTotal(498.98)).toEqual([]);
-    expect(lineTotal(498.97)).toEqual(['error lines.1.netAmount: xrechnung-line-net']);
-    // Forint has no cents in practice: there the rule allows half a forint.
-    expect(lineTotal(499.5, 'HUF')).toEqual([]);
-    expect(lineTotal(499.51, 'HUF')).toEqual(['error lines.1.netAmount: xrechnung-line-net']);
+  it('reports a line total that is not quantity times price once, as every profile does', () => {
+    const findings = found(
+      xrechnung((d) => {
+        d.lines[1].netAmount = 499.03;
+        delete d.totals;
+      }),
+    );
+    expect(findings).toEqual(['error lines.1.netAmount: line-net']);
   });
 
   it('reads a payment terms line that starts with # as a cash discount in the fixed form', () => {

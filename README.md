@@ -181,8 +181,9 @@ owed. Defaults: `typeCode` 380 (invoice), `currency` EUR, `unit` C62 (piece), `v
 
 Every category except `S` and `Z` needs `vatExemptionReason`: the sentence on your invoice that says why no VAT is
 charged. `totals` are the sums printed on the PDF; if they contradict the calculation, that is an error, because the
-XML must not contradict the page. The full list of fields is in [`src/model.ts`](src/model.ts) and in
-`npx pdf-to-einvoice schema`.
+XML must not contradict the page. A line's `netAmount` may differ from quantity x unit price by rounding only (0.02);
+with a discount on a line, give the unit price after the discount. The full list of fields is in
+[`src/model.ts`](src/model.ts) and in `npx pdf-to-einvoice schema`.
 
 ## XRechnung
 
@@ -201,7 +202,6 @@ missing, under codes that start with `xrechnung-`, and both ways of creating run
 - a contact at the seller: `seller.contactName`, `seller.phone`, `seller.email`
 - `buyer.email`, which is written as the buyer's electronic address
 - `city` and `postalCode` of seller and buyer
-- a line's `netAmount` at most 0.02 away from quantity x unit price
 - a line of `paymentTerms` that starts with `#` in the form of a cash discount: `#SKONTO#TAGE=14#PROZENT=2.00#`
 
 The XML declares XRechnung 3.0. What it cannot do yet:

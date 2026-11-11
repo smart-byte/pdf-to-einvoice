@@ -31,7 +31,8 @@
 - Give `deliveryDate`, or `periodStart` and `periodEnd` for a service period: German invoices must state it.
 - Other type codes: 381 credit note, 384 corrected invoice (name the original in `precedingInvoiceNumber` and
   `precedingInvoiceDate`), 326 partial invoice, 386 prepayment invoice, 389 self-billed invoice.
-- A line total that differs from quantity x unit price by rounding goes into the line's `netAmount`.
+- A line total that differs from quantity x unit price by rounding goes into the line's `netAmount`. More than 0.02
+  apart is an error: with a discount on a line, give the unit price after the discount.
 - The full list with descriptions: `npx -y pdf-to-einvoice schema`.
 
 ## VAT categories
@@ -64,7 +65,6 @@ What the check reports under codes that start with `xrechnung-`, beyond EN 16931
 - `seller.contactName`, `seller.phone`, `seller.email`: a contact at the seller.
 - `buyer.email`: where the buyer takes invoices; it is written as the buyer's electronic address.
 - `city` and `postalCode` of both parties.
-- A line's `netAmount` has to be quantity x unit price, at most 0.02 apart.
 - A line of `paymentTerms` that starts with `#` has to be a cash discount in the fixed form
   `#SKONTO#TAGE=14#PROZENT=2.00#`.
 

@@ -286,6 +286,10 @@ export const STRINGS: Record<string, Entry> = {
     de: 'Die im XML angegebene Summe passt nicht zu seinen Positionen. Bitten Sie den Rechnungssteller um eine korrigierte E-Rechnung.',
     en: 'The total stated in the XML does not match its lines. Ask the issuer for a corrected e-invoice.',
   },
+  'e.line-net': {
+    de: 'Menge mal Preis ergibt {a}, auf Ihrer Rechnung steht als Betrag dieser Position aber {b}. Beides muss bis auf Rundung übereinstimmen. Passen Sie Menge oder Preis an; bei einem Rabatt auf die Position tragen Sie den Preis nach Abzug des Rabatts ein.',
+    en: '',
+  },
   'e.totals-mismatch': {
     de: 'Die Summe im PDF weicht von der Summe der Positionen ab. Die E-Rechnung darf dem PDF nicht widersprechen: Bitte prüfen Sie Mengen und Preise.',
     en: '',
@@ -319,10 +323,6 @@ export const STRINGS: Record<string, Entry> = {
     en: '',
   },
   'e.xrechnung-address': { de: 'Dieser Teil der Anschrift fehlt. Für eine XRechnung ist er Pflicht.', en: '' },
-  'e.xrechnung-line-net': {
-    de: 'Menge mal Preis ergibt {a}, auf Ihrer Rechnung steht als Betrag dieser Position aber {b}. Bei einer XRechnung muss beides bis auf Rundung übereinstimmen. Passen Sie Menge oder Preis an; einen Rabatt auf einzelne Positionen kann diese Seite noch nicht angeben.',
-    en: '',
-  },
   'e.xrechnung-payment-terms': {
     de: 'Beginnen die Zahlungsbedingungen mit #, liest die XRechnung sie als Skonto. Das muss genau so geschrieben sein: #SKONTO#TAGE=14#PROZENT=2.00# (Tage, dann Prozent mit zwei Nachkommastellen). Schreiben Sie es so, oder lassen Sie das # weg.',
     en: '',

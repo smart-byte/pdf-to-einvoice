@@ -131,7 +131,8 @@ export function check(draft: InvoiceDraft, options: CheckOptions = {}): CheckRes
   }
 
   if (d.lines.length === 0) error('lines', 'required', 'The invoice needs at least one line.');
-  let calculable = d.lines.length > 0;
+  // An amount that is not a number was reported above; nothing can be calculated with it.
+  let calculable = d.lines.length > 0 && (d.prepaidAmount === undefined || isNumber(d.prepaidAmount));
   d.lines.forEach((line: Bag, i: number) => {
     const at = (field: string) => `lines.${i}.${field}`;
     if (line.name === undefined) error(at('name'), 'required', 'The line needs a description.');
@@ -179,6 +180,20 @@ export function check(draft: InvoiceDraft, options: CheckOptions = {}): CheckRes
     if (totals.due > 0 && d.dueDate === undefined && d.paymentTerms === undefined) {
       error('dueDate', 'payment-terms', 'An invoice with an amount due needs a due date or payment terms.');
     }
+    // The data has no discount on a line that could explain a difference between its total and quantity times price.
+    // Two cents are allowed for rounding, half a forint where a currency has no cents (PEPPOL-EN16931-R120).
+    const slack = d.currency === 'HUF' ? 0.5 : 0.02;
+    d.lines.forEach((line: Bag, i: number) => {
+      if (!isNumber(line.netAmount)) return;
+      const apart = micro(line.quantity) * micro(line.unitPrice) - micro(totals.lineNet[i]!) * 10n ** 6n;
+      if ((apart < 0n ? -apart : apart) > micro(slack) * 10n ** 6n) {
+        error(
+          `lines.${i}.netAmount`,
+          'line-net',
+          `Quantity times unit price is ${(line.quantity * line.unitPrice).toFixed(2)}, but the line states ${totals.lineNet[i]!.toFixed(2)}. Correct the quantity or the price; if the line carries a discount, enter the unit price after the discount.`,
+        );
+      }
+    });
     for (const key of ['net', 'vat', 'gross', 'due'] as const) {
       const printed = d.totals?.[key];
       if (printed === undefined) continue;
@@ -244,21 +259,6 @@ function xrechnungFindings(d: Bag, totals: Totals | undefined): Finding[] {
     need(`${who}.city`, 'address', `XRechnung needs the city of the ${who}.`);
     need(`${who}.postalCode`, 'address', `XRechnung needs the postal code of the ${who}.`);
   }
-
-  // PEPPOL-EN16931-R120. The validator applies it to UBL only; the specification states it for both syntaxes.
-  const slack = d.currency === 'HUF' ? 0.5 : 0.02;
-  d.lines.forEach((line: Bag, i: number) => {
-    if (!totals || !isNumber(line.netAmount)) return;
-    const apart = micro(line.quantity) * micro(line.unitPrice) - micro(totals.lineNet[i]!) * 10n ** 6n;
-    if ((apart < 0n ? -apart : apart) > micro(slack) * 10n ** 6n) {
-      add(
-        'error',
-        `lines.${i}.netAmount`,
-        'line-net',
-        `XRechnung wants the total of a line to be quantity times unit price, here ${(line.quantity * line.unitPrice).toFixed(2)}, at most ${slack.toFixed(2)} apart. This line states ${totals.lineNet[i]!.toFixed(2)}. Correct the quantity, the price or the total; a discount on a line cannot be stated yet.`,
-      );
-    }
-  });
 
   // BR-DE-18. The validator also wants a line break right after the last "#...#" of the text; `toUbl` ends the text with one.
   if (typeof d.paymentTerms === 'string') {
