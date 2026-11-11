@@ -899,6 +899,21 @@ select:disabled {
 .reader details > * + * {
   margin-top: 0.8rem;
 }
+/* While a model loads or reads, the button that cancels stands at the end of the line that says how far it is. */
+.busy {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+}
+.busy .status {
+  margin: 0;
+}
+.busy .quiet {
+  flex: none;
+  padding: 0.3rem 0.8rem;
+  font-size: 0.875rem;
+}
 /* Loading a model takes minutes the first time: a bar shows how much of it is there. */
 .reader .loading {
   margin-top: 0.3rem;

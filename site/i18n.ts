@@ -107,6 +107,8 @@ export const STRINGS: Record<string, Entry> = {
     en: 'This browser lacks WebGPU, which in-browser models need. Use Chrome or Edge, or choose your own service.',
   },
   'ai.failed': { de: 'Das Auslesen ist fehlgeschlagen: {m}', en: 'Reading failed: {m}' },
+  'ai.cancel': { de: 'Abbrechen', en: 'Cancel' },
+  'ai.cancelled': { de: 'Abgebrochen. Was die Mustersuche gefunden hat, bleibt.', en: 'Cancelled. What the patterns found stays.' },
 
   's.invoice': { de: 'Rechnung', en: 'Invoice' },
   's.seller': { de: 'Rechnungssteller (Sie)', en: 'Seller (you)' },

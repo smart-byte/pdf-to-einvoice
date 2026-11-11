@@ -22,6 +22,8 @@ All notable changes to this project are documented here. The format follows
 - Web app: a German text for every code the library puts on a finding or an error, the XRechnung rules included,
   each saying what to do; a test fails when a code has none.
 - Web app: the landing page compares the approach with typical online converters, without naming any.
+- Web app: reading with a language model can be cancelled while the model loads or reads, also with the user's own
+  endpoint. Nothing of a cancelled reading is taken over; what the patterns found stays.
 - `extractLayout`: the text of a PDF with its geometry (blocks, pieces with positions, page sizes).
 - `guessFromText` reads by what fits together instead of where it stands: totals by arithmetic, items that add up to
   them, the seller by evidence and the buyer by exclusion, identifiers by their shape; labels in German, English and

@@ -789,40 +789,53 @@ modelSelect.onchange = () => ($('#ai-endpoint').hidden = modelSelect.value !== '
 function reading(fraction?: number): void {
   const loading = fraction !== undefined && fraction < 1;
   $('#ai-loading').hidden = !loading;
+  $('#ai-cancel').hidden = fraction === undefined;
   $<HTMLProgressElement>('#ai-progress').value = fraction ?? 0;
   if (fraction !== undefined) $('#ai-status').textContent = loading ? t('ai.loading', { p: Math.round(fraction * 100) }) : t('ai.reading');
   scan(fraction !== undefined && !loading ? 'on' : 'off');
 }
 
+/** Each reading has a number: only the last one may fill in the form, and one that was cancelled fills in nothing. */
+let reads = 0;
+let cancelRead: AbortController | undefined;
+$('#ai-cancel').onclick = () => cancelRead?.abort();
+
 $('#ai-run').onclick = async () => {
   const status = $('#ai-status');
-  const button = $<HTMLButtonElement>('#ai-run');
+  const [button, cancel] = [$<HTMLButtonElement>('#ai-run'), $<HTMLButtonElement>('#ai-cancel')];
   const viaEndpoint = modelSelect.value === 'endpoint';
   if (!viaEndpoint && !hasWebGpu()) return void (status.textContent = t('ai.nogpu'));
+  const run = ++reads;
+  const abort = (cancelRead = new AbortController());
+  // The button waits while the model works; the focus goes on to the button that cancels.
+  const focused = document.activeElement === button;
   button.disabled = true;
   const pdf = state.pdf;
   try {
     reading(viaEndpoint ? 1 : 0);
+    if (focused) cancel.focus();
     const read = viaEndpoint
-      ? readWithEndpoint(state.pdfText, {
-          url: $<HTMLInputElement>('#ai-url').value,
-          model: $<HTMLInputElement>('#ai-name').value,
-          key: $<HTMLInputElement>('#ai-key').value,
-        })
-      : readWithBrowserModel(state.pdfText, modelSelect.value, reading);
+      ? readWithEndpoint(
+          state.pdfText,
+          { url: $<HTMLInputElement>('#ai-url').value, model: $<HTMLInputElement>('#ai-name').value, key: $<HTMLInputElement>('#ai-key').value },
+          abort.signal,
+        )
+      : readWithBrowserModel(state.pdfText, modelSelect.value, reading, abort.signal);
     const answer = await read;
-    // Another PDF was opened while the model read: its answer is about the invoice that is gone.
-    if (state.pdf !== pdf) return;
+    // Another PDF was opened, or the reading was cancelled, while the model read: the answer is not taken over.
+    if (state.pdf !== pdf || run !== reads || abort.signal.aborted) return;
     // A small model translates names and makes up identifiers. Only what the PDF shows is taken over, and even of
     // that a good part is wrong: every value the model added is marked until the user has looked at it.
     for (const path of merge(keepWhatThePdfShows(normaliseDraft(answer), state.pdfText), true)) state.toCheck.set(path, 'model');
     renderForm();
     status.textContent = t('ai.done');
   } catch (error) {
-    status.textContent = t('ai.failed', { m: error instanceof Error ? error.message : String(error) });
+    status.textContent = abort.signal.aborted ? t('ai.cancelled') : t('ai.failed', { m: error instanceof Error ? error.message : String(error) });
   } finally {
+    const refocus = document.activeElement === cancel;
     reading();
     button.disabled = false;
+    if (refocus) button.focus();
     if (state.pdf !== pdf) status.textContent = '';
   }
 };

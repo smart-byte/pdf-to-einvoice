@@ -68,32 +68,79 @@ function parse(json: string | null | undefined): InvoiceDraft {
   return JSON.parse(json.slice(start, json.lastIndexOf('}') + 1));
 }
 
-let engine: { id: string; instance: any } | undefined;
+/** The model in use and the worker it runs in. Ending the worker stops the model at once and frees its graphics memory. */
+interface Engine {
+  id: string;
+  worker: Worker;
+  ready?: Promise<any>;
+}
+let engine: Engine | undefined;
 
-/** Reads the invoice with a model running in this browser (WebGPU). The model is downloaded once and cached. */
-export async function readWithBrowserModel(text: string, modelId: string, onProgress: (fraction: number) => void): Promise<InvoiceDraft> {
-  const { CreateWebWorkerMLCEngine } = await import('@mlc-ai/web-llm');
-  if (engine?.id !== modelId) {
-    await engine?.instance.unload();
-    const worker = new Worker(new URL('./llm-worker.ts', import.meta.url), { type: 'module' });
-    engine = { id: modelId, instance: await CreateWebWorkerMLCEngine(worker, modelId, { initProgressCallback: (report) => onProgress(report.progress) }) };
-  }
-  onProgress(1);
-  const reply = await engine.instance.chat.completions.create({
-    messages: [{ role: 'user', content: prompt(text) }],
-    temperature: 0,
-    // Room for an invoice with many lines; what really limits the answer is the context of the model.
-    max_tokens: 3000,
-    response_format: { type: 'json_object', schema: JSON.stringify(extractionSchema()) },
-    // A model that can think aloud first would spend the answer on it: the data is wanted, nothing else.
-    extra_body: { enable_thinking: false },
-  });
-  return parse(reply.choices[0]?.message.content);
+/** Ends the model in use. The next reading loads it again, from the browser's cache: nothing is downloaded twice. */
+function stop(): void {
+  engine?.worker.terminate();
+  engine = undefined;
 }
 
-/** Reads the invoice with any OpenAI-compatible chat endpoint the user runs or trusts, e.g. Ollama on localhost. */
-export async function readWithEndpoint(text: string, endpoint: Endpoint): Promise<InvoiceDraft> {
+/** Settles as `work` does, or rejects with the reason of the signal (an AbortError) as soon as it fires. */
+function unlessAborted<T>(work: Promise<T>, signal?: AbortSignal): Promise<T> {
+  if (!signal) return work;
+  return new Promise((resolve, reject) => {
+    const abort = () => reject(signal.reason);
+    if (signal.aborted) return abort();
+    signal.addEventListener('abort', abort, { once: true });
+    void work.then(resolve, reject).finally(() => signal.removeEventListener('abort', abort));
+  });
+}
+
+/**
+ * Reads the invoice with a model running in this browser (WebGPU). The model is downloaded once and cached. When
+ * `signal` fires, loading or reading stops at once and the promise rejects with an AbortError.
+ */
+export async function readWithBrowserModel(text: string, modelId: string, onProgress: (fraction: number) => void, signal?: AbortSignal): Promise<InvoiceDraft> {
+  const { CreateWebWorkerMLCEngine } = await import('@mlc-ai/web-llm');
+  signal?.throwIfAborted();
+  if (engine?.id !== modelId) {
+    stop();
+    const loading: Engine = { id: modelId, worker: new Worker(new URL('./llm-worker.ts', import.meta.url), { type: 'module' }) };
+    engine = loading;
+    // Only the model that is still in use says how far it has loaded.
+    loading.ready = CreateWebWorkerMLCEngine(loading.worker, modelId, { initProgressCallback: (report) => engine === loading && onProgress(report.progress) });
+    // A model that failed to load is not kept: the next reading starts afresh.
+    loading.ready.catch(() => engine === loading && stop());
+  }
+  const mine = engine;
+  // Cancelling ends the worker. Interrupting the engine would stop an answer, but not a model that is still loading.
+  const cancel = () => engine === mine && stop();
+  signal?.addEventListener('abort', cancel, { once: true });
+  try {
+    const instance = await unlessAborted(mine.ready!, signal);
+    onProgress(1);
+    const reply = await unlessAborted<any>(
+      instance.chat.completions.create({
+        messages: [{ role: 'user', content: prompt(text) }],
+        temperature: 0,
+        // Room for an invoice with many lines; what really limits the answer is the context of the model.
+        max_tokens: 3000,
+        response_format: { type: 'json_object', schema: JSON.stringify(extractionSchema()) },
+        // A model that can think aloud first would spend the answer on it: the data is wanted, nothing else.
+        extra_body: { enable_thinking: false },
+      }),
+      signal,
+    );
+    return parse(reply.choices[0]?.message.content);
+  } finally {
+    signal?.removeEventListener('abort', cancel);
+  }
+}
+
+/**
+ * Reads the invoice with any OpenAI-compatible chat endpoint the user runs or trusts, e.g. Ollama on localhost. When
+ * `signal` fires, the request is aborted and the promise rejects with an AbortError.
+ */
+export async function readWithEndpoint(text: string, endpoint: Endpoint, signal?: AbortSignal): Promise<InvoiceDraft> {
   const response = await fetch(`${endpoint.url.replace(/\/+$/, '')}/chat/completions`, {
+    signal,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...(endpoint.key ? { Authorization: `Bearer ${endpoint.key}` } : {}) },
     body: JSON.stringify({
