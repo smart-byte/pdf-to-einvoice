@@ -1,0 +1,46 @@
+name: MCP Registry
+
+# Lists the version that server.json describes in the MCP Registry (https://registry.modelcontextprotocol.io). The
+# "Release" workflow calls it once npm has the new version; it can also be started by hand on main.
+# The registry trusts the identity of this repository's workflows (OIDC) for the namespace io.github.smart-byte, so no
+# token is stored. It also checks that the npm package of that version names the same server in `mcpName`.
+on:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    if: github.repository == 'smart-byte/pdf-to-einvoice' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # prove to the registry which repository this is
+    env:
+      # A fixed release of the registry's publisher, checked against the SHA-256 its release states.
+      MCP_PUBLISHER_VERSION: 1.8.6
+      MCP_PUBLISHER_SHA256: 1fbe93fc0783c2394d8012c8d6e50a59e98cb2cc2d216264cc69f405d0e21340
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      # npm takes a few minutes to serve a version it has just accepted, and the registry looks the package up there.
+      - name: Wait until npm serves the version the entry names
+        run: |
+          package=$(jq -r '.packages[0] | "\(.identifier)/\(.version)"' server.json)
+          for attempt in $(seq 1 40); do
+            if curl -sf -o /dev/null "https://registry.npmjs.org/$package"; then exit 0; fi
+            echo "npm does not serve $package yet (attempt $attempt)"
+            sleep 15
+          done
+          echo "::error::npm does not serve $package"
+          exit 1
+      - name: Fetch the publisher
+        run: |
+          curl -sSL --fail -o "$RUNNER_TEMP/mcp-publisher.tar.gz" "https://github.com/modelcontextprotocol/registry/releases/download/v$MCP_PUBLISHER_VERSION/mcp-publisher_linux_amd64.tar.gz"
+          echo "$MCP_PUBLISHER_SHA256  $RUNNER_TEMP/mcp-publisher.tar.gz" | sha256sum --check
+          tar -xzf "$RUNNER_TEMP/mcp-publisher.tar.gz" -C "$RUNNER_TEMP" mcp-publisher
+      - name: Publish server.json
+        run: |
+          "$RUNNER_TEMP/mcp-publisher" login github-oidc
+          "$RUNNER_TEMP/mcp-publisher" publish
