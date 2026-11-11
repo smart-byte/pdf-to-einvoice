@@ -23,7 +23,7 @@ describe.skipIf(!asked)('the web app in a browser', () => {
   let server: PreviewServer;
   let browser: Browser;
   let base: string;
-  /** What must not happen on any page: an error in the console (a breach of the policy is one), a failed request, a request to another host. */
+  /** What must not happen on any page: an error in the console (a breach of the policy is one), a failed request, a request to another host, an upload. */
   let problems: string[];
 
   beforeAll(async () => {
@@ -47,7 +47,15 @@ describe.skipIf(!asked)('the web app in a browser', () => {
     page.on('console', (message) => message.type() === 'error' && problems.push(`console: ${message.text()}`));
     page.on('pageerror', (error) => problems.push(`error: ${error.message}`));
     page.on('response', (response) => response.status() >= 400 && problems.push(`${response.status()} ${response.url()}`));
-    page.on('request', (request) => /^https?:/.test(request.url()) && !request.url().startsWith(base) && problems.push(`request to ${request.url()}`));
+    // Nothing is uploaded: the page fetches its own files and nothing else. A request that carries data, in its body or
+    // in its address, would be an upload, also one to its own host.
+    page.on('request', (request) => {
+      const url = request.url();
+      if (!/^https?:/.test(url)) return;
+      if (!url.startsWith(base)) problems.push(`request to ${url}`);
+      else if (request.method() !== 'GET' || request.postData() !== null) problems.push(`${request.method()} with data to ${url}`);
+      else if (new URL(url).search && !request.isNavigationRequest()) problems.push(`data in the address ${url}`);
+    });
     await page.goto(`${base}?lang=${lang}`);
     return page;
   };
@@ -75,6 +83,15 @@ describe.skipIf(!asked)('the web app in a browser', () => {
     }
     await page.fill('[data-path="vatExemptionReason"]', 'Steuerfreie innergemeinschaftliche Lieferung');
   };
+
+  it('would notice an upload, also one to its own host', async () => {
+    const page = await open();
+    await page.evaluate(() => fetch('./', { method: 'POST', body: 'RE-2026-0042' }).catch(() => {}));
+    await page.evaluate(() => fetch('./llms.txt?number=RE-2026-0042').catch(() => {}));
+    expect(problems).toEqual(expect.arrayContaining([expect.stringMatching(/^POST with data to /), expect.stringMatching(/^data in the address /)]));
+    // These two were made on purpose.
+    problems = [];
+  }, 120_000);
 
   it('turns the sample into an e-invoice that holds what the page showed', async () => {
     const page = await open();
