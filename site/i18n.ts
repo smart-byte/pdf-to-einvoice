@@ -256,6 +256,7 @@ export const STRINGS: Record<string, Entry> = {
   'done.pdf': { de: 'E-Rechnung herunterladen', en: 'Download e-invoice' },
   'done.xml': { de: 'Nur das XML herunterladen', en: 'Download the XML only' },
   'done.again': { de: 'Angaben noch einmal ändern', en: 'Change the data again' },
+  'done.another': { de: 'Weitere Rechnung umwandeln', en: 'Convert another invoice' },
   'done.checksum': { de: 'Prüfsumme (SHA-256) von', en: 'Checksum (SHA-256) of' },
   'done.title.xr': { de: 'Ihre XRechnung ist fertig.', en: 'Your XRechnung is ready.' },
   'done.lead.xr': {

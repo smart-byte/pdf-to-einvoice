@@ -1036,6 +1036,7 @@ $('#create').onclick = async () => {
   }
 };
 $('#again').onclick = () => show('work');
+$('#another').onclick = () => show('start');
 
 // ---------------------------------------------------------------------------------------------------------------
 // The listings for developers: one is shown at a time
