@@ -23,6 +23,12 @@ export interface CheckOptions {
   pdfText?: string;
   /** `xrechnung` adds what XRechnung 3.0 asks for beyond EN 16931: an error where it demands, a warning where it recommends. */
   rules?: 'xrechnung';
+  /**
+   * For data read from an existing e-invoice (`readInvoiceXml`): the lines, counted from 0, whose total its XML
+   * explains by a discount, a surcharge or a price for several units. A line total that is not quantity times price
+   * is then a warning, since the standard does not forbid it, and none at all for these lines.
+   */
+  adjustedLines?: number[];
 }
 
 type Bag = Record<string, any>;
@@ -198,11 +204,19 @@ export function check(draft: InvoiceDraft, options: CheckOptions = {}): CheckRes
     d.lines.forEach((line: Bag, i: number) => {
       if (!isNumber(line.netAmount)) return;
       const apart = micro(line.quantity) * micro(line.unitPrice) - micro(totals.lineNet[i]!) * 10n ** 6n;
-      if ((apart < 0n ? -apart : apart) > micro(slack) * 10n ** 6n) {
+      if ((apart < 0n ? -apart : apart) <= micro(slack) * 10n ** 6n) return;
+      const [product, stated] = [(line.quantity * line.unitPrice).toFixed(2), totals.lineNet[i]!.toFixed(2)];
+      if (!options.adjustedLines) {
         error(
           `lines.${i}.netAmount`,
           'line-net',
-          `Quantity times unit price is ${(line.quantity * line.unitPrice).toFixed(2)}, but the line states ${totals.lineNet[i]!.toFixed(2)}. Correct the quantity or the price; if the line carries a discount, enter the unit price after the discount.`,
+          `Quantity times unit price is ${product}, but the line states ${stated}. Correct the quantity or the price; if the line carries a discount, enter the unit price after the discount.`,
+        );
+      } else if (!options.adjustedLines.includes(i)) {
+        warn(
+          `lines.${i}.netAmount`,
+          'line-net',
+          `The XML states ${stated} as the total of this line, but its quantity times its price is ${product}, and it names no discount or surcharge on the line that explains the difference.`,
         );
       }
     });
@@ -283,6 +297,17 @@ function xrechnungFindings(d: Bag): Finding[] {
         'XRechnung reads a line of the payment terms that starts with # as a cash discount, which has to be written exactly like #SKONTO#TAGE=14#PROZENT=2.00# on a line of its own (days, then percent with two decimals). Write the line that way, or do not start it with #.',
       );
     }
+  }
+
+  // A place of delivery needs its city and postal code in an XRechnung (BR-DE-10, BR-DE-11), which the data cannot hold.
+  // A country alone would be left out of the XML without a word, so it is refused.
+  if (d.deliveryCountry !== undefined) {
+    add(
+      'error',
+      'deliveryCountry',
+      'delivery-address',
+      'XRechnung takes a place of delivery with its city and postal code only, which this tool cannot state yet. Leave the country of delivery empty.',
+    );
   }
 
   // BR-IC-12 asks for the country of delivery of an intra-community supply, and BR-DE-10 and BR-DE-11 then for its city and postal code.
@@ -370,7 +395,10 @@ export function amountSpellings(n: number): string[] {
   return frac === '00' ? [...spellings, int, grouped('.'), grouped(',')] : spellings;
 }
 
-/** Reports values that the text of the PDF does not contain. */
+/**
+ * Reports values that the text of the PDF does not contain. Known limit: it tells whether a value stands in the text,
+ * not where. An address entered for the wrong party passes, because each of its words stands somewhere on the page.
+ */
 function compareWithPdf(d: Bag, totals: Totals | undefined, pdfText: string): Finding[] {
   const haystack = pdfText.replace(/\s+/g, '').toLowerCase();
   if (!haystack) {

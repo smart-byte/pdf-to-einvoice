@@ -13,6 +13,8 @@ export interface ValidationResult {
   xml?: string;
   /** The data read from the XML. */
   invoice?: InvoiceDraft;
+  /** The lines, counted from 0, whose total the XML explains by what the data does not hold; pass them on to `check`. */
+  adjustedLines?: number[];
   /** Calculated from the lines of the XML. */
   totals?: Totals;
   findings: Finding[];
@@ -87,8 +89,9 @@ export async function validateEInvoice(pdf: Uint8Array, options: { pdfText?: str
   }
   if (!read) return { isEInvoice, xml, findings };
 
-  const { invoice, profile } = read;
-  const checked = check(invoice, options);
+  const { invoice, profile, adjustedLines } = read;
+  // A line may state what `check` knows nothing of, a discount for one: its total is then explained, see `adjustedLines`.
+  const checked = check(invoice, { ...options, adjustedLines });
   // check() words a totals mismatch for data typed in from a PDF; here both sides of the contradiction are in the XML.
   const reworded = (finding: Finding): Finding => {
     const key = finding.path.replace('totals.', '') as 'net' | 'vat' | 'gross' | 'due';
@@ -96,5 +99,5 @@ export async function validateEInvoice(pdf: Uint8Array, options: { pdfText?: str
     return { ...finding, message };
   };
   findings.push(...checked.findings.map((finding) => (finding.code === 'totals-mismatch' ? reworded(finding) : finding)));
-  return { isEInvoice, profile, xml, invoice, totals: checked.totals, findings };
+  return { isEInvoice, profile, xml, invoice, adjustedLines, totals: checked.totals, findings };
 }

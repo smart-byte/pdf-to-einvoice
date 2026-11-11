@@ -444,6 +444,10 @@ describe('check with the XRechnung rules', () => {
     expect(terms('Rechnungen #42 und #43 zahlbar in 30 Tagen\n  #SKONTO#TAGE=14#PROZENT=2.00#')).toEqual([]);
   });
 
+  it('refuses a country of delivery, which XRechnung takes with city and postal code only', () => {
+    expect(found(xrechnung((d) => (d.deliveryCountry = 'AT')))).toEqual(['error deliveryCountry: xrechnung-delivery-address']);
+  });
+
   it('refuses an intra-community supply, which needs a delivery address the data cannot hold', () => {
     const draft = xrechnung((d) => {
       for (const line of d.lines) Object.assign(line, { vatCategory: 'K', vatRate: 0 });

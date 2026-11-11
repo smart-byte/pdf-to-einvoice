@@ -1,8 +1,10 @@
 # Response headers for the site (Cloudflare Workers static assets). The Content-Security-Policy for scripts, styles
 # and connections is a meta tag in the pages, written at build time; what a meta tag cannot say is said here.
+# Strict-Transport-Security keeps a browser on HTTPS; that plain HTTP is redirected at all is a setting of the host.
 # While the site is being tested, search engines leave it out: remove the X-Robots-Tag line at the launch.
 /*
   X-Content-Type-Options: nosniff
+  Strict-Transport-Security: max-age=31536000
   Referrer-Policy: strict-origin-when-cross-origin
   Content-Security-Policy: frame-ancestors 'none'
   X-Frame-Options: DENY

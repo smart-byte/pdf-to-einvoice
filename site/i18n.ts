@@ -295,6 +295,10 @@ export const STRINGS: Record<string, Entry> = {
     de: 'Menge mal Preis ergibt {a}, auf Ihrer Rechnung steht als Betrag dieser Position aber {b}. Beides muss bis auf Rundung übereinstimmen. Passen Sie Menge oder Preis an; bei einem Rabatt auf die Position tragen Sie den Preis nach Abzug des Rabatts ein.',
     en: '',
   },
+  'e.line-net.xml': {
+    de: 'Das XML nennt für diese Position {b}, Menge mal Preis ergibt aber {a}, und es nennt keinen Rabatt oder Zuschlag auf die Position, der das erklärt.',
+    en: 'The XML states {b} for this line item, but quantity times price is {a}, and it names no discount or surcharge on the line that explains the difference.',
+  },
   'e.totals-mismatch': {
     de: 'Die Summe im PDF weicht von der Summe der Positionen ab. Die E-Rechnung darf dem PDF nicht widersprechen: Bitte prüfen Sie Mengen und Preise.',
     en: '',
@@ -338,6 +342,10 @@ export const STRINGS: Record<string, Entry> = {
   'e.xrechnung-address': { de: 'Dieser Teil der Anschrift fehlt. Für eine XRechnung ist er Pflicht.', en: '' },
   'e.xrechnung-payment-terms': {
     de: 'Beginnen die Zahlungsbedingungen mit #, liest die XRechnung sie als Skonto. Das muss genau so geschrieben sein: #SKONTO#TAGE=14#PROZENT=2.00# (Tage, dann Prozent mit zwei Nachkommastellen). Schreiben Sie es so, oder lassen Sie das # weg.',
+    en: '',
+  },
+  'e.xrechnung-delivery-address.deliveryCountry': {
+    de: 'Eine XRechnung nimmt einen Lieferort nur mit Postleitzahl und Ort an, und dafür gibt es hier noch kein Feld. Lassen Sie das Land der Lieferung leer.',
     en: '',
   },
   'e.xrechnung-delivery-address': {
@@ -411,8 +419,8 @@ export const STRINGS: Record<string, Entry> = {
   'cmp.3': { de: 'Woher stammt jede Angabe?', en: 'Where does each value come from?' },
   'cmp.3.them': { de: 'Sie sehen ein Formular zum Korrigieren.', en: 'You get a form to correct.' },
   'cmp.3.us': {
-    de: 'Was aus dem PDF gelesen wurde, ist dort markiert. Nummern, Namen, Anschriften, Daten, Preise und Summen werden mit seinem Text abgeglichen.',
-    en: 'What was read from the PDF is marked on it. Numbers, names, addresses, dates, prices and totals are compared with its text.',
+    de: 'Was aus dem PDF gelesen wurde, ist dort markiert. Nummern, Namen, Anschriften, Daten, Preise und Summen werden mit seinem Text abgeglichen: ob sie dort stehen, nicht an welcher Stelle.',
+    en: 'What was read from the PDF is marked on it. Numbers, names, addresses, dates, prices and totals are compared with its text: whether they are there, not where.',
   },
   'cmp.4': { de: 'Konto, Werbung, Tracking', en: 'Account, ads, tracking' },
   'cmp.4.them': { de: 'Je nach Anbieter Anmeldung, Werbung oder Abo.', en: 'Depending on the provider, sign-up, ads or a subscription.' },

@@ -248,19 +248,19 @@ describe('createEInvoice repairs what PDF/A forbids', () => {
   });
 });
 
-describe('createEInvoice without a delivery date', () => {
+describe('createEInvoice states no place of supply that nobody named', () => {
   const shipToCountry = (xml: string) => /<ram:ShipToTradeParty>[\s\S]*?<ram:CountryID>(\w+)<\/ram:CountryID>/.exec(xml)?.[1];
   const withPeriod = (d: any) => {
     delete d.deliveryDate;
     Object.assign(d, { periodStart: '2026-10-01', periodEnd: '2026-10-31' });
   };
 
-  it('names the seller country as place of supply when VAT is charged', async () => {
+  it('none without a delivery date, where VAT is charged at home', async () => {
     const { xml } = await createEInvoice({ pdf: samplePdf(), invoice: sample(withPeriod) });
-    expect(shipToCountry(xml)).toBe('DE');
+    expect(shipToCountry(xml)).toBeUndefined();
   });
 
-  it('names the buyer country as place of supply when the VAT is owed abroad', async () => {
+  it('none without a delivery date, where the VAT is owed abroad', async () => {
     const invoice = sample((d) => {
       withPeriod(d);
       for (const line of d.lines) Object.assign(line, { vatCategory: 'AE', vatRate: 0 });
@@ -269,12 +269,12 @@ describe('createEInvoice without a delivery date', () => {
       delete d.totals;
     });
     const { xml } = await createEInvoice({ pdf: samplePdf(), invoice });
-    expect(shipToCountry(xml)).toBe('AT');
+    expect(shipToCountry(xml)).toBeUndefined();
   });
 
-  it('adds no place of supply when the delivery date is given', async () => {
-    const { xml } = await createEInvoice({ pdf: samplePdf(), invoice: sample() });
-    expect(shipToCountry(xml)).toBeUndefined();
+  it('the one the data states', async () => {
+    const { xml } = await createEInvoice({ pdf: samplePdf(), invoice: sample((d) => (d.deliveryCountry = 'FR')) });
+    expect(shipToCountry(xml)).toBe('FR');
   });
 });
 

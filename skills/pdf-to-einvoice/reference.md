@@ -71,7 +71,8 @@ What the check reports under codes that start with `xrechnung-`, beyond EN 16931
 - A line of `paymentTerms` that starts with `#` has to be a cash discount in the fixed form
   `#SKONTO#TAGE=14#PROZENT=2.00#`.
 
-An intra-community supply (category `K`) cannot be written as XRechnung: the data has no delivery address yet. The tool
+An intra-community supply (category `K`) cannot be written as XRechnung, and neither can a `deliveryCountry`: the data
+has no delivery address yet. The tool
 does not send the file; how the public body takes invoices in (portal, e-mail, Peppol) is for it to say. The XML
 declares XRechnung 3.0.
 

@@ -45,6 +45,8 @@ interface State {
    * until the user changes the value or says it is right.
    */
   toCheck: Map<string, 'suggested' | 'inferred' | 'model'>;
+  /** Of an existing e-invoice: the lines whose total its XML explains by a discount, a surcharge or a price for several units. */
+  adjustedLines?: number[];
 }
 type Format = 'pdf' | 'xrechnung';
 const state: State = { fileName: '', pdfText: '', draft: {}, touched: new Set(), fileFindings: [], mode: 'create', format: 'pdf', toCheck: new Map() };
@@ -356,6 +358,7 @@ function validate(): void {
   const result = (state.result = check(state.draft, {
     ...(state.pdf ? { pdfText: state.pdfText } : {}),
     ...(shownFormat() === 'xrechnung' ? { rules: 'xrechnung' as const } : {}),
+    ...(state.mode === 'validate' ? { adjustedLines: state.adjustedLines ?? [] } : {}),
   }));
   // What nobody has looked at yet is said at its field. A model may have read a value the form has no field for: that one is not counted.
   // A suggestion is not on the PDF at all: it stands in the way of creating until it is confirmed or changed.
@@ -732,6 +735,7 @@ async function open(pdf: Uint8Array, fileName: string): Promise<void> {
       const { validateEInvoice } = await import('../src/validate.js');
       const result = await validateEInvoice(pdf, { pdfText: text });
       state.draft = result.invoice ?? {};
+      state.adjustedLines = result.adjustedLines ?? [];
       state.fileFindings = result.findings.filter((finding) => FILE_CODES.has(finding.code));
       $('#read-status').textContent = result.profile ? t('valid.profile', { p: result.profile }) : '';
     } else {

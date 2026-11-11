@@ -118,11 +118,16 @@ describe.skipIf(!jar)('reference validation with Mustang', () => {
     return { pdf: status(stdout, 'pdf'), xml: status(stdout, 'xml'), problems: problems(stdout), report: stdout };
   };
 
+  // Without a delivery date and a country of delivery there is nothing to say about the delivery, and nothing is made
+  // up: the element the syntax demands stays empty, as in official samples of the standard. The validator accepts the
+  // file and remarks on the empty element.
+  const REMARKS: Record<string, unknown[]> = { 'service period instead of a delivery date': [expect.stringContaining('PEPPOL-EN16931-R008')] };
+
   it.concurrent.each(Object.entries(CASES))(
     '%s',
     async (name, invoice) => {
       const { pdf } = await createEInvoice({ pdf: samplePdf(), invoice });
-      expect(await validate(`${name}.pdf`, pdf)).toMatchObject({ pdf: 'valid', xml: 'valid', problems: [] });
+      expect(await validate(`${name}.pdf`, pdf)).toMatchObject({ pdf: 'valid', xml: 'valid', problems: REMARKS[name] ?? [] });
     },
     120_000,
   );

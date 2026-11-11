@@ -61,19 +61,17 @@ export function toUbl(invoice: Invoice, totals: Totals, xrechnung = false): EInv
   // (or allowed), the tax identifier the invoice prints is passed on as the plain seller identifier.
   const sellerIdentifier = vatIdsAllowed && seller.vatId ? undefined : (seller.vatId ?? seller.taxNumber);
 
-  // The country of supply. Where the data does not state it, it is assumed from the VAT treatment: where VAT is
-  // charged (or exempt) at home it is the seller's country, otherwise the buyer's. That is an assumption, not a fact:
-  // `check` asks about it where a rule relies on the country, the intra-community supply (BR-IC-12). The country is
-  // also written whenever there is no delivery date (ZUGFeRD rule BR-FX-DE-04; it keeps the mandatory delivery
-  // element from being empty).
+  // The country of delivery is written where the data states it. Only an intra-community supply has to name one
+  // (BR-IC-12): there the country of the buyer stands in, and `check` asks about that assumption. Nothing else is
+  // assumed, so an invoice without a delivery date and a country of delivery has an empty delivery element, as
+  // official samples of the standard have; a validator may remark on the empty element.
   // Not so in an XRechnung: a place of delivery there needs its city and postal code (BR-DE-10, BR-DE-11), which the
   // data does not have. `check` refuses an intra-community supply for that reason.
-  const suppliedAtHome = !categories.has('K') && ['S', 'Z', 'E'].some((c) => categories.has(c as 'S'));
-  const stateCountry = !xrechnung && (categories.has('K') || !invoice.deliveryDate || invoice.deliveryCountry !== undefined);
+  const stateCountry = !xrechnung && (categories.has('K') || invoice.deliveryCountry !== undefined);
   const delivery = compact({
     'cbc:ActualDeliveryDate': invoice.deliveryDate,
     'cac:DeliveryLocation': stateCountry
-      ? { 'cac:Address': { 'cac:Country': { 'cbc:IdentificationCode': invoice.deliveryCountry ?? (suppliedAtHome ? seller.country : buyer.country) } } }
+      ? { 'cac:Address': { 'cac:Country': { 'cbc:IdentificationCode': invoice.deliveryCountry ?? buyer.country } } }
       : undefined,
   });
 
