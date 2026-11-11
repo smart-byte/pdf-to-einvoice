@@ -5,15 +5,18 @@ For maintainers.
 ## A new version on npm
 
 1. Move the "Unreleased" section of `CHANGELOG.md` under the new version and its date, and set the same version in
-   `package.json` (`npm version <x.y.z> --no-git-tag-version` also updates the lockfile).
+   `package.json` (`npm version <x.y.z> --no-git-tag-version` also updates the lockfile) and in `server.json`.
 2. Merge that change, then start the "Release" workflow by hand on main (Actions → Release → Run workflow). Nothing
    else starts it: publishing to npm cannot be undone.
 3. It checks the version against the changelog and the existing tags, runs the checks and the reference validation,
    publishes to npm with a provenance statement, and then creates the tag `v<x.y.z>` and the GitHub release from the
    changelog section.
+4. A second job then lists the version in the [MCP Registry](https://registry.modelcontextprotocol.io) from
+   `server.json`. It is the "MCP Registry" workflow, which can also be started alone on main.
 
 npm trusts the workflow directly (trusted publishing), so no token is stored. On npmjs.com the package's settings
-name repository `smart-byte/pdf-to-einvoice` and workflow file `release.yml` as its trusted publisher.
+name repository `smart-byte/pdf-to-einvoice` and workflow file `release.yml` as its trusted publisher. The MCP
+Registry trusts the repository's workflows in the same way, for the namespace `io.github.smart-byte`.
 
 ## The website
 
