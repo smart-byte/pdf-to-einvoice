@@ -819,14 +819,26 @@ modelSelect.onchange = showModel;
 
 /**
  * Shows how far reading with a model is: below 1 the model is still loading and a bar says how much of it is there,
- * at 1 it reads and the band of light travels over the page. Without a number, reading is over.
+ * at 1 it reads and the band of light travels over the page. Once it writes its answer, `written` says how far that
+ * is, and the bar is back for it. Without a number, reading is over.
  */
-function reading(fraction?: number): void {
+function reading(fraction?: number, written?: { fraction: number; line: number }): void {
   const loading = fraction !== undefined && fraction < 1;
-  $('#ai-loading').hidden = !loading;
+  const bar = $<HTMLProgressElement>('#ai-progress');
+  $('#ai-loading').hidden = !loading && !written;
+  $('#ai-wait').hidden = !loading;
   $('#ai-cancel').hidden = fraction === undefined;
-  $<HTMLProgressElement>('#ai-progress').value = fraction ?? 0;
-  if (fraction !== undefined) $('#ai-status').textContent = loading ? t('ai.loading', { p: Math.round(fraction * 100) }) : t('ai.reading');
+  bar.value = written?.fraction ?? fraction ?? 0;
+  bar.setAttribute('aria-label', t(written ? 'ai.progress.answer' : 'ai.progress'));
+  if (fraction !== undefined) {
+    $('#ai-status').textContent = loading
+      ? t('ai.loading', { p: Math.round(fraction * 100) })
+      : !written
+        ? t('ai.reading')
+        : written.line
+          ? t('ai.writing.line', { n: written.line })
+          : t('ai.writing', { p: Math.round(written.fraction * 100) });
+  }
   scan(fraction !== undefined && !loading ? 'on' : 'off');
 }
 
@@ -861,7 +873,7 @@ $('#ai-run').onclick = async () => {
           { url: address.value, model: $<HTMLInputElement>('#ai-name').value, key: $<HTMLInputElement>('#ai-key').value },
           abort.signal,
         )
-      : readWithBrowserModel(state.pdfText, modelSelect.value, reading, abort.signal);
+      : readWithBrowserModel(state.pdfText, modelSelect.value, reading, abort.signal, (written) => reading(1, written));
     const answer = await read;
     // Another PDF was opened, or the reading was cancelled, while the model read: the answer is not taken over.
     if (state.pdf !== pdf || run !== reads || abort.signal.aborted) return;
