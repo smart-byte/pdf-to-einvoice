@@ -1227,6 +1227,13 @@ textarea.warned {
 .done__text > * + * {
   margin-top: 1rem;
 }
+/* What to do after the download: two quiet choices side by side, one under the other where the column is narrow. */
+.next {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.75rem;
+}
+
 .actions {
   display: flex;
   flex-wrap: wrap;
