@@ -1,11 +1,11 @@
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
-import { COUNTER_ORIGIN, counterTag, forBuild } from './counter.js';
+import { forBuild } from './counter.js';
 
 const page = (name: string) => fileURLToPath(new URL(name, import.meta.url));
 
 // The ID of the website for the page counter. Only the deployment of the project's own site gives it to the build
-// (see docs/releasing.md); without it no page gets the counter, and the pages say so.
+// (see docs/releasing.md); without it the pages count nothing, and say so.
 const COUNTER_ID = process.env.ANALYTICS_WEBSITE_ID || undefined;
 
 /**
@@ -18,8 +18,7 @@ const POLICY = [
   // Only the page's own files run as script: nothing inline, nothing from elsewhere. WebAssembly is what the language
   // models are made of. 'unsafe-eval' is there for one reason: the library that writes the XML compiles its checks
   // of the invoice data from text when it is first used. It can go when that library ships them compiled.
-  // A build with the page counter may run that one script from its server besides.
-  `script-src 'self' 'wasm-unsafe-eval' 'unsafe-eval'${COUNTER_ID ? ` ${COUNTER_ORIGIN}` : ''}`,
+  "script-src 'self' 'wasm-unsafe-eval' 'unsafe-eval'",
   "worker-src 'self' blob:",
   "style-src 'self'",
   "font-src 'self'",
@@ -39,7 +38,7 @@ export default defineConfig({
       name: 'page-counter',
       transformIndexHtml: {
         order: 'pre',
-        handler: (html: string) => ({ html: forBuild(html, Boolean(COUNTER_ID)), tags: counterTag(COUNTER_ID, 'pdf-to-einvoice.app') }),
+        handler: (html: string) => forBuild(html, Boolean(COUNTER_ID)),
       },
     },
     {
@@ -50,6 +49,8 @@ export default defineConfig({
   ],
   root: page('.'),
   base: './',
+  // What count.ts counts for; empty in a build that does not count, which leaves its code out.
+  define: { COUNTER_WEBSITE_ID: JSON.stringify(COUNTER_ID ?? '') },
   // Several pages, no router: the local server answers an address that does not exist with 404, as the host does,
   // instead of with the start page. A request for a file the site does not ship then shows up while testing.
   appType: 'mpa',

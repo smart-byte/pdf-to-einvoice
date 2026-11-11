@@ -1,10 +1,8 @@
 // The legal notice and the privacy policy share the language switch and the footer texts with the main page.
+import { NOT_COUNTED, countVisit } from './count.js';
 import { lang, setLang, t, type Lang } from './i18n.js';
 import './styles.css';
 import './theme-switch.js';
-
-// The page counter of a build that has one counts nothing while this is set in the local storage of the browser.
-const NOT_COUNTED = 'umami.disabled';
 
 /** Says whether visits are counted in this browser and offers to change it. A build without the counter has no such box. */
 function showCounting(): void {
@@ -39,3 +37,4 @@ function apply(next: Lang): void {
 }
 for (const button of document.querySelectorAll<HTMLButtonElement>('[data-lang]')) button.onclick = () => apply(button.dataset.lang as Lang);
 apply(lang);
+countVisit();

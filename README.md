@@ -30,8 +30,8 @@ in their format. This one starts from the PDF you already produce with Word, you
 
 **[Open the web app](https://pdf-to-einvoice.app/)**, or start it locally with `npm run site`. Drop a PDF, check the
 data that was read from it, download the e-invoice. The page is in English and German. The site at that address
-counts page views and created files with a cookieless Umami we run ourselves, never anything of an invoice; a copy
-you build yourself has no counter.
+can count page views and created files, never anything of an invoice, with a cookieless Umami we run ourselves; its
+privacy policy says whether it does. A copy you build yourself counts nothing.
 
 Reading works by pattern matching, without any AI. On request a small language model fills in what the patterns did
 not find. It runs in your browser (WebGPU) and is downloaded once from Hugging Face (huggingface.co, hf.co) and
