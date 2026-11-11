@@ -19,6 +19,8 @@ All notable changes to this project are documented here. The format follows
   asks for the Leitweg-ID or other buyer reference, a contact with phone and e-mail and the e-mail address of the
   buyer, the check runs the XRechnung rules, and two files are created: the XRechnung as XML (UBL) for the portal of
   the public body, and the PDF that carries it.
+- Web app: a German text for every code the library puts on a finding or an error, the XRechnung rules included,
+  each saying what to do; a test fails when a code has none.
 - `extractLayout`: the text of a PDF with its geometry (blocks, pieces with positions, page sizes).
 - `guessFromText` reads by what fits together instead of where it stands: totals by arithmetic, items that add up to
   them, the seller by evidence and the buyer by exclusion, identifiers by their shape; labels in German, English and

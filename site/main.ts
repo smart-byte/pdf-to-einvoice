@@ -7,7 +7,7 @@ import { guessFromText, languageOf } from '../src/guess.js';
 import { INVOICE_TYPES, VAT_CATEGORIES, type InvoiceDraft } from '../src/model.js';
 import { inspectPdf } from '../src/pdf.js';
 import { extractLayout } from '../src/text.js';
-import { lang, setLang, t } from './i18n.js';
+import { lang, setLang, STRINGS, t } from './i18n.js';
 import { DEFAULT_MODEL, MODELS, hasWebGpu, readWithBrowserModel, readWithEndpoint } from './llm.js';
 import { locate, pageToShow, type Piece, type Rect } from './locate.js';
 import './styles.css';
@@ -293,7 +293,33 @@ function renderForm(): void {
 // ---------------------------------------------------------------------------------------------------------------
 // Findings and totals
 
-const describe = (finding: Finding) => (lang === 'de' && t(`e.${finding.code}`) !== `e.${finding.code}` ? t(`e.${finding.code}`) : finding.message);
+/**
+ * A finding, or an error of the library, in the language of the page: in German the text for its code, worded for its
+ * field where there is one (`e.format.iban`), else the English message of the library. What a German text names, it
+ * takes from the data rather than from the English sentence; only the value a message quotes and a message of the
+ * library that writes the XML are passed on as they are.
+ */
+function describe(finding: { code: string; message: string; path?: string }): string {
+  const path = finding.path ?? '';
+  const key = [`e.${finding.code}.${path.split('.').at(-1)}`, `e.${finding.code}`].find((candidate) => candidate in STRINGS);
+  if (lang !== 'de' || !key) return finding.message;
+  const line = state.draft.lines?.[Number(/^lines\.(\d+)\./.exec(path)?.[1])];
+  return t(key, {
+    a: line ? money(Number(line.quantity) * Number(line.unitPrice)) : '',
+    b: line ? money(Number(line.netAmount)) : '',
+    // Known limit: the value that could not be written is read from the quotes of the English message. Give the finding
+    // the value itself if that message is ever worded differently.
+    v: /"(.*)"/.exec(finding.message)?.[1] ?? '',
+    m: finding.message,
+  });
+}
+/** Why creating failed. An error of the library carries a code, and the page has a sentence for each. */
+const reasonOf = (error: unknown) =>
+  error instanceof Error && error.name === 'InvoiceError'
+    ? describe(error as Error & { code: string })
+    : error instanceof Error
+      ? error.message
+      : String(error);
 const money = (n: number) =>
   new Intl.NumberFormat(lang, {
     style: 'currency',
@@ -303,13 +329,17 @@ const money = (n: number) =>
 function fieldLabel(path: string): string {
   const input = document.querySelector<HTMLElement>(`[data-path="${path}"]`);
   const label = input && document.querySelector(`label[for="${input.id}"]`)?.textContent;
-  const line = /^lines\.(\d+)\./.exec(path);
-  if (label) return line ? `${t('s.lines')} ${Number(line[1]) + 1}, ${label}` : label;
-  return path.startsWith('totals') ? t('s.totals') : path === 'lines' ? t('s.lines') : '';
+  // A line item is named by its number, also for a value of it the form does not show, such as its total.
+  const line = /^lines\.(\d+)(\.|$)/.exec(path);
+  if (line) return `${t('s.lines')} ${Number(line[1]) + 1}${label ? `, ${label}` : ''}`;
+  if (label) return label;
+  return path.startsWith('totals.') ? t(`t.${path.slice(7)}`) : path === 'lines' ? t('s.lines') : '';
 }
 
-/** The field of a path, or the first field of a line item for the path of the whole line. */
-const fieldOf = (path: string) => document.querySelector<HTMLElement>(`[data-path="${path}"], [data-path="${path}.name"]`);
+/** The field of a path; the first field of a line item for the path of the whole line, or of a value of it the form does not show. */
+const fieldOf = (path: string) =>
+  document.querySelector<HTMLElement>(`[data-path="${path}"], [data-path="${path}.name"]`) ??
+  document.querySelector<HTMLElement>(`[data-path="${path.replace(/^(lines\.\d+)\..*$/, '$1')}.name"]`);
 
 function validate(): void {
   const result = (state.result = check(state.draft, {
@@ -325,7 +355,10 @@ function validate(): void {
       code: why,
       message: t(why === 'suggested' ? 'hint.suggested' : /^lines\.\d+$/.test(path) ? 'hint.model.line' : 'hint.model'),
     }));
-  const findings = [...result.findings, ...state.fileFindings, ...unchecked];
+  // Where XRechnung demands a part of the address, the warning that it is missing would only say the same again.
+  const demanded = (finding: Finding) =>
+    finding.code === 'address' && result.findings.some((other) => other.code === 'xrechnung-address' && other.path === finding.path);
+  const findings = [...result.findings.filter((finding) => !demanded(finding)), ...state.fileFindings, ...unchecked];
 
   for (const hint of document.querySelectorAll<HTMLElement>('[data-hint]')) {
     const path = hint.dataset.hint!;
@@ -530,8 +563,7 @@ function renderMarks(): void {
 function turnTo(path: string): void {
   const page = pageToShow(pagePieces, shown, (on) => placesOf(path, on).length > 0);
   if (page === undefined || page === shown) return;
-  const label = path.startsWith('totals.') ? t(`t.${path.slice(7)}`) : fieldLabel(path);
-  void showPage(page).then(() => ($('#page-live').textContent = t('page.turned', { n: page + 1, f: label })));
+  void showPage(page).then(() => ($('#page-live').textContent = t('page.turned', { n: page + 1, f: fieldLabel(path) })));
 }
 
 $('#form').addEventListener('focusin', (event) => {
@@ -852,7 +884,7 @@ async function renderXml(): Promise<void> {
     status.textContent = '';
     pair.hidden = whole.hidden = false;
   } catch (error) {
-    if (run === xmlRun) instead(t('create.failed', { m: error instanceof Error ? error.message : String(error) }));
+    if (run === xmlRun) instead(t('create.failed', { m: reasonOf(error) }));
   }
 }
 
@@ -932,7 +964,7 @@ $('#create').onclick = async () => {
     to.getContext('2d')!.drawImage(from, 0, 0);
     show('done');
   } catch (error) {
-    status.textContent = t('create.failed', { m: error instanceof Error ? error.message : String(error) });
+    status.textContent = t('create.failed', { m: reasonOf(error) });
   } finally {
     button.disabled = false;
     validate();

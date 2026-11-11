@@ -237,30 +237,96 @@ export const STRINGS: Record<string, Entry> = {
   'done.xr.xml': { de: 'XRechnung herunterladen (XML)', en: 'Download XRechnung (XML)' },
   'done.xr.pdf': { de: 'PDF mit XRechnung herunterladen', en: 'Download PDF with XRechnung' },
 
+  // One text per code of the library; in English its own message is shown. `e.<code>.<field>` words a code for one field,
+  // and {a}, {b}, {v} and {m} are filled in by the page (see `describe` in main.ts). test/i18n.test.ts checks that no
+  // code is missing.
   'e.required': { de: 'Diese Angabe fehlt.', en: '' },
-  'e.format': { de: 'Diese Angabe hat nicht das richtige Format.', en: '' },
-  'e.seller-tax-id': { de: 'Der Rechnungssteller braucht eine USt-IdNr. oder eine Steuernummer.', en: '' },
+  'e.format': { de: 'Diese Angabe hat nicht das richtige Format. Bitte prüfen Sie die Schreibweise.', en: '' },
+  'e.format.country': { de: 'Bitte geben Sie das Land als Kürzel mit zwei Buchstaben an, z. B. DE.', en: '' },
+  'e.format.currency': { de: 'Bitte geben Sie die Währung als Kürzel mit drei Buchstaben an, z. B. EUR.', en: '' },
+  'e.format.iban': { de: 'Diese IBAN ist ungültig: Die Prüfziffern passen nicht. Bitte vergleichen Sie sie mit Ihrem PDF.', en: '' },
+  'e.format.periodEnd': { de: 'Der Leistungszeitraum endet vor seinem Beginn. Bitte prüfen Sie beide Daten.', en: '' },
+  'e.format.unitPrice': { de: 'Der Preis darf nicht negativ sein. Für eine Gutschrift geben Sie stattdessen eine negative Menge an.', en: '' },
+  'e.seller-tax-id': {
+    de: 'Bitte tragen Sie Ihre USt-IdNr. ein, sonst Ihre Steuernummer. Bei innergemeinschaftlichen Lieferungen und Ausfuhren ist die USt-IdNr. Pflicht.',
+    en: '',
+  },
   'e.payment-terms': { de: 'Bei einem offenen Betrag ist ein Fälligkeitsdatum oder eine Zahlungsbedingung nötig.', en: '' },
-  'e.vat-rate': { de: 'Der Steuersatz passt nicht zur gewählten Umsatzsteuer-Art.', en: '' },
+  'e.vat-rate': {
+    de: 'Der Steuersatz passt nicht zur gewählten Umsatzsteuer-Art: Mit Umsatzsteuer braucht es einen Satz über 0 %, bei allen anderen Arten 0 %.',
+    en: '',
+  },
   'e.exemption-reason': { de: 'Bitte nennen Sie den Grund, warum keine Umsatzsteuer berechnet wird, so wie er auf der Rechnung steht.', en: '' },
   'e.buyer-vat-id': { de: 'Für Reverse Charge und innergemeinschaftliche Lieferungen ist die USt-IdNr. des Kunden nötig.', en: '' },
-  'e.totals-mismatch': { de: 'Die Summe im PDF weicht von der Summe der Positionen ab. Die E-Rechnung darf dem PDF nicht widersprechen.', en: '' },
+  'e.totals-mismatch': {
+    de: 'Die Summe im PDF weicht von der Summe der Positionen ab. Die E-Rechnung darf dem PDF nicht widersprechen: Bitte prüfen Sie Mengen und Preise.',
+    en: '',
+  },
   'e.address': { de: 'Diese Angabe der Anschrift fehlt. § 14 UStG verlangt die vollständige Anschrift.', en: '' },
   'e.delivery-date': { de: 'Das Leistungsdatum fehlt. Es ist Pflicht, auch wenn es dem Rechnungsdatum entspricht.', en: '' },
   'e.preceding-invoice': { de: 'Eine Korrektur oder Gutschrift sollte die ursprüngliche Rechnung nennen.', en: '' },
   'e.not-in-pdf': { de: 'Dieser Wert steht so nicht im PDF. Bitte prüfen.', en: '' },
-  'e.no-pdf-text': { de: 'Das PDF enthält keinen Text. Die Angaben konnten nicht mit dem PDF verglichen werden.', en: '' },
+  'e.no-pdf-text': {
+    de: 'Das PDF enthält keinen Text. Die Angaben konnten nicht mit dem PDF verglichen werden: Bitte prüfen Sie jede Angabe selbst.',
+    en: '',
+  },
+  'e.xrechnung-buyer-reference': {
+    de: 'Für eine XRechnung ist die Leitweg-ID oder eine andere Käuferreferenz nötig. Ihr Kunde nennt sie Ihnen, eine Behörde meist mit dem Auftrag.',
+    en: '',
+  },
+  'e.xrechnung-seller-contact': {
+    de: 'Für eine XRechnung ist ein Ansprechpartner nötig: die Person oder Abteilung, an die sich Ihr Kunde mit Fragen zur Rechnung wendet.',
+    en: '',
+  },
+  'e.xrechnung-seller-phone': { de: 'Für eine XRechnung ist die Telefonnummer Ihres Ansprechpartners nötig.', en: '' },
+  'e.xrechnung-seller-email': {
+    de: 'Für eine XRechnung ist Ihre E-Mail-Adresse nötig. Sie steht im XML beim Ansprechpartner und als Ihre elektronische Adresse.',
+    en: '',
+  },
+  'e.xrechnung-buyer-email': {
+    de: 'Für eine XRechnung ist die E-Mail-Adresse Ihres Kunden nötig: Sie steht im XML als seine elektronische Adresse. Fragen Sie Ihren Kunden, an welche Adresse Rechnungen gehen sollen.',
+    en: '',
+  },
+  'e.xrechnung-address': { de: 'Diese Angabe der Anschrift fehlt. Für eine XRechnung ist sie Pflicht.', en: '' },
+  'e.xrechnung-line-net': {
+    de: 'Menge mal Preis ergibt {a}, auf Ihrer Rechnung steht als Betrag dieser Position aber {b}. Bei einer XRechnung muss beides bis auf Rundung übereinstimmen. Passen Sie Menge oder Preis an; einen Rabatt auf einzelne Positionen kann diese Seite noch nicht angeben.',
+    en: '',
+  },
+  'e.xrechnung-payment-terms': {
+    de: 'Beginnt die Zahlungsbedingung mit #, liest die XRechnung sie als Skonto. Das muss genau so geschrieben sein: #SKONTO#TAGE=14#PROZENT=2.00# (Tage, dann Prozent mit zwei Nachkommastellen). Schreiben Sie es so, oder lassen Sie das # weg.',
+    en: '',
+  },
+  'e.xrechnung-delivery-address': {
+    de: 'Eine innergemeinschaftliche Lieferung lässt sich hier noch nicht als XRechnung erstellen: Die XRechnung verlangt dann Postleitzahl und Ort des Lieferorts, und dafür gibt es noch kein Feld. Wählen Sie oben „E-Rechnung (PDF)“, wenn Ihr Kunde sie annimmt.',
+    en: '',
+  },
+  'e.xrechnung-type-code': {
+    de: 'Die XRechnung kennt die Abschlagsrechnung (Typ 386) nicht; der Empfänger nimmt sie womöglich nicht an. Klären Sie das vorher, oder wählen Sie eine andere Art des Dokuments.',
+    en: '',
+  },
+  'e.xrechnung-phone': { de: 'Das sieht nicht nach einer Telefonnummer aus: Die XRechnung erwartet mindestens drei Ziffern.', en: '' },
+  'e.xrechnung-email': { de: 'Das sieht nicht nach einer E-Mail-Adresse aus. Die XRechnung erwartet eine Adresse wie name@example.org.', en: '' },
   'e.pdf-fonts': {
     de: 'Im PDF sind nicht alle Schriften eingebettet. Das XML ist gültig, die Datei aber kein strenges PDF/A-3. Exportieren Sie das PDF mit eingebetteten Schriften (oder als PDF/A), um das zu beheben.',
     en: '',
   },
-  'e.no-xml': { de: 'Das PDF enthält kein Rechnungs-XML.', en: '' },
-  'e.xml-syntax': { de: 'Das eingebettete XML lässt sich nicht als Rechnung (CII) lesen.', en: '' },
-  'e.profile': {
-    de: 'Das XML nennt kein Profil der EN 16931. Die Profile MINIMUM und BASIC WL gelten nicht als E-Rechnung.',
+  'e.generator': { de: 'Beim Schreiben des XML kam diese Meldung: {m}', en: '' },
+  'e.not-written': { de: '„{v}“ ließ sich nicht in das XML schreiben. Bitte melden Sie das als Fehler auf GitHub.', en: '' },
+  'e.invalid-invoice': { de: 'Die Angaben sind noch nicht vollständig oder fehlerhaft: Bitte beheben Sie, was die Prüfung nennt.', en: '' },
+  'e.already-einvoice': { de: 'Dieses PDF ist bereits eine E-Rechnung. Nehmen Sie das PDF ohne XML, um eine neue zu erstellen.', en: '' },
+  'e.no-xml': { de: 'Das PDF enthält kein Rechnungs-XML: Es ist ein gewöhnliches PDF, keine E-Rechnung.', en: '' },
+  'e.xml-syntax': {
+    de: 'Das eingebettete XML lässt sich nicht als Rechnung (CII) lesen. Bitten Sie den Aussteller um eine E-Rechnung nach ZUGFeRD 2 oder Factur-X.',
     en: '',
   },
-  'e.pdf-a': { de: 'Die Datei weist sich nicht als PDF/A-3 aus.', en: '' },
+  'e.profile': {
+    de: 'Das XML nennt kein Profil der EN 16931. Die Profile MINIMUM und BASIC WL gelten nicht als E-Rechnung: Bitten Sie den Aussteller um das Profil EN 16931 (COMFORT), EXTENDED oder XRECHNUNG.',
+    en: '',
+  },
+  'e.pdf-a': {
+    de: 'Die Datei weist sich nicht als PDF/A-3 aus. Das XML lässt sich trotzdem lesen, ein strenger Empfänger kann die Datei aber ablehnen: Lassen Sie sie als PDF/A-3 neu ausgeben.',
+    en: '',
+  },
   'e.invalid-pdf': { de: 'Diese Datei lässt sich nicht als PDF lesen.', en: 'This file cannot be read as a PDF.' },
 
   'pair.title': { de: 'Was in Ihrer Datei dazukommt', en: 'What is added to your file' },
