@@ -78,6 +78,13 @@ export async function validateEInvoice(pdf: Uint8Array, options: { pdfText?: str
       `The PDF does not embed these fonts: ${info.unembeddedFonts.join(', ')}. The XML is not affected, but the file is not a strict PDF/A-3. Have the PDF exported again with fonts embedded (or as PDF/A) and the e-invoice created from that.`,
     );
   }
+  if (info.forbiddenActions.length) {
+    add(
+      'warning',
+      'pdf-actions',
+      `The file carries what PDF/A forbids a file to run: ${info.forbiddenActions.join(', ')}. It is not a strict PDF/A-3, and software may refuse it or warn about it.`,
+    );
+  }
   if (!read) return { isEInvoice, xml, findings };
 
   const { invoice, profile } = read;

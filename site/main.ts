@@ -700,7 +700,7 @@ function suggestPaymentTerms(): void {
 }
 
 /** Findings that are about the file, not about a field of the form. */
-const FILE_CODES = new Set(['no-xml', 'xml-syntax', 'profile', 'pdf-a', 'pdf-fonts']);
+const FILE_CODES = new Set(['no-xml', 'xml-syntax', 'profile', 'pdf-a', 'pdf-fonts', 'pdf-actions']);
 
 function setText(selector: string, key: string): void {
   const node = $(selector);

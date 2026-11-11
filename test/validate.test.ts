@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { PDFDocument, StandardFonts } from '@cantoo/pdf-lib';
+import { PDFDocument, PDFName, PDFString, StandardFonts } from '@cantoo/pdf-lib';
 import { describe, expect, it } from 'vitest';
 import { createEInvoice } from '../src/create.js';
 import type { InvoiceDraft } from '../src/model.js';
@@ -28,6 +28,14 @@ async function pdfCarrying(xml: string, drawText = false): Promise<Uint8Array> {
 const codes = (findings: { code: string }[]) => findings.map((f) => f.code);
 
 describe('validateEInvoice', () => {
+  it('reports a script in the file, which PDF/A forbids', async () => {
+    const doc = await PDFDocument.load((await create()).pdf, { updateMetadata: false });
+    doc.catalog.set(PDFName.of('OpenAction'), doc.context.obj({ S: 'JavaScript', JS: PDFString.of("app.alert('x')") }));
+    const result = await validateEInvoice(await doc.save());
+    expect(result.findings).toMatchObject([{ severity: 'warning', code: 'pdf-actions' }]);
+    expect(result.findings[0]!.message).toContain('JavaScript');
+  });
+
   it('accepts a created e-invoice without findings', async () => {
     const created = await create();
     const result = await validateEInvoice(created.pdf, { pdfText: await extractText(created.pdf) });

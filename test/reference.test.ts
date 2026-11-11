@@ -9,6 +9,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
+import { PDFDocument, PDFName, PDFString } from '@cantoo/pdf-lib';
 import { describe, expect, it } from 'vitest';
 import { createEInvoice, createXRechnung } from '../src/create.js';
 import type { InvoiceDraft } from '../src/model.js';
@@ -125,6 +126,14 @@ describe.skipIf(!jar)('reference validation with Mustang', () => {
     },
     120_000,
   );
+
+  it('a PDF that came with a script is a valid PDF/A-3 once the script is removed', async () => {
+    const doc = await PDFDocument.load(samplePdf(), { updateMetadata: false });
+    doc.catalog.set(PDFName.of('OpenAction'), doc.context.obj({ Type: 'Action', S: 'JavaScript', JS: PDFString.of("app.alert('x')") }));
+    const { pdf, findings } = await createEInvoice({ pdf: await doc.save(), invoice: sample() });
+    expect(findings.map((finding) => finding.code)).toEqual(['pdf-actions']);
+    expect(await validate('with-script.pdf', pdf)).toMatchObject({ pdf: 'valid', xml: 'valid', problems: [] });
+  }, 120_000);
 
   describe('XRechnung', () => {
     it.concurrent.each(Object.entries(XRECHNUNG_CASES))(

@@ -354,6 +354,14 @@ export const STRINGS: Record<string, Entry> = {
     de: 'Im PDF sind nicht alle Schriften eingebettet. Das XML ist davon nicht betroffen, die Datei ist aber kein strenges PDF/A-3. Abhilfe: das PDF mit eingebetteten Schriften (oder als PDF/A) exportieren und die E-Rechnung daraus neu erstellen.',
     en: '',
   },
+  'e.pdf-actions': {
+    de: 'Ihr PDF enthielt Skripte oder automatische Aktionen, die eine E-Rechnung (PDF/A) nicht enthalten darf. In der E-Rechnung sind sie weggelassen; das Aussehen der Seiten ändert sich dadurch nicht.',
+    en: '',
+  },
+  'e.pdf-actions.xml': {
+    de: 'Die Datei enthält Skripte oder automatische Aktionen. PDF/A verbietet sie: Die Datei ist kein strenges PDF/A-3, und Programme können sie ablehnen oder davor warnen.',
+    en: 'The file carries scripts or automatic actions. PDF/A forbids them: the file is not a strict PDF/A-3, and software may refuse it or warn about it.',
+  },
   'e.generator': { de: 'Beim Schreiben des XML kam diese Meldung: {m}', en: '' },
   'e.not-written': { de: '„{v}“ ließ sich nicht in das XML schreiben. Bitte melden Sie das als Fehler auf GitHub.', en: '' },
   'e.invalid-invoice': { de: 'Die Angaben sind noch nicht vollständig oder fehlerhaft: Bitte beheben Sie, was die Prüfung nennt.', en: '' },

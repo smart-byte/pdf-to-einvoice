@@ -151,6 +151,15 @@ export async function createEInvoice(options: CreateOptions): Promise<CreateResu
     });
   }
 
+  if (info.forbiddenActions.length) {
+    findings.push({
+      path: '',
+      severity: 'warning',
+      code: 'pdf-actions',
+      message: `The PDF carried what PDF/A forbids a file to run: ${info.forbiddenActions.join(', ')}. It was left out of the e-invoice; the pages are unchanged.`,
+    });
+  }
+
   const pdf = (await write(xrechnung ? 'Factur-X-XRechnung' : 'Factur-X-EN16931', invoice, totals, findings, options.lang, options.pdf)) as Uint8Array;
   const xml = await readEmbeddedXml(pdf);
   if (xml === null) throw new InvoiceError('generator', 'The e-invoice was written without its XML.', findings);

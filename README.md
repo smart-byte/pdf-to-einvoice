@@ -216,10 +216,11 @@ The XML declares XRechnung 3.0. What it cannot do yet:
 ## What changes in your PDF
 
 Only what the standard asks for: the XML attachment, XMP metadata that declares PDF/A-3 and Factur-X, an sRGB
-output intent and a document ID. Images that ask viewers to smooth them (`/Interpolate true`) have that flag switched
-off, because PDF/A forbids it. The page content is not touched.
+output intent and a document ID. Two things PDF/A forbids are taken out: the flag of images that ask viewers to smooth
+them (`/Interpolate true`), and scripts and actions the file would run (JavaScript, starting a program and the like),
+which you are told about. The page content is not touched.
 
-One defect is detected and reported: fonts that are not embedded. The XML is not affected, but the file is not a
+One defect is detected and reported, but not repaired: fonts that are not embedded. The XML is not affected, but the file is not a
 strict PDF/A-3; export the PDF with embedded fonts (or as PDF/A) and run it again. Other things PDF/A forbids in
 your original are neither found nor repaired. If the software of a recipient rejects the file, check it with a PDF/A
 validator.
