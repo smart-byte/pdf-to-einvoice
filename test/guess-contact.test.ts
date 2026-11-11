@@ -38,6 +38,9 @@ const letterhead = (...contact: string[]) =>
     'Endbetrag   119,00',
   ].join('\n');
 
+/** The same letterhead, with an explicit seller heading. */
+const sellerLetterhead = (...contact: string[]) => `Verkäufer:\n${letterhead(...contact)}`;
+
 /** Two columns side by side, as extractLayout() returns them: the rows, and each column as a block. */
 const columns = (left: string[], right: string[]) => ({
   text: Array.from({ length: Math.max(left.length, right.length) }, (_, i) => [left[i], right[i]].filter(Boolean).join('   ')).join('\n'),
@@ -51,14 +54,28 @@ describe('guessFromText on contact data', () => {
     expect(guess.buyer?.email).toBe('rechnung@musterstadt.example');
   });
 
-  it('takes the one phone number and the one e-mail address of a page for the issuer’s own', () => {
-    const guess = guessFromText(letterhead('Tel.: 030 / 12 34 567', 'E-Mail: info@muster-software.example'));
+  it('reads the phone number and e-mail address under the seller heading', () => {
+    const guess = guessFromText(sellerLetterhead('Tel.: 030 / 12 34 567', 'E-Mail: info@muster-software.example'));
     expect(guess.seller).toMatchObject({ phone: '030 / 12 34 567', email: 'info@muster-software.example' });
     expect(guess.buyer?.email).toBeUndefined();
   });
 
+  it('reads a contact beside a recognised seller address even without a heading', () => {
+    const text = [
+      'Muster Software GmbH · Beispielweg 1 · 12345 Musterstadt',
+      'Tel.: 030 / 12 34 567',
+      'E-Mail: info@muster-software.example',
+      '',
+      'Beispiel AG',
+      'Hauptstraße 5',
+      '54321 Beispielstadt',
+      'Rechnung 2301   09.08.2024',
+    ].join('\n');
+    expect(guessFromText(text).seller).toMatchObject({ phone: '030 / 12 34 567', email: 'info@muster-software.example' });
+  });
+
   it('reads a value printed twice once', () => {
-    expect(guessFromText(letterhead('Telefon: +49 711-50885524', 'Bei Rückfragen:', 'Telefon: +49 711-50885524')).seller?.phone).toBe('+49 711-50885524');
+    expect(guessFromText(sellerLetterhead('Telefon: +49 711-50885524', 'Bei Rückfragen:', 'Telefon: +49 711-50885524')).seller?.phone).toBe('+49 711-50885524');
   });
 
   it('leaves two phone numbers that nothing tells apart unread', () => {
@@ -85,16 +102,16 @@ describe('guessFromText on contact data', () => {
   });
 
   it('does not take a fax number for a phone number', () => {
-    expect(guessFromText(letterhead('Telefax: 030 999 888', 'Tel./Fax: 030 999 777', 'Telefon: 030 111 222')).seller?.phone).toBe('030 111 222');
+    expect(guessFromText(sellerLetterhead('Telefax: 030 999 888', 'Tel./Fax: 030 999 777', 'Telefon: 030 111 222')).seller?.phone).toBe('030 111 222');
   });
 
   it('ends a phone number where the next column starts', () => {
-    expect(guessFromText(letterhead('Tel: 030 1234567   10115 Berlin')).seller?.phone).toBe('030 1234567');
+    expect(guessFromText(sellerLetterhead('Tel: 030 1234567   10115 Berlin')).seller?.phone).toBe('030 1234567');
   });
 
   it('gives an e-mail address under the heading of the buyer to the buyer, also beside the address of the seller', () => {
     const page = columns(
-      ['Muster Inc.', '1 Example Road', 'Dover, DE 19901', 'support@muster.example'],
+      ['Seller', 'Muster Inc.', '1 Example Road', 'Dover, DE 19901', 'support@muster.example'],
       ['Bill to', 'Beispiel GmbH', 'Hauptstraße 5', '54321 Beispielstadt', 'einkauf@beispiel.example'],
     );
     const guess = guessFromText(page.text, { blocks: page.blocks });
@@ -119,6 +136,56 @@ describe('guessFromText on contact data', () => {
     expect(guess.buyer?.email).toBe('einkauf@beispiel.example');
   });
 
+  it('recognises a customer named after the e-mail label', () => {
+    const guess = guessFromText(letterhead('E-Mail des Kunden: einkauf@beispiel.example'));
+    expect(guess.seller?.email).toBeUndefined();
+    expect(guess.buyer?.email).toBe('einkauf@beispiel.example');
+  });
+
+  it('does not give a buyer or delivery contact to the seller across a blank line', () => {
+    for (const heading of ['Käufer:', 'Lieferadresse:']) {
+      const rows = [heading, 'Stadt Beispiel', 'Rathausplatz 2', '54321 Beispielstadt', '', 'E-Mail: einkauf@beispiel.example', 'Telefon: 030 555666'];
+      for (const options of [{}, { blocks: [rows] }]) {
+        const guess = guessFromText(rows.join('\n'), options);
+        expect(guess.seller?.email).toBeUndefined();
+        expect(guess.seller?.phone).toBeUndefined();
+      }
+    }
+  });
+
+  it('does not give an address belonging to an unheaded buyer to the seller', () => {
+    const rows = [
+      'Muster Software GmbH · Beispielweg 1 · 12345 Musterstadt',
+      '',
+      'Stadt Beispiel',
+      'Rathausplatz 2',
+      '54321 Beispielstadt',
+      'E-Mail: einkauf@beispiel.example',
+      '',
+      'Rechnung 2301   09.08.2024',
+    ];
+    const guess = guessFromText(rows.join('\n'), { blocks: [rows] });
+    expect(guess.seller?.email).toBeUndefined();
+  });
+
+  it('does not assume an otherwise unassigned single contact is the seller’s', () => {
+    const text = ['Rechnung 2301   09.08.2024', 'Kontakt: fremd@beispiel.example', 'Telefon: 040 555666', 'Endbetrag 119,00'].join('\n');
+    const guess = guessFromText(text);
+    expect(guess.seller?.email).toBeUndefined();
+    expect(guess.seller?.phone).toBeUndefined();
+  });
+
+  it('does not select a number merely near the seller when another number is also printed', () => {
+    const text = [
+      'Muster Software GmbH · Beispielweg 1 · 12345 Musterstadt',
+      'Telefon: 030 111222',
+      '',
+      'Telefon: 040 555666',
+      'Rechnung 2301   09.08.2024',
+    ].join('\n');
+    expect(guessFromText(text).seller?.phone).toBeUndefined();
+  });
+
   it('gives nobody the contact data of a delivery address', () => {
     const text = letterhead('Lieferadresse:', 'Lager Nord', 'Hafenstraße 9', '20457 Hamburg', 'Tel.: 040 555 666', 'lager@beispiel.example');
     const guess = guessFromText(text);
@@ -128,12 +195,12 @@ describe('guessFromText on contact data', () => {
   });
 
   it('reads the contact after its label, with a title, and from the line below', () => {
-    expect(guessFromText(letterhead('Ihr Ansprechpartner: Max Mustermann')).seller?.contactName).toBe('Max Mustermann');
-    expect(guessFromText(letterhead('Sachbearbeiterin: Frau Dr. Erika Muster, Tel. 030 111 222')).seller).toMatchObject({
+    expect(guessFromText(sellerLetterhead('Ihr Ansprechpartner: Max Mustermann')).seller?.contactName).toBe('Max Mustermann');
+    expect(guessFromText(sellerLetterhead('Sachbearbeiterin: Frau Dr. Erika Muster, Tel. 030 111 222')).seller).toMatchObject({
       contactName: 'Frau Dr. Erika Muster',
       phone: '030 111 222',
     });
-    expect(guessFromText(letterhead('Contact person', 'Jane Doe')).seller?.contactName).toBe('Jane Doe');
+    expect(guessFromText(sellerLetterhead('Contact person', 'Jane Doe')).seller?.contactName).toBe('Jane Doe');
   });
 
   it('takes no single word and no label for the name of a contact', () => {

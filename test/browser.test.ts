@@ -210,6 +210,28 @@ describe.skipIf(!asked)('the web app in a browser', () => {
     expect(await said(page, '#summary li.error')).toEqual([expect.stringContaining('E-Mail')]);
   }, 120_000);
 
+  it('shows the buyer contact read from an address before writing it into the XML', async () => {
+    const doc = await PDFDocument.load(samplePdf(), { updateMetadata: false });
+    const font = await doc.embedFont(StandardFonts.Helvetica);
+    const added = doc.addPage();
+    ['Käufer:', 'Beispiel AG', 'Erika Muster', 'Hauptstraße 5', '54321 Beispielstadt'].forEach((line, i) =>
+      added.drawText(line, { x: 56, y: 760 - 18 * i, size: 11, font }),
+    );
+    const page = await open();
+    await read(page, upload('buyer-contact.pdf', await doc.save()));
+    const field = page.locator('[data-path="buyer.contactName"]');
+    expect(await field.isVisible()).toBe(true);
+    expect(await field.inputValue()).toBe('Erika Muster');
+    await page.click('label:has(input[name="format"][value="xrechnung"])');
+    expect(await field.isVisible()).toBe(true);
+    await page.click('label:has(input[name="format"][value="pdf"])');
+    await field.fill('Erika Beispiel');
+    await page.click('#create');
+    await page.waitForSelector('body[data-view="done"]', { timeout: 90_000 });
+    const xml = Buffer.from(await bytesOf(await download(page, '#download-xml'))).toString('utf8');
+    expect(xml).toContain('Erika Beispiel');
+  }, 120_000);
+
   it('asks where an intra-community supply went, and refuses a country of delivery for an XRechnung', async () => {
     const page = await open();
     await read(page);

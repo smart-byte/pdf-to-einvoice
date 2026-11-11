@@ -735,12 +735,15 @@ function readNumber(searched: string, rows: string[]): { number?: string; dated?
 }
 
 // ---------------------------------------------------------------------------------------------------------------
-// Contact data and the reference of the buyer. Only what the page leaves no doubt about: a value under the heading of
-// a party is that party's, and where no heading says whose it is, the one value the page shows is the issuer's own.
+// Contact data and the reference of the buyer. A contact is read for a party only where a heading, a label or the
+// party's recognised address identifies it. A single contact with no such indication may belong to somebody else.
 
 const EMAIL = /[\p{L}\d._%+-]+@[\p{L}\d-]+(?:\.[\p{L}\d-]+)+/gu;
 /** "E-Mail:" right before an address, and what its cell says before that. */
 const EMAIL_LABEL = /^(.*?)(?:e-?mail(?:[- ]?(?:adresse|address))?|courriel)\s*:?\s*$/i;
+/** A customer can also be named after the kind of address: "E-Mail des Kunden". */
+const CUSTOMER_EMAIL_SUFFIX =
+  /(?:e-?mail(?:[- ]?(?:adresse|address))?|courriel)\s+(?:(?:des|der|du|de|of(?:\s+the)?)\s+)?(?:kunden?|käufers?|buyers?|customers?|clients?)\s*:?\s*$/i;
 /** "Tel.", "Telefon-Nr.", "Phone", "Mobil"; not a fax, which "Telefax" and "Tel./Fax" name. */
 const PHONE_LABEL = /(?<![a-zäöü])(?:tele(?:fon|phone)|tel|phone|fon|mobil(?:e|telefon)?|handy)(?:\.?[-\s]?(?:nr|nummer|number|no))?(?![a-zäöü])\.?/;
 /** Digits in groups, one space apart at most: three spaces start the next column. */
@@ -760,7 +763,7 @@ interface Mention {
   /** The same for two ways of writing one value. */
   key: string;
   /** `unclear`: a heading stands in a row beside something else, so the row does not tell which column the value is in. */
-  role?: Role | 'unclear';
+  role?: Role | 'unclear' | 'seller-address' | 'buyer-address';
 }
 
 /**
@@ -779,9 +782,8 @@ function headedBy(lines: string[], i: number): Mention['role'] {
 }
 
 /**
- * The one value `who` has. A value under the heading of the seller counts before any other; without one, the seller
- * has the one value that stands under nobody's heading. Two values that nothing tells apart stay unread. With
- * `columns` the blocks of the page were searched too, and they tell what a row of two columns leaves open.
+ * The one value `who` has. Two values that nothing tells apart stay unread, as does a value with no known party.
+ * With `columns` the blocks of the page were searched too, and they tell what a row of two columns leaves open.
  */
 function theOne(mentions: Mention[], who: 'seller' | 'buyer', columns: boolean): string | undefined {
   const values = new Map<string, { value: string; roles: Set<string> }>();
@@ -790,14 +792,17 @@ function theOne(mentions: Mention[], who: 'seller' | 'buyer', columns: boolean):
     if (role && !(role === 'unclear' && columns)) entry.roles.add(role);
     values.set(key, entry);
   }
-  const of = (role?: string) => [...values.values()].filter(({ roles }) => (role ? roles.size === 1 && roles.has(role) : roles.size === 0));
-  const own = of(who);
-  const left = own.length || who === 'buyer' ? own : of();
-  return left.length === 1 ? left[0]!.value : undefined;
+  const entries = [...values.values()];
+  const address = `${who}-address`;
+  const own = entries.filter(({ roles }) => roles.has(who) && [...roles].every((role) => role === who || role === address));
+  if (own.length) return own.length === 1 ? own[0]!.value : undefined;
+  // A value merely near an address is weaker evidence than a heading. If the page prints another value of the
+  // same kind, neither is chosen on that basis alone.
+  return entries.length === 1 && entries[0]!.roles.size === 1 && entries[0]!.roles.has(address) ? entries[0]!.value : undefined;
 }
 
 /** E-mail address, phone number and contact of the seller, and the e-mail address of the buyer. */
-function readContact(searched: string, columns: boolean): { seller: Partial<Party>; buyer: Partial<Party> } {
+function readContact(searched: string, columns: boolean, parties: { seller?: Found; buyer?: Found }): { seller: Partial<Party>; buyer: Partial<Party> } {
   const lines = searched.split('\n');
   /** What the cell of the value says before it. */
   const before = (at: number) =>
@@ -805,11 +810,37 @@ function readContact(searched: string, columns: boolean): { seller: Partial<Part
       .slice(searched.lastIndexOf('\n', at - 1) + 1, at)
       .split(/\s{3,}/)
       .at(-1)!;
-  const role = (at: number, customers: boolean) => (customers ? 'buyer' : headedBy(lines, searched.slice(0, at).split('\n').length - 1));
+  /** A recognised party's name, alone or in its sender line, identifies the address around it. */
+  const partyIn = (cell: string): 'seller' | 'buyer' | 'unclear' | undefined => {
+    const name = (senderOf(cell)?.name ?? cell).trim().toLowerCase();
+    const matches = (['seller', 'buyer'] as const).filter((who) => parties[who]?.party.name?.toLowerCase() === name);
+    return matches.length === 1 ? matches[0] : matches.length > 1 ? 'unclear' : undefined;
+  };
+  const role = (at: number, customers: boolean): Mention['role'] => {
+    if (customers) return 'buyer';
+    const sameCell = partyIn(before(at));
+    if (sameCell) return sameCell === 'unclear' ? sameCell : `${sameCell}-address`;
+    const i = searched.slice(0, at).split('\n').length - 1;
+    const underHeading = headedBy(lines, i);
+    if (underHeading) return underHeading;
+    for (let j = i - 1; j >= 0 && j >= i - 10; j--) {
+      const line = lines[j]!;
+      if (!line || DATE_OR_AMOUNT.test(line) || TITLE.test(line) || roleOf(line)) break;
+      const parts = cells(line);
+      const matches = parts.map(partyIn).filter((found) => found !== undefined);
+      if (matches.length) return parts.length === 1 && matches.length === 1 && matches[0] !== 'unclear' ? `${matches[0]!}-address` : 'unclear';
+    }
+    return undefined;
+  };
 
   const emails = [...searched.matchAll(EMAIL)].map((match): Mention => {
-    const label = EMAIL_LABEL.exec(before(match.index));
-    return { value: match[0], key: match[0].toLowerCase(), role: role(match.index, label !== null && CUSTOMER.test(label[1]!)) };
+    const prefix = before(match.index);
+    const label = EMAIL_LABEL.exec(prefix);
+    return {
+      value: match[0],
+      key: match[0].toLowerCase(),
+      role: role(match.index, (label !== null && CUSTOMER.test(label[1]!)) || CUSTOMER_EMAIL_SUFFIX.test(prefix)),
+    };
   });
   const labelled = (label: RegExp, value: RegExp, key: (found: string) => string) =>
     after(searched, label, value).map(({ hit, at }): Mention => ({ value: hit[1]!, key: key(hit[1]!), role: role(at, CUSTOMER.test(before(at))) }));
@@ -910,7 +941,7 @@ export function guessFromText(text: string, options: GuessOptions = {}): Invoice
 
   const { number, dated, beside } = readNumber(searched, rows);
   const iban = findIban(text);
-  const contact = readContact(searched, options.blocks !== undefined);
+  const contact = readContact(searched, options.blocks !== undefined, found);
   return prune({
     number,
     buyerReference: readBuyerReference(searched),

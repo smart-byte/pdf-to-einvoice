@@ -148,6 +148,8 @@ const party = (who: 'seller' | 'buyer'): Field[] => [
       ] satisfies Field[])
     : ([
         { path: 'buyer.email', label: 'f.email', type: 'email', wide: true, only: 'xrechnung' },
+        { path: 'buyer.contactName', label: 'f.contactName', only: 'xrechnung' },
+        { path: 'buyer.phone', label: 'f.phone', type: 'tel', only: 'xrechnung' },
         { ...BUYER_REFERENCE, only: 'xrechnung' },
       ] satisfies Field[])),
 ];
