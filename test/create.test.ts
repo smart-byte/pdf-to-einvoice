@@ -35,6 +35,17 @@ const failure = (promise: Promise<unknown>) =>
   );
 
 describe('createEInvoice', () => {
+  it('compares the data with the text of the PDF it is given', async () => {
+    const { findings } = await createEInvoice({ pdf: samplePdf(), invoice: sample((d) => (d.buyer.city = 'Anderswo')) });
+    expect(findings).toMatchObject([{ path: 'buyer.city', severity: 'warning', code: 'not-in-pdf' }]);
+    expect((await createEInvoice({ pdf: samplePdf(), invoice: sample() })).findings).toEqual([]);
+  });
+
+  it('takes the text of the PDF from a caller who has read it already', async () => {
+    const { findings } = await createEInvoice({ pdf: samplePdf(), invoice: sample(), pdfText: '' });
+    expect(findings.map((f) => f.code)).toEqual(['no-pdf-text']);
+  });
+
   it('embeds the invoice data as XML into the PDF', async () => {
     const result = await createEInvoice({ pdf: samplePdf(), invoice: sample() });
     expect(result.xml).toContain('<ram:ID>RE-2026-0042</ram:ID>');
@@ -105,8 +116,10 @@ describe('createEInvoice', () => {
 
   it('warns when the PDF uses fonts it does not embed', async () => {
     const result = await createEInvoice({ pdf: await pdfWithoutEmbeddedFont(), invoice: sample() });
-    expect(result.findings).toMatchObject([{ severity: 'warning', code: 'pdf-fonts' }]);
-    expect(result.findings[0]!.message).toContain('Helvetica');
+    // The page says nothing but "Invoice": what the comparison with it reports is not the point here.
+    const aboutTheFile = result.findings.filter((finding) => finding.code !== 'not-in-pdf');
+    expect(aboutTheFile).toMatchObject([{ severity: 'warning', code: 'pdf-fonts' }]);
+    expect(aboutTheFile[0]!.message).toContain('Helvetica');
   });
 
   it('refuses a file that is not a PDF', async () => {

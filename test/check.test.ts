@@ -287,6 +287,15 @@ describe('check against the PDF text', () => {
     ).toEqual(['warning:not-in-pdf']);
   });
 
+  it.each(['seller.street', 'seller.postalCode', 'seller.city', 'buyer.street', 'buyer.postalCode', 'buyer.city'])(
+    'warns about a part of an address the PDF does not show: %s',
+    (path) => {
+      const [who, field] = path.split('.') as [string, string];
+      const draft = withChange((d) => (d[who][field] = field === 'postalCode' ? '99999' : 'Anderswo 7'));
+      expect(codesAt(draft, path, { pdfText })).toEqual(['warning:not-in-pdf']);
+    },
+  );
+
   it('warns about a date the PDF does not show', () => {
     expect(
       codesAt(

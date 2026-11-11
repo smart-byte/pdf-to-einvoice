@@ -976,7 +976,7 @@ $('#create').onclick = async () => {
     // No language is passed on. The library that writes the XML asks the server for a catalogue of translations in
     // whatever language it is given, and ships none: for English, its default here, the site answers with an empty
     // one (public/assets/locale).
-    const result = await createEInvoice({ pdf: state.pdf!, invoice: state.draft, ...(xr ? { profile: 'xrechnung' as const } : {}) });
+    const result = await createEInvoice({ pdf: state.pdf!, invoice: state.draft, pdfText: state.pdfText, ...(xr ? { profile: 'xrechnung' as const } : {}) });
     // A public body takes the XRechnung as a file of its own; the PDF that carries it too is the copy that keeps the look.
     const plain = xr ? await createXRechnung({ invoice: state.draft }) : undefined;
     downloads.forEach((url) => URL.revokeObjectURL(url));

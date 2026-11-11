@@ -208,7 +208,7 @@ export function check(draft: InvoiceDraft, options: CheckOptions = {}): CheckRes
     }
   }
 
-  if (options.rules === 'xrechnung') findings.push(...xrechnungFindings(d, totals));
+  if (options.rules === 'xrechnung') findings.push(...xrechnungFindings(d));
   if (options.pdfText !== undefined) findings.push(...compareWithPdf(d, totals, options.pdfText));
 
   const ok = !findings.some((f) => f.severity === 'error');
@@ -224,7 +224,7 @@ const SKONTO = /^#SKONTO#TAGE=\d+#PROZENT=\d+\.\d{2}(#BASISBETRAG=-?\d+\.\d{2})?
  * for it: an error where the rule says "must" and the validator rejects the file, a warning where it says "should".
  * What the rules ask of the XML alone (payment instructions, a VAT rate in every breakdown) is the job of `toUbl`.
  */
-function xrechnungFindings(d: Bag, totals: Totals | undefined): Finding[] {
+function xrechnungFindings(d: Bag): Finding[] {
   const findings: Finding[] = [];
   const add = (severity: Finding['severity'], path: string, code: string, message: string) =>
     findings.push({ path, severity, code: `xrechnung-${code}`, message });
@@ -387,8 +387,9 @@ function compareWithPdf(d: Bag, totals: Totals | undefined, pdfText: string): Fi
   const expectWords = (path: string, value: unknown) => {
     if (typeof value === 'string' && !value.split(/\s+/).every((word) => haystack.includes(word.toLowerCase()))) expect(path, [value], value);
   };
-  expectWords('seller.name', get('seller.name'));
-  expectWords('buyer.name', get('buyer.name'));
+  for (const who of ['seller', 'buyer']) {
+    for (const part of ['name', 'street', 'postalCode', 'city']) expectWords(`${who}.${part}`, get(`${who}.${part}`));
+  }
   for (const path of ['issueDate', 'dueDate', 'deliveryDate']) {
     const value = get(path);
     if (isDate(value)) expect(path, dateSpellings(value), value);

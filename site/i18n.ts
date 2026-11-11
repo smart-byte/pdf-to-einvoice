@@ -390,8 +390,8 @@ export const STRINGS: Record<string, Entry> = {
   'cmp.3': { de: 'Woher stammt jede Angabe?', en: 'Where does each value come from?' },
   'cmp.3.them': { de: 'Sie sehen ein Formular zum Korrigieren.', en: 'You get a form to correct.' },
   'cmp.3.us': {
-    de: 'Jede Angabe ist im PDF markiert, und das XML wird mit dem PDF abgeglichen.',
-    en: 'Each value is marked on the PDF, and the XML is compared with the PDF.',
+    de: 'Was aus dem PDF gelesen wurde, ist dort markiert. Nummern, Namen, Anschriften, Daten, Preise und Summen werden mit seinem Text abgeglichen.',
+    en: 'What was read from the PDF is marked on it. Numbers, names, addresses, dates, prices and totals are compared with its text.',
   },
   'cmp.4': { de: 'Konto, Werbung, Tracking', en: 'Account, ads, tracking' },
   'cmp.4.them': { de: 'Je nach Anbieter Anmeldung, Werbung oder Abo.', en: 'Depending on the provider, sign-up, ads or a subscription.' },

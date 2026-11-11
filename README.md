@@ -15,8 +15,8 @@ in their format. This one starts from the PDF you already produce with Word, you
 
 - **Your layout stays.** The pages are not redrawn. The data is attached as `factur-x.xml` and the file becomes a
   PDF/A-3.
-- **It tells you what is missing.** Required fields, sums that do not add up, and values that do not appear on
-  your PDF are listed before anything is created.
+- **It tells you what is missing.** Required fields, sums that do not add up, and numbers, names, addresses, dates
+  and amounts that do not appear on your PDF are listed before anything is created.
 - **Nothing is uploaded.** The web app works in your browser; the library and the command line tool run on your
   machine.
 - **The common kinds of invoice.** Domestic with VAT, several rates, small businesses, reverse charge, intra-community
@@ -39,15 +39,15 @@ if you point the page at a model service of your own, the invoice text goes to t
 
 Many services convert PDF invoices too. The main difference is where your invoice is processed.
 
-|                                         | typical online converter                                                                               | pdf-to-einvoice                                                                       |
-| --------------------------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
-| Where is your invoice processed?        | On the provider's servers: the file is uploaded.                                                       | On your device, in the browser. Nothing is uploaded.                                  |
-| Who reads the data?                     | Depending on the provider, an AI service in the cloud, also outside the EU, or you type everything in. | Rules on your device; on request also a language model that runs in your browser too. |
-| Where does each value come from?        | You get a form to correct.                                                                             | Each value is marked on the PDF, and the XML is compared with the PDF.                |
-| Account, ads, tracking                  | Depending on the provider, sign-up, ads or a subscription.                                             | No sign-up, no ads, no cookies.                                                       |
-| Source code                             | Mostly closed.                                                                                         | Open (MIT licence): anyone can check what the page does.                              |
-| For software and AI assistants          | Mostly an API that invoices are sent to.                                                               | Library, command line tool and MCP server, all on your own machine.                   |
-| Checking against the official rule sets | Some offer their own validator.                                                                        | Its own plausibility check; not a complete check against the official rule sets.      |
+|                                         | typical online converter                                                                               | pdf-to-einvoice                                                                                                             |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
+| Where is your invoice processed?        | On the provider's servers: the file is uploaded.                                                       | On your device, in the browser. Nothing is uploaded.                                                                        |
+| Who reads the data?                     | Depending on the provider, an AI service in the cloud, also outside the EU, or you type everything in. | Rules on your device; on request also a language model that runs in your browser too.                                       |
+| Where does each value come from?        | You get a form to correct.                                                                             | What was read from the PDF is marked on it. Numbers, names, addresses, dates, prices and totals are compared with its text. |
+| Account, ads, tracking                  | Depending on the provider, sign-up, ads or a subscription.                                             | No sign-up, no ads, no cookies.                                                                                             |
+| Source code                             | Mostly closed.                                                                                         | Open (MIT licence): anyone can check what the page does.                                                                    |
+| For software and AI assistants          | Mostly an API that invoices are sent to.                                                               | Library, command line tool and MCP server, all on your own machine.                                                         |
+| Checking against the official rule sets | Some offer their own validator.                                                                        | Its own plausibility check; not a complete check against the official rule sets.                                            |
 
 ## As a library
 
