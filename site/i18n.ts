@@ -491,8 +491,8 @@ export const STRINGS: Record<string, Entry> = {
 
   'dev.title': { de: 'Für Entwickler und KI-Assistenten', en: 'For developers and AI assistants' },
   'dev.text': {
-    de: 'Derselbe Kern läuft als Bibliothek, als Kommandozeilenprogramm und als MCP-Server, über den KI-Assistenten Rechnungen umwandeln.',
-    en: 'The same core runs as a library, as a command line tool and as an MCP server that lets AI assistants convert invoices.',
+    de: 'Derselbe Kern läuft als Bibliothek, als Kommandozeilenprogramm und als MCP-Server, über den KI-Assistenten Rechnungen umwandeln. Alle drei laufen auf Ihrem Rechner und senden nichts. Ein KI-Assistent liest die Rechnung aber selbst: Ihr Inhalt geht dorthin, wo sein Sprachmodell läuft.',
+    en: 'The same core runs as a library, as a command line tool and as an MCP server that lets AI assistants convert invoices. All three run on your machine and send nothing. An AI assistant reads the invoice itself, though: its content goes wherever the model of that assistant runs.',
   },
   'dev.npm': { de: 'Das Paket: Bibliothek, Kommandozeile, MCP-Server', en: 'The package: library, command line tool, MCP server' },
   'dev.github': { de: 'Quelltext, Dokumentation, Fehler melden', en: 'Source, documentation, issues' },

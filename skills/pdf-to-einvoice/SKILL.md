@@ -7,7 +7,8 @@ description: Turn an invoice PDF the user issued into an e-invoice (E-Rechnung) 
 
 You turn an invoice PDF into an e-invoice: the same PDF, with the invoice data attached as XML. You read the invoice;
 the tool does what has to be exact: the EN 16931 rules, the arithmetic, the comparison with the text of the PDF, the
-XML and the PDF/A-3 file. Everything stays on this machine.
+XML and the PDF/A-3 file. The tool runs on this machine and sends nothing; what you read of the invoice goes wherever
+your model runs, so do not promise the user more than that.
 
 Run the tool as `npx -y pdf-to-einvoice <command>` (Node 22.13 or newer). Field lists, VAT categories and finding codes
 are in [reference.md](reference.md); read it when you need them.

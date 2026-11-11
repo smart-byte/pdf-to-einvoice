@@ -10,7 +10,7 @@ import { invoiceJsonSchema, type InvoiceDraft } from './model.js';
 import { readEmbeddedXml } from './pdf.js';
 import { extractText } from './text.js';
 
-const INSTRUCTIONS = `pdf-to-einvoice turns an existing invoice PDF into an EN 16931 e-invoice (ZUGFeRD / Factur-X): the invoice data is attached to the PDF as XML, the pages stay as they are. It also writes the data as an XRechnung, the XML German public bodies ask for. Everything runs locally; no file is uploaded.
+const INSTRUCTIONS = `pdf-to-einvoice turns an existing invoice PDF into an EN 16931 e-invoice (ZUGFeRD / Factur-X): the invoice data is attached to the PDF as XML, the pages stay as they are. It also writes the data as an XRechnung, the XML German public bodies ask for. The tools run on the user's machine and send nothing. What you read through them is yours to handle: if your model runs elsewhere, the content of the invoice goes there, so do not tell the user that it stays on their machine unless that holds for you.
 
 Workflow:
 1. read_invoice_pdf: get the text of the PDF and a first guess of the values (parties, line items, totals and more).
