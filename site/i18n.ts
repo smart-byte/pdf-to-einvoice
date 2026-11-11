@@ -71,7 +71,8 @@ export const STRINGS: Record<string, Entry> = {
     en: 'Marked in yellow: where each value is printed. Click a mark to go to its field.',
   },
 
-  'read.found': { de: '{n} Angaben per Mustersuche erkannt.', en: '{n} values found by pattern matching.' },
+  'read.found': { de: '{n} Angaben ohne KI aus dem PDF übernommen.', en: '{n} values taken from the PDF without AI.' },
+  'read.found.one': { de: '1 Angabe ohne KI aus dem PDF übernommen.', en: '1 value taken from the PDF without AI.' },
   'read.none': {
     de: 'Das PDF enthält keinen lesbaren Text (vermutlich ein Scan). Bitte tragen Sie die Angaben von Hand ein.',
     en: 'The PDF has no readable text (probably a scan). Please enter the data by hand.',
@@ -90,6 +91,10 @@ export const STRINGS: Record<string, Entry> = {
   'ai.endpoint.url': { de: 'Adresse', en: 'Address' },
   'ai.endpoint.model': { de: 'Modellname', en: 'Model name' },
   'ai.endpoint.key': { de: 'Schlüssel (falls nötig)', en: 'Key (if needed)' },
+  'ai.endpoint.missing': {
+    de: 'Bitte geben Sie die Adresse Ihres Dienstes vollständig ein, mit http:// oder https:// am Anfang.',
+    en: 'Please enter the full address of your service, starting with http:// or https://.',
+  },
   'ai.endpoint.warn': {
     de: 'Der Text Ihrer Rechnung wird an diese Adresse gesendet. Liegt sie nicht auf Ihrem Gerät, verlässt er Ihr Gerät.',
     en: 'The text of your invoice is sent to this address. If it is not on your device, the text leaves your device.',
@@ -102,10 +107,9 @@ export const STRINGS: Record<string, Entry> = {
     en: 'You can keep working while the model loads; it is kept for next time.',
   },
   'ai.reading': { de: 'Das Modell liest die Rechnung\u00a0…', en: 'The model is reading the invoice…' },
-  'ai.done': {
-    de: 'Fertig. Die Angaben wurden ergänzt. Ein Modell kann sich irren: Bitte alles prüfen.',
-    en: 'Done. The data has been filled in. A model can be wrong: please check everything.',
-  },
+  'ai.done': { de: 'Fertig. Die KI hat {n} Angaben ergänzt: Bitte prüfen Sie sie.', en: 'Done. The AI added {n} values: please check them.' },
+  'ai.done.one': { de: 'Fertig. Die KI hat 1 Angabe ergänzt: Bitte prüfen Sie sie.', en: 'Done. The AI added 1 value: please check it.' },
+  'ai.done.none': { de: 'Fertig. Die KI hat nichts gefunden, was noch fehlte.', en: 'Done. The AI found nothing that was missing.' },
   'ai.nogpu': {
     de: 'Dieser Browser unterstützt kein WebGPU, das die Modelle im Browser brauchen. Nutzen Sie einen Browser mit WebGPU, oder wählen Sie einen eigenen Dienst.',
     en: 'This browser lacks WebGPU, which in-browser models need. Use a browser with WebGPU, or choose your own service.',
@@ -162,6 +166,7 @@ export const STRINGS: Record<string, Entry> = {
   'l.vatRate': { de: 'Satz\u00a0%', en: 'Rate %' },
   'l.add': { de: 'Position hinzufügen', en: 'Add a line item' },
   'l.remove': { de: 'Position {n} entfernen', en: 'Remove line item {n}' },
+  'l.item': { de: 'Position {n}', en: 'Line item {n}' },
 
   'type.380': { de: 'Rechnung', en: 'Invoice' },
   'type.381': { de: 'Gutschrift', en: 'Credit note' },
@@ -190,6 +195,7 @@ export const STRINGS: Record<string, Entry> = {
   't.gross': { de: 'Gesamt', en: 'Total' },
   't.due': { de: 'Zu zahlen', en: 'Amount due' },
   't.printed': { de: 'im PDF: {v}', en: 'on the PDF: {v}' },
+  't.printed.xml': { de: 'laut XML: {v}', en: 'stated in the XML: {v}' },
   't.empty': { de: 'Die Summen erscheinen, sobald die Positionen vollständig sind.', en: 'Totals appear once the line items are complete.' },
 
   'xml.title': { de: 'Was in Ihre Datei kommt', en: 'What goes into your file' },
@@ -214,6 +220,10 @@ export const STRINGS: Record<string, Entry> = {
   'hint.suggested': {
     de: 'Auf Ihrem PDF steht weder ein Fälligkeitsdatum noch Zahlungsbedingungen; die E-Rechnung braucht eines davon. Dies ist ein Vorschlag: Bitte prüfen oder ändern Sie ihn.',
     en: 'Your PDF states neither a due date nor payment terms; the e-invoice needs one of them. This is a suggestion: please check or change it.',
+  },
+  'hint.inferred': {
+    de: 'Das PDF weist keine Umsatzsteuer aus; die Umsatzsteuer-Art ist aus dem Land des Kunden abgeleitet. Bitte prüfen.',
+    en: "The PDF shows no VAT; the VAT category was inferred from the buyer's country. Please check.",
   },
   'hint.model': { de: 'Von KI ergänzt: Bitte prüfen.', en: 'Added by AI: please check.' },
   'hint.model.line': { de: 'Diese Position hat die KI ergänzt: Bitte prüfen.', en: 'AI added this line item: please check.' },
@@ -265,6 +275,11 @@ export const STRINGS: Record<string, Entry> = {
   },
   'e.exemption-reason': { de: 'Bitte nennen Sie den Grund, warum keine Umsatzsteuer berechnet wird, so wie er auf der Rechnung steht.', en: '' },
   'e.buyer-vat-id': { de: 'Für Reverse Charge und innergemeinschaftliche Lieferungen ist die USt-IdNr. des Kunden nötig.', en: '' },
+  // An existing e-invoice: both sides of the contradiction are in its XML.
+  'e.totals-mismatch.xml': {
+    de: 'Die im XML angegebene Summe passt nicht zu seinen Positionen. Bitten Sie den Rechnungssteller um eine korrigierte E-Rechnung.',
+    en: 'The total stated in the XML does not match its lines. Ask the issuer for a corrected e-invoice.',
+  },
   'e.totals-mismatch': {
     de: 'Die Summe im PDF weicht von der Summe der Positionen ab. Die E-Rechnung darf dem PDF nicht widersprechen: Bitte prüfen Sie Mengen und Preise.',
     en: '',

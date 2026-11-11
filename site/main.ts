@@ -41,9 +41,10 @@ interface State {
   format: Format;
   /**
    * Values nobody has looked at yet, by the path of their field or of a whole line item ("lines.2"): a suggestion that
-   * is not on the PDF, or what a language model read. Each stays until the user changes the value or says it is right.
+   * is not on the PDF, a VAT category inferred from the buyer's country, or what a language model read. Each stays
+   * until the user changes the value or says it is right.
    */
-  toCheck: Map<string, 'suggested' | 'model'>;
+  toCheck: Map<string, 'suggested' | 'inferred' | 'model'>;
 }
 type Format = 'pdf' | 'xrechnung';
 const state: State = { fileName: '', pdfText: '', draft: {}, touched: new Set(), fileFindings: [], mode: 'create', format: 'pdf', toCheck: new Map() };
@@ -230,7 +231,7 @@ function renderLines(): HTMLElement {
       state.touched.add('lines.removed');
       // The lines below move up by one, and what is still to be checked moves with them.
       state.toCheck = new Map(
-        [...state.toCheck].flatMap(([path, why]): [string, 'suggested' | 'model'][] => {
+        [...state.toCheck].flatMap(([path, why]): [string, typeof why][] => {
           const at = /^lines\.(\d+)(.*)$/.exec(path);
           if (!at || Number(at[1]) < i) return [[path, why]];
           return Number(at[1]) === i ? [] : [[`lines.${Number(at[1]) - 1}${at[2]}`, why]];
@@ -295,14 +296,17 @@ function renderForm(): void {
 
 /**
  * A finding, or an error of the library, in the language of the page: in German the text for its code, worded for its
- * field where there is one (`e.format.iban`), else the English message of the library. What a German text names, it
- * takes from the data rather than from the English sentence; only the value a message quotes and a message of the
+ * field where there is one (`e.format.iban`), else the English message of the library. An existing e-invoice has words
+ * of its own where a finding is about its XML (`e.totals-mismatch.xml`), in English as well. What a German text names,
+ * it takes from the data rather than from the English sentence; only the value a message quotes and a message of the
  * library that writes the XML are passed on as they are.
  */
 function describe(finding: { code: string; message: string; path?: string }): string {
   const path = finding.path ?? '';
-  const key = [`e.${finding.code}.${path.split('.').at(-1)}`, `e.${finding.code}`].find((candidate) => candidate in STRINGS);
-  if (lang !== 'de' || !key) return finding.message;
+  const candidates = [`e.${finding.code}.${path.split('.').at(-1)}`, `e.${finding.code}`];
+  if (state.mode === 'validate') candidates.unshift(`e.${finding.code}.xml`);
+  const key = candidates.find((candidate) => candidate in STRINGS);
+  if (!key || (lang !== 'de' && !STRINGS[key]?.en)) return finding.message;
   const line = state.draft.lines?.[Number(/^lines\.(\d+)\./.exec(path)?.[1])];
   return t(key, {
     a: line ? money(Number(line.quantity) * Number(line.unitPrice)) : '',
@@ -331,8 +335,10 @@ function fieldLabel(path: string): string {
   const label = input && document.querySelector(`label[for="${input.id}"]`)?.textContent;
   // A line item is named by its number, also for a value of it the form does not show, such as its total.
   const line = /^lines\.(\d+)(\.|$)/.exec(path);
-  if (line) return `${t('s.lines')} ${Number(line[1]) + 1}${label ? `, ${label}` : ''}`;
-  if (label) return label;
+  if (line) return `${t('l.item', { n: Number(line[1]) + 1 })}${label ? `, ${label}` : ''}`;
+  // Seller and buyer have fields of the same name: the party is named first.
+  const who = /^(seller|buyer)\./.exec(path)?.[1];
+  if (label) return who ? `${t(who === 'seller' ? 'xml.seller' : 's.buyer')}, ${label}` : label;
   return path.startsWith('totals.') ? t(`t.${path.slice(7)}`) : path === 'lines' ? t('s.lines') : '';
 }
 
@@ -353,7 +359,7 @@ function validate(): void {
       path,
       severity: 'warning',
       code: why,
-      message: t(why === 'suggested' ? 'hint.suggested' : /^lines\.\d+$/.test(path) ? 'hint.model.line' : 'hint.model'),
+      message: t(why === 'model' && /^lines\.\d+$/.test(path) ? 'hint.model.line' : `hint.${why}`),
     }));
   // Where XRechnung demands a part of the address, the warning that it is missing would only say the same again.
   const demanded = (finding: Finding) =>
@@ -378,7 +384,7 @@ function validate(): void {
     // A value that is still to be checked can be ticked off where it stands, without typing it again.
     if (worst && unchecked.includes(worst) && state.mode === 'create') {
       const ok = el('button', { type: 'button', className: 'ok' }, t('hint.ok'));
-      ok.setAttribute('aria-label', t('hint.ok.label', { f: fieldLabel(path) || `${t('s.lines')} ${Number(path.split('.')[1]) + 1}` }));
+      ok.setAttribute('aria-label', t('hint.ok.label', { f: fieldLabel(path) }));
       ok.onclick = () => {
         state.toCheck.delete(path);
         validate();
@@ -400,7 +406,9 @@ function validate(): void {
         el('dt', {}, t(`t.${key}`)),
         el('dd', {}, money(result.totals[key])),
       );
-      if (mismatch && typeof printed[key] === 'number') row.append(el('dd', { className: 'total__printed' }, t('t.printed', { v: money(printed[key]!) })));
+      // An existing e-invoice states its totals in its XML; for a PDF they are what the page prints.
+      const printedAs = state.mode === 'validate' ? 't.printed.xml' : 't.printed';
+      if (mismatch && typeof printed[key] === 'number') row.append(el('dd', { className: 'total__printed' }, t(printedAs, { v: money(printed[key]!) })));
       // A total has no field to focus: pointing at it shows where it stands, on whichever page that is.
       row.onmouseenter = () => {
         pointed = `totals.${key}`;
@@ -447,8 +455,8 @@ function validate(): void {
   }
   if (list.children.length) summary.append(list);
   $<HTMLButtonElement>('#create').disabled = errors.length > 0 || !state.pdf;
-  // An existing e-invoice that passes the check gets its stamp on the preview.
-  $('#work-stamp').hidden = !(state.mode === 'validate' && errors.length === 0);
+  // The stamp reads like a seal: an existing e-invoice gets it only where the check found nothing at all.
+  $('#work-stamp').hidden = !(state.mode === 'validate' && errors.length === 0 && warnings.length === 0);
   renderMarks();
   refreshXml();
 }
@@ -722,9 +730,13 @@ async function open(pdf: Uint8Array, fileName: string): Promise<void> {
       $('#read-status').textContent = result.profile ? t('valid.profile', { p: result.profile }) : '';
     } else {
       merge(guessFromText(text, { blocks }));
-      suggestPaymentTerms();
+      // What was read from the PDF, before anything is suggested.
       const found = JSON.stringify(state.draft).match(/":("|\d|-)/g)?.length ?? 0;
-      $('#read-status').textContent = text.trim() ? t('read.found', { n: found }) : t('read.none');
+      // An invoice that shows no VAT gets its VAT category from the buyer's country, the same for every line: a person
+      // confirms it at the first line.
+      if ((state.draft.lines?.[0]?.vatCategory ?? 'S') !== 'S') state.toCheck.set('lines.0.vatCategory', 'inferred');
+      suggestPaymentTerms();
+      $('#read-status').textContent = text.trim() ? t(found === 1 ? 'read.found.one' : 'read.found', { n: found }) : t('read.none');
     }
     document.body.dataset.mode = state.mode;
     setText('#work-title', state.mode === 'validate' ? 'valid.title' : 'work.title');
@@ -805,6 +817,12 @@ $('#ai-run').onclick = async () => {
   const [button, cancel] = [$<HTMLButtonElement>('#ai-run'), $<HTMLButtonElement>('#ai-cancel')];
   const viaEndpoint = modelSelect.value === 'endpoint';
   if (!viaEndpoint && !hasWebGpu()) return void (status.textContent = t('ai.nogpu'));
+  // Without a full address the request would go to this site itself: nothing is sent until one is given.
+  const address = $<HTMLInputElement>('#ai-url');
+  if (viaEndpoint && !address.checkValidity()) {
+    address.focus();
+    return void (status.textContent = t('ai.endpoint.missing'));
+  }
   const run = ++reads;
   const abort = (cancelRead = new AbortController());
   // The button waits while the model works; the focus goes on to the button that cancels.
@@ -817,7 +835,7 @@ $('#ai-run').onclick = async () => {
     const read = viaEndpoint
       ? readWithEndpoint(
           state.pdfText,
-          { url: $<HTMLInputElement>('#ai-url').value, model: $<HTMLInputElement>('#ai-name').value, key: $<HTMLInputElement>('#ai-key').value },
+          { url: address.value, model: $<HTMLInputElement>('#ai-name').value, key: $<HTMLInputElement>('#ai-key').value },
           abort.signal,
         )
       : readWithBrowserModel(state.pdfText, modelSelect.value, reading, abort.signal);
@@ -826,9 +844,12 @@ $('#ai-run').onclick = async () => {
     if (state.pdf !== pdf || run !== reads || abort.signal.aborted) return;
     // A small model translates names and makes up identifiers. Only what the PDF shows is taken over, and even of
     // that a good part is wrong: every value the model added is marked until the user has looked at it.
-    for (const path of merge(keepWhatThePdfShows(normaliseDraft(answer), state.pdfText), true)) state.toCheck.set(path, 'model');
+    const added = merge(keepWhatThePdfShows(normaliseDraft(answer), state.pdfText), true);
+    for (const path of added) state.toCheck.set(path, 'model');
     renderForm();
-    status.textContent = t('ai.done');
+    // Counted as the verdict counts them: a value the form has no field for is not shown, so it is not counted.
+    const counted = added.filter((path) => document.querySelector(`[data-hint="${path}"]`)).length;
+    status.textContent = counted ? t(counted === 1 ? 'ai.done.one' : 'ai.done', { n: counted }) : t('ai.done.none');
   } catch (error) {
     status.textContent = abort.signal.aborted ? t('ai.cancelled') : t('ai.failed', { m: error instanceof Error ? error.message : String(error) });
   } finally {
@@ -970,6 +991,8 @@ $('#create').onclick = async () => {
     const notes = $('#done-notes');
     notes.replaceChildren(...findings.map((finding) => el('li', {}, describe(finding))));
     notes.hidden = findings.length === 0;
+    // The stamp reads like a seal: it lands only where neither the check nor the writing of the file found anything.
+    $('#done .stamp').hidden = findings.length > 0 || document.querySelector('#summary li') !== null;
     status.textContent = '';
     // The finished page shows the same preview, with the stamp landing on it.
     const [from, to] = [$<HTMLCanvasElement>('#preview'), $<HTMLCanvasElement>('#done-preview')];

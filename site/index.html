@@ -226,14 +226,14 @@
                 <div class="fields" id="ai-endpoint" hidden>
                   <div class="field field--wide">
                     <label for="ai-url" data-i18n="ai.endpoint.url">Address</label>
-                    <input id="ai-url" type="url" value="http://localhost:11434/v1" />
+                    <input id="ai-url" type="url" required placeholder="http://localhost:8080/v1" />
                     <p class="hint hint--warning" data-i18n="ai.endpoint.warn">
                       The text of your invoice is sent to this address. If it is not on your device, the text leaves your device.
                     </p>
                   </div>
                   <div class="field">
                     <label for="ai-name" data-i18n="ai.endpoint.model">Model name</label>
-                    <input id="ai-name" type="text" value="qwen3:8b" />
+                    <input id="ai-name" type="text" />
                   </div>
                   <div class="field">
                     <label for="ai-key" data-i18n="ai.endpoint.key">Key (if needed)</label>
