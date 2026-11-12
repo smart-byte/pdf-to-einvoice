@@ -529,8 +529,11 @@ const stored = () => {
   }
 };
 
+/** The start page of one language: /de or /en. Its language wins over a choice made before. */
+const routeLang = () => /^\/(de|en)\b/.exec(location.pathname)?.[1];
+
 export let lang: Lang = (() => {
-  const wanted = new URLSearchParams(location.search).get('lang') ?? stored() ?? navigator.language;
+  const wanted = new URLSearchParams(location.search).get('lang') ?? routeLang() ?? stored() ?? navigator.language;
   return wanted.toLowerCase().startsWith('de') ? 'de' : 'en';
 })();
 
@@ -547,6 +550,9 @@ export function setLang(next: Lang): void {
   } catch {
     // Private mode: the choice simply lasts for this visit.
   }
+  // The address follows the switch, so that a copied link opens what was shown.
+  const route = routeLang();
+  if (route && route !== next) history.replaceState(null, '', next);
   document.documentElement.lang = next;
   for (const el of document.querySelectorAll<HTMLElement>('[data-i18n]')) el.textContent = t(el.dataset.i18n!);
   for (const el of document.querySelectorAll<HTMLElement>('[data-i18n-label]')) el.setAttribute('aria-label', t(el.dataset.i18nLabel!));

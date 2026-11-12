@@ -364,6 +364,47 @@ describe.skipIf(!asked)('the web app in a browser', () => {
     expect(await page.evaluate(() => (window as any).widest.value)).toBe(0);
   }, 120_000);
 
+  // Search engines and link previews (LinkedIn, messengers) read the HTML: each language has an address whose page
+  // says everything in that language before any script runs, and starts in it, whatever was chosen before.
+  it('has an address per language whose page is in that language before any script runs', async () => {
+    const page = await open();
+    const head = () =>
+      page.$$eval('meta[property^="og:"], meta[name="description"], meta[name^="twitter:"], link[rel="canonical"]', (tags) =>
+        Object.fromEntries(
+          tags.map((tag) => [tag.getAttribute('property') ?? tag.getAttribute('name') ?? 'canonical', tag.getAttribute('content') ?? tag.getAttribute('href')]),
+        ),
+      );
+    const heads: Record<string, Record<string, string | null>> = {};
+    for (const [lang, chosenBefore, headline] of [
+      ['en', 'de', 'e-invoice'],
+      ['de', 'en', 'E-Rechnung'],
+    ] as const) {
+      await page.evaluate((chosen) => localStorage.setItem('lang', chosen), chosenBefore);
+      const response = await page.goto(`${base}${lang}`);
+      expect(response?.status()).toBe(200);
+      const html = await response!.text();
+      expect(/<html lang="([a-z]+)"/.exec(html)?.[1]).toBe(lang);
+      heads[lang] = await head();
+      expect(heads[lang]).toMatchObject({ canonical: `https://pdf-to-einvoice.app/${lang}`, 'og:url': `https://pdf-to-einvoice.app/${lang}` });
+      expect(await page.textContent('h1')).toContain(headline);
+      // The title a search engine or a preview shows is the one the page shows.
+      expect(/<title[^>]*>([^<]*)</.exec(html)?.[1]).toBe(await page.title());
+    }
+    for (const key of ['description', 'og:title', 'og:description', 'og:image', 'og:image:alt', 'twitter:title', 'twitter:image']) {
+      expect(heads.de![key]).not.toBe(heads.en![key]);
+    }
+    const image = await page.request.get(heads.de!['og:image']!.replace('https://pdf-to-einvoice.app/', base));
+    expect(image.headers()['content-type']).toBe('image/png');
+    // The switch takes the address along, so that a copied link opens what was shown.
+    await page.click('[data-lang="en"]');
+    expect(new URL(page.url()).pathname).toBe('/en');
+    // The sitemap names the addresses every start page names as its alternates.
+    const alternates = await page.$$eval('link[rel="alternate"][hreflang]', (links) => links.map((link) => (link as HTMLLinkElement).href));
+    const sitemap = await (await page.request.get(`${base}sitemap.xml`)).text();
+    expect([...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) => match[1]).sort()).toEqual(alternates.sort());
+    expect(await (await page.request.get(`${base}robots.txt`)).text()).toContain('Sitemap: https://pdf-to-einvoice.app/sitemap.xml');
+  }, 120_000);
+
   it('offers the next invoice after the download, in the language of the page', async () => {
     const page = await open('en');
     await read(page);
