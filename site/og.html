@@ -1,5 +1,6 @@
 <!doctype html>
-<!-- Source of public/og.png, the link preview image. Not part of the built site: open it at 1200×630 and take a screenshot at 2× to regenerate. -->
+<!-- Source of public/og.png, the link preview image, and with ?lang=de of public/og-de.png, the one of the German address.
+     Not part of the built site: open it at 1200×630 and take a screenshot at 2× to regenerate. -->
 <html lang="en">
   <head>
     <meta charset="utf-8" />
@@ -221,5 +222,12 @@
         </div>
       </div>
     </div>
+    <script>
+      if (new URLSearchParams(location.search).get('lang') === 'de') {
+        document.documentElement.lang = 'de';
+        document.querySelector('h1').innerHTML = 'Aus Ihrer PDF-Rechnung wird eine <span>E-Rechnung</span>.';
+        document.querySelector('p').textContent = 'Ihr Layout bleibt. Die Daten kommen als XML nach EN 16931 dazu. Nichts wird hochgeladen.';
+      }
+    </script>
   </body>
 </html>

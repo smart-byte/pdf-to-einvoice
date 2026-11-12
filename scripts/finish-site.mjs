@@ -3,6 +3,8 @@
 // - third-party-licenses.txt: the licence texts of everything the site ships. MIT, Apache-2.0, the SIL Open Font
 //   License and others ask for their text to travel with every copy, and a bundle is a copy.
 // - llms-full.txt: the README, for language models that want the whole documentation in one file.
+// - de.html and en.html: the start page once per language, at pdf-to-einvoice.app/de and /en, in that language
+//   before any script runs. Search engines and link previews read the HTML; the start page at / follows the visitor.
 //
 // Run by `npm run site:build` after the bundler.
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -60,4 +62,41 @@ writeFileSync(
   [readFileSync(join(root, 'THIRD_PARTY_NOTICES.md'), 'utf8').trim(), ...sections].join(`\n\n${rule}\n\n`) + '\n',
 );
 writeFileSync(join(out, 'llms-full.txt'), readFileSync(join(root, 'README.md'), 'utf8'));
-console.log(`third-party-licenses.txt: ${packages.size} packages, ${byText.size} licence texts, ${withoutText.length} without a text file`);
+
+const SITE = 'https://pdf-to-einvoice.app/';
+const GERMAN_TITLE = 'pdf-to-einvoice: Aus Ihrer PDF-Rechnung wird eine E-Rechnung';
+// What a start page of one language says in its head. index.html is in English; German replaces its texts.
+const START_PAGES = {
+  en: {},
+  de: {
+    title: GERMAN_TITLE,
+    meta: {
+      description:
+        'Machen Sie aus der PDF-Rechnung, die Sie schon haben, eine E-Rechnung nach EN 16931 (ZUGFeRD / Factur-X). Ihr Layout bleibt, die Daten kommen als XML dazu. Kostenlos, quelloffen, und alles passiert in Ihrem Browser.',
+      'og:title': GERMAN_TITLE,
+      'og:description':
+        'Ihr Layout bleibt, die Rechnungsdaten kommen als XML nach EN 16931 dazu (ZUGFeRD / Factur-X). Kostenlos, quelloffen, und nichts wird hochgeladen.',
+      'og:image': `${SITE}og-de.png`,
+      'og:image:alt': 'pdf-to-einvoice: eine Rechnung mit gelb markierten Werten, dahinter die Fassung für Maschinen, das XML der E-Rechnung.',
+      'twitter:title': GERMAN_TITLE,
+      'twitter:image': `${SITE}og-de.png`,
+    },
+  },
+};
+
+/** Replaces what `pattern` finds, and fails the build when the start page no longer has it. */
+const swap = (html, pattern, replacement) => {
+  if (!pattern.test(html)) throw new Error(`index.html has nothing that matches ${pattern}`);
+  return html.replace(pattern, replacement);
+};
+const start = readFileSync(join(out, 'index.html'), 'utf8');
+for (const [lang, { title, meta = {} }] of Object.entries(START_PAGES)) {
+  const address = `${SITE}${lang}`;
+  let html = swap(start, /<html lang="[a-z]+">/, `<html lang="${lang}">`);
+  html = swap(html, /(<link rel="canonical" href=")[^"]*/, `$1${address}`);
+  if (title) html = swap(html, /(<title[^>]*>)[^<]*/, `$1${title}`);
+  for (const [key, value] of Object.entries({ 'og:url': address, ...meta })) {
+    html = swap(html, new RegExp(`(<meta\\s+(?:name|property)="${key}"\\s+content=")[^"]*`), `$1${value}`);
+  }
+  writeFileSync(join(out, `${lang}.html`), html);
+}
