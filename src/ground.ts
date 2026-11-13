@@ -4,7 +4,8 @@ import type { InvoiceDraft } from './model.js';
 type Bag = Record<string, any>;
 type Rule = (value: any, siblings: Bag) => boolean;
 
-const COUNTRY_NAMES: Record<string, string[]> = {
+/** How a country is written on a page, in lower case. */
+export const COUNTRY_NAMES: Record<string, string[]> = {
   DE: ['deutschland', 'germany'],
   AT: ['österreich', 'austria'],
   CH: ['schweiz', 'switzerland', 'suisse'],
@@ -15,6 +16,7 @@ const COUNTRY_NAMES: Record<string, string[]> = {
   LU: ['luxemburg', 'luxembourg'],
   PL: ['polen', 'poland', 'polska'],
   ES: ['spanien', 'spain', 'españa'],
+  IE: ['irland', 'ireland'],
   GB: ['großbritannien', 'vereinigtes königreich', 'united kingdom', 'great britain'],
   US: ['usa', 'united states', 'vereinigte staaten'],
 };

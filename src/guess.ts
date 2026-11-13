@@ -1,4 +1,5 @@
 import { isIban } from './check.js';
+import { COUNTRY_NAMES } from './ground.js';
 import type { InvoiceDraft, Line, Party, VatCategory } from './model.js';
 
 // Known limit: patterns for German, English and French invoices, no model. A value is believed for what it fits to, not
@@ -107,6 +108,8 @@ function findCurrency(text: string): string | undefined {
 
 const VAT_ID_LABEL =
   /ust\.?-?\s?id\.?-?\s?(?:nr\.?)?|umsatzsteuer-?\s?id(?:entifikationsnummer)?|uid(?:-nr\.?)?|vat[\s-]*(?:id|reg(?:istration)?\.?)?\s*(?:no\.?|number)?|(?:n°\s*)?tva(?:\s+intracom\w*)?(?:\s+client)?/;
+/** A line that starts with the label of a VAT ID, with or without a colon: "USt-IdNr. ATU12345678". */
+const VAT_ID_LINE = new RegExp(`^(?:${VAT_ID_LABEL.source})\\s*:?\\s*[A-Z]{2}`, 'i');
 /** A German VAT ID has a shape of its own, DE and nine digits. An IBAN goes on with digits, a SEPA creditor ID with letters. */
 const GERMAN_VAT_ID = /(?<![A-Z0-9])DE(?: ?\d){9}(?! ?\d)/g;
 /** What stands before the label of a VAT ID that is the customer's ("Ihre USt-IdNr."), or ends it ("N° TVA client"). */
@@ -133,8 +136,8 @@ function vatIdsIn(text: string): { id: string; customer: boolean }[] {
 const cells = (row: string) => row.split(/\s{3,}(?!:)/).map((cell) => cell.trim());
 /** "Name · Street 1 · 12345 City", also written with dashes, bars or dots. */
 const SENDER_SEPARATOR = /\s[·|•●–—-]\s/;
-/** "12345 Musterstadt", "DE-12345 Musterstadt", "D-12345 Musterstadt", "DE 12345 Musterstadt". */
-const POSTAL = /^(?:([A-Z]{1,2})[- ])?(\d{4,5})\s+(\p{L}.*)$/u;
+/** "12345 Musterstadt", "DE-12345 Musterstadt", "D-12345 Musterstadt", "DE 12345 Musterstadt", and the Dutch "1234 AB Voorbeeldstad". */
+const POSTAL = /^(?:([A-Z]{1,2})[- ])?(\d{4} [A-Z]{2}(?= )|\d{4,5})\s+(\p{L}.*)$/u;
 /** "Dover, DE 19901", with the country in front ("USA – Dover, DE 19901") or behind ("Dover, DE 19901, USA"). */
 const US_PLACE =
   /^(?:(?:USA|United States(?: of America)?)\s[–—-]\s)?([\p{L} .'-]+),\s[A-Z]{2}\s(\d{5}(?:-\d{4})?)(?:,\s(?:USA|United States(?: of America)?))?$/u;
@@ -143,6 +146,9 @@ const EU = new Set('AT BE BG CY CZ DE DK EE ES FI FR GR HR HU IE IT LT LU LV MT 
 const COUNTRY_PREFIX: Record<string, string> = { D: 'DE', A: 'AT', F: 'FR', B: 'BE', L: 'LU', CH: 'CH' };
 /** VAT IDs start with the country code, except that Greece writes EL. */
 const countryOfVatId = (vatId: string | undefined) => (vatId ? vatId.slice(0, 2).replace('EL', 'GR') : undefined);
+
+/** The country a line names and nothing else, as "ÖSTERREICH" below an address. */
+const countryNamed = (line: string | undefined) => Object.entries(COUNTRY_NAMES).find(([, names]) => names.includes(line?.trim().toLowerCase() ?? ''))?.[0];
 
 /** Postal code, city and country, from the last line of an address. */
 function placeOf(line: string): Partial<Party> | undefined {
@@ -182,6 +188,8 @@ const SALUTATION = /^(?:herrn?|frau|mr\.?|mrs\.?|ms\.?|monsieur|madame|mme\.?)$/
 const LEGAL_FORM = /(?:^|\s)(?:gmbh|mbh|ag|kg|ohg|gbr|e\.\s?[vk]\.|a\.\s?g\.|ltd\.?|inc\.?|llc|plc|sarl|sas|s\.a\.|b\.v\.)(?=\s|$)|&\s*co\b/i;
 /** What only the issuer prints about itself: its tax number and its entry in the commercial register. */
 const ISSUER_SIGNS = /steuer-?(?:nr|nummer)|\bst\.?-?nr|tax\s+(?:number|no\b)|\bhr[ab]\b|amtsgericht|registergericht|handelsregister|siret/i;
+/** What a footer lists beside the issuer's name: its numbers, its VAT ID and its bank account. */
+const IDENTIFIERS = new RegExp(`${ISSUER_SIGNS.source}|\\b(?:${VAT_ID_LABEL.source})|\\b(?:iban|bic)\\b`, 'i');
 
 function roleOf(line: string): Role | undefined {
   return BUYER_HEADING.test(line) ? 'buyer' : SELLER_HEADING.test(line) ? 'seller' : OTHER_HEADING.test(line) ? 'other' : undefined;
@@ -237,8 +245,11 @@ function addressesIn(lines: string[]): Found[] {
     const under = climb(true);
     const { above, role } = under.role ? under : climb(false);
     if (above.length < 2) return;
+    // An address abroad may name its country in a line of its own, below the place.
+    const country = countryNamed(lines[i + 1]);
     const tail: string[] = [];
-    for (let k = i + 1; k < lines.length && tail.length < 4 && KEY_VALUE.test(lines[k]!); k++) tail.push(lines[k]!);
+    for (let k = i + (country ? 2 : 1); k < lines.length && tail.length < 4 && (KEY_VALUE.test(lines[k]!) || VAT_ID_LINE.test(lines[k]!)); k++)
+      tail.push(lines[k]!);
     const [first, second] = above.length >= 3 ? above : [above[0]!];
     // "Herrn" above a name and a second line with the legal form belong to the name; another second line names a person.
     const joined = second !== undefined && (SALUTATION.test(first!) || LEGAL_FORM.test(second));
@@ -249,6 +260,7 @@ function addressesIn(lines: string[]): Found[] {
       contactName: joined || mixed ? undefined : second,
       street: mixed ? undefined : above.at(-1),
       ...place,
+      country: country ?? place.country,
     };
     found.push({ party, role, tail: tail.join('\n') });
   });
@@ -288,7 +300,10 @@ function readParties(rows: string[], blocks: string[][]): { seller?: Found; buye
     ([party.name, party.contactName, party.street].includes(seller.party.name) ||
       (party.street !== undefined && party.street === seller.party.street && party.postalCode === seller.party.postalCode));
   const labelled = addresses.filter((found) => found.role === 'buyer');
-  const left = labelled.length ? labelled : addresses.filter((found) => found.role === undefined && !isSellers(found));
+  // A name that stands beside a VAT ID, a tax number or a bank account, as in a footer, is the issuer's, even where
+  // nothing else makes it the seller.
+  const issuer = ({ party }: Found) => rows.some((row) => row.includes(party.name!) && IDENTIFIERS.test(row));
+  const left = labelled.length ? labelled : addresses.filter((found) => found.role === undefined && !isSellers(found) && !issuer(found));
   return { seller, buyer: new Set(left.map((found) => found.party.name)).size === 1 ? left[0] : undefined };
 }
 
