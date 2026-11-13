@@ -70,6 +70,11 @@ const CASES: Record<string, InvoiceDraft> = {
     delete d.totals;
   }),
   'credit note': sample((d) => Object.assign(d, { typeCode: '381', precedingInvoiceNumber: 'RE-2026-0041', precedingInvoiceDate: '2026-10-20' })),
+  'line discounts: a percentage with a cent fraction, an amount with a reason': sample((d) => {
+    d.lines.push({ name: 'Schulungsunterlagen', quantity: 3, unit: 'C62', unitPrice: 33.33, vatCategory: 'S', vatRate: 19, discount: { percent: 10 } });
+    d.lines[1].discount = { amount: 50, reason: 'Treuerabatt' };
+    delete d.totals;
+  }),
   'corrected invoice replacing an earlier plain PDF': sample((d) =>
     Object.assign(d, { typeCode: '384', precedingInvoiceNumber: 'RE-2026-0042', precedingInvoiceDate: '2026-11-03', number: 'RE-2026-0042-K' }),
   ),
@@ -95,6 +100,13 @@ const XRECHNUNG_CASES: Record<string, InvoiceDraft> = Object.fromEntries(
     'cash discount in the payment terms': sample((d) => (d.paymentTerms = 'Zahlbar innerhalb von 30 Tagen.\n#SKONTO#TAGE=14#PROZENT=2.00#')),
     'credit note with negative amounts and neither due date nor bank account': sample((d) => {
       for (const line of d.lines) line.quantity = -line.quantity;
+      for (const field of ['dueDate', 'paymentTerms', 'iban', 'bic', 'totals']) delete d[field];
+      Object.assign(d, { typeCode: '381', precedingInvoiceNumber: 'RE-2026-0041', precedingInvoiceDate: '2026-10-20' });
+    }),
+    'credit note with discounts on negative lines': sample((d) => {
+      for (const line of d.lines) line.quantity = -line.quantity;
+      d.lines[0].discount = { percent: 10 };
+      d.lines[1].discount = { amount: -50 };
       for (const field of ['dueDate', 'paymentTerms', 'iban', 'bic', 'totals']) delete d[field];
       Object.assign(d, { typeCode: '381', precedingInvoiceNumber: 'RE-2026-0041', precedingInvoiceDate: '2026-10-20' });
     }),

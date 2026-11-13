@@ -57,6 +57,32 @@ describe('createEInvoice', () => {
     expect(xml).toMatch(/<ram:GuidelineSpecifiedDocumentContextParameter>\s*<ram:ID>urn:cen\.eu:en16931:2017<\/ram:ID>/);
   });
 
+  it('writes a line discount with its percentage, base and reason code', async () => {
+    const { xml } = await createEInvoice({
+      pdf: samplePdf(),
+      invoice: sample((d) => {
+        delete d.totals;
+        d.lines[1].discount = { percent: 10 };
+      }),
+    });
+    expect(xml).toMatch(
+      /<ram:SpecifiedTradeAllowanceCharge>[\s\S]*?false[\s\S]*?<ram:CalculationPercent>10(\.0+)?<\/ram:CalculationPercent>[\s\S]*?<ram:BasisAmount>499\.00<\/ram:BasisAmount>[\s\S]*?<ram:ActualAmount>49\.90<\/ram:ActualAmount>[\s\S]*?<ram:ReasonCode>95<\/ram:ReasonCode>/,
+    );
+    expect(xml).toContain('<ram:LineTotalAmount>449.10</ram:LineTotalAmount>');
+  });
+
+  it('writes the reason of a line discount as text only', async () => {
+    const { xml } = await createEInvoice({
+      pdf: samplePdf(),
+      invoice: sample((d) => {
+        delete d.totals;
+        d.lines[1].discount = { amount: 50, reason: 'Treuerabatt' };
+      }),
+    });
+    expect(xml).toContain('<ram:Reason>Treuerabatt</ram:Reason>');
+    expect(xml).not.toContain('<ram:ReasonCode>');
+  });
+
   it('writes the calculated totals', async () => {
     const { xml } = await createEInvoice({ pdf: samplePdf(), invoice: sample() });
     expect(xml).toContain('<ram:TaxBasisTotalAmount>1499.00</ram:TaxBasisTotalAmount>');

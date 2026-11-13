@@ -150,6 +150,21 @@ export function toUbl(invoice: Invoice, totals: Totals, xrechnung = false): EInv
       'cbc:InvoicedQuantity': decimal(line.quantity),
       'cbc:InvoicedQuantity@unitCode': line.unit,
       ...money('cbc:LineExtensionAmount', totals.lineNet[i]!),
+      ...(line.discount
+        ? {
+            'cac:AllowanceCharge': [
+              compact({
+                'cbc:ChargeIndicator': 'false',
+                // A reason in words stands alone: a code beside it would have to name the same kind of discount (BR-CO-7).
+                'cbc:AllowanceChargeReasonCode': line.discount.reason ? undefined : '95',
+                'cbc:AllowanceChargeReason': line.discount.reason,
+                'cbc:MultiplierFactorNumeric': line.discount.percent !== undefined ? decimal(line.discount.percent) : undefined,
+                ...money('cbc:Amount', totals.lineDiscounts[i]!.amount),
+                ...(line.discount.percent !== undefined ? money('cbc:BaseAmount', totals.lineDiscounts[i]!.base) : {}),
+              }),
+            ],
+          }
+        : {}),
       'cac:Item': compact({
         'cbc:Description': line.description,
         'cbc:Name': line.name,
