@@ -228,3 +228,12 @@ describe('guessFromText with an invoice that charges no VAT', () => {
     expect(guessFromText(invoice('Steuerfreie innergemeinschaftliche Lieferung.', address)).lines).toMatchObject([{ vatCategory: 'K', vatRate: 0 }]);
   });
 });
+
+describe('guessFromText with payment terms', () => {
+  it.each(['Die Zahlung ist bis zum 31. Oktober 2026 fällig.', 'Die Zahlung ist sofort fällig.', 'Zahlung ist innerhalb von 14 Tagen zu leisten.'])(
+    'reads terms that start with the payment: %s',
+    (terms) => {
+      expect(guessFromText(`Rechnung 2026-21   6. Oktober 2026\n${terms}`).paymentTerms).toBe(terms);
+    },
+  );
+});

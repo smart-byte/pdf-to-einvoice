@@ -714,7 +714,7 @@ const TERMS_LABEL =
   /^(?:zahlungs(?:bedingung(?:en)?|ziel|frist|konditionen)|payment\s+terms?|terms\s+of\s+payment|conditions\s+de\s+(?:paiement|règlement))\s*:?\s*/i;
 /** How a sentence starts that says when to pay. "Zahlbetrag" and "Zahlungsart" say something else. */
 const TERMS_START =
-  /^(?:zahlbar\b|zahlung\s+(?:innerhalb|bis|sofort|ohne|erfolgt|fällig)|bitte\s+(?:überweisen|zahlen|begleichen)|der\s+(?:rechnungs|gesamt)betrag\s+ist|sofort\s+(?:fällig|zahlbar)|payable\b|payment\s+(?:is\s+)?(?:due|within|upon)|please\s+(?:pay|remit|transfer)|net\s+\d+|due\s+(?:on|upon)\s+receipt|paiement\s+(?:à|sous|dans|comptant))/i;
+  /^(?:zahlbar\b|(?:die\s+)?zahlung\s+(?:ist\s+)?(?:innerhalb|bis|sofort|ohne|erfolgt|fällig|\d)|bitte\s+(?:überweisen|zahlen|begleichen)|der\s+(?:rechnungs|gesamt)betrag\s+ist|sofort\s+(?:fällig|zahlbar)|payable\b|payment\s+(?:is\s+)?(?:due|within|upon)|please\s+(?:pay|remit|transfer)|net\s+\d+|due\s+(?:on|upon)\s+receipt|paiement\s+(?:à|sous|dans|comptant))/i;
 
 /**
  * The payment terms as printed: what stands after their label, or the sentence that says when to pay, joined over
