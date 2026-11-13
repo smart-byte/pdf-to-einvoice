@@ -1063,13 +1063,23 @@ textarea.warned {
   position: relative;
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
-  align-items: end;
-  gap: 0.8rem 0.9rem;
+  gap: 0 0.9rem;
   width: 100%;
   margin: 0;
-  padding: 0.9rem 1rem 1rem;
+  padding: 0.9rem 1rem 0.2rem;
   border: 1px solid var(--line);
   border-radius: var(--radius);
+}
+/* Each field takes three rows of the line item: label, control and hint. Fields side by side share them, so a hint
+   below one field or a label that wraps moves no control beside it. A field here has no further help text. */
+.line > .field {
+  display: grid;
+  grid-row: span 3;
+  grid-template-rows: subgrid;
+  margin-bottom: 0.8rem;
+}
+.line > .field > label {
+  align-self: end;
 }
 /* The button that removes the line item stands beside its first field only: the rows below keep the full width. */
 .line > .field:first-of-type {

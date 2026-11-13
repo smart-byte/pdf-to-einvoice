@@ -264,6 +264,11 @@ describe.skipIf(!asked)('the web app in a browser', () => {
     await page.fill('[data-path="lines.1.discount.percent"]', '10');
     // The page does not show the percentage. `said` turns the no-break space of the label into a plain one.
     expect(await said(page)).toEqual(expect.arrayContaining([expect.stringMatching(/^Position 2, Rabatt %: Diese Angabe steht so nicht im PDF/)]));
+    // The hint below one field moves no field beside it. Both are measured at once: the page may still be scrolling.
+    const [percent, amount] = await page.$$eval('[data-path^="lines.1.discount."]', (inputs) =>
+      inputs.map((input) => Math.round(input.getBoundingClientRect().top)),
+    );
+    expect(amount).toBe(percent);
     const invoice = sampleData() as any;
     delete invoice.totals;
     invoice.lines[1].discount = { percent: 10 };
