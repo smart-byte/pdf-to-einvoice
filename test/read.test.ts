@@ -108,6 +108,26 @@ describe('readInvoiceXml returns what createEInvoice wrote', () => {
     expect(invoice.lines?.[0]?.vatRate).toBe(0);
   });
 
+  it('for discounts on lines, as a percentage and as an amount with a reason', async () => {
+    const input = sample((d) => {
+      d.lines[0].discount = { percent: 10 };
+      d.lines[1].discount = { amount: 50, reason: 'Treuerabatt' };
+    });
+    await roundTrip(input);
+    expect(readInvoiceXml(await xmlOf(input))).toMatchObject({ adjustedLines: [], contradictions: [] });
+  });
+
+  it('for discounts on lines with a negative quantity', async () => {
+    const invoice = await roundTrip(
+      sample((d) => {
+        for (const line of d.lines) line.quantity = -line.quantity;
+        d.lines[0].discount = { percent: 10 };
+        d.lines[1].discount = { amount: -50 };
+      }),
+    );
+    expect(invoice.lines?.[0]?.discount?.amount).toBe(-100);
+  });
+
   it('for a single line, as a list of one', async () => {
     const invoice = await roundTrip(sample((d) => (d.lines.length = 1)));
     expect(invoice.lines).toHaveLength(1);
@@ -187,6 +207,21 @@ describe('readInvoiceXml', () => {
     const { invoice } = readInvoiceXml(xml);
     expect(invoice.buyer?.taxNumber).toBeUndefined();
     expect(invoice.seller?.taxNumber).toBeUndefined();
+  });
+
+  it('takes the reason code of a line discount where no reason is written out', async () => {
+    const { invoice } = readInvoiceXml(await xmlOf(sample((d) => (d.lines[0].discount = { percent: 10 }))));
+    expect(invoice.lines?.[0]?.discount?.reason).toBe('95');
+  });
+
+  it('keeps a line with a charge among the adjusted lines', async () => {
+    const xml = (await xmlOf(sample((d) => (d.lines[0].discount = { amount: 10 })))).replace(
+      '<udt:Indicator>false</udt:Indicator>',
+      '<udt:Indicator>true</udt:Indicator>',
+    );
+    const read = readInvoiceXml(xml);
+    expect(read.adjustedLines).toEqual([0]);
+    expect(read.invoice.lines?.[0]).not.toHaveProperty('discount');
   });
 
   it('refuses a UBL invoice', () => {

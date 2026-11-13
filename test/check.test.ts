@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { check } from '../src/check.js';
+import { check, percentSpellings } from '../src/check.js';
 import type { InvoiceDraft } from '../src/model.js';
 
 const sample = (): InvoiceDraft => JSON.parse(readFileSync(new URL('../examples/sample-invoice.json', import.meta.url), 'utf8'));
@@ -86,6 +86,109 @@ describe('check', () => {
     // Forint has no cents in practice: there half a forint is allowed.
     expect(lineTotal(499.5, 'HUF')).toEqual([]);
     expect(lineTotal(499.51, 'HUF')).toEqual(['error:line-net']);
+  });
+
+  it('checks a line total against quantity times price less the discount', () => {
+    const at = (netAmount: number) =>
+      codesAt(
+        withChange((d) => {
+          delete d.totals;
+          Object.assign(d.lines[1], { discount: { percent: 10 }, netAmount });
+        }),
+        'lines.1.netAmount',
+      );
+    expect(at(449.1)).toEqual([]);
+    expect(at(499)).toEqual(['error:line-net']);
+  });
+
+  it('wants a discount to have a percentage or an amount, a percentage that is not negative, and numbers', () => {
+    const at = (discount: unknown, path: string) =>
+      codesAt(
+        withChange((d) => {
+          delete d.totals;
+          d.lines[1].discount = discount;
+        }),
+        path,
+      );
+    expect(at({ reason: 'Treuerabatt' }, 'lines.1.discount')).toEqual(['error:discount']);
+    expect(at({ percent: -5 }, 'lines.1.discount.percent')).toEqual(['error:discount']);
+    expect(at({ percent: '10 %' }, 'lines.1.discount.percent')).toEqual(['error:format']);
+  });
+
+  it('ignores a discount whose fields were all left empty', () => {
+    const result = check(
+      withChange((d) => {
+        delete d.totals;
+        d.lines[1].discount = { percent: null, amount: '' };
+      }),
+    );
+    expect(result.findings.filter((f) => f.path.startsWith('lines.1'))).toEqual([]);
+    expect(result.invoice?.lines[1]).not.toHaveProperty('discount');
+  });
+
+  it('wants percentage and amount of a discount to agree, two cents apart at most', () => {
+    const at = (amount: number) =>
+      codesAt(
+        withChange((d) => {
+          delete d.totals;
+          d.lines[1].discount = { percent: 10, amount };
+        }),
+        'lines.1.discount.amount',
+      );
+    expect(at(49.92)).toEqual([]);
+    expect(at(49.93)).toEqual(['error:discount-mismatch']);
+  });
+
+  it('compares the discount the XML gets, in cents, with its percentage', () => {
+    // 9.995 is two cents from 10 % of 99.75 (9.975), but the XML gets 10.00, which is 0.025 off.
+    const at = (amount: number) =>
+      codesAt(
+        withChange((d) => {
+          delete d.totals;
+          Object.assign(d.lines[1], { quantity: 1, unitPrice: 99.75, discount: { percent: 10, amount } });
+        }),
+        'lines.1.discount.amount',
+      );
+    expect(at(9.995)).toEqual(['error:discount-mismatch']);
+    expect(at(9.99)).toEqual([]);
+  });
+
+  it('warns about a fixed discount whose sign differs from its line', () => {
+    const at = (quantity: number, amount: number) =>
+      codesAt(
+        withChange((d) => {
+          delete d.totals;
+          Object.assign(d.lines[1], { quantity, discount: { amount } });
+        }),
+        'lines.1.discount.amount',
+      );
+    expect(at(-2, 50)).toEqual(['warning:discount-sign']);
+    expect(at(-2, -50)).toEqual([]);
+    expect(at(0, 5)).toEqual([]);
+  });
+
+  it('spells a percentage the ways a page prints it', () => {
+    expect(percentSpellings(10)).toEqual(expect.arrayContaining(['10%', '10,00%', '10.0%']));
+    expect(percentSpellings(12.345)).toEqual(expect.arrayContaining(['12,345%', '12.345%']));
+  });
+
+  it('looks for the percentage of a discount on the page, never for the amount derived from it', () => {
+    const draft = withChange((d) => {
+      delete d.totals;
+      d.lines[1].discount = { percent: 10, amount: 49.9 };
+    });
+    expect(codesAt(draft, 'lines.1.discount.percent', { pdfText: 'Rabatt 10 %' })).toEqual([]);
+    expect(codesAt(draft, 'lines.1.discount.amount', { pdfText: 'Rabatt 10 %' })).toEqual([]);
+    expect(codesAt(draft, 'lines.1.discount.percent', { pdfText: 'Rabatt' })).toEqual(['warning:not-in-pdf']);
+  });
+
+  it('looks for the amount of a discount that has no percentage', () => {
+    const draft = withChange((d) => {
+      delete d.totals;
+      d.lines[1].discount = { amount: 37.5 };
+    });
+    expect(codesAt(draft, 'lines.1.discount.amount', { pdfText: 'Rabatt 37,50' })).toEqual([]);
+    expect(codesAt(draft, 'lines.1.discount.amount', { pdfText: 'Rabatt' })).toEqual(['warning:not-in-pdf']);
   });
 
   it('treats null and blank strings as missing', () => {

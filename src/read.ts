@@ -1,5 +1,6 @@
 import { XMLParser } from 'fast-xml-parser';
-import type { InvoiceDraft, InvoiceType, VatCategory } from './model.js';
+import { lineBase, percentAgrees, slackOf } from './calculate.js';
+import type { Allowance, InvoiceDraft, InvoiceType, VatCategory } from './model.js';
 
 type Node = Record<string, any> | string | undefined;
 
@@ -73,19 +74,44 @@ function line(item: Node) {
   };
 }
 
-/** Whether a line states what the invoice model cannot hold and what changes its total: a discount, a surcharge, or a price for several units. */
-const adjusted = (item: Node) =>
-  all(at(item, 'SpecifiedLineTradeSettlement'), 'SpecifiedTradeAllowanceCharge').length > 0 ||
-  ![undefined, 1].includes(number(item, 'SpecifiedLineTradeAgreement', 'NetPriceProductTradePrice', 'BasisQuantity'));
+/**
+ * A line with its discount. The model holds one discount on a line. Several of them, a surcharge or a price for
+ * several units change the total in a way it cannot hold: such a line is `adjusted`. A discount whose percentage,
+ * base and amount disagree in the XML `contradicts` itself (Peppol R040). Its percentage stays only where it gives the
+ * amount from quantity times price as well, so that `check` does not report the same thing twice.
+ */
+function lineOf(item: Node, currency: string | undefined) {
+  const read = line(item);
+  const entries = all(at(item, 'SpecifiedLineTradeSettlement'), 'SpecifiedTradeAllowanceCharge');
+  const perUnit = [undefined, 1].includes(number(item, 'SpecifiedLineTradeAgreement', 'NetPriceProductTradePrice', 'BasisQuantity'));
+  const [entry] = entries;
+  if (entries.length !== 1 || text(entry, 'ChargeIndicator', 'Indicator') !== 'false' || !perUnit) {
+    return { line: read, adjusted: entries.length > 0 || !perUnit, contradicts: false };
+  }
+  const amount = number(entry, 'ActualAmount');
+  const percent = number(entry, 'CalculationPercent');
+  const base = number(entry, 'BasisAmount');
+  const slack = slackOf(currency);
+  const agrees = (from: number | undefined) =>
+    from !== undefined && percent !== undefined && amount !== undefined && percentAgrees(from, percent, amount, slack);
+  const ownBase = read.quantity !== undefined && read.unitPrice !== undefined ? lineBase(read.quantity, read.unitPrice) : undefined;
+  const discount: Allowance = {
+    ...(agrees(ownBase) ? { percent } : {}),
+    ...(amount !== undefined ? { amount } : {}),
+    reason: text(entry, 'Reason') ?? text(entry, 'ReasonCode'),
+  };
+  return { line: { ...read, discount }, adjusted: false, contradicts: percent !== undefined && base !== undefined && !agrees(base) };
+}
 
 /**
  * Reads a UN/CEFACT Cross Industry Invoice (the XML inside a ZUGFeRD 2 / Factur-X PDF) into the invoice model: the
  * inverse of what `createEInvoice` writes. `profile` is the specification identifier (BT-24). `totals` holds the
  * totals the XML states, so `check` reports them when they contradict the lines. `adjustedLines` counts from 0 the
- * lines whose total the XML explains by a discount, a surcharge or a price for several units, which the model does
- * not hold. Throws if the XML is not well-formed or not a Cross Industry Invoice.
+ * lines whose total the XML explains by what the model does not hold: more than one discount, a surcharge or a price
+ * for several units. `contradictions` names the discounts whose percentage, base and amount disagree in the XML.
+ * Throws if the XML is not well-formed or not a Cross Industry Invoice.
  */
-export function readInvoiceXml(xml: string): { profile?: string; invoice: InvoiceDraft; adjustedLines: number[] } {
+export function readInvoiceXml(xml: string): { profile?: string; invoice: InvoiceDraft; adjustedLines: number[]; contradictions: string[] } {
   let root: Node;
   try {
     root = parser.parse(xml, true).CrossIndustryInvoice;
@@ -110,13 +136,14 @@ export function readInvoiceXml(xml: string): { profile?: string; invoice: Invoic
   // The VAT total may be given a second time in the accounting currency (BT-111); the one in the invoice currency counts.
   const vatTotals = all(sums, 'TaxTotalAmount');
   const notes = all(document, 'IncludedNote').map((note) => text(note, 'Content'));
-  const items = all(transaction, 'IncludedSupplyChainTradeLineItem');
+  const lines = all(transaction, 'IncludedSupplyChainTradeLineItem').map((item) => lineOf(item, currency));
 
   // Known limit: document-level allowances and charges (BG-20, BG-21) are not in the model, so an invoice that has them
   // shows up in `check` as totals-mismatch. Add them to the model and to `calculate` when such invoices matter.
   return {
     profile: text(root, 'ExchangedDocumentContext', 'GuidelineSpecifiedDocumentContextParameter', 'ID'),
-    adjustedLines: items.flatMap((item, i) => (adjusted(item) ? [i] : [])),
+    adjustedLines: lines.flatMap((read, i) => (read.adjusted ? [i] : [])),
+    contradictions: lines.flatMap((read, i) => (read.contradicts ? [`lines.${i}.discount.percent`] : [])),
     invoice: {
       number: text(document, 'ID'),
       issueDate: date(document, 'IssueDateTime'),
@@ -142,7 +169,7 @@ export function readInvoiceXml(xml: string): { profile?: string; invoice: Invoic
       prepaidAmount: number(sums, 'TotalPrepaidAmount'),
       seller: party(at(agreement, 'SellerTradeParty'), 'seller'),
       buyer: party(at(agreement, 'BuyerTradeParty'), 'buyer'),
-      lines: items.map(line),
+      lines: lines.map((read) => read.line),
       totals: {
         net: number(sums, 'TaxBasisTotalAmount'),
         vat: number(vatTotals.find((total) => attribute(total, 'currencyID') === currency) ?? vatTotals[0]),

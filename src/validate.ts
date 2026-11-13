@@ -15,6 +15,8 @@ export interface ValidationResult {
   invoice?: InvoiceDraft;
   /** The lines, counted from 0, whose total the XML explains by what the data does not hold; pass them on to `check`. */
   adjustedLines?: number[];
+  /** The discounts whose percentage, base and amount disagree in the XML, by path, e.g. `lines.0.discount.percent`. */
+  contradictions?: string[];
   /** Calculated from the lines of the XML. */
   totals?: Totals;
   findings: Finding[];
@@ -89,8 +91,17 @@ export async function validateEInvoice(pdf: Uint8Array, options: { pdfText?: str
   }
   if (!read) return { isEInvoice, xml, findings };
 
-  const { invoice, profile, adjustedLines } = read;
-  // A line may state what `check` knows nothing of, a discount for one: its total is then explained, see `adjustedLines`.
+  const { invoice, profile, adjustedLines, contradictions } = read;
+  // The data holds one value of such a discount, so `check` cannot see the contradiction: it is reported here.
+  for (const path of contradictions) {
+    findings.push({
+      path,
+      severity: 'error',
+      code: 'xml-discount',
+      message: 'The XML states a percentage, a base and an amount for this discount that do not agree. Ask the issuer for a corrected e-invoice.',
+    });
+  }
+  // A line may state what `check` knows nothing of, a surcharge for one: its total is then explained, see `adjustedLines`.
   const checked = check(invoice, { ...options, adjustedLines });
   // check() words a totals mismatch for data typed in from a PDF; here both sides of the contradiction are in the XML.
   const reworded = (finding: Finding): Finding => {
@@ -99,5 +110,5 @@ export async function validateEInvoice(pdf: Uint8Array, options: { pdfText?: str
     return { ...finding, message };
   };
   findings.push(...checked.findings.map((finding) => (finding.code === 'totals-mismatch' ? reworded(finding) : finding)));
-  return { isEInvoice, profile, xml, invoice, adjustedLines, totals: checked.totals, findings };
+  return { isEInvoice, profile, xml, invoice, adjustedLines, contradictions, totals: checked.totals, findings };
 }

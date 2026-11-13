@@ -1,4 +1,4 @@
-import { calculate, micro, type Totals } from './calculate.js';
+import { calculate, micro, percentAgrees, percentOf, slackOf, type Totals } from './calculate.js';
 import { INVOICE_TYPES, VAT_CATEGORIES, type Invoice, type InvoiceDraft, type VatCategory } from './model.js';
 
 export interface Finding {
@@ -25,8 +25,9 @@ export interface CheckOptions {
   rules?: 'xrechnung';
   /**
    * For data read from an existing e-invoice (`readInvoiceXml`): the lines, counted from 0, whose total its XML
-   * explains by a discount, a surcharge or a price for several units. A line total that is not quantity times price
-   * is then a warning, since the standard does not forbid it, and none at all for these lines.
+   * explains by what the data does not hold: more than one discount, a surcharge or a price for several units. A line
+   * total that is not quantity times price less the discount is then a warning, since the standard does not forbid
+   * it, and none at all for these lines.
    */
   adjustedLines?: number[];
 }
@@ -61,7 +62,12 @@ function withDefaults(draft: InvoiceDraft): Bag {
     d[who].country = upper(d[who].country);
     d[who].vatId = compact(d[who].vatId);
   }
-  d.lines = (Array.isArray(d.lines) ? d.lines : []).map((l: Bag) => ({ unit: 'C62', vatCategory: 'S', ...l }));
+  d.lines = (Array.isArray(d.lines) ? d.lines : []).map((l: Bag) => {
+    const line: Bag = { unit: 'C62', vatCategory: 'S', ...l };
+    // A discount whose fields were all left empty is none.
+    if (line.discount && typeof line.discount === 'object' && Object.keys(line.discount).length === 0) delete line.discount;
+    return line;
+  });
   return d;
 }
 
@@ -153,6 +159,19 @@ export function check(draft: InvoiceDraft, options: CheckOptions = {}): CheckRes
       error(at('netAmount'), 'format', 'Not a number.');
       calculable = false;
     }
+    const discount = line.discount;
+    if (discount !== undefined) {
+      if (discount.percent === undefined && discount.amount === undefined) error(at('discount'), 'discount', 'A discount needs a percentage or an amount.');
+      for (const field of ['percent', 'amount']) {
+        if (discount[field] !== undefined && !isNumber(discount[field])) {
+          error(at(`discount.${field}`), 'format', 'Not a number.');
+          calculable = false;
+        }
+      }
+      if (isNumber(discount.percent) && discount.percent < 0) {
+        error(at('discount.percent'), 'discount', 'A percentage is never negative; the sign comes from the line.');
+      }
+    }
     if (isNumber(line.unitPrice) && line.unitPrice < 0) {
       error(at('unitPrice'), 'negative-price', 'The unit price must not be negative. Use a negative quantity for credits.');
     }
@@ -198,25 +217,45 @@ export function check(draft: InvoiceDraft, options: CheckOptions = {}): CheckRes
     if (totals.due > 0 && d.dueDate === undefined && d.paymentTerms === undefined) {
       error('dueDate', 'payment-terms', 'An invoice with an amount due needs a due date or payment terms.');
     }
-    // The data has no discount on a line that could explain a difference between its total and quantity times price.
-    // Two cents are allowed for rounding, half a forint where a currency has no cents (PEPPOL-EN16931-R120).
-    const slack = d.currency === 'HUF' ? 0.5 : 0.02;
+    // A line total is quantity times price less the discount. Two cents are allowed for rounding, half a forint where
+    // a currency has no cents.
+    const slack = slackOf(d.currency);
     d.lines.forEach((line: Bag, i: number) => {
+      const discount = totals.lineDiscounts[i];
+      if (discount && line.discount.amount !== undefined) {
+        // The amount as the XML gets it, in cents: a stated 9.995 is written as 10.00.
+        const { percent } = line.discount;
+        const { amount } = discount;
+        if (percent !== undefined && !percentAgrees(discount.base, percent, amount, slack)) {
+          error(
+            `lines.${i}.discount.amount`,
+            'discount-mismatch',
+            `${percent} % of ${discount.base.toFixed(2)} is ${percentOf(discount.base, percent).toFixed(2)}, but the discount states ${amount.toFixed(2)}. Correct the percentage or the amount.`,
+          );
+        } else if (percent === undefined && discount.base !== 0 && amount !== 0 && Math.sign(discount.base) !== Math.sign(amount)) {
+          warn(
+            `lines.${i}.discount.amount`,
+            'discount-sign',
+            'The discount and its line have different signs. On a line with a negative amount the discount is negative too: -10 for 10 off.',
+          );
+        }
+      }
       if (!isNumber(line.netAmount)) return;
-      const apart = micro(line.quantity) * micro(line.unitPrice) - micro(totals.lineNet[i]!) * 10n ** 6n;
+      const apart = micro(line.quantity) * micro(line.unitPrice) - (micro(discount?.amount ?? 0) + micro(totals.lineNet[i]!)) * 10n ** 6n;
       if ((apart < 0n ? -apart : apart) <= micro(slack) * 10n ** 6n) return;
-      const [product, stated] = [(line.quantity * line.unitPrice).toFixed(2), totals.lineNet[i]!.toFixed(2)];
+      const expected = (line.quantity * line.unitPrice - (discount?.amount ?? 0)).toFixed(2);
+      const stated = totals.lineNet[i]!.toFixed(2);
       if (!options.adjustedLines) {
         error(
           `lines.${i}.netAmount`,
           'line-net',
-          `Quantity times unit price is ${product}, but the line states ${stated}. Correct the quantity or the price; if the line carries a discount, enter the unit price after the discount.`,
+          `Quantity times unit price${discount ? ' less the discount' : ''} is ${expected}, but the line states ${stated}. Correct the quantity, the price or the discount.`,
         );
       } else if (!options.adjustedLines.includes(i)) {
         warn(
           `lines.${i}.netAmount`,
           'line-net',
-          `The XML states ${stated} as the total of this line, but its quantity times its price is ${product}, and it names no discount or surcharge on the line that explains the difference.`,
+          `The XML states ${stated} as the total of this line, but its quantity times its price${discount ? ' less its discount' : ''} is ${expected}, and it names nothing else on the line that explains the difference.`,
         );
       }
     });
@@ -398,6 +437,13 @@ export function amountSpellings(n: number): string[] {
   return frac === '00' ? [...spellings, int, grouped('.'), grouped(',')] : spellings;
 }
 
+/** The ways a percentage is commonly printed, without whitespace: "10%", "10,0%", "10.00%", "12,345%". */
+export function percentSpellings(p: number): string[] {
+  const own = String(p).split('.')[1]?.length ?? 0;
+  const forms = [own, 1, 2].filter((decimals) => decimals >= own).map((decimals) => p.toFixed(decimals));
+  return [...new Set(forms.flatMap((form) => [`${form}%`, `${form.replace('.', ',')}%`]))];
+}
+
 /**
  * Reports values that the text of the PDF does not contain. Known limit: it tells whether a value stands in the text,
  * not where. An address entered for the wrong party passes, because each of its words stands somewhere on the page.
@@ -440,6 +486,10 @@ function compareWithPdf(d: Bag, totals: Totals | undefined, pdfText: string): Fi
   d.lines.forEach((line: Bag, i: number) => {
     expectWords(`lines.${i}.name`, line.name);
     if (isNumber(line.unitPrice)) expect(`lines.${i}.unitPrice`, amountSpellings(line.unitPrice), line.unitPrice);
+    // What a page prints of a discount: its percentage, from which the amount follows, or else its amount.
+    const discount = line.discount;
+    if (isNumber(discount?.percent)) expect(`lines.${i}.discount.percent`, percentSpellings(discount.percent), `${discount.percent} %`);
+    else if (isNumber(discount?.amount)) expect(`lines.${i}.discount.amount`, amountSpellings(discount.amount), discount.amount);
   });
   if (totals) {
     for (const key of ['net', 'vat', 'gross'] as const) {

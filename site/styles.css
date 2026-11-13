@@ -1063,19 +1063,30 @@ textarea.warned {
   position: relative;
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
-  align-items: end;
-  gap: 0.8rem 0.9rem;
+  gap: 0 0.9rem;
   width: 100%;
   margin: 0;
-  padding: 0.9rem 1rem 1rem;
+  padding: 0.9rem 1rem 0.2rem;
   border: 1px solid var(--line);
   border-radius: var(--radius);
+}
+/* Each field takes three rows of the line item: label, control and hint. Fields side by side share them, so a hint
+   below one field or a label that wraps moves no control beside it. A field here has no further help text. */
+.line > .field {
+  display: grid;
+  grid-row: span 3;
+  grid-template-rows: subgrid;
+  margin-bottom: 0.8rem;
+}
+.line > .field > label {
+  align-self: end;
 }
 /* The button that removes the line item stands beside its first field only: the rows below keep the full width. */
 .line > .field:first-of-type {
   margin-right: 1.6rem;
 }
-/* Quantity, unit and price share a row; the VAT treatment gets a row with room for its wording, the rate beside it. */
+/* Quantity, unit and price share a row, and so do the two ways to state a discount; the VAT treatment gets a row with
+   room for its wording, the rate beside it. */
 .line > .field:nth-of-type(2) {
   grid-column: span 3;
 }
@@ -1085,10 +1096,14 @@ textarea.warned {
 .line > .field:nth-of-type(4) {
   grid-column: span 4;
 }
-.line > .field:nth-of-type(5) {
+.line > .field:nth-of-type(5),
+.line > .field:nth-of-type(6) {
+  grid-column: span 6;
+}
+.line > .field:nth-of-type(7) {
   grid-column: span 8;
 }
-.line > .field:nth-of-type(6) {
+.line > .field:nth-of-type(8) {
   grid-column: span 4;
 }
 /* A line item a model added as a whole. */
@@ -1758,7 +1773,9 @@ html[lang='en']:has([data-lang][aria-pressed='true']) .legal[lang='de'] {
   .line > .field:nth-of-type(n + 2) {
     grid-column: auto;
   }
-  .line > .field:nth-of-type(5) {
+  /* Two columns: the price and the VAT treatment each get a row of their own. */
+  .line > .field:nth-of-type(4),
+  .line > .field:nth-of-type(7) {
     grid-column: 1 / -1;
   }
   .fields {
