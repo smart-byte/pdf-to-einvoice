@@ -1,6 +1,6 @@
 import { isIban } from './check.js';
 import { COUNTRY_NAMES } from './ground.js';
-import type { InvoiceDraft, Line, Party, VatCategory } from './model.js';
+import type { InvoiceDraft, InvoiceType, Line, Party, VatCategory } from './model.js';
 
 // Known limit: patterns for German, English and French invoices, no model. A value is believed for what it fits to, not
 // for where it stands: the totals are three printed amounts with net + VAT = gross, the items are rows that add up to
@@ -198,8 +198,17 @@ const KEY_VALUE = /\S\s*:\s*\S|^\p{L}[\p{L}.-]*\s+\d[\d ]{7,}$/u;
 /** A date or an amount of money: no line of an address holds one. */
 const DATE_OR_AMOUNT = /\d{1,2}[./]\d{1,2}[./]\d{2,4}|\d{4}-\d{2}-\d{2}|\d[.,]\d{2}(?!\d)/;
 /** The title of the document, alone or at the end of a cell ("Ihre Rechnung"), and with its number ("Rechnung 2301"). */
-const TITLE = /(?:^|\s)(?:Rechnung|Invoice|Facture)$/i;
-const NAMED = /^(?:Rechnung|Invoice|Facture|Avoir)[ \t]+([A-Z]{0,3}[-/]?\d{2,}[\w/-]*)$/i;
+/** The words that title an invoice, also as the end of a longer one ("Teilrechnung"). */
+const TITLE_WORD = '\\p{L}*rechnung|rechnungskorrektur|gutschrift|(?:partial|prepayment|advance|corrected)\\s+invoice|invoice|facture|avoir|credit\\s+note';
+const TITLE = new RegExp(`(?:^|\\s)(?:${TITLE_WORD})$`, 'iu');
+const NAMED = new RegExp(`^(${TITLE_WORD})[ \\t]+([A-Z]{0,3}[-/]?\\d{2,}[\\w/-]*)$`, 'iu');
+/** The kinds of invoice a title names. A "Gutschrift" may be a credit note or an invoice the buyer issued, and stays open. */
+const TYPES: [RegExp, InvoiceType][] = [
+  [/^(?:teilrechnung|partial\s+invoice)$/i, '326'],
+  [/^(?:(?:abschlags|anzahlungs|vorauszahlungs)rechnung|(?:prepayment|advance)\s+invoice)$/i, '386'],
+  [/^(?:(?:storno|korrektur)rechnung|rechnungskorrektur|corrected\s+invoice)$/i, '384'],
+  [/^(?:credit\s+note|avoir)$/i, '381'],
+];
 const SALUTATION = /^(?:herrn?|frau|mr\.?|mrs\.?|ms\.?|monsieur|madame|mme\.?)$/i;
 const LEGAL_FORM = /(?:^|\s)(?:gmbh|mbh|ag|kg|ohg|gbr|e\.\s?[vk]\.|a\.\s?g\.|ltd\.?|inc\.?|llc|plc|sarl|sas|s\.a\.|b\.v\.)(?=\s|$)|&\s*co\b/i;
 /** What only the issuer prints about itself: its tax number and its entry in the commercial register. */
@@ -689,6 +698,7 @@ const PERIOD = new RegExp(
   `${SEPARATOR}(?:Q([1-4])[ /]?(\\d{4})|([1-4])\\.\\s?Quartal\\s+(\\d{4})|${DOTTED}\\s*(?:-|–|bis|to)\\s*${DOTTED}|${MONTH}\\s+(\\d{4})|(\\d{1,2})[./-](\\d{4})(?!\\d)|(\\d{4})-(\\d{2})(?![-\\d]))`,
   'i',
 );
+const MONTH_RANGE = new RegExp(`${SEPARATOR}${MONTH}\\s+(\\d{4})\\s*(?:-|–|bis|to|until)\\s*${MONTH}\\s+(\\d{4})`, 'i');
 const MONTH_ROW = new RegExp(`^${MONTH}\\s+(\\d{4})$`, 'i');
 /** The label of payment terms: what follows it is the terms, whatever words they use. */
 const TERMS_LABEL =
@@ -738,6 +748,11 @@ function readPeriod(text: string, rows: string[]): { periodStart?: string; perio
     if (from < 1 || to > 12) return undefined;
     return { periodStart: `${year}-${pad(from)}-01`, periodEnd: `${year}-${pad(to)}-${new Date(Date.UTC(Number(year), to, 0)).getUTCDate()}` };
   };
+  // "September 2026 bis Januar 2027": from the first day of the one month to the last day of the other.
+  for (const { hit: m } of after(text, PERIOD_LABEL, MONTH_RANGE)) {
+    const [from, to] = [months(m[2]!, monthNumber(m[1]!), monthNumber(m[1]!)), months(m[4]!, monthNumber(m[3]!), monthNumber(m[3]!))];
+    if (from && to && from.periodStart < to.periodEnd) return { periodStart: from.periodStart, periodEnd: to.periodEnd };
+  }
   for (const { hit: m } of after(text, PERIOD_LABEL, PERIOD)) {
     const quarter = Number(m[1] ?? m[3]);
     const period = quarter
@@ -782,10 +797,19 @@ function readNumber(searched: string, rows: string[]): { number?: string; dated?
   const titles = rows.map(cells).filter((parts) => parts.some((cell) => TITLE.test(cell) || NAMED.test(cell)));
   const dated = labelled && after(searched, new RegExp(`${escape(labelled.hit[1]!)}\\s+(?:vom|von|issued\\s+(?:at|on)|dated|du|of)`), DATE)[0]?.hit;
   return {
-    number: labelled?.hit[1]!.replace(/ /g, '') ?? titles.flatMap((parts) => parts.map((cell) => NAMED.exec(cell)?.[1])).find(Boolean),
+    number: labelled?.hit[1]!.replace(/ /g, '') ?? titles.flatMap((parts) => parts.map((cell) => NAMED.exec(cell)?.[2])).find(Boolean),
     dated: date(dated),
     beside: titles.flatMap((parts) => parts.map((cell) => date(DATE.exec(cell)))).find(Boolean),
   };
+}
+
+/** The kind of invoice the title names: the first cell that is a title, alone or with the number. */
+function readType(rows: string[]): InvoiceType | undefined {
+  const title = rows
+    .flatMap(cells)
+    .map((cell) => (TITLE.exec(cell)?.index === 0 ? cell : NAMED.exec(cell)?.[1]))
+    .find(Boolean);
+  return title ? TYPES.find(([pattern]) => pattern.test(title))?.[1] : undefined;
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -998,6 +1022,7 @@ export function guessFromText(text: string, options: GuessOptions = {}): Invoice
   const contact = readContact(searched, options.blocks !== undefined, found);
   return prune({
     number,
+    typeCode: readType(rows),
     buyerReference: readBuyerReference(searched),
     issueDate:
       date(/rechnungs-?datum|belegdatum|invoice\s+date|date\s+of\s+issue|issue\s+date|date\s+de\s+(?:la\s+)?facture|date\s+d['’]émission/) ??

@@ -166,3 +166,34 @@ describe('guessFromText with units', () => {
     expect(guessFromText(text).lines?.map((line) => line.unit)).toEqual([undefined, 'C62']);
   });
 });
+
+describe('guessFromText with the title of the document', () => {
+  it('reads number and date after a title such as Teilrechnung, and the kind of invoice it names', () => {
+    const titles: [string, string | undefined][] = [
+      ['Teilrechnung', '326'],
+      ['Abschlagsrechnung', '386'],
+      ['Stornorechnung', '384'],
+      ['Rechnungskorrektur', '384'],
+      ['Credit note', '381'],
+      ['Rechnung', undefined],
+      ['Schlussrechnung', undefined],
+      // A Gutschrift may be a credit note or an invoice that the buyer issued: a person says which.
+      ['Gutschrift', undefined],
+    ];
+    for (const [title, type] of titles) {
+      const guess = guessFromText(`${title} 2026-13   6. Oktober 2026\nNettobetrag   100,00 €`);
+      expect(guess, title).toMatchObject({ number: '2026-13', issueDate: '2026-10-06' });
+      expect(guess.typeCode, title).toBe(type);
+    }
+  });
+
+  it('takes the kind of invoice from the title only, not from a document the text names', () => {
+    const guess = guessFromText('Rechnung 2026-14   6. Oktober 2026\nDiese Rechnung ersetzt die Stornorechnung 2026-12.');
+    expect(guess).toMatchObject({ number: '2026-14' });
+    expect(guess.typeCode).toBeUndefined();
+  });
+
+  it('reads a service period over several months', () => {
+    expect(guessFromText('Leistungszeitraum: September 2026 bis Januar 2027')).toMatchObject({ periodStart: '2026-09-01', periodEnd: '2027-01-31' });
+  });
+});
