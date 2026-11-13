@@ -139,6 +139,20 @@ describe('check', () => {
     expect(at(49.93)).toEqual(['error:discount-mismatch']);
   });
 
+  it('compares the discount the XML gets, in cents, with its percentage', () => {
+    // 9.995 is two cents from 10 % of 99.75 (9.975), but the XML gets 10.00, which is 0.025 off.
+    const at = (amount: number) =>
+      codesAt(
+        withChange((d) => {
+          delete d.totals;
+          Object.assign(d.lines[1], { quantity: 1, unitPrice: 99.75, discount: { percent: 10, amount } });
+        }),
+        'lines.1.discount.amount',
+      );
+    expect(at(9.995)).toEqual(['error:discount-mismatch']);
+    expect(at(9.99)).toEqual([]);
+  });
+
   it('warns about a fixed discount whose sign differs from its line', () => {
     const at = (quantity: number, amount: number) =>
       codesAt(

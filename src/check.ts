@@ -25,8 +25,9 @@ export interface CheckOptions {
   rules?: 'xrechnung';
   /**
    * For data read from an existing e-invoice (`readInvoiceXml`): the lines, counted from 0, whose total its XML
-   * explains by a discount, a surcharge or a price for several units. A line total that is not quantity times price
-   * is then a warning, since the standard does not forbid it, and none at all for these lines.
+   * explains by what the data does not hold: more than one discount, a surcharge or a price for several units. A line
+   * total that is not quantity times price less the discount is then a warning, since the standard does not forbid
+   * it, and none at all for these lines.
    */
   adjustedLines?: number[];
 }
@@ -222,7 +223,9 @@ export function check(draft: InvoiceDraft, options: CheckOptions = {}): CheckRes
     d.lines.forEach((line: Bag, i: number) => {
       const discount = totals.lineDiscounts[i];
       if (discount && line.discount.amount !== undefined) {
-        const { percent, amount } = line.discount;
+        // The amount as the XML gets it, in cents: a stated 9.995 is written as 10.00.
+        const { percent } = line.discount;
+        const { amount } = discount;
         if (percent !== undefined && !percentAgrees(discount.base, percent, amount, slack)) {
           error(
             `lines.${i}.discount.amount`,
