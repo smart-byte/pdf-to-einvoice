@@ -435,6 +435,13 @@ export function amountSpellings(n: number): string[] {
   return frac === '00' ? [...spellings, int, grouped('.'), grouped(',')] : spellings;
 }
 
+/** The ways a percentage is commonly printed, without whitespace: "10%", "10,0%", "10.00%", "12,345%". */
+export function percentSpellings(p: number): string[] {
+  const own = String(p).split('.')[1]?.length ?? 0;
+  const forms = [own, 1, 2].filter((decimals) => decimals >= own).map((decimals) => p.toFixed(decimals));
+  return [...new Set(forms.flatMap((form) => [`${form}%`, `${form.replace('.', ',')}%`]))];
+}
+
 /**
  * Reports values that the text of the PDF does not contain. Known limit: it tells whether a value stands in the text,
  * not where. An address entered for the wrong party passes, because each of its words stands somewhere on the page.
@@ -477,6 +484,10 @@ function compareWithPdf(d: Bag, totals: Totals | undefined, pdfText: string): Fi
   d.lines.forEach((line: Bag, i: number) => {
     expectWords(`lines.${i}.name`, line.name);
     if (isNumber(line.unitPrice)) expect(`lines.${i}.unitPrice`, amountSpellings(line.unitPrice), line.unitPrice);
+    // What a page prints of a discount: its percentage, from which the amount follows, or else its amount.
+    const discount = line.discount;
+    if (isNumber(discount?.percent)) expect(`lines.${i}.discount.percent`, percentSpellings(discount.percent), `${discount.percent} %`);
+    else if (isNumber(discount?.amount)) expect(`lines.${i}.discount.amount`, amountSpellings(discount.amount), discount.amount);
   });
   if (totals) {
     for (const key of ['net', 'vat', 'gross'] as const) {

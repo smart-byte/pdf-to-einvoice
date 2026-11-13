@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { check } from '../src/check.js';
+import { check, percentSpellings } from '../src/check.js';
 import type { InvoiceDraft } from '../src/model.js';
 
 const sample = (): InvoiceDraft => JSON.parse(readFileSync(new URL('../examples/sample-invoice.json', import.meta.url), 'utf8'));
@@ -151,6 +151,30 @@ describe('check', () => {
     expect(at(-2, 50)).toEqual(['warning:discount-sign']);
     expect(at(-2, -50)).toEqual([]);
     expect(at(0, 5)).toEqual([]);
+  });
+
+  it('spells a percentage the ways a page prints it', () => {
+    expect(percentSpellings(10)).toEqual(expect.arrayContaining(['10%', '10,00%', '10.0%']));
+    expect(percentSpellings(12.345)).toEqual(expect.arrayContaining(['12,345%', '12.345%']));
+  });
+
+  it('looks for the percentage of a discount on the page, never for the amount derived from it', () => {
+    const draft = withChange((d) => {
+      delete d.totals;
+      d.lines[1].discount = { percent: 10, amount: 49.9 };
+    });
+    expect(codesAt(draft, 'lines.1.discount.percent', { pdfText: 'Rabatt 10 %' })).toEqual([]);
+    expect(codesAt(draft, 'lines.1.discount.amount', { pdfText: 'Rabatt 10 %' })).toEqual([]);
+    expect(codesAt(draft, 'lines.1.discount.percent', { pdfText: 'Rabatt' })).toEqual(['warning:not-in-pdf']);
+  });
+
+  it('looks for the amount of a discount that has no percentage', () => {
+    const draft = withChange((d) => {
+      delete d.totals;
+      d.lines[1].discount = { amount: 37.5 };
+    });
+    expect(codesAt(draft, 'lines.1.discount.amount', { pdfText: 'Rabatt 37,50' })).toEqual([]);
+    expect(codesAt(draft, 'lines.1.discount.amount', { pdfText: 'Rabatt' })).toEqual(['warning:not-in-pdf']);
   });
 
   it('treats null and blank strings as missing', () => {
