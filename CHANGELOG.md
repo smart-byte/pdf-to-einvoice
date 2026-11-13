@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- A discount on a line item (`discount`): a percentage, an amount or both, with a reason. It is checked, written into
+  the XML, read back from an e-invoice and entered in the web app.
+
 ### Fixed
 
 - `guessFromText` no longer takes the customer's VAT ID or the seller's own address for the other party, nor a
