@@ -1,5 +1,6 @@
 import { isIban } from './check.js';
-import type { InvoiceDraft, Line, Party, VatCategory } from './model.js';
+import { COUNTRY_NAMES } from './ground.js';
+import type { InvoiceDraft, InvoiceType, Line, Party, VatCategory } from './model.js';
 
 // Known limit: patterns for German, English and French invoices, no model. A value is believed for what it fits to, not
 // for where it stands: the totals are three printed amounts with net + VAT = gross, the items are rows that add up to
@@ -19,7 +20,10 @@ const DATE = new RegExp(
 );
 const MONEY = "(-?\\d{1,3}(?:[.,' ]\\d{3})*[.,]\\d{2}|-?\\d+[.,]\\d{2})";
 const CURRENCY = '(?:€|EUR|US\\$|\\$|USD|£|GBP|CHF)';
-const AMOUNT = new RegExp(`${SEPARATOR}(?:\\d{1,2}(?:[.,]\\d+)?\\s*%\\s*)?(?:in\\s+)?${CURRENCY}?\\s*${MONEY}(?![.,]?\\d)`);
+// A label may go on with a word in brackets: "Zwischensumme (netto)". A code such as the category in "USt (S)" is no word.
+const AMOUNT = new RegExp(
+  `${SEPARATOR}(?:\\([A-Za-zÄÖÜäöüß]{3,}[^)\\d]*\\)\\s*)?(?:\\d{1,2}(?:[.,]\\d+)?\\s*%\\s*)?(?:in\\s+)?${CURRENCY}?\\s*${MONEY}(?![.,]?\\d)`,
+);
 
 const pad = (n: string | number) => String(n).padStart(2, '0');
 const century = (year: string) => (year.length === 2 ? `20${year}` : year);
@@ -99,14 +103,29 @@ const CURRENCY_SIGNS: [RegExp, string][] = [
   [/\bCHF\b/, 'CHF'],
 ];
 
-/** The currency after its label, or the one currency the page shows. A page with two does not tell which one the invoice is in. */
+/**
+ * The currency after its label, or the one currency the page shows. A page with two, such as one that also gives the
+ * VAT in euros, is in the one currency of its totals; where they do not tell either, it stays unread.
+ */
 function findCurrency(text: string): string | undefined {
-  const shown = CURRENCY_SIGNS.filter(([pattern]) => pattern.test(text));
-  return after(text, /währung|currency|devise/, new RegExp(`${SEPARATOR}([A-Z]{3})\\b`))[0]?.hit[1] ?? (shown.length === 1 ? shown[0]![1] : undefined);
+  const shown = (part: string) => CURRENCY_SIGNS.filter(([pattern]) => pattern.test(part)).map(([, code]) => code);
+  const [onPage, inTotals] = [
+    shown(text),
+    shown(
+      text
+        .split('\n')
+        .filter((row) => TOTALS_ROW.test(row))
+        .join('\n'),
+    ),
+  ];
+  const one = onPage.length === 1 ? onPage : inTotals.length === 1 ? inTotals : [];
+  return after(text, /währung|currency|devise/, new RegExp(`${SEPARATOR}([A-Z]{3})\\b`))[0]?.hit[1] ?? one[0];
 }
 
 const VAT_ID_LABEL =
   /ust\.?-?\s?id\.?-?\s?(?:nr\.?)?|umsatzsteuer-?\s?id(?:entifikationsnummer)?|uid(?:-nr\.?)?|vat[\s-]*(?:id|reg(?:istration)?\.?)?\s*(?:no\.?|number)?|(?:n°\s*)?tva(?:\s+intracom\w*)?(?:\s+client)?/;
+/** A line that starts with the label of a VAT ID, with or without a colon: "USt-IdNr. ATU12345678". */
+const VAT_ID_LINE = new RegExp(`^(?:${VAT_ID_LABEL.source})\\s*:?\\s*[A-Z]{2}`, 'i');
 /** A German VAT ID has a shape of its own, DE and nine digits. An IBAN goes on with digits, a SEPA creditor ID with letters. */
 const GERMAN_VAT_ID = /(?<![A-Z0-9])DE(?: ?\d){9}(?! ?\d)/g;
 /** What stands before the label of a VAT ID that is the customer's ("Ihre USt-IdNr."), or ends it ("N° TVA client"). */
@@ -133,8 +152,8 @@ function vatIdsIn(text: string): { id: string; customer: boolean }[] {
 const cells = (row: string) => row.split(/\s{3,}(?!:)/).map((cell) => cell.trim());
 /** "Name · Street 1 · 12345 City", also written with dashes, bars or dots. */
 const SENDER_SEPARATOR = /\s[·|•●–—-]\s/;
-/** "12345 Musterstadt", "DE-12345 Musterstadt", "D-12345 Musterstadt", "DE 12345 Musterstadt". */
-const POSTAL = /^(?:([A-Z]{1,2})[- ])?(\d{4,5})\s+(\p{L}.*)$/u;
+/** "12345 Musterstadt", "DE-12345 Musterstadt", "D-12345 Musterstadt", "DE 12345 Musterstadt", and the Dutch "1234 AB Voorbeeldstad". */
+const POSTAL = /^(?:([A-Z]{1,2})[- ])?(\d{4} [A-Z]{2}(?= )|\d{4,5})\s+(\p{L}.*)$/u;
 /** "Dover, DE 19901", with the country in front ("USA – Dover, DE 19901") or behind ("Dover, DE 19901, USA"). */
 const US_PLACE =
   /^(?:(?:USA|United States(?: of America)?)\s[–—-]\s)?([\p{L} .'-]+),\s[A-Z]{2}\s(\d{5}(?:-\d{4})?)(?:,\s(?:USA|United States(?: of America)?))?$/u;
@@ -143,6 +162,9 @@ const EU = new Set('AT BE BG CY CZ DE DK EE ES FI FR GR HR HU IE IT LT LU LV MT 
 const COUNTRY_PREFIX: Record<string, string> = { D: 'DE', A: 'AT', F: 'FR', B: 'BE', L: 'LU', CH: 'CH' };
 /** VAT IDs start with the country code, except that Greece writes EL. */
 const countryOfVatId = (vatId: string | undefined) => (vatId ? vatId.slice(0, 2).replace('EL', 'GR') : undefined);
+
+/** The country a line names and nothing else, as "ÖSTERREICH" below an address. */
+const countryNamed = (line: string | undefined) => Object.entries(COUNTRY_NAMES).find(([, names]) => names.includes(line?.trim().toLowerCase() ?? ''))?.[0];
 
 /** Postal code, city and country, from the last line of an address. */
 function placeOf(line: string): Partial<Party> | undefined {
@@ -176,12 +198,25 @@ const KEY_VALUE = /\S\s*:\s*\S|^\p{L}[\p{L}.-]*\s+\d[\d ]{7,}$/u;
 /** A date or an amount of money: no line of an address holds one. */
 const DATE_OR_AMOUNT = /\d{1,2}[./]\d{1,2}[./]\d{2,4}|\d{4}-\d{2}-\d{2}|\d[.,]\d{2}(?!\d)/;
 /** The title of the document, alone or at the end of a cell ("Ihre Rechnung"), and with its number ("Rechnung 2301"). */
-const TITLE = /(?:^|\s)(?:Rechnung|Invoice|Facture)$/i;
-const NAMED = /^(?:Rechnung|Invoice|Facture|Avoir)[ \t]+([A-Z]{0,3}[-/]?\d{2,}[\w/-]*)$/i;
+/** The words that title an invoice, also as the end of a longer one ("Teilrechnung"). */
+const TITLE_WORD = '\\p{L}*rechnung|rechnungskorrektur|gutschrift|(?:partial|prepayment|advance|corrected)\\s+invoice|invoice|facture|avoir|credit\\s+note';
+const TITLE = new RegExp(`(?:^|\\s)(?:${TITLE_WORD})$`, 'iu');
+const NAMED = new RegExp(`^(${TITLE_WORD})[ \\t]+([A-Z]{0,3}[-/]?\\d{2,}[\\w/-]*)$`, 'iu');
+/** The kinds of invoice a title names. A "Gutschrift" may be a credit note or an invoice the buyer issued, and stays open. */
+const TYPES: [RegExp, InvoiceType][] = [
+  [/^(?:teilrechnung|partial\s+invoice)$/i, '326'],
+  [/^(?:(?:abschlags|anzahlungs|vorauszahlungs)rechnung|(?:prepayment|advance)\s+invoice)$/i, '386'],
+  [/^(?:(?:storno|korrektur)rechnung|rechnungskorrektur|corrected\s+invoice)$/i, '384'],
+  [/^(?:credit\s+note|avoir)$/i, '381'],
+];
 const SALUTATION = /^(?:herrn?|frau|mr\.?|mrs\.?|ms\.?|monsieur|madame|mme\.?)$/i;
 const LEGAL_FORM = /(?:^|\s)(?:gmbh|mbh|ag|kg|ohg|gbr|e\.\s?[vk]\.|a\.\s?g\.|ltd\.?|inc\.?|llc|plc|sarl|sas|s\.a\.|b\.v\.)(?=\s|$)|&\s*co\b/i;
 /** What only the issuer prints about itself: its tax number and its entry in the commercial register. */
 const ISSUER_SIGNS = /steuer-?(?:nr|nummer)|\bst\.?-?nr|tax\s+(?:number|no\b)|\bhr[ab]\b|amtsgericht|registergericht|handelsregister|siret/i;
+/** What only the issuer prints beside its VAT ID: its numbers and its bank account. */
+const ISSUER_OR_BANK = new RegExp(`${ISSUER_SIGNS.source}|\\b(?:iban|bic)\\b`, 'i');
+/** What a footer lists beside the issuer's name: its numbers, its VAT ID and its bank account. */
+const IDENTIFIERS = new RegExp(`${ISSUER_OR_BANK.source}|\\b(?:${VAT_ID_LABEL.source})`, 'i');
 
 function roleOf(line: string): Role | undefined {
   return BUYER_HEADING.test(line) ? 'buyer' : SELLER_HEADING.test(line) ? 'seller' : OTHER_HEADING.test(line) ? 'other' : undefined;
@@ -196,7 +231,12 @@ interface Found {
   sender?: boolean;
   /** The labelled lines right below it, which may hold its VAT ID or tax number. */
   tail: string;
+  /** The page spells it twice with its words broken apart differently: its words are not believed. */
+  broken?: boolean;
 }
+
+/** The words of an address. */
+const WORDS = ['name', 'contactName', 'street', 'city'] as const;
 
 /**
  * The addresses of one column: the lines above a line with postal code and city, up to three of them, or up to five
@@ -237,8 +277,11 @@ function addressesIn(lines: string[]): Found[] {
     const under = climb(true);
     const { above, role } = under.role ? under : climb(false);
     if (above.length < 2) return;
+    // An address abroad may name its country in a line of its own, below the place.
+    const country = countryNamed(lines[i + 1]);
     const tail: string[] = [];
-    for (let k = i + 1; k < lines.length && tail.length < 4 && KEY_VALUE.test(lines[k]!); k++) tail.push(lines[k]!);
+    for (let k = i + (country ? 2 : 1); k < lines.length && tail.length < 4 && (KEY_VALUE.test(lines[k]!) || VAT_ID_LINE.test(lines[k]!)); k++)
+      tail.push(lines[k]!);
     const [first, second] = above.length >= 3 ? above : [above[0]!];
     // "Herrn" above a name and a second line with the legal form belong to the name; another second line names a person.
     const joined = second !== undefined && (SALUTATION.test(first!) || LEGAL_FORM.test(second));
@@ -249,6 +292,7 @@ function addressesIn(lines: string[]): Found[] {
       contactName: joined || mixed ? undefined : second,
       street: mixed ? undefined : above.at(-1),
       ...place,
+      country: country ?? place.country,
     };
     found.push({ party, role, tail: tail.join('\n') });
   });
@@ -288,9 +332,31 @@ function readParties(rows: string[], blocks: string[][]): { seller?: Found; buye
     ([party.name, party.contactName, party.street].includes(seller.party.name) ||
       (party.street !== undefined && party.street === seller.party.street && party.postalCode === seller.party.postalCode));
   const labelled = addresses.filter((found) => found.role === 'buyer');
-  const left = labelled.length ? labelled : addresses.filter((found) => found.role === undefined && !isSellers(found));
-  return { seller, buyer: new Set(left.map((found) => found.party.name)).size === 1 ? left[0] : undefined };
+  // A name that stands beside a VAT ID, a tax number or a bank account, as in a footer, is the issuer's, even where
+  // nothing else makes it the seller.
+  const issuer = ({ party }: Found) => rows.some((row) => row.includes(party.name!) && IDENTIFIERS.test(row));
+  const left = labelled.length ? labelled : addresses.filter((found) => found.role === undefined && !isSellers(found) && !issuer(found));
+  const buyer = new Set(left.map((found) => found.party.name)).size === 1 ? left[0] : undefined;
+
+  // An address may stand twice on a page, say in the letterhead and in the footer. Copies that differ in their spaces
+  // only show that the text breaks words apart where the print does not, as some PDFs space their letters.
+  const squeezed = (value?: string) => value?.replace(/\s+/g, '');
+  const checked = (found?: Found) =>
+    found &&
+    (found.party.postalCode !== undefined &&
+    [...senders, ...addresses].some(
+      ({ party }) =>
+        party.postalCode === found.party.postalCode &&
+        WORDS.some((key) => party[key] !== undefined && party[key] !== found.party[key] && squeezed(party[key]) === squeezed(found.party[key])),
+    )
+      ? { ...found, broken: true }
+      : found);
+  return { seller: checked(seller), buyer: checked(buyer) };
 }
+
+/** What an address says, without its words where the page breaks them apart. */
+const believed = (found?: Found): Partial<Party> =>
+  found?.broken ? Object.fromEntries(Object.entries(found.party).filter(([key]) => !(WORDS as readonly string[]).includes(key))) : { ...found?.party };
 
 // ---------------------------------------------------------------------------------------------------------------
 // Totals
@@ -308,7 +374,7 @@ const GROSS_LABEL = new RegExp(
 );
 /** A row that sums up: it starts with a word for a total ("Taxi" and "Nettopreis" are none), or a cell of it is one ("Positionssumme", "Zahlbetrag", "Total HT"). */
 const TOTALS_ROW =
-  /^(?:\d{1,2}(?:[.,]\d+)?\s?%\s*)?(?:(?:netto|brutto|gesamt)(?:betrag|summe)?|zwischensumme|summe|mwst|ust|umsatzsteuer|mehrwertsteuer|rechnungsbetrag|endbetrag|zzgl|total|subtotal|vat|tax(?:es)?|tva|übertrag)\b/i;
+  /^(?:\d{1,2}(?:[.,]\d+)?\s?%\s*)?(?:(?:netto|brutto|gesamt)(?:betrag|summe)?|zwischensumme|summe|mwst|ust|umsatzsteuer|mehrwertsteuer|rechnungsbetrag|endbetrag|zzgl|total|subtotal|net\s+(?:amount|total)|vat|tax(?:es)?|tva|übertrag)\b/i;
 const TOTALS_CELL = /(?:summe|betrag)(?![\p{L}])|\btotal\b/iu;
 /** An amount that stands on its own: not part of a date, a longer number or a percentage. */
 const PRINTED_AMOUNT = new RegExp(`(?<![\\d.,])${MONEY}(?![.,]?\\d)(?!\\s?%)`, 'g');
@@ -337,6 +403,8 @@ function readTotals(searched: string, text: string): Totals {
   const [net, vat, gross] = [hits.net[0], hits.vat[0], hits.gross[0]];
   const first = { net: net === undefined ? net : net / 100, vat: vat === undefined ? vat : vat / 100, gross: gross === undefined ? gross : gross / 100 };
   if (net !== undefined && vat !== undefined && net + vat === gross) return first;
+  // The same amount as net and as gross, and no VAT: an invoice without VAT, whatever else adds up on the page.
+  if (net !== undefined && net === gross && vat === undefined) return { net: first.net, gross: first.gross };
 
   const printed = new Set([...text.matchAll(PRINTED_AMOUNT)].map((match) => cents(toNumber(match[1]!))));
   const sums: { net: number; vat: number; gross: number; score: number }[] = [];
@@ -372,8 +440,13 @@ const UNITS: [RegExp, string][] = [
   [/^(l|liter|litre)(\(?s\)?)?\.?$/i, 'LTR'],
   [/^(m²|qm)\.?$/i, 'MTK'],
   [/^m\.?$/i, 'MTR'],
-  [/^(pauschal|psch)\.?$/i, 'LS'],
+  [/^(pauschal|psch|flat(?: rate)?|lump sum)\.?$/i, 'LS'],
+  [/^km\.?$/i, 'KMT'],
+  [/^(wochen?|weeks?)\.?$/i, 'WEE'],
+  [/^(stk|stück|st|pcs?|pieces?|units?|unit\(s\))\.?$/i, 'C62'],
 ];
+/** The code of a printed unit. A quantity without one counts pieces; a unit not listed here stays open. */
+const unitOf = (mark: string) => (mark === '' ? 'C62' : UNITS.find(([pattern]) => pattern.test(mark))?.[1]);
 const MONEY_CELL = new RegExp(`^[€$£]?\\s*${MONEY}\\s*${CURRENCY}?$`);
 const RATE_CELL = /^\(?(\d{1,2}(?:[.,]\d+)?)\s?%\)?$/;
 const QUANTITY_CELL = /^(-?\d+(?:[.,]\d+)?)\s*(\p{L}+\.?)?$/u;
@@ -414,7 +487,13 @@ interface Figure {
  */
 function itemOf(parts: string[], table: number): Item {
   const numbered = /^\d{1,3}\.?$/.test(parts[0]!);
-  const before = parts.slice(numbered ? 1 : 0, -1);
+  // A unit in a column of its own belongs to the quantity before it: "8   Std.".
+  const before = parts.slice(numbered ? 1 : 0, -1).reduce<string[]>((joined, cell) => {
+    const last = joined.at(-1);
+    if (last !== undefined && /^-?\d+(?:[.,]\d+)?$/.test(last) && UNITS.some(([pattern]) => pattern.test(cell))) joined[joined.length - 1] = `${last} ${cell}`;
+    else joined.push(cell);
+    return joined;
+  }, []);
   const name = before.find((cell) => !RATE_CELL.test(cell) && !MONEY_CELL.test(cell) && !QUANTITY_CELL.test(cell));
   const figures: Figure[] = before
     .filter((cell) => cell !== name && /^\(?[€$£]?\s*-?\d/.test(cell))
@@ -433,7 +512,7 @@ function itemOf(parts: string[], table: number): Item {
   }
 
   // Nothing but the total, or the total once more: one unit at that price.
-  if (others.every((figure) => cents(figure.value) === cents(item.total))) return { ...item, quantity: 1, unitPrice: item.total };
+  if (others.every((figure) => cents(figure.value) === cents(item.total))) return { ...item, quantity: 1, unit: 'C62', unitPrice: item.total };
   const isPrice = (figure: Figure) => IS_CURRENCY.test(figure.mark);
   const hasUnit = (figure: Figure) => figure.mark !== '' && !isPrice(figure);
   for (const [i, a] of others.entries()) {
@@ -442,7 +521,7 @@ function itemOf(parts: string[], table: number): Item {
       // Known limit: where neither a currency nor a unit nor a whole number tells, the quantity is taken to come first.
       const swap = isPrice(a) || hasUnit(b) || (!hasUnit(a) && !isPrice(b) && !Number.isInteger(a.value) && Number.isInteger(b.value));
       const [quantity, price] = swap ? [b, a] : [a, b];
-      return { ...item, quantity: quantity.value, unit: UNITS.find(([pattern]) => pattern.test(quantity.mark))?.[1], unitPrice: price.value };
+      return { ...item, quantity: quantity.value, unit: unitOf(quantity.mark), unitPrice: price.value };
     }
   }
   // No two numbers give the total, e.g. because of a discount or a rounded quantity: both stay open.
@@ -471,6 +550,16 @@ function runOf(items: Item[], total: number | undefined): Item[] | undefined {
     }
   }
   return best;
+}
+
+/** "80,00 € 960,00 €": price and total set so close that they share a cell. Each amount is a cell of its own. */
+function splitAmounts(cell: string): string[] {
+  const parts: string[] = [];
+  for (const word of cell.split(' ')) {
+    if (parts.length && MONEY_CELL.test(`${parts.at(-1)} ${word}`)) parts[parts.length - 1] += ` ${word}`;
+    else parts.push(word);
+  }
+  return parts.length > 1 && parts.every((part) => MONEY_CELL.test(part)) ? parts : [cell];
 }
 
 /** Joins the lines a text wraps into: with a space, or without one where a hyphen holds two of them together ("Wartungs-", "Vertrag"). */
@@ -519,7 +608,7 @@ function readItems(rows: string[], totals: Totals, blocks: string[][] | undefine
   return lines.map((line) => ({
     name: line.name || undefined,
     quantity: line.quantity,
-    unit: line.unit ?? 'C62',
+    unit: line.unit,
     unitPrice: line.unitPrice,
     vatCategory: 'S' as VatCategory,
     vatRate: rated ? line.vatRate : undefined,
@@ -549,7 +638,7 @@ function itemsThatAddUp(
     loose = [];
   };
   for (const row of rows) {
-    const all = cells(row);
+    const all = cells(row).flatMap(splitAmounts);
     // A row may end with a cell of the column beside the table.
     const parts = all.slice(0, lastIndex(all, (cell) => MONEY_CELL.test(cell)) + 1);
     if (TOTALS_ROW.test(row) || all.some((cell) => TOTALS_CELL.test(cell))) {
@@ -608,6 +697,15 @@ function itemsThatAddUp(
   return withVat && { run: withVat, inclusive: true };
 }
 
+/** What the printed reason for charging no VAT says the sale is. The exemptions of § 4 UStG other than 1a and 1b are E. */
+const NOTE_CATEGORIES: [RegExp, VatCategory][] = [
+  [/innergemeinschaftlich\w*\s+(?:waren)?lieferung|intra-?community\s+(?:supply|delivery)|livraison\s+intracommunautaire|§\s?4\s?nr\.?\s?1\s?b\b/i, 'K'],
+  [/ausfuhr\w*|\bexport(?:s|ed)?\b|exportation|§\s?4\s?nr\.?\s?1\s?a\b/i, 'G'],
+  [/steuerschuldnerschaft|reverse[- ]charge|autoliquidation|§\s?13b/i, 'AE'],
+  [/kleinunternehmer|§\s?19\b|§\s?4\s?nr\.?\s?\d/i, 'E'],
+  [/nicht\s+steuerbar|not\s+(?:taxable|subject\s+to)|non\s+soumis/i, 'O'],
+];
+
 /** The printed sentence that says why no VAT is charged, joined over the rows it wraps into. */
 function readVatNote(rows: string[]): string | undefined {
   const start = rows.findIndex(
@@ -635,13 +733,14 @@ const PERIOD = new RegExp(
   `${SEPARATOR}(?:Q([1-4])[ /]?(\\d{4})|([1-4])\\.\\s?Quartal\\s+(\\d{4})|${DOTTED}\\s*(?:-|–|bis|to)\\s*${DOTTED}|${MONTH}\\s+(\\d{4})|(\\d{1,2})[./-](\\d{4})(?!\\d)|(\\d{4})-(\\d{2})(?![-\\d]))`,
   'i',
 );
+const MONTH_RANGE = new RegExp(`${SEPARATOR}${MONTH}\\s+(\\d{4})\\s*(?:-|–|bis|to|until)\\s*${MONTH}\\s+(\\d{4})`, 'i');
 const MONTH_ROW = new RegExp(`^${MONTH}\\s+(\\d{4})$`, 'i');
 /** The label of payment terms: what follows it is the terms, whatever words they use. */
 const TERMS_LABEL =
   /^(?:zahlungs(?:bedingung(?:en)?|ziel|frist|konditionen)|payment\s+terms?|terms\s+of\s+payment|conditions\s+de\s+(?:paiement|règlement))\s*:?\s*/i;
 /** How a sentence starts that says when to pay. "Zahlbetrag" and "Zahlungsart" say something else. */
 const TERMS_START =
-  /^(?:zahlbar\b|zahlung\s+(?:innerhalb|bis|sofort|ohne|erfolgt|fällig)|bitte\s+(?:überweisen|zahlen|begleichen)|der\s+(?:rechnungs|gesamt)betrag\s+ist|sofort\s+(?:fällig|zahlbar)|payable\b|payment\s+(?:is\s+)?(?:due|within|upon)|please\s+(?:pay|remit|transfer)|net\s+\d+|due\s+(?:on|upon)\s+receipt|paiement\s+(?:à|sous|dans|comptant))/i;
+  /^(?:zahlbar\b|(?:die\s+)?zahlung\s+(?:ist\s+)?(?:innerhalb|bis|sofort|ohne|erfolgt|fällig|\d)|bitte\s+(?:überweisen|zahlen|begleichen)|der\s+(?:rechnungs|gesamt)betrag\s+ist|sofort\s+(?:fällig|zahlbar)|payable\b|payment\s+(?:is\s+)?(?:due|within|upon)|please\s+(?:pay|remit|transfer)|net\s+\d+|due\s+(?:on|upon)\s+receipt|paiement\s+(?:à|sous|dans|comptant))/i;
 
 /**
  * The payment terms as printed: what stands after their label, or the sentence that says when to pay, joined over
@@ -684,6 +783,11 @@ function readPeriod(text: string, rows: string[]): { periodStart?: string; perio
     if (from < 1 || to > 12) return undefined;
     return { periodStart: `${year}-${pad(from)}-01`, periodEnd: `${year}-${pad(to)}-${new Date(Date.UTC(Number(year), to, 0)).getUTCDate()}` };
   };
+  // "September 2026 bis Januar 2027": from the first day of the one month to the last day of the other.
+  for (const { hit: m } of after(text, PERIOD_LABEL, MONTH_RANGE)) {
+    const [from, to] = [months(m[2]!, monthNumber(m[1]!), monthNumber(m[1]!)), months(m[4]!, monthNumber(m[3]!), monthNumber(m[3]!))];
+    if (from && to && from.periodStart < to.periodEnd) return { periodStart: from.periodStart, periodEnd: to.periodEnd };
+  }
   for (const { hit: m } of after(text, PERIOD_LABEL, PERIOD)) {
     const quarter = Number(m[1] ?? m[3]);
     const period = quarter
@@ -728,10 +832,19 @@ function readNumber(searched: string, rows: string[]): { number?: string; dated?
   const titles = rows.map(cells).filter((parts) => parts.some((cell) => TITLE.test(cell) || NAMED.test(cell)));
   const dated = labelled && after(searched, new RegExp(`${escape(labelled.hit[1]!)}\\s+(?:vom|von|issued\\s+(?:at|on)|dated|du|of)`), DATE)[0]?.hit;
   return {
-    number: labelled?.hit[1]!.replace(/ /g, '') ?? titles.flatMap((parts) => parts.map((cell) => NAMED.exec(cell)?.[1])).find(Boolean),
+    number: labelled?.hit[1]!.replace(/ /g, '') ?? titles.flatMap((parts) => parts.map((cell) => NAMED.exec(cell)?.[2])).find(Boolean),
     dated: date(dated),
     beside: titles.flatMap((parts) => parts.map((cell) => date(DATE.exec(cell)))).find(Boolean),
   };
+}
+
+/** The kind of invoice the title names: the first cell that is a title, alone or with the number. */
+function readType(rows: string[]): InvoiceType | undefined {
+  const title = rows
+    .flatMap(cells)
+    .map((cell) => (TITLE.exec(cell)?.index === 0 ? cell : NAMED.exec(cell)?.[1]))
+    .find(Boolean);
+  return title ? TYPES.find(([pattern]) => pattern.test(title))?.[1] : undefined;
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -914,36 +1027,38 @@ export function guessFromText(text: string, options: GuessOptions = {}): Invoice
   const totals = readTotals(searched, text);
   const lines = readItems(rows, totals, options.blocks);
 
-  // A VAT ID belongs to the party in whose address it stands. Otherwise the customer's is labelled as such, and the seller's is the first of the rest.
+  // A VAT ID belongs to the party in whose address it stands. Otherwise the customer's is labelled as such.
   const vatIds = vatIdsIn(searched);
   const inAddress = (party: Found | undefined) => (party ? vatIdsIn(party.tail)[0]?.id : undefined);
-  const buyer: Partial<Party> = { ...found.buyer?.party, vatId: inAddress(found.buyer) ?? vatIds.find(({ customer }) => customer)?.id };
-  const seller: Partial<Party> = {
-    ...found.seller?.party,
-    vatId: inAddress(found.seller) ?? vatIds.find(({ id, customer }) => !customer && id !== buyer.vatId)?.id,
-  };
+  const buyer: Partial<Party> = { ...believed(found.buyer), vatId: inAddress(found.buyer) ?? vatIds.find(({ customer }) => customer)?.id };
+  // Of the rest, one that stands beside the issuer's numbers or bank account, as in a footer, is the seller's.
+  const others = vatIds.filter(({ id, customer }) => !customer && id !== buyer.vatId);
+  const units = [...rows, ...(options.blocks ?? []).map((block) => block.join('   '))];
+  const besideIssuer = others.find(({ id }) => units.some((unit) => unit.replace(/ /g, '').includes(id) && ISSUER_OR_BANK.test(unit)));
+  const seller: Partial<Party> = { ...believed(found.seller), vatId: inAddress(found.seller) ?? (besideIssuer ?? others[0])?.id };
   seller.country ??= countryOfVatId(seller.vatId);
   // An address without a country is at home when VAT is charged: that is the ordinary domestic invoice.
   buyer.country ??= countryOfVatId(buyer.vatId) ?? (buyer.postalCode && lines?.some((line) => (line.vatRate ?? 0) > 0) ? seller.country : undefined);
 
-  // An invoice that shows no VAT at all charges none. Why, the country of the buyer tells: outside the EU the sale is
-  // not subject to VAT, elsewhere in the EU the buyer owes it, at home the seller is exempt. A person confirms this.
+  // An invoice that shows no VAT at all charges none.
   const showsNoVat =
     totals.vat === undefined &&
     lines?.every((line) => line.vatRate === undefined) &&
     (totals.net === undefined || totals.gross === undefined || cents(totals.net) === cents(totals.gross));
-  let vatExemptionReason: string | undefined;
-  if (lines && showsNoVat && buyer.country) {
-    const vatCategory: VatCategory = !EU.has(buyer.country) ? 'O' : buyer.country !== seller.country ? 'AE' : 'E';
-    for (const line of lines) Object.assign(line, { vatCategory, vatRate: 0 });
-    vatExemptionReason = readVatNote(rows);
-  }
+  // Why, the printed reason says, or else the country of the buyer: outside the EU the sale is not subject to VAT,
+  // elsewhere in the EU the buyer owes it, at home the seller is exempt. A person confirms this.
+  const note = lines && showsNoVat ? readVatNote(rows) : undefined;
+  const byCountry = buyer.country && (!EU.has(buyer.country) ? 'O' : buyer.country !== seller.country ? 'AE' : 'E');
+  const vatCategory = lines && showsNoVat ? (NOTE_CATEGORIES.find(([pattern]) => pattern.test(note ?? ''))?.[1] ?? byCountry) : undefined;
+  if (lines && vatCategory) for (const line of lines) Object.assign(line, { vatCategory, vatRate: 0 });
+  const vatExemptionReason = vatCategory ? note : undefined;
 
   const { number, dated, beside } = readNumber(searched, rows);
   const iban = findIban(text);
   const contact = readContact(searched, options.blocks !== undefined, found);
   return prune({
     number,
+    typeCode: readType(rows),
     buyerReference: readBuyerReference(searched),
     issueDate:
       date(/rechnungs-?datum|belegdatum|invoice\s+date|date\s+of\s+issue|issue\s+date|date\s+de\s+(?:la\s+)?facture|date\s+d['’]émission/) ??

@@ -106,7 +106,9 @@ export async function extractLayout(pdf: Uint8Array): Promise<Layout> {
       const pieces: Raw[] = [];
       for (const item of content.items) {
         if (!('str' in item) || !item.str.trim()) continue;
-        const piece = { page: n, x: item.transform[4], y: item.transform[5], width: item.width, height: item.height, text: item.str.trim() };
+        // Typesetting writes a negative amount with the minus sign (U+2212); everything that reads amounts expects a hyphen.
+        const text = item.str.trim().replace(/−/g, '-');
+        const piece = { page: n, x: item.transform[4], y: item.transform[5], width: item.width, height: item.height, text };
         pieces.push({ piece, str: item.str });
         layout.pieces.push(piece);
       }

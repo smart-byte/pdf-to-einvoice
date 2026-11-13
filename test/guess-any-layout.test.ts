@@ -260,7 +260,7 @@ describe('guessFromText with the blocks of the page', () => {
         vatId: 'FR98765432109',
       },
       lines: [
-        { name: 'Miel 500g', unit: 'C62', vatCategory: 'S' },
+        { name: 'Miel 500g', vatCategory: 'S' },
         { name: 'Savon 100g', quantity: 15, unit: 'C62', unitPrice: 2.4, vatCategory: 'S' },
       ],
       totals: { net: 153, vat: 25.38, gross: 178.38 },
@@ -385,8 +385,10 @@ describe('guessFromText on the currency', () => {
     expect(guessFromText('Rechnungswährung : GBP\nUmgerechnet 110,00 €').currency).toBe('GBP');
   });
 
-  it('reads no currency from a page that shows two', () => {
-    expect(guessFromText('Summe 100,00 €\nentspricht 110,00 USD').currency).toBeUndefined();
+  it('takes the currency of the totals from a page that shows two, and none where the totals do not tell', () => {
+    expect(guessFromText('Summe 100,00 €\nentspricht 110,00 USD').currency).toBe('EUR');
+    expect(guessFromText('Summe 100,00 €\nTotal 110,00 USD').currency).toBeUndefined();
+    expect(guessFromText('Preis 100,00 €\nentspricht 110,00 USD').currency).toBeUndefined();
   });
 });
 
@@ -566,7 +568,7 @@ describe('guessFromText on table rows', () => {
 
   it('reads no quantity that does not give the row total', () => {
     const text = 'Pos   Leistung   Preis   Menge   Betrag\n1   Kurierfahrt   3,00   7 km   22,50\nNettosumme   22,50';
-    expect(guessFromText(text).lines).toEqual([{ name: 'Kurierfahrt', unit: 'C62', vatCategory: 'S' }]);
+    expect(guessFromText(text).lines).toEqual([{ name: 'Kurierfahrt', vatCategory: 'S' }]);
   });
 
   /** A table whose prices include VAT: its rows add up to the gross total. */
