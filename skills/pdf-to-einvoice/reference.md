@@ -31,9 +31,9 @@
 - Give `deliveryDate`, or `periodStart` and `periodEnd` for a service period: German invoices must state it.
 - Other type codes: 381 credit note, 384 corrected invoice (name the original in `precedingInvoiceNumber` and
   `precedingInvoiceDate`), 326 partial invoice, 386 prepayment invoice, 389 self-billed invoice.
-- A discount on a line goes into its `discount` (`percent` and/or `amount` as printed), never into the price. A line
-  total that differs from quantity x unit price less the discount by rounding goes into `netAmount`; more than 0.02
-  apart is an error.
+- A discount on a line goes into its `discount` (`percent` and/or `amount` as printed, the amount negative on a line
+  with a negative quantity), never into the price. A line total that differs from quantity x unit price less the
+  discount by rounding goes into `netAmount`; more than 0.02 apart is an error.
 - The full list with descriptions: `npx -y pdf-to-einvoice schema`.
 
 ## VAT categories
