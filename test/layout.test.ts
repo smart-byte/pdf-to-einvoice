@@ -15,6 +15,13 @@ async function pdfWith(texts: Drawn[]): Promise<Uint8Array> {
 }
 
 describe('extractLayout', () => {
+  it('writes the minus sign of typesetting as a hyphen, the way amounts are read', async () => {
+    const doc = await PDFDocument.create();
+    const font = await doc.embedFont(StandardFonts.Symbol);
+    doc.addPage([595, 842]).drawText('−1.234,50', { x: 60, y: 700, size: 10, font });
+    expect((await extractLayout(await doc.save())).text).toBe('-1.234,50');
+  });
+
   it('returns the rows that extractText returns', async () => {
     const pdf = new Uint8Array(readFileSync(new URL('../examples/sample-invoice.pdf', import.meta.url)));
     expect((await extractLayout(pdf)).text).toBe(await extractText(pdf));

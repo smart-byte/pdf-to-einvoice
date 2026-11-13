@@ -385,8 +385,10 @@ describe('guessFromText on the currency', () => {
     expect(guessFromText('Rechnungswährung : GBP\nUmgerechnet 110,00 €').currency).toBe('GBP');
   });
 
-  it('reads no currency from a page that shows two', () => {
-    expect(guessFromText('Summe 100,00 €\nentspricht 110,00 USD').currency).toBeUndefined();
+  it('takes the currency of the totals from a page that shows two, and none where the totals do not tell', () => {
+    expect(guessFromText('Summe 100,00 €\nentspricht 110,00 USD').currency).toBe('EUR');
+    expect(guessFromText('Summe 100,00 €\nTotal 110,00 USD').currency).toBeUndefined();
+    expect(guessFromText('Preis 100,00 €\nentspricht 110,00 USD').currency).toBeUndefined();
   });
 });
 

@@ -93,3 +93,56 @@ describe('guessFromText with a customer abroad', () => {
     expect(guess.buyer).toMatchObject({ name: 'Beispielkunde GmbH', street: 'Industriestraße 1', postalCode: '90402', city: 'Nürnberg' });
   });
 });
+
+describe('guessFromText with amounts', () => {
+  it('takes the currency of the totals where the page names another one as well', () => {
+    const text = [
+      'Rechnung 2026-5   6. Oktober 2026',
+      'Workshop   20 Std.   120,00 $   2.400,00 $',
+      'Nettobetrag   2.400,00 $',
+      'zzgl. 19 % USt.   456,00 $',
+      'Gesamtbetrag   2.856,00 $',
+      'Die Umsatzsteuer beträgt 390,24 € (Kurs 1 € = 1,1685 $).',
+    ];
+    expect(guessFromText(text.join('\n'))).toMatchObject({ currency: 'USD', totals: { net: 2400, vat: 456, gross: 2856 } });
+  });
+
+  it('reads totals of nothing as nothing', () => {
+    const text = [
+      'Pos.   Bezeichnung   Menge   Einheit   Einzelpreis   Gesamt',
+      '1   Nachbesserung ohne Berechnung   0   Std.   70,00 €   0,00 €',
+      'Zwischensumme (netto)   0,00 €',
+      'Umsatzsteuer 19 %   0,00 €',
+      'Gesamtbetrag   0,00 €',
+    ];
+    expect(guessFromText(text.join('\n')).totals).toEqual({ net: 0, vat: 0, gross: 0 });
+  });
+
+  it('reads the negative amounts of a cancellation', () => {
+    const text = [
+      'Stornorechnung 2026-6   7. Oktober 2026',
+      'Beratung   -10 Std.   95,50 € -955,00 €',
+      'Nettobetrag   -955,00 €',
+      'zzgl. 19 % USt.   -181,45 €',
+      'Gesamtbetrag   -1.136,45 €',
+    ];
+    expect(guessFromText(text.join('\n')).totals).toEqual({ net: -955, vat: -181.45, gross: -1136.45 });
+  });
+
+  it('does not take an English totals row for an item, and reads a price and a total that share a cell', () => {
+    const text = [
+      'Invoice 2026-40   October 6, 2026',
+      'Description   Quantity   Unit price   Amount',
+      'Design review   4 days   $1,200.00 $4,800.00',
+      'Travel expenses   1 flat rate   $350.25 $350.25',
+      'Net amount   $5,150.25',
+      'Total amount   $5,150.25',
+    ];
+    const guess = guessFromText(text.join('\n'));
+    expect(guess.totals).toEqual({ net: 5150.25, gross: 5150.25 });
+    expect(guess.lines).toEqual([
+      { name: 'Design review', quantity: 4, unit: 'DAY', unitPrice: 1200, vatCategory: 'S' },
+      { name: 'Travel expenses', quantity: 1, unit: 'LS', unitPrice: 350.25, vatCategory: 'S' },
+    ]);
+  });
+});

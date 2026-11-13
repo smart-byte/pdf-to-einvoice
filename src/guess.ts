@@ -20,7 +20,10 @@ const DATE = new RegExp(
 );
 const MONEY = "(-?\\d{1,3}(?:[.,' ]\\d{3})*[.,]\\d{2}|-?\\d+[.,]\\d{2})";
 const CURRENCY = '(?:€|EUR|US\\$|\\$|USD|£|GBP|CHF)';
-const AMOUNT = new RegExp(`${SEPARATOR}(?:\\d{1,2}(?:[.,]\\d+)?\\s*%\\s*)?(?:in\\s+)?${CURRENCY}?\\s*${MONEY}(?![.,]?\\d)`);
+// A label may go on with a word in brackets: "Zwischensumme (netto)". A code such as the category in "USt (S)" is no word.
+const AMOUNT = new RegExp(
+  `${SEPARATOR}(?:\\([A-Za-zÄÖÜäöüß]{3,}[^)\\d]*\\)\\s*)?(?:\\d{1,2}(?:[.,]\\d+)?\\s*%\\s*)?(?:in\\s+)?${CURRENCY}?\\s*${MONEY}(?![.,]?\\d)`,
+);
 
 const pad = (n: string | number) => String(n).padStart(2, '0');
 const century = (year: string) => (year.length === 2 ? `20${year}` : year);
@@ -100,10 +103,23 @@ const CURRENCY_SIGNS: [RegExp, string][] = [
   [/\bCHF\b/, 'CHF'],
 ];
 
-/** The currency after its label, or the one currency the page shows. A page with two does not tell which one the invoice is in. */
+/**
+ * The currency after its label, or the one currency the page shows. A page with two, such as one that also gives the
+ * VAT in euros, is in the one currency of its totals; where they do not tell either, it stays unread.
+ */
 function findCurrency(text: string): string | undefined {
-  const shown = CURRENCY_SIGNS.filter(([pattern]) => pattern.test(text));
-  return after(text, /währung|currency|devise/, new RegExp(`${SEPARATOR}([A-Z]{3})\\b`))[0]?.hit[1] ?? (shown.length === 1 ? shown[0]![1] : undefined);
+  const shown = (part: string) => CURRENCY_SIGNS.filter(([pattern]) => pattern.test(part)).map(([, code]) => code);
+  const [onPage, inTotals] = [
+    shown(text),
+    shown(
+      text
+        .split('\n')
+        .filter((row) => TOTALS_ROW.test(row))
+        .join('\n'),
+    ),
+  ];
+  const one = onPage.length === 1 ? onPage : inTotals.length === 1 ? inTotals : [];
+  return after(text, /währung|currency|devise/, new RegExp(`${SEPARATOR}([A-Z]{3})\\b`))[0]?.hit[1] ?? one[0];
 }
 
 const VAT_ID_LABEL =
@@ -323,7 +339,7 @@ const GROSS_LABEL = new RegExp(
 );
 /** A row that sums up: it starts with a word for a total ("Taxi" and "Nettopreis" are none), or a cell of it is one ("Positionssumme", "Zahlbetrag", "Total HT"). */
 const TOTALS_ROW =
-  /^(?:\d{1,2}(?:[.,]\d+)?\s?%\s*)?(?:(?:netto|brutto|gesamt)(?:betrag|summe)?|zwischensumme|summe|mwst|ust|umsatzsteuer|mehrwertsteuer|rechnungsbetrag|endbetrag|zzgl|total|subtotal|vat|tax(?:es)?|tva|übertrag)\b/i;
+  /^(?:\d{1,2}(?:[.,]\d+)?\s?%\s*)?(?:(?:netto|brutto|gesamt)(?:betrag|summe)?|zwischensumme|summe|mwst|ust|umsatzsteuer|mehrwertsteuer|rechnungsbetrag|endbetrag|zzgl|total|subtotal|net\s+(?:amount|total)|vat|tax(?:es)?|tva|übertrag)\b/i;
 const TOTALS_CELL = /(?:summe|betrag)(?![\p{L}])|\btotal\b/iu;
 /** An amount that stands on its own: not part of a date, a longer number or a percentage. */
 const PRINTED_AMOUNT = new RegExp(`(?<![\\d.,])${MONEY}(?![.,]?\\d)(?!\\s?%)`, 'g');
@@ -352,6 +368,8 @@ function readTotals(searched: string, text: string): Totals {
   const [net, vat, gross] = [hits.net[0], hits.vat[0], hits.gross[0]];
   const first = { net: net === undefined ? net : net / 100, vat: vat === undefined ? vat : vat / 100, gross: gross === undefined ? gross : gross / 100 };
   if (net !== undefined && vat !== undefined && net + vat === gross) return first;
+  // The same amount as net and as gross, and no VAT: an invoice without VAT, whatever else adds up on the page.
+  if (net !== undefined && net === gross && vat === undefined) return { net: first.net, gross: first.gross };
 
   const printed = new Set([...text.matchAll(PRINTED_AMOUNT)].map((match) => cents(toNumber(match[1]!))));
   const sums: { net: number; vat: number; gross: number; score: number }[] = [];
@@ -387,7 +405,7 @@ const UNITS: [RegExp, string][] = [
   [/^(l|liter|litre)(\(?s\)?)?\.?$/i, 'LTR'],
   [/^(m²|qm)\.?$/i, 'MTK'],
   [/^m\.?$/i, 'MTR'],
-  [/^(pauschal|psch)\.?$/i, 'LS'],
+  [/^(pauschal|psch|flat)\.?$/i, 'LS'],
 ];
 const MONEY_CELL = new RegExp(`^[€$£]?\\s*${MONEY}\\s*${CURRENCY}?$`);
 const RATE_CELL = /^\(?(\d{1,2}(?:[.,]\d+)?)\s?%\)?$/;
@@ -488,6 +506,16 @@ function runOf(items: Item[], total: number | undefined): Item[] | undefined {
   return best;
 }
 
+/** "80,00 € 960,00 €": price and total set so close that they share a cell. Each amount is a cell of its own. */
+function splitAmounts(cell: string): string[] {
+  const parts: string[] = [];
+  for (const word of cell.split(' ')) {
+    if (parts.length && MONEY_CELL.test(`${parts.at(-1)} ${word}`)) parts[parts.length - 1] += ` ${word}`;
+    else parts.push(word);
+  }
+  return parts.length > 1 && parts.every((part) => MONEY_CELL.test(part)) ? parts : [cell];
+}
+
 /** Joins the lines a text wraps into: with a space, or without one where a hyphen holds two of them together ("Wartungs-", "Vertrag"). */
 const unwrap = (lines: string[]) =>
   lines.slice(1).reduce((text, line) => (/[\p{L}\d]-$/u.test(text) || /^-\p{L}/u.test(line) ? text + line : `${text} ${line}`), lines[0] ?? '');
@@ -564,7 +592,7 @@ function itemsThatAddUp(
     loose = [];
   };
   for (const row of rows) {
-    const all = cells(row);
+    const all = cells(row).flatMap(splitAmounts);
     // A row may end with a cell of the column beside the table.
     const parts = all.slice(0, lastIndex(all, (cell) => MONEY_CELL.test(cell)) + 1);
     if (TOTALS_ROW.test(row) || all.some((cell) => TOTALS_CELL.test(cell))) {
