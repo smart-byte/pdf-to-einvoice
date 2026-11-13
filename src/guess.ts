@@ -231,7 +231,12 @@ interface Found {
   sender?: boolean;
   /** The labelled lines right below it, which may hold its VAT ID or tax number. */
   tail: string;
+  /** The page spells it twice with its words broken apart differently: its words are not believed. */
+  broken?: boolean;
 }
+
+/** The words of an address. */
+const WORDS = ['name', 'contactName', 'street', 'city'] as const;
 
 /**
  * The addresses of one column: the lines above a line with postal code and city, up to three of them, or up to five
@@ -331,8 +336,27 @@ function readParties(rows: string[], blocks: string[][]): { seller?: Found; buye
   // nothing else makes it the seller.
   const issuer = ({ party }: Found) => rows.some((row) => row.includes(party.name!) && IDENTIFIERS.test(row));
   const left = labelled.length ? labelled : addresses.filter((found) => found.role === undefined && !isSellers(found) && !issuer(found));
-  return { seller, buyer: new Set(left.map((found) => found.party.name)).size === 1 ? left[0] : undefined };
+  const buyer = new Set(left.map((found) => found.party.name)).size === 1 ? left[0] : undefined;
+
+  // An address may stand twice on a page, say in the letterhead and in the footer. Copies that differ in their spaces
+  // only show that the text breaks words apart where the print does not, as some PDFs space their letters.
+  const squeezed = (value?: string) => value?.replace(/\s+/g, '');
+  const checked = (found?: Found) =>
+    found &&
+    (found.party.postalCode !== undefined &&
+    [...senders, ...addresses].some(
+      ({ party }) =>
+        party.postalCode === found.party.postalCode &&
+        WORDS.some((key) => party[key] !== undefined && party[key] !== found.party[key] && squeezed(party[key]) === squeezed(found.party[key])),
+    )
+      ? { ...found, broken: true }
+      : found);
+  return { seller: checked(seller), buyer: checked(buyer) };
 }
+
+/** What an address says, without its words where the page breaks them apart. */
+const believed = (found?: Found): Partial<Party> =>
+  found?.broken ? Object.fromEntries(Object.entries(found.party).filter(([key]) => !(WORDS as readonly string[]).includes(key))) : { ...found?.party };
 
 // ---------------------------------------------------------------------------------------------------------------
 // Totals
@@ -1006,12 +1030,12 @@ export function guessFromText(text: string, options: GuessOptions = {}): Invoice
   // A VAT ID belongs to the party in whose address it stands. Otherwise the customer's is labelled as such.
   const vatIds = vatIdsIn(searched);
   const inAddress = (party: Found | undefined) => (party ? vatIdsIn(party.tail)[0]?.id : undefined);
-  const buyer: Partial<Party> = { ...found.buyer?.party, vatId: inAddress(found.buyer) ?? vatIds.find(({ customer }) => customer)?.id };
+  const buyer: Partial<Party> = { ...believed(found.buyer), vatId: inAddress(found.buyer) ?? vatIds.find(({ customer }) => customer)?.id };
   // Of the rest, one that stands beside the issuer's numbers or bank account, as in a footer, is the seller's.
   const others = vatIds.filter(({ id, customer }) => !customer && id !== buyer.vatId);
   const units = [...rows, ...(options.blocks ?? []).map((block) => block.join('   '))];
   const besideIssuer = others.find(({ id }) => units.some((unit) => unit.replace(/ /g, '').includes(id) && ISSUER_OR_BANK.test(unit)));
-  const seller: Partial<Party> = { ...found.seller?.party, vatId: inAddress(found.seller) ?? (besideIssuer ?? others[0])?.id };
+  const seller: Partial<Party> = { ...believed(found.seller), vatId: inAddress(found.seller) ?? (besideIssuer ?? others[0])?.id };
   seller.country ??= countryOfVatId(seller.vatId);
   // An address without a country is at home when VAT is charged: that is the ordinary domestic invoice.
   buyer.country ??= countryOfVatId(buyer.vatId) ?? (buyer.postalCode && lines?.some((line) => (line.vatRate ?? 0) > 0) ? seller.country : undefined);

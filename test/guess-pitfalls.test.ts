@@ -235,6 +235,38 @@ describe('guessFromText with an invoice that charges no VAT', () => {
   });
 });
 
+describe('guessFromText with words the text of the page breaks apart', () => {
+  // Some PDFs space their letters so that the text breaks words where the print does not, and not the same way twice.
+  const HEADER = [
+    'Ver käufer :',
+    'Beispiel Hand el GmbH',
+    'Musterstraße 3',
+    'DE 80331 München',
+    'Steuernummer : 143/123/12345',
+    'Käufer :',
+    'Erika Muster',
+    'Hauptstraße 5',
+    'DE 54321 Beispielstadt',
+  ];
+  const FOOTER = ['Beispiel Hand el GmbH', 'Muster str aße 3', '80331 München', 'Deutschland', 'Geschäftsführer : Max Muster', 'Handelsregister : HRB 12345'];
+  const BODY = [
+    'Rechnung Nr. 2026-31 vom 05.10.2026',
+    '1   Beratung   2   100,00   200,00',
+    'Nettobetrag   200,00',
+    'USt 19 %   38,00',
+    'Gesamtbetrag   238,00',
+  ];
+
+  it('leaves name, street and city of an address open that the page spells twice with its words broken differently', () => {
+    const guess = guessFromText(...page([...HEADER, ...BODY, ...FOOTER], [HEADER, BODY, FOOTER]));
+    expect(guess.seller).toMatchObject({ postalCode: '80331', country: 'DE', taxNumber: '143/123/12345' });
+    expect(guess.seller).not.toHaveProperty('name');
+    expect(guess.seller).not.toHaveProperty('street');
+    expect(guess.seller).not.toHaveProperty('city');
+    expect(guess.buyer).toMatchObject({ name: 'Erika Muster', street: 'Hauptstraße 5', city: 'Beispielstadt' });
+  });
+});
+
 describe('guessFromText with payment terms', () => {
   it.each(['Die Zahlung ist bis zum 31. Oktober 2026 fällig.', 'Die Zahlung ist sofort fällig.', 'Zahlung ist innerhalb von 14 Tagen zu leisten.'])(
     'reads terms that start with the payment: %s',
