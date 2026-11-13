@@ -44,6 +44,16 @@ export interface Party {
   contactName?: string;
 }
 
+/** A discount or charge: a percentage of its base, an amount, or both. */
+export interface Allowance {
+  /** Percentage of the base, e.g. 10 (BT-138). Not negative. */
+  percent?: number;
+  /** Amount (BT-136), signed as in the standard: the line total is its base less this amount. */
+  amount?: number;
+  /** Reason as printed, e.g. "Treuerabatt" (BT-139). */
+  reason?: string;
+}
+
 export interface Line {
   /** What was sold (BT-153). */
   name: string;
@@ -54,8 +64,10 @@ export interface Line {
   unit: string;
   /** Net price per unit, without VAT (BT-146). Never negative. */
   unitPrice: number;
-  /** Net line total (BT-131). Defaults to quantity x unitPrice. */
+  /** Net line total (BT-131). Defaults to quantity x unitPrice less the discount. */
   netAmount?: number;
+  /** Discount on the line (BG-27); its base is quantity x unitPrice. */
+  discount?: Allowance;
   vatCategory: VatCategory;
   /** VAT rate in percent, e.g. 19 (BT-152). 0 for every category except S. */
   vatRate: number;
@@ -204,6 +216,16 @@ export const invoiceJsonSchema = {
           unit: text('UN/ECE Rec. 20 unit code: C62 piece (default), HUR hour, DAY day, MON month, KGM kilogram, MTR metre, LTR litre, LS lump sum.'),
           unitPrice: amount('Net price per unit, without VAT.'),
           netAmount: amount('Net line total as printed.'),
+          discount: {
+            type: 'object',
+            additionalProperties: false,
+            description: 'Discount on this line as printed: a percentage of quantity x unit price, an amount, or both.',
+            properties: {
+              percent: amount('Percentage, e.g. 10.'),
+              amount: amount('Discount amount. Negative on a line with a negative quantity.'),
+              reason: text('Reason as printed, e.g. "Treuerabatt".'),
+            },
+          },
           vatCategory: {
             type: 'string',
             enum: Object.keys(VAT_CATEGORIES),
