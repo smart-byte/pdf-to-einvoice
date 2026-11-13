@@ -1,6 +1,6 @@
 {
   "name": "pdf-to-einvoice",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "mcpName": "io.github.smart-byte/pdf-to-einvoice",
   "description": "Turn an existing invoice PDF into an EN 16931 e-invoice (ZUGFeRD / Factur-X) without changing how it looks, or write the invoice data as XRechnung. Runs in the browser, as a CLI, as a library and as an MCP server for AI assistants.",
   "keywords": [
