@@ -169,6 +169,26 @@ describe('readInvoiceXml', () => {
     expect(readInvoiceXml(xml).invoice).toMatchObject(sample());
   });
 
+  it('reads no tax number from the identifier of a party, such as a customer number', async () => {
+    const withIds = (xml: string) =>
+      xml
+        .replace('<ram:BuyerTradeParty>', '<ram:BuyerTradeParty><ram:ID>0042</ram:ID>')
+        .replace(/(<ram:SellerTradeParty>\s*)<ram:ID>[^<]*<\/ram:ID>/, '$1<ram:ID>LIEF-0042</ram:ID>')
+        .replace(/<ram:SpecifiedTaxRegistration>[\s\S]*?<\/ram:SpecifiedTaxRegistration>/g, '');
+    const notSubjectToVat = sample((d) => {
+      for (const line of d.lines) Object.assign(line, { vatCategory: 'O', vatRate: 0 });
+      d.vatExemptionReason = 'Nicht steuerbar.';
+      delete d.seller.vatId;
+      delete d.buyer.vatId;
+      d.seller.taxNumber = '12/345/67890';
+    });
+    const xml = withIds(await xmlOf(notSubjectToVat));
+    expect(xml).toContain('<ram:ID>LIEF-0042</ram:ID>');
+    const { invoice } = readInvoiceXml(xml);
+    expect(invoice.buyer?.taxNumber).toBeUndefined();
+    expect(invoice.seller?.taxNumber).toBeUndefined();
+  });
+
   it('refuses a UBL invoice', () => {
     const ubl = '<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"><ID>RE-1</ID></Invoice>';
     expect(() => readInvoiceXml(ubl)).toThrow(/CrossIndustryInvoice/);

@@ -33,22 +33,24 @@ const date = (node: Node, ...path: string[]) => text(node, ...path, 'DateTimeStr
 
 const attribute = (node: Node, name: string): string | undefined => (typeof node === 'object' ? node[`@_${name}`] : undefined);
 
-function party(node: Node) {
+function party(node: Node, who: 'seller' | 'buyer') {
   const address = at(node, 'PostalTradeAddress');
   const contact = at(node, 'DefinedTradeContact');
   const endpoint = at(node, 'URIUniversalCommunication', 'URIID');
   const taxIds = all(node, 'SpecifiedTaxRegistration').map((registration) => at(registration, 'ID'));
   const taxId = (scheme: string) => text(taxIds.find((id) => attribute(id, 'schemeID') === scheme));
-  const plainId = text(node, 'ID');
+  // The plain identifier is any number the party is known by (BT-29, BT-46), such as a customer number. It stands
+  // in for a tax ID only where the seller has no registration, and only in the shape of one.
+  const plainId = who === 'seller' && taxIds.length === 0 ? text(node, 'ID') : undefined;
   return {
     name: text(node, 'Name'),
     street: text(address, 'LineOne'),
     postalCode: text(address, 'PostcodeCode'),
     city: text(address, 'CityName'),
     country: text(address, 'CountryID'),
-    // Without any tax registration, the plain party identifier is the tax ID (see BR-O-02 in ubl.ts).
-    vatId: taxId('VA') ?? (taxIds.length === 0 && /^[A-Z]{2}[A-Z0-9]{2,12}$/.test(plainId ?? '') ? plainId : undefined),
-    taxNumber: taxId('FC') ?? (taxIds.length === 0 && !/^[A-Z]{2}[A-Z0-9]{2,12}$/.test(plainId ?? '') ? plainId : undefined),
+    // Without any tax registration, the plain identifier of the seller is its tax ID (see BR-O-02 in ubl.ts).
+    vatId: taxId('VA') ?? (/^[A-Z]{2}[A-Z0-9]{2,12}$/.test(plainId ?? '') ? plainId : undefined),
+    taxNumber: taxId('FC') ?? (/^\d[\d/ -]{7,}$/.test(plainId ?? '') ? plainId : undefined),
     email: text(contact, 'EmailURIUniversalCommunication', 'URIID') ?? (attribute(endpoint, 'schemeID') === 'EM' ? text(endpoint) : undefined),
     phone: text(contact, 'TelephoneUniversalCommunication', 'CompleteNumber'),
     contactName: text(contact, 'PersonName'),
@@ -138,8 +140,8 @@ export function readInvoiceXml(xml: string): { profile?: string; invoice: Invoic
         .map((tax) => text(tax, 'ExemptionReason') ?? text(tax, 'ExemptionReasonCode'))
         .find(Boolean),
       prepaidAmount: number(sums, 'TotalPrepaidAmount'),
-      seller: party(at(agreement, 'SellerTradeParty')),
-      buyer: party(at(agreement, 'BuyerTradeParty')),
+      seller: party(at(agreement, 'SellerTradeParty'), 'seller'),
+      buyer: party(at(agreement, 'BuyerTradeParty'), 'buyer'),
       lines: items.map(line),
       totals: {
         net: number(sums, 'TaxBasisTotalAmount'),
