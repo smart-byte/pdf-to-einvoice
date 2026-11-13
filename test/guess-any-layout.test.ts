@@ -260,7 +260,7 @@ describe('guessFromText with the blocks of the page', () => {
         vatId: 'FR98765432109',
       },
       lines: [
-        { name: 'Miel 500g', unit: 'C62', vatCategory: 'S' },
+        { name: 'Miel 500g', vatCategory: 'S' },
         { name: 'Savon 100g', quantity: 15, unit: 'C62', unitPrice: 2.4, vatCategory: 'S' },
       ],
       totals: { net: 153, vat: 25.38, gross: 178.38 },
@@ -568,7 +568,7 @@ describe('guessFromText on table rows', () => {
 
   it('reads no quantity that does not give the row total', () => {
     const text = 'Pos   Leistung   Preis   Menge   Betrag\n1   Kurierfahrt   3,00   7 km   22,50\nNettosumme   22,50';
-    expect(guessFromText(text).lines).toEqual([{ name: 'Kurierfahrt', unit: 'C62', vatCategory: 'S' }]);
+    expect(guessFromText(text).lines).toEqual([{ name: 'Kurierfahrt', vatCategory: 'S' }]);
   });
 
   /** A table whose prices include VAT: its rows add up to the gross total. */

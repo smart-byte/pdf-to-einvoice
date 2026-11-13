@@ -146,3 +146,23 @@ describe('guessFromText with amounts', () => {
     ]);
   });
 });
+
+describe('guessFromText with units', () => {
+  const table = (...items: string[]) =>
+    ['Pos.   Bezeichnung   Menge   Einheit   Einzelpreis   Gesamt', ...items, 'Zwischensumme (netto)   1.000,00 €', 'Gesamtbetrag   1.000,00 €'].join('\n');
+
+  it('reads a unit that stands in a column of its own', () => {
+    const text = table(
+      '1   Gestaltung   8   Std.   80,00 €   640,00 €',
+      '2   Fahrt   400   km   0,30 €   120,00 €',
+      '3   Betreuung   2   Wochen   100,00 €   200,00 €',
+      '4   Material   1   pauschal   40,00 €   40,00 €',
+    );
+    expect(guessFromText(text).lines?.map((line) => line.unit)).toEqual(['HUR', 'KMT', 'WEE', 'LS']);
+  });
+
+  it('leaves a unit it does not know open instead of taking it for pieces', () => {
+    const text = table('1   Lizenz   10 Nutzer   60,00 €   600,00 €', '2   Schulung   4 Stk   100,00 €   400,00 €');
+    expect(guessFromText(text).lines?.map((line) => line.unit)).toEqual([undefined, 'C62']);
+  });
+});

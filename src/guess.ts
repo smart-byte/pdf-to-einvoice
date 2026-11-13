@@ -406,7 +406,12 @@ const UNITS: [RegExp, string][] = [
   [/^(m²|qm)\.?$/i, 'MTK'],
   [/^m\.?$/i, 'MTR'],
   [/^(pauschal|psch|flat)\.?$/i, 'LS'],
+  [/^km\.?$/i, 'KMT'],
+  [/^(wochen?|weeks?)\.?$/i, 'WEE'],
+  [/^(stk|stück|st|pcs?|pieces?|units?|unit\(s\))\.?$/i, 'C62'],
 ];
+/** The code of a printed unit. A quantity without one counts pieces; a unit not listed here stays open. */
+const unitOf = (mark: string) => (mark === '' ? 'C62' : UNITS.find(([pattern]) => pattern.test(mark))?.[1]);
 const MONEY_CELL = new RegExp(`^[€$£]?\\s*${MONEY}\\s*${CURRENCY}?$`);
 const RATE_CELL = /^\(?(\d{1,2}(?:[.,]\d+)?)\s?%\)?$/;
 const QUANTITY_CELL = /^(-?\d+(?:[.,]\d+)?)\s*(\p{L}+\.?)?$/u;
@@ -447,7 +452,13 @@ interface Figure {
  */
 function itemOf(parts: string[], table: number): Item {
   const numbered = /^\d{1,3}\.?$/.test(parts[0]!);
-  const before = parts.slice(numbered ? 1 : 0, -1);
+  // A unit in a column of its own belongs to the quantity before it: "8   Std.".
+  const before = parts.slice(numbered ? 1 : 0, -1).reduce<string[]>((joined, cell) => {
+    const last = joined.at(-1);
+    if (last !== undefined && /^-?\d+(?:[.,]\d+)?$/.test(last) && UNITS.some(([pattern]) => pattern.test(cell))) joined[joined.length - 1] = `${last} ${cell}`;
+    else joined.push(cell);
+    return joined;
+  }, []);
   const name = before.find((cell) => !RATE_CELL.test(cell) && !MONEY_CELL.test(cell) && !QUANTITY_CELL.test(cell));
   const figures: Figure[] = before
     .filter((cell) => cell !== name && /^\(?[€$£]?\s*-?\d/.test(cell))
@@ -466,7 +477,7 @@ function itemOf(parts: string[], table: number): Item {
   }
 
   // Nothing but the total, or the total once more: one unit at that price.
-  if (others.every((figure) => cents(figure.value) === cents(item.total))) return { ...item, quantity: 1, unitPrice: item.total };
+  if (others.every((figure) => cents(figure.value) === cents(item.total))) return { ...item, quantity: 1, unit: 'C62', unitPrice: item.total };
   const isPrice = (figure: Figure) => IS_CURRENCY.test(figure.mark);
   const hasUnit = (figure: Figure) => figure.mark !== '' && !isPrice(figure);
   for (const [i, a] of others.entries()) {
@@ -475,7 +486,7 @@ function itemOf(parts: string[], table: number): Item {
       // Known limit: where neither a currency nor a unit nor a whole number tells, the quantity is taken to come first.
       const swap = isPrice(a) || hasUnit(b) || (!hasUnit(a) && !isPrice(b) && !Number.isInteger(a.value) && Number.isInteger(b.value));
       const [quantity, price] = swap ? [b, a] : [a, b];
-      return { ...item, quantity: quantity.value, unit: UNITS.find(([pattern]) => pattern.test(quantity.mark))?.[1], unitPrice: price.value };
+      return { ...item, quantity: quantity.value, unit: unitOf(quantity.mark), unitPrice: price.value };
     }
   }
   // No two numbers give the total, e.g. because of a discount or a rounded quantity: both stay open.
@@ -562,7 +573,7 @@ function readItems(rows: string[], totals: Totals, blocks: string[][] | undefine
   return lines.map((line) => ({
     name: line.name || undefined,
     quantity: line.quantity,
-    unit: line.unit ?? 'C62',
+    unit: line.unit,
     unitPrice: line.unitPrice,
     vatCategory: 'S' as VatCategory,
     vatRate: rated ? line.vatRate : undefined,
