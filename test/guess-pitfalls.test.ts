@@ -197,3 +197,34 @@ describe('guessFromText with the title of the document', () => {
     expect(guessFromText('Leistungszeitraum: September 2026 bis Januar 2027')).toMatchObject({ periodStart: '2026-09-01', periodEnd: '2027-01-31' });
   });
 });
+
+describe('guessFromText with an invoice that charges no VAT', () => {
+  const invoice = (note: string, address: string[] = []) =>
+    [
+      'Rechnung 2026-20   6. Oktober 2026',
+      ...address,
+      'Beratung   10 Std.   100,00 €   1.000,00 €',
+      'Nettobetrag   1.000,00 €',
+      'Gesamtbetrag   1.000,00 €',
+      `Ohne Umsatzsteuer – ${note}`,
+    ].join('\n');
+
+  it.each([
+    ['Steuerfreie innergemeinschaftliche Lieferung.', 'K'],
+    ['Steuerfreie Ausfuhrlieferung.', 'G'],
+    ['Steuerschuldnerschaft des Leistungsempfängers.', 'AE'],
+    ['Reverse charge.', 'AE'],
+    ['Steuerfrei nach § 4 Nr. 14 UStG.', 'E'],
+    ['Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.', 'E'],
+    ['Not subject to VAT in Germany.', 'O'],
+  ])('takes the category from the printed reason: %s', (note, category) => {
+    const guess = guessFromText(invoice(note));
+    expect(guess.lines).toMatchObject([{ vatCategory: category, vatRate: 0 }]);
+    expect(guess.vatExemptionReason).toContain(note);
+  });
+
+  it('believes the printed reason before the country of the customer', () => {
+    const address = ['Voorbeeld B.V.', 'Voorbeeldstraat 5', '1234 AB Voorbeeldstad', 'NIEDERLANDE'];
+    expect(guessFromText(invoice('Steuerfreie innergemeinschaftliche Lieferung.', address)).lines).toMatchObject([{ vatCategory: 'K', vatRate: 0 }]);
+  });
+});

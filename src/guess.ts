@@ -671,6 +671,15 @@ function itemsThatAddUp(
   return withVat && { run: withVat, inclusive: true };
 }
 
+/** What the printed reason for charging no VAT says the sale is. The exemptions of § 4 UStG other than 1a and 1b are E. */
+const NOTE_CATEGORIES: [RegExp, VatCategory][] = [
+  [/innergemeinschaftlich\w*\s+(?:waren)?lieferung|intra-?community\s+(?:supply|delivery)|livraison\s+intracommunautaire|§\s?4\s?nr\.?\s?1\s?b\b/i, 'K'],
+  [/ausfuhr\w*|\bexport(?:s|ed)?\b|exportation|§\s?4\s?nr\.?\s?1\s?a\b/i, 'G'],
+  [/steuerschuldnerschaft|reverse[- ]charge|autoliquidation|§\s?13b/i, 'AE'],
+  [/kleinunternehmer|§\s?19\b|§\s?4\s?nr\.?\s?\d/i, 'E'],
+  [/nicht\s+steuerbar|not\s+(?:taxable|subject\s+to)|non\s+soumis/i, 'O'],
+];
+
 /** The printed sentence that says why no VAT is charged, joined over the rows it wraps into. */
 function readVatNote(rows: string[]): string | undefined {
   const start = rows.findIndex(
@@ -1004,18 +1013,18 @@ export function guessFromText(text: string, options: GuessOptions = {}): Invoice
   // An address without a country is at home when VAT is charged: that is the ordinary domestic invoice.
   buyer.country ??= countryOfVatId(buyer.vatId) ?? (buyer.postalCode && lines?.some((line) => (line.vatRate ?? 0) > 0) ? seller.country : undefined);
 
-  // An invoice that shows no VAT at all charges none. Why, the country of the buyer tells: outside the EU the sale is
-  // not subject to VAT, elsewhere in the EU the buyer owes it, at home the seller is exempt. A person confirms this.
+  // An invoice that shows no VAT at all charges none.
   const showsNoVat =
     totals.vat === undefined &&
     lines?.every((line) => line.vatRate === undefined) &&
     (totals.net === undefined || totals.gross === undefined || cents(totals.net) === cents(totals.gross));
-  let vatExemptionReason: string | undefined;
-  if (lines && showsNoVat && buyer.country) {
-    const vatCategory: VatCategory = !EU.has(buyer.country) ? 'O' : buyer.country !== seller.country ? 'AE' : 'E';
-    for (const line of lines) Object.assign(line, { vatCategory, vatRate: 0 });
-    vatExemptionReason = readVatNote(rows);
-  }
+  // Why, the printed reason says, or else the country of the buyer: outside the EU the sale is not subject to VAT,
+  // elsewhere in the EU the buyer owes it, at home the seller is exempt. A person confirms this.
+  const note = lines && showsNoVat ? readVatNote(rows) : undefined;
+  const byCountry = buyer.country && (!EU.has(buyer.country) ? 'O' : buyer.country !== seller.country ? 'AE' : 'E');
+  const vatCategory = lines && showsNoVat ? (NOTE_CATEGORIES.find(([pattern]) => pattern.test(note ?? ''))?.[1] ?? byCountry) : undefined;
+  if (lines && vatCategory) for (const line of lines) Object.assign(line, { vatCategory, vatRate: 0 });
+  const vatExemptionReason = vatCategory ? note : undefined;
 
   const { number, dated, beside } = readNumber(searched, rows);
   const iban = findIban(text);
