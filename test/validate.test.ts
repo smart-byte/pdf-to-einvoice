@@ -137,6 +137,63 @@ describe('validateEInvoice', () => {
     expect(result.findings[0]).toMatchObject({ severity: 'error', code: 'xml-syntax' });
   });
 
+  it('reports a line discount whose percentage, base and amount in the XML disagree, also where the line hides it', async () => {
+    // Base 50, 10 %, amount 10; the line itself is 1 x 100, against which 10 % is 10 again.
+    const xml = (
+      await create(
+        sample((d) => {
+          delete d.totals;
+          Object.assign(d.lines[0], { quantity: 1, discount: { percent: 10 } });
+        }),
+      )
+    ).xml.replace('<ram:BasisAmount>100.00</ram:BasisAmount>', '<ram:BasisAmount>50.00</ram:BasisAmount>');
+    const result = await validateEInvoice(await pdfCarrying(xml));
+    expect(result.findings).toContainEqual(expect.objectContaining({ path: 'lines.0.discount.percent', code: 'xml-discount', severity: 'error' }));
+  });
+
+  it('reports base 50, 10 % and an amount of 40', async () => {
+    const xml = (
+      await create(
+        sample((d) => {
+          delete d.totals;
+          Object.assign(d.lines[0], { quantity: 1, unitPrice: 50, discount: { percent: 10 } });
+        }),
+      )
+    ).xml.replace('<ram:ActualAmount>5.00</ram:ActualAmount>', '<ram:ActualAmount>40.00</ram:ActualAmount>');
+    expect(codes((await validateEInvoice(await pdfCarrying(xml))).findings)).toContain('xml-discount');
+  });
+
+  it('accepts its own e-invoice in forints whose discount is half a forint off its percentage', async () => {
+    const xml = (
+      await create(
+        sample((d) => {
+          delete d.totals;
+          d.currency = 'HUF';
+          Object.assign(d.lines[0], { quantity: 1, unitPrice: 4990, discount: { percent: 10, amount: 499.5 } });
+        }),
+      )
+    ).xml;
+    expect(codes((await validateEInvoice(await pdfCarrying(xml))).findings)).not.toContain('xml-discount');
+  });
+
+  it('accepts a line discount whose base differs from the line but agrees with its percentage and amount', async () => {
+    const xml = (
+      await create(
+        sample((d) => {
+          delete d.totals;
+          Object.assign(d.lines[0], { quantity: 1, discount: { percent: 20 } });
+        }),
+      )
+    ).xml
+      .replace(/<ram:CalculationPercent>20(\.0+)?<\/ram:CalculationPercent>/, '<ram:CalculationPercent>10</ram:CalculationPercent>')
+      .replace('<ram:BasisAmount>100.00</ram:BasisAmount>', '<ram:BasisAmount>200.00</ram:BasisAmount>');
+    const result = await validateEInvoice(await pdfCarrying(xml));
+    expect(codes(result.findings)).not.toContain('xml-discount');
+    expect(codes(result.findings)).not.toContain('discount-mismatch');
+    expect(codes(result.findings)).not.toContain('line-net');
+    expect(result.invoice?.lines?.[0]?.discount).toEqual({ amount: 20, reason: '95' });
+  });
+
   it('reports totals in the XML that contradict its lines', async () => {
     const xml = (await create()).xml.replace('<ram:GrandTotalAmount>1783.81<', '<ram:GrandTotalAmount>1800.00<');
     const result = await validateEInvoice(await pdfCarrying(xml));

@@ -306,6 +306,10 @@ export const STRINGS: Record<string, Entry> = {
     de: 'Der Rabatt hat ein anderes Vorzeichen als die Position. Auf einer Position mit negativem Betrag ist auch der Rabatt negativ, etwa −10 für 10 Nachlass.',
     en: '',
   },
+  'e.xml-discount': {
+    de: 'Im XML passen Prozentsatz, Grundbetrag und Betrag dieses Rabatts nicht zusammen. Bitten Sie den Rechnungssteller um eine korrigierte E-Rechnung.',
+    en: 'In the XML, the percentage, base and amount of this discount do not agree. Ask the issuer for a corrected e-invoice.',
+  },
   'e.line-net.xml': {
     de: 'Das XML nennt für diese Position {b}, Menge mal Preis ergibt aber {a}, und es nennt keinen Rabatt oder Zuschlag auf die Position, der das erklärt.',
     en: 'The XML states {b} for this line item, but quantity times price is {a}, and it names no discount or surcharge on the line that explains the difference.',
