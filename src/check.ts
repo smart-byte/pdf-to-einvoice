@@ -342,7 +342,8 @@ function xrechnungFindings(d: Bag): Finding[] {
   return findings;
 }
 
-const MONTHS = [
+/** The names of the months, as German and English invoices print them, in lower case. */
+export const MONTHS = [
   ['januar', 'january', 'jan'],
   ['februar', 'february', 'feb'],
   ['märz', 'march', 'mar', 'mär'],

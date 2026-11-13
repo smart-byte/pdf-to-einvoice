@@ -63,6 +63,24 @@ describe('keepWhatThePdfShows', () => {
     expect(keepWhatThePdfShows({ lines: [{ quantity: 7 }, { quantity: 10 }] }, pdfText)).toEqual({ lines: [{}, { quantity: 10 }] });
   });
 
+  it('keeps a quantity printed with a thousands separator', () => {
+    const text = `${pdfText}\n2  Schrauben   24.000 Stk.   0,01 €   240,00 €`;
+    expect(keepWhatThePdfShows({ lines: [{ quantity: 24000 }, { quantity: 2400 }] }, text)).toEqual({ lines: [{ quantity: 24000 }, {}] });
+  });
+
+  it('keeps a service period printed as its months, from the first day of the one to the last day of the other', () => {
+    const text = `${pdfText}\nLeistungszeitraum: September 2026 bis Januar 2027`;
+    const period = { periodStart: '2026-09-01', periodEnd: '2027-01-31' };
+    expect(keepWhatThePdfShows(period, text)).toEqual(period);
+    expect(keepWhatThePdfShows({ periodStart: '2026-09-02', periodEnd: '2027-01-30' }, text)).toEqual({});
+  });
+
+  it('does not take a single day of a month for a period', () => {
+    for (const day of ['15. September 2026', '15.09.2026', '2026-09-15']) {
+      expect(keepWhatThePdfShows({ periodStart: '2026-09-01' }, `${pdfText}\nLieferdatum ${day}`), day).toEqual({});
+    }
+  });
+
   it('does not take part of a date for an amount', () => {
     expect(keepWhatThePdfShows({ totals: { due: 3.11, gross: 1190 } }, pdfText)).toEqual({ totals: { gross: 1190 } });
   });

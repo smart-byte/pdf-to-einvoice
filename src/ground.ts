@@ -1,4 +1,4 @@
-import { amountSpellings, dateSpellings, isDate, isIban } from './check.js';
+import { amountSpellings, dateSpellings, isDate, isIban, MONTHS } from './check.js';
 import type { InvoiceDraft } from './model.js';
 
 type Bag = Record<string, any>;
@@ -50,8 +50,25 @@ export function keepWhatThePdfShows(draft: unknown, pdfText: string): InvoiceDra
   const amount: Rule = (v) =>
     typeof v === 'number' &&
     amountSpellings(v).some((spelling) => new RegExp(`(?<![\\d.,])${escape(spelling)}(?![.,]?\\d)`).test(pdfText.replace(/(\d)[ \u00a0](?=\d{3}\b)/g, '$1')));
-  // A bare number is only believed where it stands on its own, not inside a longer one.
-  const count: Rule = (v) => typeof v === 'number' && new RegExp(`(?<![\\d.,])${escape(String(v)).replace('\\.', '[.,]')}(?![\\d]|[.,]\\d)`).test(pdfText);
+  // A bare number is only believed where it stands on its own, not inside a longer one. "24.000" shows 24000.
+  const count: Rule = (v) => {
+    if (typeof v !== 'number') return false;
+    const plain = escape(String(v)).replace('\\.', '[.,]');
+    const grouped = Number.isInteger(v) ? String(v).replace(/\B(?=(\d{3})+(?!\d))/g, "[.,' ]") : plain;
+    return new RegExp(`(?<![\\d.,])(?:${plain}|${grouped})(?![\\d]|[.,]\\d)`).test(pdfText);
+  };
+  // A period may be printed as its months: "Oktober 2026" shows its first and its last day.
+  const month =
+    (which: 'first' | 'last'): Rule =>
+    (v, siblings) => {
+      if (date(v, siblings)) return true;
+      if (typeof v !== 'string' || !isDate(v)) return false;
+      const [y, m, d] = v.split('-').map(Number) as [number, number, number];
+      if (d !== (which === 'first' ? 1 : new Date(Date.UTC(y, m, 0)).getUTCDate())) return false;
+      const [mm, names] = [String(m).padStart(2, '0'), (MONTHS[m - 1] ?? []).map(escape).join('|')];
+      // The month alone, not a day in it ("15. September 2026", "15.09.2026").
+      return new RegExp(`(?<!\\d\\.?\\s*)\\b(?:${names})\\.?\\s*${y}\\b|(?<![\\d./-])${mm}[./]${y}(?!\\d)|(?<![\\d-])${y}-${mm}(?![-\\d])`).test(lower);
+    };
   const rate: Rule = (v) => typeof v === 'number' && new RegExp(`(?<![\\d.,])${escape(String(v)).replace('\\.', '[.,]')}(?:[.,]0+)?\\s?%`).test(pdfText);
   const country: Rule = (v, party) =>
     typeof v === 'string' &&
@@ -89,8 +106,8 @@ export function keepWhatThePdfShows(draft: unknown, pdfText: string): InvoiceDra
     issueDate: date,
     dueDate: date,
     deliveryDate: date,
-    periodStart: date,
-    periodEnd: date,
+    periodStart: month('first'),
+    periodEnd: month('last'),
     currency,
     paymentTerms: text,
     vatExemptionReason: text,
