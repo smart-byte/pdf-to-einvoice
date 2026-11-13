@@ -1075,7 +1075,8 @@ textarea.warned {
 .line > .field:first-of-type {
   margin-right: 1.6rem;
 }
-/* Quantity, unit and price share a row; the VAT treatment gets a row with room for its wording, the rate beside it. */
+/* Quantity, unit and price share a row, and so do the two ways to state a discount; the VAT treatment gets a row with
+   room for its wording, the rate beside it. */
 .line > .field:nth-of-type(2) {
   grid-column: span 3;
 }
@@ -1085,10 +1086,14 @@ textarea.warned {
 .line > .field:nth-of-type(4) {
   grid-column: span 4;
 }
-.line > .field:nth-of-type(5) {
+.line > .field:nth-of-type(5),
+.line > .field:nth-of-type(6) {
+  grid-column: span 6;
+}
+.line > .field:nth-of-type(7) {
   grid-column: span 8;
 }
-.line > .field:nth-of-type(6) {
+.line > .field:nth-of-type(8) {
   grid-column: span 4;
 }
 /* A line item a model added as a whole. */
@@ -1758,7 +1763,9 @@ html[lang='en']:has([data-lang][aria-pressed='true']) .legal[lang='de'] {
   .line > .field:nth-of-type(n + 2) {
     grid-column: auto;
   }
-  .line > .field:nth-of-type(5) {
+  /* Two columns: the price and the VAT treatment each get a row of their own. */
+  .line > .field:nth-of-type(4),
+  .line > .field:nth-of-type(7) {
     grid-column: 1 / -1;
   }
   .fields {

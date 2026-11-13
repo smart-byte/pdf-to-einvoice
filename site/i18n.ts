@@ -177,6 +177,8 @@ export const STRINGS: Record<string, Entry> = {
   'l.unitPrice': { de: 'Einzelpreis netto', en: 'Unit price (net)' },
   'l.vatCategory': { de: 'Umsatzsteuer', en: 'VAT' },
   'l.vatRate': { de: 'Satz\u00a0%', en: 'Rate %' },
+  'l.discountPercent': { de: 'Rabatt\u00a0%', en: 'Discount %' },
+  'l.discountAmount': { de: 'Rabattbetrag', en: 'Discount amount' },
   'l.add': { de: 'Position hinzufügen', en: 'Add a line item' },
   'l.remove': { de: 'Position {n} entfernen', en: 'Remove line item {n}' },
   'l.item': { de: 'Position {n}', en: 'Line item {n}' },
@@ -296,7 +298,7 @@ export const STRINGS: Record<string, Entry> = {
     en: 'The total stated in the XML does not match its lines. Ask the issuer for a corrected e-invoice.',
   },
   'e.line-net': {
-    de: 'Menge mal Preis ergibt {a}, auf Ihrer Rechnung steht als Betrag dieser Position aber {b}. Beides muss bis auf Rundung übereinstimmen. Passen Sie Menge oder Preis an; bei einem Rabatt auf die Position tragen Sie den Preis nach Abzug des Rabatts ein.',
+    de: 'Menge mal Preis, abzüglich eines Rabatts, ergibt {a}, auf Ihrer Rechnung steht als Betrag dieser Position aber {b}. Beides muss bis auf Rundung übereinstimmen. Passen Sie Menge, Preis oder Rabatt an.',
     en: '',
   },
   'e.discount': { de: 'Ein Rabatt braucht einen Prozentsatz oder einen Betrag.', en: '' },
@@ -311,8 +313,8 @@ export const STRINGS: Record<string, Entry> = {
     en: 'In the XML, the percentage, base and amount of this discount do not agree. Ask the issuer for a corrected e-invoice.',
   },
   'e.line-net.xml': {
-    de: 'Das XML nennt für diese Position {b}, Menge mal Preis ergibt aber {a}, und es nennt keinen Rabatt oder Zuschlag auf die Position, der das erklärt.',
-    en: 'The XML states {b} for this line item, but quantity times price is {a}, and it names no discount or surcharge on the line that explains the difference.',
+    de: 'Das XML nennt für diese Position {b}, Menge mal Preis abzüglich eines Rabatts ergibt aber {a}, und es nennt nichts sonst auf der Position, das den Unterschied erklärt.',
+    en: 'The XML states {b} for this line item, but quantity times price less a discount is {a}, and it names nothing else on the line that explains the difference.',
   },
   'e.totals-mismatch': {
     de: 'Die Summe im PDF weicht von der Summe der Positionen ab. Die E-Rechnung darf dem PDF nicht widersprechen: Bitte prüfen Sie Mengen und Preise.',

@@ -258,6 +258,39 @@ describe.skipIf(!asked)('the web app in a browser', () => {
     expect(await page.isVisible('#create')).toBe(false);
   }, 120_000);
 
+  it('takes a discount on a line item into the check, and shows the discount of an existing e-invoice', async () => {
+    const page = await open();
+    await read(page);
+    await page.fill('[data-path="lines.1.discount.percent"]', '10');
+    // The page does not show the percentage. `said` turns the no-break space of the label into a plain one.
+    expect(await said(page)).toEqual(expect.arrayContaining([expect.stringMatching(/^Position 2, Rabatt %: Diese Angabe steht so nicht im PDF/)]));
+    const invoice = sampleData() as any;
+    delete invoice.totals;
+    invoice.lines[1].discount = { percent: 10 };
+    const existing = await open();
+    await read(existing, upload('discount.einvoice.pdf', (await createEInvoice({ pdf: samplePdf(), invoice })).pdf));
+    expect(await existing.inputValue('[data-path="lines.1.discount.percent"]')).toBe('10');
+    expect(await existing.inputValue('[data-path="lines.1.discount.amount"]')).toBe('49.9');
+  }, 120_000);
+
+  it('reports a discount of an existing e-invoice whose XML contradicts its own base', async () => {
+    // Base 50, 10 %, amount 10, on a line of 1 x 100: only the base the XML states shows the contradiction.
+    const invoice = sampleData() as any;
+    delete invoice.totals;
+    Object.assign(invoice.lines[0], { quantity: 1, discount: { percent: 10 } });
+    const xml = (await createEInvoice({ pdf: samplePdf(), invoice })).xml.replace(
+      '<ram:BasisAmount>100.00</ram:BasisAmount>',
+      '<ram:BasisAmount>50.00</ram:BasisAmount>',
+    );
+    const doc = await PDFDocument.load(samplePdf());
+    await doc.attach(new TextEncoder().encode(xml), 'factur-x.xml', { mimeType: 'text/xml' });
+    const page = await open();
+    await read(page, upload('contradiction.pdf', await doc.save()));
+    expect(await said(page)).toEqual(
+      expect.arrayContaining([expect.stringMatching(/Im XML passen Prozentsatz, Grundbetrag und Betrag dieses Rabatts nicht zusammen/)]),
+    );
+  }, 120_000);
+
   it('gives a long text the room it needs: the field grows with it and can be drawn larger', async () => {
     const page = await open();
     await read(page);

@@ -240,7 +240,6 @@ export function check(draft: InvoiceDraft, options: CheckOptions = {}): CheckRes
       if (!isNumber(line.netAmount)) return;
       const apart = micro(line.quantity) * micro(line.unitPrice) - (micro(discount?.amount ?? 0) + micro(totals.lineNet[i]!)) * 10n ** 6n;
       if ((apart < 0n ? -apart : apart) <= micro(slack) * 10n ** 6n) return;
-      const product = (line.quantity * line.unitPrice).toFixed(2);
       const expected = (line.quantity * line.unitPrice - (discount?.amount ?? 0)).toFixed(2);
       const stated = totals.lineNet[i]!.toFixed(2);
       if (!options.adjustedLines) {
@@ -253,7 +252,7 @@ export function check(draft: InvoiceDraft, options: CheckOptions = {}): CheckRes
         warn(
           `lines.${i}.netAmount`,
           'line-net',
-          `The XML states ${stated} as the total of this line, but its quantity times its price is ${product}, and it names no discount or surcharge on the line that explains the difference.`,
+          `The XML states ${stated} as the total of this line, but its quantity times its price${discount ? ' less its discount' : ''} is ${expected}, and it names nothing else on the line that explains the difference.`,
         );
       }
     });

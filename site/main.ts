@@ -200,6 +200,8 @@ const LINE_FIELDS: Field[] = [
   { path: 'quantity', label: 'l.quantity', type: 'number' },
   { path: 'unit', label: 'l.unit', type: 'select', options: ['C62', 'HUR', 'DAY', 'MON', 'KGM', 'MTR', 'LTR', 'LS'].map((code) => [code, `unit.${code}`]) },
   { path: 'unitPrice', label: 'l.unitPrice', type: 'number' },
+  { path: 'discount.percent', label: 'l.discountPercent', type: 'number' },
+  { path: 'discount.amount', label: 'l.discountAmount', type: 'number' },
   { path: 'vatCategory', label: 'l.vatCategory', type: 'select', options: Object.keys(VAT_CATEGORIES).map((code) => [code, `vat.${code}`]) },
   { path: 'vatRate', label: 'l.vatRate', type: 'number' },
 ];
@@ -329,8 +331,11 @@ function describe(finding: { code: string; message: string; path?: string }): st
   const key = candidates.find((candidate) => candidate in STRINGS);
   if (!key || (lang !== 'de' && !STRINGS[key]?.en)) return finding.message;
   const line = state.draft.lines?.[Number(/^lines\.(\d+)\./.exec(path)?.[1])];
+  // What the line comes to: quantity times price, less its discount.
+  const product = Number(line?.quantity) * Number(line?.unitPrice);
+  const discount = line?.discount?.amount ?? (line?.discount?.percent != null ? (product * Number(line.discount.percent)) / 100 : 0);
   return t(key, {
-    a: line ? money(Number(line.quantity) * Number(line.unitPrice)) : '',
+    a: line ? money(product - Number(discount)) : '',
     b: line ? money(Number(line.netAmount)) : '',
     // Known limit: the value that could not be written is read from the quotes of the English message. Give the finding
     // the value itself if that message is ever worded differently.
@@ -723,7 +728,7 @@ function suggestPaymentTerms(): void {
 }
 
 /** Findings that are about the file, not about a field of the form. */
-const FILE_CODES = new Set(['no-xml', 'xml-syntax', 'profile', 'pdf-a', 'pdf-fonts', 'pdf-actions']);
+const FILE_CODES = new Set(['no-xml', 'xml-syntax', 'profile', 'pdf-a', 'pdf-fonts', 'pdf-actions', 'xml-discount']);
 
 function setText(selector: string, key: string): void {
   const node = $(selector);
