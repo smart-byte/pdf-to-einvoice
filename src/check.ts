@@ -1,4 +1,4 @@
-import { calculate, micro, type Totals } from './calculate.js';
+import { calculate, micro, percentAgrees, percentOf, slackOf, type Totals } from './calculate.js';
 import { INVOICE_TYPES, VAT_CATEGORIES, type Invoice, type InvoiceDraft, type VatCategory } from './model.js';
 
 export interface Finding {
@@ -61,7 +61,12 @@ function withDefaults(draft: InvoiceDraft): Bag {
     d[who].country = upper(d[who].country);
     d[who].vatId = compact(d[who].vatId);
   }
-  d.lines = (Array.isArray(d.lines) ? d.lines : []).map((l: Bag) => ({ unit: 'C62', vatCategory: 'S', ...l }));
+  d.lines = (Array.isArray(d.lines) ? d.lines : []).map((l: Bag) => {
+    const line: Bag = { unit: 'C62', vatCategory: 'S', ...l };
+    // A discount whose fields were all left empty is none.
+    if (line.discount && typeof line.discount === 'object' && Object.keys(line.discount).length === 0) delete line.discount;
+    return line;
+  });
   return d;
 }
 
@@ -153,6 +158,19 @@ export function check(draft: InvoiceDraft, options: CheckOptions = {}): CheckRes
       error(at('netAmount'), 'format', 'Not a number.');
       calculable = false;
     }
+    const discount = line.discount;
+    if (discount !== undefined) {
+      if (discount.percent === undefined && discount.amount === undefined) error(at('discount'), 'discount', 'A discount needs a percentage or an amount.');
+      for (const field of ['percent', 'amount']) {
+        if (discount[field] !== undefined && !isNumber(discount[field])) {
+          error(at(`discount.${field}`), 'format', 'Not a number.');
+          calculable = false;
+        }
+      }
+      if (isNumber(discount.percent) && discount.percent < 0) {
+        error(at('discount.percent'), 'discount', 'A percentage is never negative; the sign comes from the line.');
+      }
+    }
     if (isNumber(line.unitPrice) && line.unitPrice < 0) {
       error(at('unitPrice'), 'negative-price', 'The unit price must not be negative. Use a negative quantity for credits.');
     }
@@ -198,19 +216,38 @@ export function check(draft: InvoiceDraft, options: CheckOptions = {}): CheckRes
     if (totals.due > 0 && d.dueDate === undefined && d.paymentTerms === undefined) {
       error('dueDate', 'payment-terms', 'An invoice with an amount due needs a due date or payment terms.');
     }
-    // The data has no discount on a line that could explain a difference between its total and quantity times price.
-    // Two cents are allowed for rounding, half a forint where a currency has no cents (PEPPOL-EN16931-R120).
-    const slack = d.currency === 'HUF' ? 0.5 : 0.02;
+    // A line total is quantity times price less the discount. Two cents are allowed for rounding, half a forint where
+    // a currency has no cents.
+    const slack = slackOf(d.currency);
     d.lines.forEach((line: Bag, i: number) => {
+      const discount = totals.lineDiscounts[i];
+      if (discount && line.discount.amount !== undefined) {
+        const { percent, amount } = line.discount;
+        if (percent !== undefined && !percentAgrees(discount.base, percent, amount, slack)) {
+          error(
+            `lines.${i}.discount.amount`,
+            'discount-mismatch',
+            `${percent} % of ${discount.base.toFixed(2)} is ${percentOf(discount.base, percent).toFixed(2)}, but the discount states ${amount.toFixed(2)}. Correct the percentage or the amount.`,
+          );
+        } else if (percent === undefined && discount.base !== 0 && amount !== 0 && Math.sign(discount.base) !== Math.sign(amount)) {
+          warn(
+            `lines.${i}.discount.amount`,
+            'discount-sign',
+            'The discount and its line have different signs. On a line with a negative amount the discount is negative too: -10 for 10 off.',
+          );
+        }
+      }
       if (!isNumber(line.netAmount)) return;
-      const apart = micro(line.quantity) * micro(line.unitPrice) - micro(totals.lineNet[i]!) * 10n ** 6n;
+      const apart = micro(line.quantity) * micro(line.unitPrice) - (micro(discount?.amount ?? 0) + micro(totals.lineNet[i]!)) * 10n ** 6n;
       if ((apart < 0n ? -apart : apart) <= micro(slack) * 10n ** 6n) return;
-      const [product, stated] = [(line.quantity * line.unitPrice).toFixed(2), totals.lineNet[i]!.toFixed(2)];
+      const product = (line.quantity * line.unitPrice).toFixed(2);
+      const expected = (line.quantity * line.unitPrice - (discount?.amount ?? 0)).toFixed(2);
+      const stated = totals.lineNet[i]!.toFixed(2);
       if (!options.adjustedLines) {
         error(
           `lines.${i}.netAmount`,
           'line-net',
-          `Quantity times unit price is ${product}, but the line states ${stated}. Correct the quantity or the price; if the line carries a discount, enter the unit price after the discount.`,
+          `Quantity times unit price${discount ? ' less the discount' : ''} is ${expected}, but the line states ${stated}. Correct the quantity, the price or the discount.`,
         );
       } else if (!options.adjustedLines.includes(i)) {
         warn(

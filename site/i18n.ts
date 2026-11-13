@@ -299,6 +299,13 @@ export const STRINGS: Record<string, Entry> = {
     de: 'Menge mal Preis ergibt {a}, auf Ihrer Rechnung steht als Betrag dieser Position aber {b}. Beides muss bis auf Rundung übereinstimmen. Passen Sie Menge oder Preis an; bei einem Rabatt auf die Position tragen Sie den Preis nach Abzug des Rabatts ein.',
     en: '',
   },
+  'e.discount': { de: 'Ein Rabatt braucht einen Prozentsatz oder einen Betrag.', en: '' },
+  'e.discount.percent': { de: 'Ein Prozentsatz ist nie negativ; das Vorzeichen ergibt sich aus der Position.', en: '' },
+  'e.discount-mismatch': { de: 'Prozentsatz und Betrag des Rabatts passen nicht zusammen. Bitte prüfen Sie beide.', en: '' },
+  'e.discount-sign': {
+    de: 'Der Rabatt hat ein anderes Vorzeichen als die Position. Auf einer Position mit negativem Betrag ist auch der Rabatt negativ, etwa −10 für 10 Nachlass.',
+    en: '',
+  },
   'e.line-net.xml': {
     de: 'Das XML nennt für diese Position {b}, Menge mal Preis ergibt aber {a}, und es nennt keinen Rabatt oder Zuschlag auf die Position, der das erklärt.',
     en: 'The XML states {b} for this line item, but quantity times price is {a}, and it names no discount or surcharge on the line that explains the difference.',

@@ -88,6 +88,71 @@ describe('check', () => {
     expect(lineTotal(499.51, 'HUF')).toEqual(['error:line-net']);
   });
 
+  it('checks a line total against quantity times price less the discount', () => {
+    const at = (netAmount: number) =>
+      codesAt(
+        withChange((d) => {
+          delete d.totals;
+          Object.assign(d.lines[1], { discount: { percent: 10 }, netAmount });
+        }),
+        'lines.1.netAmount',
+      );
+    expect(at(449.1)).toEqual([]);
+    expect(at(499)).toEqual(['error:line-net']);
+  });
+
+  it('wants a discount to have a percentage or an amount, a percentage that is not negative, and numbers', () => {
+    const at = (discount: unknown, path: string) =>
+      codesAt(
+        withChange((d) => {
+          delete d.totals;
+          d.lines[1].discount = discount;
+        }),
+        path,
+      );
+    expect(at({ reason: 'Treuerabatt' }, 'lines.1.discount')).toEqual(['error:discount']);
+    expect(at({ percent: -5 }, 'lines.1.discount.percent')).toEqual(['error:discount']);
+    expect(at({ percent: '10 %' }, 'lines.1.discount.percent')).toEqual(['error:format']);
+  });
+
+  it('ignores a discount whose fields were all left empty', () => {
+    const result = check(
+      withChange((d) => {
+        delete d.totals;
+        d.lines[1].discount = { percent: null, amount: '' };
+      }),
+    );
+    expect(result.findings.filter((f) => f.path.startsWith('lines.1'))).toEqual([]);
+    expect(result.invoice?.lines[1]).not.toHaveProperty('discount');
+  });
+
+  it('wants percentage and amount of a discount to agree, two cents apart at most', () => {
+    const at = (amount: number) =>
+      codesAt(
+        withChange((d) => {
+          delete d.totals;
+          d.lines[1].discount = { percent: 10, amount };
+        }),
+        'lines.1.discount.amount',
+      );
+    expect(at(49.92)).toEqual([]);
+    expect(at(49.93)).toEqual(['error:discount-mismatch']);
+  });
+
+  it('warns about a fixed discount whose sign differs from its line', () => {
+    const at = (quantity: number, amount: number) =>
+      codesAt(
+        withChange((d) => {
+          delete d.totals;
+          Object.assign(d.lines[1], { quantity, discount: { amount } });
+        }),
+        'lines.1.discount.amount',
+      );
+    expect(at(-2, 50)).toEqual(['warning:discount-sign']);
+    expect(at(-2, -50)).toEqual([]);
+    expect(at(0, 5)).toEqual([]);
+  });
+
   it('treats null and blank strings as missing', () => {
     expect(
       codesAt(
