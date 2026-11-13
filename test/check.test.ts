@@ -344,6 +344,15 @@ describe('check against the PDF text', () => {
     expect(codesAt(draft, 'lines.1.unitPrice', { pdfText })).toEqual(['warning:not-in-pdf']);
   });
 
+  it('finds a unit price with more decimals than cents, as the PDF prints it', () => {
+    const draft = withChange((d) => {
+      Object.assign(d.lines[1], { quantity: 1000, unitPrice: 0.4995 });
+      delete d.totals;
+    });
+    const fine = pdfText.replace('2 Stk.   249,50 €   499,00 €', '1.000 Stk.   0,4995 €   499,50 €');
+    expect(codesAt(draft, 'lines.1.unitPrice', { pdfText: fine })).toEqual([]);
+  });
+
   it('warns when the calculated total is not on the PDF', () => {
     const draft = withChange((d) => {
       d.lines[0].quantity = 11;

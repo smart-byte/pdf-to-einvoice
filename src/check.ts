@@ -388,7 +388,9 @@ export function dateSpellings(iso: string): string[] {
 
 /** The ways an amount is commonly printed, without whitespace. */
 export function amountSpellings(n: number): string[] {
-  const [int, frac] = Math.abs(n).toFixed(2).split('.') as [string, string];
+  // A price may be finer than a cent ("0,4995 €"): it keeps its decimals, two at least.
+  const decimals = Math.min(Math.max(2, String(n).split('.')[1]?.length ?? 0), 6);
+  const [int, frac] = Math.abs(n).toFixed(decimals).split('.') as [string, string];
   const grouped = (sep: string) => int.replace(/\B(?=(\d{3})+(?!\d))/g, sep);
   const spellings = [`${int},${frac}`, `${int}.${frac}`, `${grouped('.')},${frac}`, `${grouped(',')}.${frac}`, `${grouped("'")}.${frac}`];
   // Known limit: a whole number matches any occurrence of its digits ("100" in "1000"); tighten with word boundaries if that hides real mismatches.
