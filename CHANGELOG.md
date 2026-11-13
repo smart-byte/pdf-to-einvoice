@@ -11,9 +11,10 @@ All notable changes to this project are documented here. The format follows
 - `guessFromText` no longer takes the customer's VAT ID or the seller's own address for the other party, nor a
   second currency on the page for the invoice's. It reads the country below an address abroad, Dutch postal codes,
   units in a column of their own, negative amounts set with a minus sign, English totals rows, the title of a
-  partial, prepayment or corrected invoice with its type, and periods over several months.
+  partial, prepayment or corrected invoice with its type, periods over several months, payment terms that start
+  with "Die Zahlung ist", and the VAT category of an invoice without VAT from its printed reason.
 - `readInvoiceXml` takes no customer number for a tax number, and `check` finds unit prices finer than a cent on the
-  PDF.
+  PDF. `keepWhatThePdfShows` keeps quantities with a thousands separator and periods printed as months.
 
 ## [0.1.0] - 2026-11-11
 
