@@ -77,6 +77,11 @@ describe('guessFromText with a customer abroad', () => {
     expect(guess.seller).toMatchObject({ vatId: 'DE123456789', country: 'DE' });
   });
 
+  it('takes the VAT ID beside the bank account in the footer for the seller’s, where the customer’s address cannot be read', () => {
+    const guess = guessFromText(...letterhead(['Sample Ireland Limited', '2 Sample Quay', 'Dublin'], 'IRELAND', 'IE1234567T'));
+    expect(guess.seller).toMatchObject({ vatId: 'DE123456789', country: 'DE' });
+  });
+
   it('reads a Dutch postal code with its letters', () => {
     const guess = guessFromText(...letterhead(['Voorbeeld B.V.', 'Voorbeeldstraat 5', '1234 AB Voorbeeldstad'], 'NIEDERLANDE'));
     expect(guess.buyer).toMatchObject({ name: 'Voorbeeld B.V.', postalCode: '1234 AB', city: 'Voorbeeldstad', country: 'NL' });
@@ -157,8 +162,9 @@ describe('guessFromText with units', () => {
       '2   Fahrt   400   km   0,30 €   120,00 €',
       '3   Betreuung   2   Wochen   100,00 €   200,00 €',
       '4   Material   1   pauschal   40,00 €   40,00 €',
+      '5   Anfahrt   1   flat rate   0,00 €   0,00 €',
     );
-    expect(guessFromText(text).lines?.map((line) => line.unit)).toEqual(['HUR', 'KMT', 'WEE', 'LS']);
+    expect(guessFromText(text).lines?.map((line) => line.unit)).toEqual(['HUR', 'KMT', 'WEE', 'LS', 'LS']);
   });
 
   it('leaves a unit it does not know open instead of taking it for pieces', () => {

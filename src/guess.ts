@@ -213,8 +213,10 @@ const SALUTATION = /^(?:herrn?|frau|mr\.?|mrs\.?|ms\.?|monsieur|madame|mme\.?)$/
 const LEGAL_FORM = /(?:^|\s)(?:gmbh|mbh|ag|kg|ohg|gbr|e\.\s?[vk]\.|a\.\s?g\.|ltd\.?|inc\.?|llc|plc|sarl|sas|s\.a\.|b\.v\.)(?=\s|$)|&\s*co\b/i;
 /** What only the issuer prints about itself: its tax number and its entry in the commercial register. */
 const ISSUER_SIGNS = /steuer-?(?:nr|nummer)|\bst\.?-?nr|tax\s+(?:number|no\b)|\bhr[ab]\b|amtsgericht|registergericht|handelsregister|siret/i;
+/** What only the issuer prints beside its VAT ID: its numbers and its bank account. */
+const ISSUER_OR_BANK = new RegExp(`${ISSUER_SIGNS.source}|\\b(?:iban|bic)\\b`, 'i');
 /** What a footer lists beside the issuer's name: its numbers, its VAT ID and its bank account. */
-const IDENTIFIERS = new RegExp(`${ISSUER_SIGNS.source}|\\b(?:${VAT_ID_LABEL.source})|\\b(?:iban|bic)\\b`, 'i');
+const IDENTIFIERS = new RegExp(`${ISSUER_OR_BANK.source}|\\b(?:${VAT_ID_LABEL.source})`, 'i');
 
 function roleOf(line: string): Role | undefined {
   return BUYER_HEADING.test(line) ? 'buyer' : SELLER_HEADING.test(line) ? 'seller' : OTHER_HEADING.test(line) ? 'other' : undefined;
@@ -414,7 +416,7 @@ const UNITS: [RegExp, string][] = [
   [/^(l|liter|litre)(\(?s\)?)?\.?$/i, 'LTR'],
   [/^(m²|qm)\.?$/i, 'MTK'],
   [/^m\.?$/i, 'MTR'],
-  [/^(pauschal|psch|flat)\.?$/i, 'LS'],
+  [/^(pauschal|psch|flat(?: rate)?|lump sum)\.?$/i, 'LS'],
   [/^km\.?$/i, 'KMT'],
   [/^(wochen?|weeks?)\.?$/i, 'WEE'],
   [/^(stk|stück|st|pcs?|pieces?|units?|unit\(s\))\.?$/i, 'C62'],
@@ -1001,14 +1003,15 @@ export function guessFromText(text: string, options: GuessOptions = {}): Invoice
   const totals = readTotals(searched, text);
   const lines = readItems(rows, totals, options.blocks);
 
-  // A VAT ID belongs to the party in whose address it stands. Otherwise the customer's is labelled as such, and the seller's is the first of the rest.
+  // A VAT ID belongs to the party in whose address it stands. Otherwise the customer's is labelled as such.
   const vatIds = vatIdsIn(searched);
   const inAddress = (party: Found | undefined) => (party ? vatIdsIn(party.tail)[0]?.id : undefined);
   const buyer: Partial<Party> = { ...found.buyer?.party, vatId: inAddress(found.buyer) ?? vatIds.find(({ customer }) => customer)?.id };
-  const seller: Partial<Party> = {
-    ...found.seller?.party,
-    vatId: inAddress(found.seller) ?? vatIds.find(({ id, customer }) => !customer && id !== buyer.vatId)?.id,
-  };
+  // Of the rest, one that stands beside the issuer's numbers or bank account, as in a footer, is the seller's.
+  const others = vatIds.filter(({ id, customer }) => !customer && id !== buyer.vatId);
+  const units = [...rows, ...(options.blocks ?? []).map((block) => block.join('   '))];
+  const besideIssuer = others.find(({ id }) => units.some((unit) => unit.replace(/ /g, '').includes(id) && ISSUER_OR_BANK.test(unit)));
+  const seller: Partial<Party> = { ...found.seller?.party, vatId: inAddress(found.seller) ?? (besideIssuer ?? others[0])?.id };
   seller.country ??= countryOfVatId(seller.vatId);
   // An address without a country is at home when VAT is charged: that is the ordinary domestic invoice.
   buyer.country ??= countryOfVatId(buyer.vatId) ?? (buyer.postalCode && lines?.some((line) => (line.vatRate ?? 0) > 0) ? seller.country : undefined);
