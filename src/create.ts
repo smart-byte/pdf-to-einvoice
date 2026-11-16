@@ -110,8 +110,12 @@ async function write(format: string, invoice: Invoice, totals: Totals, findings:
 /** The XML is the binding part: a value that was given but did not make it there must not go unnoticed. */
 function reportNotWritten(invoice: Invoice, xml: string, findings: Finding[]): void {
   const escaped = (value: string) => value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  const { lines, seller, buyer, totals: _printed, typeCode: _type, currency: _currency, ...head } = invoice;
-  const given = [head, seller, buyer, ...lines.map(({ name, description }) => ({ name, description }))].flatMap((part) => Object.entries(part));
+  const { lines, seller, buyer, discounts = [], charges = [], totals: _printed, typeCode: _type, currency: _currency, ...head } = invoice;
+  const given = [
+    ...[head, seller, buyer, ...lines.map(({ name, description }) => ({ name, description }))].flatMap((part) => Object.entries(part)),
+    ...discounts.map((entry, i) => [`discounts.${i}.reason`, entry.reason] as const),
+    ...charges.map((entry, i) => [`charges.${i}.reason`, entry.reason] as const),
+  ];
   for (const [field, value] of given) {
     if (typeof value === 'string' && !/^\d{4}-\d{2}-\d{2}$/.test(value) && !xml.includes(escaped(value))) {
       findings.push({

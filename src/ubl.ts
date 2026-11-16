@@ -40,7 +40,8 @@ function contact(p: Party): Bag | undefined {
 export function toUbl(invoice: Invoice, totals: Totals, xrechnung = false): EInvoiceEuInvoice {
   const { seller, buyer, currency } = invoice;
   const money = (key: string, n: number) => ({ [key]: amount(n), [`${key}@currencyID`]: currency });
-  const categories = new Set(invoice.lines.map((l) => l.vatCategory));
+  // A discount or charge on the whole invoice may bring a category of its own.
+  const categories = new Set([...invoice.lines.map((l) => l.vatCategory), ...totals.adjustments.map((a) => a.category)]);
   // BR-O-02: an invoice that is not subject to VAT must not carry VAT identifiers.
   const vatIdsAllowed = !categories.has('O');
 
@@ -128,6 +129,20 @@ export function toUbl(invoice: Invoice, totals: Totals, xrechnung = false): EInv
     'cac:PaymentTerms': invoice.paymentTerms
       ? { 'cbc:Note': xrechnung && /^\s*#/m.test(invoice.paymentTerms) ? `${invoice.paymentTerms}\n` : invoice.paymentTerms }
       : undefined,
+    // One for each VAT group a discount or charge on the whole invoice goes into. A reason in words stands alone, as on a line.
+    'cac:AllowanceCharge': totals.adjustments.length
+      ? totals.adjustments.map((a) =>
+          compact({
+            'cbc:ChargeIndicator': String(a.list === 'charges'),
+            'cbc:AllowanceChargeReasonCode': a.reason || a.list === 'charges' ? undefined : '95',
+            'cbc:AllowanceChargeReason': a.reason,
+            'cbc:MultiplierFactorNumeric': a.percent !== undefined ? decimal(a.percent) : undefined,
+            ...money('cbc:Amount', a.amount),
+            ...(a.base !== undefined ? money('cbc:BaseAmount', a.base) : {}),
+            'cac:TaxCategory': taxCategory(a.category, a.rate, false),
+          }),
+        )
+      : undefined,
     'cac:TaxTotal': [
       {
         ...money('cbc:TaxAmount', totals.vat),
@@ -139,9 +154,12 @@ export function toUbl(invoice: Invoice, totals: Totals, xrechnung = false): EInv
       },
     ],
     'cac:LegalMonetaryTotal': compact({
-      ...money('cbc:LineExtensionAmount', totals.net),
+      ...money('cbc:LineExtensionAmount', totals.lineTotal),
       ...money('cbc:TaxExclusiveAmount', totals.net),
       ...money('cbc:TaxInclusiveAmount', totals.gross),
+      // Written whenever there is a discount or charge, even at 0.00 (BR-CO-11, BR-CO-12).
+      ...(totals.adjustments.some((a) => a.list === 'discounts') ? money('cbc:AllowanceTotalAmount', totals.allowances) : {}),
+      ...(totals.adjustments.some((a) => a.list === 'charges') ? money('cbc:ChargeTotalAmount', totals.charges) : {}),
       ...(totals.prepaid ? money('cbc:PrepaidAmount', totals.prepaid) : {}),
       ...money('cbc:PayableAmount', totals.due),
     }),
