@@ -8,6 +8,15 @@ type Node = Record<string, any> | string | undefined;
 // they are read. Character references such as &#228; are decoded only with htmlEntities.
 const parser = new XMLParser({ ignoreAttributes: false, removeNSPrefix: true, parseTagValue: false, htmlEntities: true });
 
+/**
+ * The percentage of a discount or charge, without its sign. Some generators repeat the minus of a credit note there:
+ * 10 % off -100.00 is written as -10 % of -100.00 = -10.00. `signed` keeps whether it had one.
+ */
+function percentageOf(entry: Node): { percent?: number; signed: boolean } {
+  const given = number(entry, 'CalculationPercent');
+  return { percent: given === undefined ? undefined : Math.abs(given), signed: given !== undefined && given < 0 };
+}
+
 /** Every occurrence of a child element; the parser gives one as a value and several as an array. */
 function all(node: Node, name: string): any[] {
   const value = typeof node === 'object' ? node[name] : undefined;
@@ -89,18 +98,22 @@ function lineOf(item: Node, currency: string | undefined) {
     return { line: read, adjusted: entries.length > 0 || !perUnit, contradicts: false };
   }
   const amount = number(entry, 'ActualAmount');
-  const percent = number(entry, 'CalculationPercent');
+  const { percent, signed } = percentageOf(entry);
   const base = number(entry, 'BasisAmount');
   const slack = slackOf(currency);
-  const agrees = (from: number | undefined) =>
-    from !== undefined && percent !== undefined && amount !== undefined && percentAgrees(from, percent, amount, slack);
+  const agrees = (from: number | undefined, sign = 1) =>
+    from !== undefined && percent !== undefined && amount !== undefined && percentAgrees(from, sign * percent, amount, slack);
   const ownBase = read.quantity !== undefined && read.unitPrice !== undefined ? lineBase(read.quantity, read.unitPrice) : undefined;
   const discount: Allowance = {
     ...(agrees(ownBase) ? { percent } : {}),
     ...(amount !== undefined ? { amount } : {}),
     reason: text(entry, 'Reason') ?? text(entry, 'ReasonCode'),
   };
-  return { line: { ...read, discount }, adjusted: false, contradicts: percent !== undefined && base !== undefined && !agrees(base) };
+  return {
+    line: { ...read, discount },
+    adjusted: false,
+    contradicts: percent !== undefined && base !== undefined && !agrees(base) && !(signed && agrees(base, -1)),
+  };
 }
 
 /**
@@ -121,17 +134,17 @@ function adjustmentsOf(settlement: Node, lines: ReturnType<typeof line>[], curre
     const list = text(entry, 'ChargeIndicator', 'Indicator') === 'true' ? 'charges' : 'discounts';
     const path = `${list}.${read[list].length}`;
     const amount = number(entry, 'ActualAmount');
-    const percent = number(entry, 'CalculationPercent');
+    const { percent, signed } = percentageOf(entry);
     const base = number(entry, 'BasisAmount');
     const vatCategory = text(entry, 'CategoryTradeTax', 'CategoryCode') as VatCategory | undefined;
     // Category O states no rate at all. Without any category (BR-32) there is no rate either, and no VAT group is guessed.
     const vatRate = number(entry, 'CategoryTradeTax', 'RateApplicablePercent') ?? (vatCategory !== undefined ? 0 : undefined);
-    const agrees = (from: number | undefined) =>
-      from !== undefined && percent !== undefined && amount !== undefined && percentAgrees(from, percent, amount, slack);
+    const agrees = (from: number | undefined, sign = 1) =>
+      from !== undefined && percent !== undefined && amount !== undefined && percentAgrees(from, sign * percent, amount, slack);
     const group = lines.filter((l) => l.vatCategory === vatCategory && l.vatRate === vatRate);
     // Summed in millionths, never in floating point euros.
     const ownBase = group.every((l) => l.netAmount !== undefined) ? Number(group.reduce((sum, l) => sum + micro(l.netAmount!), 0n)) / 1e6 : undefined;
-    if (percent !== undefined && base !== undefined && !agrees(base)) read.contradictions.push(`${path}.percent`);
+    if (percent !== undefined && base !== undefined && !agrees(base) && !(signed && agrees(base, -1))) read.contradictions.push(`${path}.percent`);
     else if (percent !== undefined && !agrees(ownBase)) read.percentages[path] = percent;
     read[list].push({
       ...(agrees(ownBase) ? { percent } : {}),
