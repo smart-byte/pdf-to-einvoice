@@ -61,7 +61,6 @@ received e-invoice with errors has to be corrected by its issuer.
 
 - Many invoices from an invoicing program: take the data from that program instead of reading PDFs back; the README
   shows how ("Many invoices at once").
-- Discounts on the whole invoice are not modelled yet: a line with a negative quantity.
 - Italy, Poland, Belgium and France route invoices through state platforms; a file alone is not enough there.
 
 With an MCP client, `npx -y pdf-to-einvoice mcp` offers the same steps as tools.

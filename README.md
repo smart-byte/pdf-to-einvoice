@@ -188,8 +188,11 @@ owed. Defaults: `typeCode` 380 (invoice), `currency` EUR, `unit` C62 (piece), `v
 Every category except `S` and `Z` needs `vatExemptionReason`: the sentence on your invoice that says why no VAT is
 charged. `totals` are the sums printed on the PDF; if they contradict the calculation, that is an error, because the
 XML must not contradict the page. A line's `discount` is a `percent` of quantity x unit price, an `amount`, or both;
-its `netAmount` may differ from quantity x unit price less the discount by rounding only (0.02). The full list of
-fields is in [`src/model.ts`](src/model.ts) and in `npx pdf-to-einvoice schema`.
+its `netAmount` may differ from quantity x unit price less the discount by rounding only (0.02). `discounts` and
+`charges` hold those on the whole invoice, the same way, with a `reason` (required for a charge) and the `vatCategory`
+and `vatRate` they belong to where the invoice names them. A percentage is taken of each VAT rate of the lines; an
+amount is never split between rates, so where the lines have several, it needs its rate. The full list of fields is in
+[`src/model.ts`](src/model.ts) and in `npx pdf-to-einvoice schema`.
 
 ## XRechnung
 
@@ -238,8 +241,8 @@ with a PDF/A validator.
   cannot place, and can be wrong. A scanned PDF has no text to read at all. The comparison with the PDF tells whether
   a value stands in its text, not where: an address entered for the wrong party passes. The XML is the part that
   counts legally, and the tool cannot know what you meant.
-- **Not modelled yet:** discounts and charges on the whole invoice (use a line with a negative quantity), VAT in a
-  second currency, several payment accounts, attachments, the profiles BASIC and EXTENDED.
+- **Not modelled yet:** VAT in a second currency, several payment accounts, attachments, the profiles BASIC and
+  EXTENDED. Reading a PDF does not find discounts and charges yet: enter them.
 - **Nothing is assumed about the delivery.** Without a delivery date and a `deliveryCountry` the delivery part of the
   XML is empty, as in official samples of the standard; a validator may remark on the empty element. Only an
   intra-community supply names the buyer's country there, and the check asks about it.
