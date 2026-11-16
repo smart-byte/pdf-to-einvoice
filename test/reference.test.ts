@@ -58,6 +58,10 @@ const CASES: Record<string, InvoiceDraft> = {
     d.buyer = US_BUYER;
     d.currency = 'USD';
   }),
+  'not subject to VAT, with a charge in the same category': withoutVat('O', 'Not taxable in Germany (§ 3a (2) UStG).', (d) => {
+    d.buyer = US_BUYER;
+    d.charges = [{ amount: 5, reason: 'Porto' }];
+  }),
   'small business without VAT (§ 19 UStG)': withoutVat('E', 'No VAT charged: small business under § 19 UStG.', (d) => {
     delete d.seller.vatId;
     d.seller.taxNumber = '123/456/78901';
@@ -73,6 +77,30 @@ const CASES: Record<string, InvoiceDraft> = {
   'line discounts: a percentage with a cent fraction, an amount with a reason': sample((d) => {
     d.lines.push({ name: 'Schulungsunterlagen', quantity: 3, unit: 'C62', unitPrice: 33.33, vatCategory: 'S', vatRate: 19, discount: { percent: 10 } });
     d.lines[1].discount = { amount: 50, reason: 'Treuerabatt' };
+    delete d.totals;
+  }),
+  'a percentage off the whole invoice, split between two VAT rates': sample((d) => {
+    d.lines[1].vatRate = 7;
+    d.discounts = [{ percent: 5 }];
+    delete d.totals;
+  }),
+  'a fixed discount on the whole invoice, with its reason': sample((d) => {
+    d.discounts = [{ amount: 100, reason: 'Treuerabatt' }];
+    delete d.totals;
+  }),
+  'freight at a VAT rate no line has': sample((d) => {
+    for (const line of d.lines) line.vatRate = 7;
+    d.charges = [{ amount: 9.9, reason: 'Fracht', vatRate: 19 }];
+    delete d.totals;
+  }),
+  'a discount on the whole invoice that rounds to 0.00': sample((d) => {
+    d.discounts = [{ percent: 0.0001 }];
+    delete d.totals;
+  }),
+  'a line discount beside a discount and a charge on the whole invoice': sample((d) => {
+    d.lines[1].discount = { percent: 10 };
+    d.discounts = [{ percent: 3, amount: 43.47, reason: 'Jubiläumsrabatt' }];
+    d.charges = [{ amount: 15, reason: 'Verpackung' }];
     delete d.totals;
   }),
   'corrected invoice replacing an earlier plain PDF': sample((d) =>
@@ -107,6 +135,13 @@ const XRECHNUNG_CASES: Record<string, InvoiceDraft> = Object.fromEntries(
       for (const line of d.lines) line.quantity = -line.quantity;
       d.lines[0].discount = { percent: 10 };
       d.lines[1].discount = { amount: -50 };
+      for (const field of ['dueDate', 'paymentTerms', 'iban', 'bic', 'totals']) delete d[field];
+      Object.assign(d, { typeCode: '381', precedingInvoiceNumber: 'RE-2026-0041', precedingInvoiceDate: '2026-10-20' });
+    }),
+    'credit note with a discount and a charge on the whole invoice, both negative': sample((d) => {
+      for (const line of d.lines) line.quantity = -line.quantity;
+      d.discounts = [{ percent: 10 }];
+      d.charges = [{ amount: -5, reason: 'Fracht' }];
       for (const field of ['dueDate', 'paymentTerms', 'iban', 'bic', 'totals']) delete d[field];
       Object.assign(d, { typeCode: '381', precedingInvoiceNumber: 'RE-2026-0041', precedingInvoiceDate: '2026-10-20' });
     }),

@@ -182,6 +182,17 @@ export const STRINGS: Record<string, Entry> = {
   'l.add': { de: 'Position hinzufügen', en: 'Add a line item' },
   'l.remove': { de: 'Position {n} entfernen', en: 'Remove line item {n}' },
   'l.item': { de: 'Position {n}', en: 'Line item {n}' },
+  's.adjustments': { de: 'Rabatte und Zuschläge auf die ganze Rechnung', en: 'Discounts and charges on the whole invoice' },
+  'a.discount': { de: 'Rabatt {n}', en: 'Discount {n}' },
+  'a.charge': { de: 'Zuschlag {n}', en: 'Charge {n}' },
+  'a.add.discount': { de: 'Rabatt hinzufügen', en: 'Add a discount' },
+  'a.add.charge': { de: 'Zuschlag hinzufügen', en: 'Add a charge' },
+  'a.remove.discount': { de: 'Rabatt {n} entfernen', en: 'Remove discount {n}' },
+  'a.remove.charge': { de: 'Zuschlag {n} entfernen', en: 'Remove charge {n}' },
+  'a.reason': { de: 'Grund', en: 'Reason' },
+  'a.percent': { de: 'Prozent', en: 'Percent' },
+  'a.amount': { de: 'Betrag', en: 'Amount' },
+  'a.vatFollow': { de: 'wie die Positionen', en: 'as the line items' },
 
   'type.380': { de: 'Rechnung', en: 'Invoice' },
   'type.381': { de: 'Gutschrift', en: 'Credit note' },
@@ -294,8 +305,8 @@ export const STRINGS: Record<string, Entry> = {
   'e.buyer-vat-id': { de: 'Für Reverse Charge und innergemeinschaftliche Lieferungen ist die USt-IdNr. des Kunden nötig.', en: '' },
   // An existing e-invoice: both sides of the contradiction are in its XML.
   'e.totals-mismatch.xml': {
-    de: 'Die im XML angegebene Summe passt nicht zu seinen Positionen. Bitten Sie den Rechnungssteller um eine korrigierte E-Rechnung.',
-    en: 'The total stated in the XML does not match its lines. Ask the issuer for a corrected e-invoice.',
+    de: 'Die im XML angegebene Summe passt nicht zu seinen Positionen, Rabatten und Zuschlägen. Bitten Sie den Rechnungssteller um eine korrigierte E-Rechnung.',
+    en: 'The total stated in the XML does not match its lines, discounts and charges. Ask the issuer for a corrected e-invoice.',
   },
   'e.line-net': {
     de: 'Menge mal Preis, abzüglich eines Rabatts, ergibt {a}, auf Ihrer Rechnung steht als Betrag dieser Position aber {b}. Beides muss bis auf Rundung übereinstimmen. Passen Sie Menge, Preis oder Rabatt an.',
@@ -312,12 +323,35 @@ export const STRINGS: Record<string, Entry> = {
     de: 'Im XML passen Prozentsatz, Grundbetrag und Betrag dieses Rabatts nicht zusammen. Bitten Sie den Rechnungssteller um eine korrigierte E-Rechnung.',
     en: 'In the XML, the percentage, base and amount of this discount do not agree. Ask the issuer for a corrected e-invoice.',
   },
+  'e.adjustment': { de: 'Ein Rabatt oder Zuschlag braucht einen Prozentsatz oder einen Betrag.', en: '' },
+  'e.adjustment.percent': { de: 'Ein Prozentsatz ist nie negativ; das Vorzeichen ergibt sich aus den Positionen.', en: '' },
+  'e.charge-reason': { de: 'Ein Zuschlag braucht seinen Grund, so wie er auf der Rechnung steht, etwa Fracht.', en: '' },
+  'e.adjustment-group': {
+    de: 'Mit diesen Angaben passt der Eintrag zu keiner oder zu mehreren Steuergruppen der Positionen. Bitte prüfen Sie Umsatzsteuer und Steuersatz: Ein Prozentsatz braucht Positionen in dieser Gruppe, ein Betrag genau eine Gruppe; er wird nicht auf mehrere Steuersätze verteilt.',
+    en: '',
+  },
+  'e.adjustment-mismatch': {
+    de: 'Prozentsatz und Betrag passen nicht zusammen. Bei mehreren Steuersätzen muss der Betrag centgenau die Summe der gerundeten Beträge je Steuersatz sein. Bitte prüfen Sie beide.',
+    en: '',
+  },
+  'e.adjustment-sign': {
+    de: 'Der Betrag hat ein anderes Vorzeichen als die Positionen. Ergeben die Positionen einen negativen Betrag, ist auch der Rabatt oder Zuschlag negativ, etwa −10 für 10.',
+    en: '',
+  },
+  'e.category-o': {
+    de: 'Eine Rechnung mit nicht steuerbaren Umsätzen (Kategorie O) darf nichts in einer anderen Umsatzsteuer-Kategorie enthalten. Stellen Sie dafür eine eigene Rechnung aus oder korrigieren Sie die Kategorie.',
+    en: '',
+  },
+  'e.xml-charge': {
+    de: 'Im XML passen Prozentsatz, Grundbetrag und Betrag dieses Zuschlags nicht zusammen. Bitten Sie den Rechnungssteller um eine korrigierte E-Rechnung.',
+    en: 'In the XML, the percentage, base and amount of this charge do not agree. Ask the issuer for a corrected e-invoice.',
+  },
   'e.line-net.xml': {
     de: 'Das XML nennt für diese Position {b}, Menge mal Preis abzüglich eines Rabatts ergibt aber {a}, und es nennt nichts sonst auf der Position, das den Unterschied erklärt.',
     en: 'The XML states {b} for this line item, but quantity times price less a discount is {a}, and it names nothing else on the line that explains the difference.',
   },
   'e.totals-mismatch': {
-    de: 'Die Summe im PDF weicht von der Summe der Positionen ab. Die E-Rechnung darf dem PDF nicht widersprechen: Bitte prüfen Sie Mengen und Preise.',
+    de: 'Die Summe im PDF weicht von der berechneten Summe ab. Die E-Rechnung darf dem PDF nicht widersprechen: Bitte prüfen Sie Mengen und Preise, und tragen Sie Rabatte oder Zuschläge auf die ganze Rechnung ein, die das PDF nennt.',
     en: '',
   },
   'e.address': { de: 'Dieser Teil der Anschrift fehlt. §\u00a014 UStG verlangt die vollständige Anschrift.', en: '' },
@@ -335,6 +369,8 @@ export const STRINGS: Record<string, Entry> = {
   },
   'e.preceding-invoice': { de: 'Eine Korrektur oder Gutschrift sollte die ursprüngliche Rechnung nennen.', en: '' },
   'e.not-in-pdf': { de: 'Diese Angabe steht so nicht im PDF. Bitte prüfen.', en: '' },
+  // A percentage the field may not show, such as one the XML of an existing e-invoice states for a discount on another base.
+  'e.not-in-pdf.percent': { de: '„{v}“ steht so nicht im PDF. Bitte prüfen.', en: '' },
   'e.no-pdf-text': {
     de: 'Das PDF enthält keinen lesbaren Text (vermutlich ein Scan). Bitte prüfen Sie jede Angabe selbst.',
     en: '',

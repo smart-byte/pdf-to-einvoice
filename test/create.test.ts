@@ -83,6 +83,20 @@ describe('createEInvoice', () => {
     expect(xml).not.toContain('<ram:ReasonCode>');
   });
 
+  it('states what the VAT category of a charge asks for, as it does for a line', async () => {
+    const { xml } = await createEInvoice({
+      pdf: samplePdf(),
+      invoice: sample((d) => {
+        delete d.totals;
+        d.buyer = { ...d.buyer, country: 'AT', vatId: 'ATU12345678' };
+        d.vatExemptionReason = 'Steuerfreie innergemeinschaftliche Lieferung';
+        d.charges = [{ amount: 20, reason: 'Fracht', vatCategory: 'K' }];
+      }),
+    });
+    expect(xml).toMatch(/<ram:ShipToTradeParty>[\s\S]*?<ram:CountryID>AT<\/ram:CountryID>/);
+    expect(xml).toContain('<ram:ExemptionReason>Steuerfreie innergemeinschaftliche Lieferung</ram:ExemptionReason>');
+  });
+
   it('writes the calculated totals', async () => {
     const { xml } = await createEInvoice({ pdf: samplePdf(), invoice: sample() });
     expect(xml).toContain('<ram:TaxBasisTotalAmount>1499.00</ram:TaxBasisTotalAmount>');
@@ -427,6 +441,86 @@ describe('XRechnung', () => {
       expect(xml).toContain('<CreditNote xmlns="urn:oasis:names:specification:ubl:schema:xsd:CreditNote-2"');
       expect(xml).toContain('<cbc:CreditNoteTypeCode>381</cbc:CreditNoteTypeCode>');
       expect(xml).toMatch(/<cbc:PaymentMeansCode>58<\/cbc:PaymentMeansCode>\s*<cbc:PaymentDueDate>2026-11-17<\/cbc:PaymentDueDate>/);
+    });
+
+    it('writes discounts and charges on the whole invoice, one for each VAT group, with the totals of the standard', async () => {
+      // 1000.00 at 19 % and 499.00 at 7 %; 10 % off both, 5.00 freight at 19 %.
+      const { ubl, cii } = await both(
+        xrechnung((d) => {
+          delete d.totals;
+          d.lines[1].vatRate = 7;
+          d.discounts = [{ percent: 10 }];
+          d.charges = [{ amount: 5, reason: 'Fracht', vatRate: 19 }];
+        }),
+      );
+      expect(ubl.match(/<cac:AllowanceCharge>/g)).toHaveLength(3);
+      expect(ubl.indexOf('<cac:AllowanceCharge>')).toBeGreaterThan(ubl.indexOf('<cac:PaymentTerms>'));
+      expect(ubl.lastIndexOf('</cac:AllowanceCharge>')).toBeLessThan(ubl.indexOf('<cac:TaxTotal>'));
+      const ublDiscount = (amount: string, base: string, rate: string) =>
+        new RegExp(
+          `<cbc:ChargeIndicator>false</cbc:ChargeIndicator>\\s*<cbc:AllowanceChargeReasonCode>95</cbc:AllowanceChargeReasonCode>\\s*<cbc:MultiplierFactorNumeric>10</cbc:MultiplierFactorNumeric>\\s*<cbc:Amount currencyID="EUR">${amount}</cbc:Amount>\\s*<cbc:BaseAmount currencyID="EUR">${base}</cbc:BaseAmount>\\s*<cac:TaxCategory>\\s*<cbc:ID>S</cbc:ID>\\s*<cbc:Percent>${rate}</cbc:Percent>`,
+        );
+      expect(ubl).toMatch(ublDiscount('100.00', '1000.00', '19'));
+      expect(ubl).toMatch(ublDiscount('49.90', '499.00', '7'));
+      expect(ubl).toMatch(
+        /<cbc:ChargeIndicator>true<\/cbc:ChargeIndicator>\s*<cbc:AllowanceChargeReason>Fracht<\/cbc:AllowanceChargeReason>\s*<cbc:Amount currencyID="EUR">5\.00<\/cbc:Amount>\s*<cac:TaxCategory>\s*<cbc:ID>S<\/cbc:ID>\s*<cbc:Percent>19<\/cbc:Percent>/,
+      );
+      expect(ubl).toMatch(
+        /<cbc:LineExtensionAmount currencyID="EUR">1499\.00<\/cbc:LineExtensionAmount>\s*<cbc:TaxExclusiveAmount currencyID="EUR">1354\.10<\/cbc:TaxExclusiveAmount>\s*<cbc:TaxInclusiveAmount currencyID="EUR">1557\.49<\/cbc:TaxInclusiveAmount>\s*<cbc:AllowanceTotalAmount currencyID="EUR">149\.90<\/cbc:AllowanceTotalAmount>\s*<cbc:ChargeTotalAmount currencyID="EUR">5\.00<\/cbc:ChargeTotalAmount>/,
+      );
+
+      expect(cii.match(/<ram:SpecifiedTradeAllowanceCharge>/g)).toHaveLength(3);
+      expect(cii).toMatch(
+        /<udt:Indicator>false<\/udt:Indicator>\s*<\/ram:ChargeIndicator>\s*<ram:CalculationPercent>10(\.0+)?<\/ram:CalculationPercent>\s*<ram:BasisAmount>1000\.00<\/ram:BasisAmount>\s*<ram:ActualAmount>100\.00<\/ram:ActualAmount>\s*<ram:ReasonCode>95<\/ram:ReasonCode>\s*<ram:CategoryTradeTax>\s*<ram:TypeCode>VAT<\/ram:TypeCode>\s*<ram:CategoryCode>S<\/ram:CategoryCode>\s*<ram:RateApplicablePercent>19(\.0+)?<\/ram:RateApplicablePercent>/,
+      );
+      expect(cii).toMatch(
+        /<udt:Indicator>true<\/udt:Indicator>\s*<\/ram:ChargeIndicator>\s*<ram:ActualAmount>5\.00<\/ram:ActualAmount>\s*<ram:Reason>Fracht<\/ram:Reason>/,
+      );
+      expect(cii).toMatch(
+        /<ram:LineTotalAmount>1499\.00<\/ram:LineTotalAmount>\s*<ram:ChargeTotalAmount>5\.00<\/ram:ChargeTotalAmount>\s*<ram:AllowanceTotalAmount>149\.90<\/ram:AllowanceTotalAmount>\s*<ram:TaxBasisTotalAmount>1354\.10<\/ram:TaxBasisTotalAmount>/,
+      );
+    });
+
+    it('gives a charge at a rate no line has a VAT breakdown of its own', async () => {
+      const { ubl, cii } = await both(
+        xrechnung((d) => {
+          delete d.totals;
+          for (const line of d.lines) line.vatRate = 7;
+          d.charges = [{ amount: 10, reason: 'Fracht', vatRate: 19 }];
+        }),
+      );
+      expect(ubl).toMatch(
+        /<cbc:TaxableAmount currencyID="EUR">10\.00<\/cbc:TaxableAmount>\s*<cbc:TaxAmount currencyID="EUR">1\.90<\/cbc:TaxAmount>\s*<cac:TaxCategory>\s*<cbc:ID>S<\/cbc:ID>\s*<cbc:Percent>19<\/cbc:Percent>/,
+      );
+      expect(cii).toMatch(
+        /<ram:CalculatedAmount>1\.90<\/ram:CalculatedAmount>\s*<ram:TypeCode>VAT<\/ram:TypeCode>\s*<ram:BasisAmount>10\.00<\/ram:BasisAmount>/,
+      );
+    });
+
+    it('writes the total of the discounts even where it rounds to 0.00, which BR-CO-11 asks for', async () => {
+      const { ubl, cii } = await both(
+        xrechnung((d) => {
+          delete d.totals;
+          d.discounts = [{ percent: 0.0001 }];
+        }),
+      );
+      expect(ubl).toContain('<cbc:AllowanceTotalAmount currencyID="EUR">0.00</cbc:AllowanceTotalAmount>');
+      expect(ubl).not.toContain('ChargeTotalAmount');
+      expect(cii).toContain('<ram:AllowanceTotalAmount>0.00</ram:AllowanceTotalAmount>');
+      expect(cii).not.toContain('ChargeTotalAmount');
+    });
+
+    it('writes a reason as given and refuses a charge without one', async () => {
+      const { xml, findings } = await createXRechnung({
+        invoice: xrechnung((d) => {
+          delete d.totals;
+          d.charges = [{ amount: 5, reason: 'Fracht & Verpackung' }];
+        }),
+      });
+      expect(xml).toContain('Fracht &amp; Verpackung');
+      expect(findings).toEqual([]);
+      const error = await failure(createXRechnung({ invoice: xrechnung((d) => (d.charges = [{ amount: 5 }])) }));
+      expect(error?.findings).toContainEqual(expect.objectContaining({ path: 'charges.0.reason', code: 'charge-reason' }));
     });
 
     it('ends payment terms that grant a cash discount with a line break, as XRechnung wants it', async () => {

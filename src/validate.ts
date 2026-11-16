@@ -15,8 +15,10 @@ export interface ValidationResult {
   invoice?: InvoiceDraft;
   /** The lines, counted from 0, whose total the XML explains by what the data does not hold; pass them on to `check`. */
   adjustedLines?: number[];
-  /** The discounts whose percentage, base and amount disagree in the XML, by path, e.g. `lines.0.discount.percent`. */
+  /** The discounts and charges whose percentage, base and amount disagree in the XML, by path, e.g. `lines.0.discount.percent`. */
   contradictions?: string[];
+  /** Percentages of discounts and charges on the whole invoice that the data leaves out, see `readInvoiceXml`; pass them on to `check`. */
+  percentages?: Record<string, number>;
   /** Calculated from the lines of the XML. */
   totals?: Totals;
   findings: Finding[];
@@ -91,24 +93,34 @@ export async function validateEInvoice(pdf: Uint8Array, options: { pdfText?: str
   }
   if (!read) return { isEInvoice, xml, findings };
 
-  const { invoice, profile, adjustedLines, contradictions } = read;
-  // The data holds one value of such a discount, so `check` cannot see the contradiction: it is reported here.
+  const { invoice, profile, adjustedLines, contradictions, percentages } = read;
+  // The data holds one value of such a discount or charge, so `check` cannot see the contradiction: it is reported here.
   for (const path of contradictions) {
-    findings.push({
-      path,
-      severity: 'error',
-      code: 'xml-discount',
-      message: 'The XML states a percentage, a base and an amount for this discount that do not agree. Ask the issuer for a corrected e-invoice.',
-    });
+    findings.push(
+      path.startsWith('charges.')
+        ? {
+            path,
+            severity: 'error',
+            code: 'xml-charge',
+            message: 'The XML states a percentage, a base and an amount for this charge that do not agree. Ask the issuer for a corrected e-invoice.',
+          }
+        : {
+            path,
+            severity: 'error',
+            code: 'xml-discount',
+            message: 'The XML states a percentage, a base and an amount for this discount that do not agree. Ask the issuer for a corrected e-invoice.',
+          },
+    );
   }
   // A line may state what `check` knows nothing of, a surcharge for one: its total is then explained, see `adjustedLines`.
-  const checked = check(invoice, { ...options, adjustedLines });
+  const checked = check(invoice, { ...options, adjustedLines, percentages });
   // check() words a totals mismatch for data typed in from a PDF; here both sides of the contradiction are in the XML.
   const reworded = (finding: Finding): Finding => {
     const key = finding.path.replace('totals.', '') as 'net' | 'vat' | 'gross' | 'due';
-    const message = `The XML states a total of ${invoice.totals?.[key]?.toFixed(2)}, but its lines add up to ${checked.totals?.[key].toFixed(2)}. Unless a discount or surcharge on the whole invoice explains the difference (this check does not read those), the XML contradicts itself: ask the issuer for a corrected e-invoice.`;
+    const what = checked.totals?.adjustments.length ? 'its lines, discounts and charges' : 'its lines';
+    const message = `The XML states a total of ${invoice.totals?.[key]?.toFixed(2)}, but ${what} add up to ${checked.totals?.[key].toFixed(2)}. The XML contradicts itself: ask the issuer for a corrected e-invoice.`;
     return { ...finding, message };
   };
   findings.push(...checked.findings.map((finding) => (finding.code === 'totals-mismatch' ? reworded(finding) : finding)));
-  return { isEInvoice, profile, xml, invoice, adjustedLines, contradictions, totals: checked.totals, findings };
+  return { isEInvoice, profile, xml, invoice, adjustedLines, contradictions, percentages, totals: checked.totals, findings };
 }

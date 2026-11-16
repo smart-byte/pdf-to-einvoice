@@ -191,6 +191,155 @@ describe('check', () => {
     expect(codesAt(draft, 'lines.1.discount.amount', { pdfText: 'Rabatt' })).toEqual(['warning:not-in-pdf']);
   });
 
+  describe('discounts and charges on the whole invoice', () => {
+    /** The sample without its printed totals, changed. Its lines are both at 19 %. */
+    const adjusted = (change: (d: any) => void) =>
+      withChange((d) => {
+        delete d.totals;
+        change(d);
+      });
+    /** What `check` says about one path, never throwing. */
+    const said = (change: (d: any) => void, path: string, options?: { pdfText?: string; rules?: 'xrechnung' }) =>
+      check(adjusted(change), options)
+        .findings.filter((f) => f.path === path)
+        .map((f) => `${f.severity}:${f.code}`);
+
+    it('takes them into the totals', () => {
+      const result = check(adjusted((d) => Object.assign(d, { discounts: [{ percent: 10 }], charges: [{ amount: 10, reason: 'Fracht' }] })));
+      expect(result.findings).toEqual([]);
+      expect(result.totals).toMatchObject({ lineTotal: 1499, allowances: 149.9, charges: 10, net: 1359.1 });
+    });
+
+    it('wants each to have a percentage or an amount, numbers, and a percentage that is not negative', () => {
+      expect(said((d) => (d.discounts = [{ reason: 'Treuerabatt' }]), 'discounts.0')).toEqual(['error:adjustment']);
+      expect(said((d) => (d.discounts = [null]), 'discounts.0')).toEqual(['error:adjustment']);
+      expect(said((d) => (d.discounts = [{ percent: -5 }]), 'discounts.0.percent')).toEqual(['error:adjustment']);
+      expect(said((d) => (d.discounts = [{ percent: '10 %' }]), 'discounts.0.percent')).toEqual(['error:format']);
+      expect(said((d) => (d.charges = [{ amount: Number.NaN, reason: 'Fracht' }]), 'charges.0.amount')).toEqual(['error:format']);
+      expect(said((d) => (d.charges = [{ amount: 5, reason: 'Fracht', vatRate: 'neunzehn' }]), 'charges.0.vatRate')).toEqual(['error:format']);
+      expect(said((d) => (d.charges = 'Fracht 5,00'), 'charges')).toEqual(['error:format']);
+    });
+
+    it('wants the reason of a charge, but not of a discount', () => {
+      expect(said((d) => (d.charges = [{ amount: 5 }]), 'charges.0.reason')).toEqual(['error:charge-reason']);
+      expect(said((d) => (d.charges = [{ amount: 5, reason: ' ' }]), 'charges.0.reason')).toEqual(['error:charge-reason']);
+      expect(said((d) => (d.discounts = [{ percent: 5, reason: ' ' }]), 'discounts.0.reason')).toEqual([]);
+    });
+
+    it('names discounts and charges where the totals of the PDF differ, since reading does not find them yet', () => {
+      const mismatch = check(withChange((d) => (d.totals.net = 1424.05))).findings.find((f) => f.path === 'totals.net');
+      expect(mismatch?.message).toMatch(/discounts or charges on the whole invoice/);
+    });
+
+    it('wants a known VAT category and a rate that fits it', () => {
+      expect(said((d) => (d.discounts = [{ amount: 5, vatCategory: 'X' }]), 'discounts.0.vatCategory')).toEqual(['error:format']);
+      expect(said((d) => (d.discounts = [{ amount: 5, vatCategory: 'Z', vatRate: 7 }]), 'discounts.0.vatRate')).toEqual(['error:vat-rate']);
+      expect(said((d) => (d.discounts = [{ amount: 5, vatCategory: 'S', vatRate: 0 }]), 'discounts.0.vatRate')).toEqual(['error:vat-rate']);
+    });
+
+    it('does not guess the VAT group of an amount, and gives neither totals nor data while it cannot be placed', () => {
+      const twoRates = (change: (d: any) => void) => (d: any) => {
+        d.lines[1].vatRate = 7;
+        change(d);
+      };
+      expect(
+        said(
+          twoRates((d) => (d.discounts = [{ amount: 10 }])),
+          'discounts.0.vatRate',
+        ),
+      ).toEqual(['error:adjustment-group']);
+      expect(
+        said(
+          twoRates((d) => (d.discounts = [{ percent: 10, vatRate: 16 }])),
+          'discounts.0.vatRate',
+        ),
+      ).toEqual(['error:adjustment-group']);
+      expect(
+        said(
+          twoRates((d) => (d.discounts = [{ amount: 10, vatRate: 7 }])),
+          'discounts.0.vatRate',
+        ),
+      ).toEqual([]);
+      const result = check(adjusted(twoRates((d) => (d.discounts = [{ amount: 10 }]))));
+      expect(result.totals).toBeUndefined();
+      expect(result.invoice).toBeUndefined();
+    });
+
+    it('wants percentage and amount to agree: within R040 on one VAT group, to the cent on several', () => {
+      const one =
+        (amount: number, currency = 'EUR') =>
+        (d: any) => {
+          d.lines = [{ ...d.lines[0], quantity: 1, unitPrice: 0.15 }];
+          Object.assign(d, { currency, discounts: [{ percent: 10, amount }] });
+        };
+      expect(said(one(0.03), 'discounts.0.amount')).toEqual([]);
+      expect(said(one(0.04), 'discounts.0.amount')).toEqual(['error:adjustment-mismatch']);
+      expect(said(one(0.5, 'HUF'), 'discounts.0.amount')).toEqual([]);
+      const several = (amount: number) => (d: any) => {
+        d.lines[1].vatRate = 7;
+        d.discounts = [{ percent: 10, amount }];
+      };
+      expect(said(several(149.9), 'discounts.0.amount')).toEqual([]);
+      expect(said(several(149.91), 'discounts.0.amount')).toEqual(['error:adjustment-mismatch']);
+    });
+
+    it('warns about an amount whose sign differs from its lines', () => {
+      expect(said((d) => (d.discounts = [{ amount: -10 }]), 'discounts.0.amount')).toEqual(['warning:adjustment-sign']);
+    });
+
+    it('does not mix category O with any other VAT group (BR-O-11), on lines or in a charge', () => {
+      const exempt = (d: any) => (d.vatExemptionReason = 'Nicht steuerbar');
+      expect(
+        said((d) => {
+          exempt(d);
+          d.lines[1] = { ...d.lines[1], vatCategory: 'O', vatRate: 0 };
+        }, 'lines.1.vatCategory'),
+      ).toEqual(['error:category-o']);
+      expect(
+        said((d) => {
+          exempt(d);
+          d.charges = [{ amount: 5, reason: 'Porto', vatCategory: 'O' }];
+        }, 'charges.0.vatCategory'),
+      ).toEqual(['error:category-o']);
+      expect(
+        said((d) => {
+          exempt(d);
+          for (const line of d.lines) Object.assign(line, { vatCategory: 'O', vatRate: 0 });
+          d.charges = [{ amount: 5, reason: 'Porto' }];
+        }, 'charges.0.vatCategory'),
+      ).toEqual([]);
+    });
+
+    it('asks what a VAT category needs also for one that only a discount or charge has', () => {
+      const charge = (vatCategory: string) => (d: any) => (d.charges = [{ amount: 5, reason: 'Fracht', vatCategory }]);
+      expect(said(charge('AE'), 'vatExemptionReason')).toEqual(['error:exemption-reason']);
+      expect(said(charge('AE'), 'buyer.vatId')).toEqual(['error:buyer-vat-id']);
+      expect(said(charge('K'), 'deliveryCountry')).toEqual(['warning:delivery-country']);
+      expect(said(charge('K'), 'charges.0.vatCategory', { rules: 'xrechnung' })).toEqual(['error:xrechnung-delivery-address']);
+      expect(
+        said((d) => {
+          charge('G')(d);
+          d.seller = { ...d.seller, vatId: undefined, taxNumber: '12/345/67890' };
+        }, 'seller.vatId'),
+      ).toEqual(['error:seller-tax-id']);
+    });
+
+    it('looks for the percentage on the page, or else the amount, never for what is derived from them', () => {
+      const pdfText = 'Treuerabatt 5 % Fracht 9,90 Gutschrift -3,00';
+      const draft = adjusted((d) => {
+        d.lines[1].vatRate = 7;
+        d.discounts = [{ percent: 5, amount: 74.95, reason: 'Treuerabatt' }];
+        d.charges = [
+          { amount: 9.9, reason: 'Fracht', vatRate: 19 },
+          { amount: -3, reason: 'Gutschrift', vatRate: 19 },
+        ];
+      });
+      const notInPdf = (text: string) => check(draft, { pdfText: text }).findings.filter((f) => f.code === 'not-in-pdf' && /^(discounts|charges)/.test(f.path));
+      expect(notInPdf(pdfText)).toEqual([]);
+      expect(notInPdf('Fracht 9,90').map((f) => f.path)).toEqual(['discounts.0.percent', 'charges.1.amount']);
+    });
+  });
+
   it('treats null and blank strings as missing', () => {
     expect(
       codesAt(

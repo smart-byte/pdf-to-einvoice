@@ -34,6 +34,9 @@
 - A discount on a line goes into its `discount` (`percent` and/or `amount` as printed, the amount negative on a line
   with a negative quantity), never into the price. A line total that differs from quantity x unit price less the
   discount by rounding goes into `netAmount`; more than 0.02 apart is an error.
+- Discounts and charges on the whole invoice go into `discounts` and `charges` the same way, with a `reason` (required
+  for a charge) and `vatCategory`/`vatRate` where the invoice names them. An amount is never split between VAT rates:
+  where the lines have several, give its rate.
 - The full list with descriptions: `npx -y pdf-to-einvoice schema`.
 
 ## VAT categories

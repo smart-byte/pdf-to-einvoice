@@ -1,4 +1,4 @@
-import { calculate, micro, percentAgrees, percentOf, slackOf, type Totals } from './calculate.js';
+import { calculate, micro, percentAgrees, percentOf, resolveAdjustments, slackOf, type Totals } from './calculate.js';
 import { INVOICE_TYPES, VAT_CATEGORIES, type Invoice, type InvoiceDraft, type VatCategory } from './model.js';
 
 export interface Finding {
@@ -30,6 +30,12 @@ export interface CheckOptions {
    * it, and none at all for these lines.
    */
   adjustedLines?: number[];
+  /**
+   * For data read from an existing e-invoice (`readInvoiceXml`): the percentages its XML states for discounts and
+   * charges on the whole invoice that the data holds as an amount only, by the path of the entry (`discounts.0`). The
+   * page is searched for the percentage rather than for the amount derived from it.
+   */
+  percentages?: Record<string, number>;
 }
 
 type Bag = Record<string, any>;
@@ -183,7 +189,29 @@ export function check(draft: InvoiceDraft, options: CheckOptions = {}): CheckRes
     }
   });
 
-  const categories = new Set<VatCategory>(d.lines.map((l: Bag) => l.vatCategory));
+  // The discounts and charges on the whole invoice, put into the VAT groups of the lines.
+  const adjustments = resolveAdjustments(d as Invoice, calculable);
+  findings.push(...adjustments.problems);
+  // What has a VAT category: each line, and each discount or charge that states one (a rate above 0 alone means S).
+  const taxed: { path: string; category: VatCategory }[] = [
+    ...d.lines.map((l: Bag, i: number) => ({ path: `lines.${i}.vatCategory`, category: l.vatCategory })),
+    ...(['discounts', 'charges'] as const).flatMap((list) =>
+      (Array.isArray(d[list]) ? d[list] : []).map((e: Bag, i: number) => ({
+        path: `${list}.${i}.vatCategory`,
+        category: e?.vatCategory ?? (isNumber(e?.vatRate) && e.vatRate > 0 ? 'S' : undefined),
+      })),
+    ),
+  ].filter((item) => item.category in VAT_CATEGORIES);
+  const categories = new Set<VatCategory>(taxed.map((item) => item.category));
+  // BR-O-11: what is not subject to VAT stands alone on its invoice.
+  const odd = taxed.find((item) => (item.category === 'O') !== (taxed[0]?.category === 'O'));
+  if (categories.has('O') && odd) {
+    error(
+      odd.path,
+      'category-o',
+      'An invoice with something not subject to VAT (category O) cannot also have anything in another VAT category. Issue a separate invoice for one of them, or correct the category.',
+    );
+  }
   if (NEEDS_REASON.some((c) => categories.has(c)) && d.vatExemptionReason === undefined) {
     error('vatExemptionReason', 'exemption-reason', 'State why no VAT is charged, as printed on the invoice.');
   }
@@ -212,7 +240,7 @@ export function check(draft: InvoiceDraft, options: CheckOptions = {}): CheckRes
     warn('precedingInvoiceNumber', 'preceding-invoice', 'A correction or credit note should name the invoice it refers to.');
   }
 
-  const totals = calculable ? calculate(d as Invoice) : undefined;
+  const totals = adjustments.resolved ? calculate(d as Invoice) : undefined;
   if (totals) {
     if (totals.due > 0 && d.dueDate === undefined && d.paymentTerms === undefined) {
       error('dueDate', 'payment-terms', 'An invoice with an amount due needs a due date or payment terms.');
@@ -267,14 +295,14 @@ export function check(draft: InvoiceDraft, options: CheckOptions = {}): CheckRes
         error(
           `totals.${key}`,
           'totals-mismatch',
-          `The PDF says ${printed.toFixed(2)}, the lines add up to ${totals[key].toFixed(2)}. The e-invoice must not contradict the PDF.`,
+          `The PDF says ${printed.toFixed(2)}, the lines${totals.adjustments.length ? ' with the discounts and charges' : ''} add up to ${totals[key].toFixed(2)}. The e-invoice must not contradict the PDF: check quantities and prices, and enter any discounts or charges on the whole invoice the PDF states.`,
         );
       }
     }
   }
 
   if (options.rules === 'xrechnung') findings.push(...xrechnungFindings(d));
-  if (options.pdfText !== undefined) findings.push(...compareWithPdf(d, totals, options.pdfText));
+  if (options.pdfText !== undefined) findings.push(...compareWithPdf(d, totals, options.pdfText, options.percentages));
 
   const ok = !findings.some((f) => f.severity === 'error');
   return { findings, totals, invoice: ok ? (d as Invoice) : undefined };
@@ -351,11 +379,14 @@ function xrechnungFindings(d: Bag): Finding[] {
 
   // BR-IC-12 asks for the country of delivery of an intra-community supply, and BR-DE-10 and BR-DE-11 then for its city and postal code.
   // Known limit: the data model has no delivery address, so such an invoice is refused instead of naming the buyer's address as the place of delivery.
-  const intraCommunity = d.lines.findIndex((line: Bag) => line.vatCategory === 'K');
-  if (intraCommunity >= 0) {
+  const intraCommunity = [
+    ...d.lines.map((line: Bag, i: number) => [`lines.${i}`, line] as const),
+    ...(['discounts', 'charges'] as const).flatMap((list) => (Array.isArray(d[list]) ? d[list] : []).map((e: Bag, i: number) => [`${list}.${i}`, e] as const)),
+  ].find(([, item]) => item?.vatCategory === 'K');
+  if (intraCommunity) {
     add(
       'error',
-      `lines.${intraCommunity}.vatCategory`,
+      `${intraCommunity[0]}.vatCategory`,
       'delivery-address',
       'An intra-community supply cannot be written as XRechnung yet: XRechnung then asks for the city and postal code of the place of delivery, and the invoice data has no field for them.',
     );
@@ -448,7 +479,7 @@ export function percentSpellings(p: number): string[] {
  * Reports values that the text of the PDF does not contain. Known limit: it tells whether a value stands in the text,
  * not where. An address entered for the wrong party passes, because each of its words stands somewhere on the page.
  */
-function compareWithPdf(d: Bag, totals: Totals | undefined, pdfText: string): Finding[] {
+function compareWithPdf(d: Bag, totals: Totals | undefined, pdfText: string, percentages: Record<string, number> = {}): Finding[] {
   const haystack = pdfText.replace(/\s+/g, '').toLowerCase();
   if (!haystack) {
     return [
@@ -491,6 +522,14 @@ function compareWithPdf(d: Bag, totals: Totals | undefined, pdfText: string): Fi
     if (isNumber(discount?.percent)) expect(`lines.${i}.discount.percent`, percentSpellings(discount.percent), `${discount.percent} %`);
     else if (isNumber(discount?.amount)) expect(`lines.${i}.discount.amount`, amountSpellings(discount.amount), discount.amount);
   });
+  // Of a discount or charge on the whole invoice, too: never what is derived from it, such as its amount in each VAT group.
+  for (const list of ['discounts', 'charges']) {
+    (Array.isArray(d[list]) ? d[list] : []).forEach((e: Bag, i: number) => {
+      const percent = isNumber(e?.percent) ? e.percent : percentages[`${list}.${i}`];
+      if (percent !== undefined) expect(`${list}.${i}.percent`, percentSpellings(percent), `${percent} %`);
+      else if (isNumber(e?.amount)) expect(`${list}.${i}.amount`, amountSpellings(e.amount), e.amount);
+    });
+  }
   if (totals) {
     for (const key of ['net', 'vat', 'gross'] as const) {
       if (totals[key] !== 0) expect(`totals.${key}`, amountSpellings(totals[key]), totals[key].toFixed(2));

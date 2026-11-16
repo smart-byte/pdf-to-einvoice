@@ -22,7 +22,7 @@ function libraryCodes(): Set<string> {
   const start = rules.indexOf('function xrechnungFindings(');
   const end = rules.indexOf('\n}\n', start);
   return new Set([
-    ...codesIn(rules.slice(0, start) + rules.slice(end) + source('create.ts') + source('validate.ts')),
+    ...codesIn(rules.slice(0, start) + rules.slice(end) + source('calculate.ts') + source('create.ts') + source('validate.ts')),
     ...codesIn(rules.slice(start, end)).map((code) => `xrechnung-${code}`),
   ]);
 }

@@ -17,8 +17,10 @@ const NOT_ASKED = new Set([
   'phone',
   'description',
   'netAmount',
-  // keepWhatThePdfShows has no rule for it yet, so a model's discount would be dropped.
+  // keepWhatThePdfShows has no rule for these yet, so what a model reads of them would be dropped.
   'discount',
+  'discounts',
+  'charges',
 ]);
 
 /** The invoice schema as a grammar for the model: every key present, every value nullable, nothing a small grammar engine may not know. */

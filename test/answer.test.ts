@@ -35,6 +35,14 @@ describe('progressOf: how far an answer that is still being written has come', (
     expect(beforeLines).toBeLessThan(0.7);
   });
 
+  it('does not ask the model for discounts and charges yet, since the check against the PDF would drop them', () => {
+    const { properties } = extractionSchema();
+    expect(Object.keys(properties)).not.toContain('discounts');
+    expect(Object.keys(properties)).not.toContain('charges');
+    expect(Object.keys(properties.lines.items.properties)).not.toContain('discount');
+    expect(Object.keys(properties.lines.items.properties)).toContain('unitPrice');
+  });
+
   it('does not ask the model for the country of delivery, which no PDF states as such', () => {
     expect(Object.keys(extractionSchema().properties)).not.toContain('deliveryCountry');
   });
