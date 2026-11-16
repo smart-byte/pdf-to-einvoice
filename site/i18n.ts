@@ -294,8 +294,8 @@ export const STRINGS: Record<string, Entry> = {
   'e.buyer-vat-id': { de: 'Für Reverse Charge und innergemeinschaftliche Lieferungen ist die USt-IdNr. des Kunden nötig.', en: '' },
   // An existing e-invoice: both sides of the contradiction are in its XML.
   'e.totals-mismatch.xml': {
-    de: 'Die im XML angegebene Summe passt nicht zu seinen Positionen. Bitten Sie den Rechnungssteller um eine korrigierte E-Rechnung.',
-    en: 'The total stated in the XML does not match its lines. Ask the issuer for a corrected e-invoice.',
+    de: 'Die im XML angegebene Summe passt nicht zu seinen Positionen, Rabatten und Zuschlägen. Bitten Sie den Rechnungssteller um eine korrigierte E-Rechnung.',
+    en: 'The total stated in the XML does not match its lines, discounts and charges. Ask the issuer for a corrected e-invoice.',
   },
   'e.line-net': {
     de: 'Menge mal Preis, abzüglich eines Rabatts, ergibt {a}, auf Ihrer Rechnung steht als Betrag dieser Position aber {b}. Beides muss bis auf Rundung übereinstimmen. Passen Sie Menge, Preis oder Rabatt an.',
@@ -330,6 +330,10 @@ export const STRINGS: Record<string, Entry> = {
   'e.category-o': {
     de: 'Eine Rechnung mit nicht steuerbaren Umsätzen (Kategorie O) darf nichts in einer anderen Umsatzsteuer-Kategorie enthalten. Stellen Sie dafür eine eigene Rechnung aus oder korrigieren Sie die Kategorie.',
     en: '',
+  },
+  'e.xml-charge': {
+    de: 'Im XML passen Prozentsatz, Grundbetrag und Betrag dieses Zuschlags nicht zusammen. Bitten Sie den Rechnungssteller um eine korrigierte E-Rechnung.',
+    en: 'In the XML, the percentage, base and amount of this charge do not agree. Ask the issuer for a corrected e-invoice.',
   },
   'e.line-net.xml': {
     de: 'Das XML nennt für diese Position {b}, Menge mal Preis abzüglich eines Rabatts ergibt aber {a}, und es nennt nichts sonst auf der Position, das den Unterschied erklärt.',

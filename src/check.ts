@@ -30,6 +30,12 @@ export interface CheckOptions {
    * it, and none at all for these lines.
    */
   adjustedLines?: number[];
+  /**
+   * For data read from an existing e-invoice (`readInvoiceXml`): the percentages its XML states for discounts and
+   * charges on the whole invoice that the data holds as an amount only, by the path of the entry (`discounts.0`). The
+   * page is searched for the percentage rather than for the amount derived from it.
+   */
+  percentages?: Record<string, number>;
 }
 
 type Bag = Record<string, any>;
@@ -296,7 +302,7 @@ export function check(draft: InvoiceDraft, options: CheckOptions = {}): CheckRes
   }
 
   if (options.rules === 'xrechnung') findings.push(...xrechnungFindings(d));
-  if (options.pdfText !== undefined) findings.push(...compareWithPdf(d, totals, options.pdfText));
+  if (options.pdfText !== undefined) findings.push(...compareWithPdf(d, totals, options.pdfText, options.percentages));
 
   const ok = !findings.some((f) => f.severity === 'error');
   return { findings, totals, invoice: ok ? (d as Invoice) : undefined };
@@ -473,7 +479,7 @@ export function percentSpellings(p: number): string[] {
  * Reports values that the text of the PDF does not contain. Known limit: it tells whether a value stands in the text,
  * not where. An address entered for the wrong party passes, because each of its words stands somewhere on the page.
  */
-function compareWithPdf(d: Bag, totals: Totals | undefined, pdfText: string): Finding[] {
+function compareWithPdf(d: Bag, totals: Totals | undefined, pdfText: string, percentages: Record<string, number> = {}): Finding[] {
   const haystack = pdfText.replace(/\s+/g, '').toLowerCase();
   if (!haystack) {
     return [
@@ -519,7 +525,8 @@ function compareWithPdf(d: Bag, totals: Totals | undefined, pdfText: string): Fi
   // Of a discount or charge on the whole invoice, too: never what is derived from it, such as its amount in each VAT group.
   for (const list of ['discounts', 'charges']) {
     (Array.isArray(d[list]) ? d[list] : []).forEach((e: Bag, i: number) => {
-      if (isNumber(e?.percent)) expect(`${list}.${i}.percent`, percentSpellings(e.percent), `${e.percent} %`);
+      const percent = isNumber(e?.percent) ? e.percent : percentages[`${list}.${i}`];
+      if (percent !== undefined) expect(`${list}.${i}.percent`, percentSpellings(percent), `${percent} %`);
       else if (isNumber(e?.amount)) expect(`${list}.${i}.amount`, amountSpellings(e.amount), e.amount);
     });
   }

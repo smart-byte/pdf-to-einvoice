@@ -200,6 +200,58 @@ describe('validateEInvoice', () => {
     const mismatch = result.findings.find((f) => f.code === 'totals-mismatch');
     expect(mismatch).toMatchObject({ path: 'totals.gross', severity: 'error' });
     expect(mismatch!.message).toMatch(/XML.*1800\.00.*1783\.81/);
+    expect(mismatch!.message).not.toMatch(/does not read/);
+  });
+
+  describe('discounts and charges on the whole invoice', () => {
+    /** The sample with one line of the given price, and changed. */
+    const oneLine = (unitPrice: number, change: (d: any) => void) =>
+      sample((d) => {
+        delete d.totals;
+        d.lines = [{ ...d.lines[0], quantity: 1, unitPrice }];
+        change(d);
+      });
+
+    it('accepts its own e-invoice with both, in forints too, where a discount is half a forint off its percentage', async () => {
+      const both = await create(oneLine(100, (d) => Object.assign(d, { discounts: [{ percent: 10 }], charges: [{ amount: 5, reason: 'Fracht' }] })));
+      expect((await validateEInvoice(both.pdf)).findings.filter((f) => f.severity === 'error')).toEqual([]);
+      const forints = await create(oneLine(4990, (d) => Object.assign(d, { currency: 'HUF', discounts: [{ percent: 10, amount: 499.5 }] })));
+      expect(codes((await validateEInvoice(forints.pdf)).findings)).not.toContain('xml-discount');
+      expect(codes((await validateEInvoice(forints.pdf)).findings)).not.toContain('adjustment-mismatch');
+    });
+
+    it('reports base 50, 10 % and an amount of 10 although the lines come to 100, where 10 % is 10 again', async () => {
+      const xml = (await create(oneLine(100, (d) => (d.discounts = [{ percent: 10 }])))).xml.replace(
+        '<ram:BasisAmount>100.00</ram:BasisAmount>',
+        '<ram:BasisAmount>50.00</ram:BasisAmount>',
+      );
+      const result = await validateEInvoice(await pdfCarrying(xml));
+      expect(result.findings).toContainEqual(expect.objectContaining({ path: 'discounts.0.percent', code: 'xml-discount', severity: 'error' }));
+      expect(result.contradictions).toEqual(['discounts.0.percent']);
+    });
+
+    it('reports a charge of 40 as 10 % of 50, in words for a charge', async () => {
+      const xml = (await create(oneLine(50, (d) => (d.charges = [{ percent: 10, reason: 'Fracht' }])))).xml.replace(
+        '<ram:ActualAmount>5.00</ram:ActualAmount>',
+        '<ram:ActualAmount>40.00</ram:ActualAmount>',
+      );
+      const finding = (await validateEInvoice(await pdfCarrying(xml))).findings.find((f) => f.path === 'charges.0.percent');
+      expect(finding).toMatchObject({ code: 'xml-charge', severity: 'error' });
+      expect(finding!.message).toContain('charge');
+      expect(finding!.message).not.toContain('discount');
+    });
+
+    it('accepts a percentage of another base that agrees, and looks for it on the page instead of the amount', async () => {
+      const xml = (await create(oneLine(100, (d) => (d.discounts = [{ percent: 20 }])))).xml
+        .replace(/<ram:CalculationPercent>20(\.0+)?<\/ram:CalculationPercent>/, '<ram:CalculationPercent>10</ram:CalculationPercent>')
+        .replace('<ram:BasisAmount>100.00</ram:BasisAmount>', '<ram:BasisAmount>200.00</ram:BasisAmount>');
+      const pdf = await pdfCarrying(xml);
+      const result = await validateEInvoice(pdf, { pdfText: 'Rabatt 10 %' });
+      expect(result.findings.filter((f) => f.path.startsWith('discounts'))).toEqual([]);
+      expect(result.percentages).toEqual({ 'discounts.0': 10 });
+      const missing = await validateEInvoice(pdf, { pdfText: 'Rabatt' });
+      expect(missing.findings.filter((f) => f.path.startsWith('discounts')).map((f) => `${f.path}:${f.code}`)).toEqual(['discounts.0.percent:not-in-pdf']);
+    });
   });
 });
 

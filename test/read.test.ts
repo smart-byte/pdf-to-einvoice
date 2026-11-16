@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { check } from '../src/check.js';
 import { createEInvoice } from '../src/create.js';
 import type { InvoiceDraft } from '../src/model.js';
 import { readInvoiceXml } from '../src/read.js';
@@ -131,6 +132,97 @@ describe('readInvoiceXml returns what createEInvoice wrote', () => {
   it('for a single line, as a list of one', async () => {
     const invoice = await roundTrip(sample((d) => (d.lines.length = 1)));
     expect(invoice.lines).toHaveLength(1);
+  });
+});
+
+describe('readInvoiceXml reads discounts and charges on the whole invoice', () => {
+  /** The XML of the sample with one line of 100.00 at 19 % and the given discounts. */
+  const oneLine = (discounts: unknown[]) =>
+    xmlOf(
+      sample((d) => {
+        d.lines = [{ ...d.lines[0], quantity: 1 }];
+        d.discounts = discounts;
+      }),
+    );
+  /** Writes the data, reads it back and checks what was read: the same totals, nothing to report. */
+  async function again(input: InvoiceDraft) {
+    const created = await createEInvoice({ pdf: samplePdf(), invoice: input });
+    const read = readInvoiceXml(created.xml);
+    const checked = check(read.invoice);
+    expect(checked.findings).toEqual([]);
+    const { net, vat, gross, lineTotal, allowances, charges, vatBreakdown } = created.totals;
+    expect(checked.totals).toMatchObject({ net, vat, gross, lineTotal, allowances, charges, vatBreakdown });
+    expect(read).toMatchObject({ contradictions: [], percentages: {} });
+    return read.invoice;
+  }
+
+  it('as one entry for each VAT group, with its percentage, its category and rate, and a reason code as the reason', async () => {
+    // 1000.00 at 19 %, 449.10 at 7 % after the discount on the line; 10 % off both, and freight.
+    const invoice = await again(
+      sample((d) => {
+        d.lines[1].vatRate = 7;
+        d.lines[1].discount = { percent: 10 };
+        d.discounts = [{ percent: 10 }];
+        d.charges = [{ amount: 5, reason: 'Fracht', vatRate: 19 }];
+      }),
+    );
+    expect(invoice.discounts).toEqual([
+      { percent: 10, amount: 100, reason: '95', vatCategory: 'S', vatRate: 19 },
+      { percent: 10, amount: 44.91, reason: '95', vatCategory: 'S', vatRate: 7 },
+    ]);
+    expect(invoice.charges).toEqual([{ amount: 5, reason: 'Fracht', vatCategory: 'S', vatRate: 19 }]);
+  });
+
+  it('with the signs of a credit note', async () => {
+    const invoice = await again(
+      sample((d) => {
+        for (const line of d.lines) line.quantity = -line.quantity;
+        d.discounts = [{ percent: 10 }];
+        d.charges = [{ amount: -5, reason: 'Fracht' }];
+      }),
+    );
+    expect(invoice.discounts?.[0]).toMatchObject({ percent: 10, amount: -149.9 });
+    expect(invoice.charges?.[0]).toMatchObject({ amount: -5 });
+  });
+
+  it('in a VAT group without lines, and in category O, which states no rate', async () => {
+    const freight = await again(
+      sample((d) => {
+        for (const line of d.lines) line.vatRate = 7;
+        d.charges = [{ amount: 10, reason: 'Fracht', vatRate: 19 }];
+      }),
+    );
+    expect(freight.charges).toEqual([{ amount: 10, reason: 'Fracht', vatCategory: 'S', vatRate: 19 }]);
+    const notTaxed = await again(
+      sample((d) => {
+        for (const line of d.lines) Object.assign(line, { vatCategory: 'O', vatRate: 0 });
+        d.vatExemptionReason = 'Nicht steuerbar';
+        delete d.seller.vatId;
+        d.seller.taxNumber = '123/456/78901';
+        d.discounts = [{ amount: 20, reason: 'Treuerabatt' }];
+      }),
+    );
+    expect(notTaxed.discounts).toEqual([{ amount: 20, reason: 'Treuerabatt', vatCategory: 'O', vatRate: 0 }]);
+  });
+
+  it('keeps an amount and leaves out a percentage that does not give it from the lines of its VAT group', async () => {
+    // The XML takes 10 % of 200.00, which is 20.00; the lines of its VAT group come to 100.00.
+    const xml = (await oneLine([{ percent: 20 }]))
+      .replace(/<ram:CalculationPercent>20(\.0+)?<\/ram:CalculationPercent>/, '<ram:CalculationPercent>10</ram:CalculationPercent>')
+      .replace('<ram:BasisAmount>100.00</ram:BasisAmount>', '<ram:BasisAmount>200.00</ram:BasisAmount>');
+    const read = readInvoiceXml(xml);
+    expect(read.invoice.discounts).toEqual([{ amount: 20, reason: '95', vatCategory: 'S', vatRate: 19 }]);
+    expect(read.contradictions).toEqual([]);
+    expect(read.percentages).toEqual({ 'discounts.0': 10 });
+  });
+
+  it('names an entry whose percentage, base and amount disagree in the XML, whatever the lines say', async () => {
+    // Base 50, 10 %, amount 10: against the lines (100.00) 10 % is 10 again, so only the XML shows the contradiction.
+    const xml = (await oneLine([{ percent: 10 }])).replace('<ram:BasisAmount>100.00</ram:BasisAmount>', '<ram:BasisAmount>50.00</ram:BasisAmount>');
+    const read = readInvoiceXml(xml);
+    expect(read.contradictions).toEqual(['discounts.0.percent']);
+    expect(read.percentages).toEqual({});
+    expect(read.invoice.discounts?.[0]).toMatchObject({ percent: 10, amount: 10 });
   });
 });
 
