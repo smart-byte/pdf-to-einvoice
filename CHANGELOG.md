@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-16
+
 ### Added
 
 - Discounts and charges on the whole invoice (`discounts`, `charges`): a percentage, an amount or both, a reason and
