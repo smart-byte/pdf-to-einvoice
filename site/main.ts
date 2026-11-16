@@ -48,6 +48,8 @@ interface State {
   toCheck: Map<string, 'suggested' | 'inferred' | 'model'>;
   /** Of an existing e-invoice: the lines whose total its XML explains by a discount, a surcharge or a price for several units. */
   adjustedLines?: number[];
+  /** Of an existing e-invoice: percentages of discounts and charges its XML states, which the data holds as amounts only. */
+  percentages?: Record<string, number>;
 }
 type Format = 'pdf' | 'xrechnung';
 const state: State = { fileName: '', pdfText: '', draft: {}, touched: new Set(), fileFindings: [], mode: 'create', format: 'pdf', toCheck: new Map() };
@@ -126,6 +128,8 @@ interface Field {
   rows?: number;
   /** Shown for this format only. */
   only?: Format;
+  /** A list that may be left empty: its empty choice, worded so. Nothing is preset then. */
+  blank?: string;
 }
 
 // XRechnung asks for the buyer reference up front, beside the buyer; for the hybrid PDF it is one of the further fields.
@@ -206,15 +210,25 @@ const LINE_FIELDS: Field[] = [
   { path: 'vatRate', label: 'l.vatRate', type: 'number' },
 ];
 
+// Left empty, a discount or charge on the whole invoice follows the VAT of the line items: its category is not preset.
+const ADJUSTMENT_FIELDS: Field[] = [
+  { path: 'reason', label: 'a.reason', wide: true },
+  { path: 'percent', label: 'a.percent', type: 'number' },
+  { path: 'amount', label: 'a.amount', type: 'number' },
+  { ...LINE_FIELDS.find((field) => field.path === 'vatCategory')!, blank: 'a.vatFollow' },
+  { path: 'vatRate', label: 'l.vatRate', type: 'number' },
+];
+
 const SELECT_DEFAULTS: Record<string, string> = { typeCode: '380', unit: 'C62', vatCategory: 'S' };
 
 function control(field: Field, path: string): HTMLElement {
   // An empty choice shows what will be used, not whichever option happens to come first.
-  const value = getPath(state.draft, path) ?? SELECT_DEFAULTS[field.path] ?? '';
+  const value = getPath(state.draft, path) ?? (field.blank ? '' : SELECT_DEFAULTS[field.path]) ?? '';
   const id = `in-${path.replace(/\./g, '-')}`;
   let input: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
   if (field.type === 'select') {
     input = el('select', { id });
+    if (field.blank) input.append(el('option', { value: '', selected: value === '' }, t(field.blank)));
     for (const [code, label] of field.options!) input.append(el('option', { value: code, selected: String(value) === code }, t(label)));
   } else if (field.type === 'textarea') {
     // A sentence wraps and the field grows with it, where one line would cut it off on a phone.
@@ -235,6 +249,18 @@ function control(field: Field, path: string): HTMLElement {
   );
 }
 
+/** Item `i` of a list is gone: the items below move up by one, and what was typed or is still to be checked moves with them. */
+function moveUp(list: string, i: number): void {
+  const moved = (path: string): string[] => {
+    const at = new RegExp(`^${list}\\.(\\d+)(.*)$`).exec(path);
+    if (!at || Number(at[1]) < i) return [path];
+    return Number(at[1]) === i ? [] : [`${list}.${Number(at[1]) - 1}${at[2]}`];
+  };
+  state.toCheck = new Map([...state.toCheck].flatMap(([path, why]) => moved(path).map((to): [string, typeof why] => [to, why])));
+  state.touched = new Set([...state.touched].flatMap(moved));
+  state.touched.add(`${list}.removed`);
+}
+
 function renderLines(): HTMLElement {
   const list = el('div', { className: 'lines' });
   const lines = (state.draft.lines ??= [{}]);
@@ -243,15 +269,7 @@ function renderLines(): HTMLElement {
     remove.setAttribute('aria-label', t('l.remove', { n: i + 1 }));
     remove.onclick = () => {
       lines.splice(i, 1);
-      state.touched.add('lines.removed');
-      // The lines below move up by one, and what is still to be checked moves with them.
-      state.toCheck = new Map(
-        [...state.toCheck].flatMap(([path, why]): [string, typeof why][] => {
-          const at = /^lines\.(\d+)(.*)$/.exec(path);
-          if (!at || Number(at[1]) < i) return [[path, why]];
-          return Number(at[1]) === i ? [] : [[`lines.${Number(at[1]) - 1}${at[2]}`, why]];
-        }),
-      );
+      moveUp('lines', i);
       renderForm();
     };
     list.append(
@@ -274,6 +292,38 @@ function renderLines(): HTMLElement {
   };
   list.append(add, el('p', { className: 'hint', dataset: { hint: 'lines' } }));
   return list;
+}
+
+/** The discounts or the charges on the whole invoice, one frame each, and a button for one more. */
+function renderAdjustments(list: 'discounts' | 'charges'): HTMLElement[] {
+  const one = list === 'discounts' ? 'discount' : 'charge';
+  const entries = state.draft[list] ?? [];
+  const rows = entries.map((_, i) => {
+    const remove = el('button', { type: 'button', className: 'icon', title: t(`a.remove.${one}`, { n: i + 1 }) }, '×');
+    remove.setAttribute('aria-label', t(`a.remove.${one}`, { n: i + 1 }));
+    remove.onclick = () => {
+      entries.splice(i, 1);
+      if (!entries.length) delete state.draft[list];
+      moveUp(list, i);
+      renderForm();
+    };
+    return el(
+      'fieldset',
+      { className: 'line line--adjustment' },
+      el('legend', {}, t(`a.${one}`, { n: i + 1 })),
+      ...ADJUSTMENT_FIELDS.map((field) => control(field, `${list}.${i}.${field.path}`)),
+      remove,
+      el('p', { className: 'hint', dataset: { hint: `${list}.${i}` } }),
+    );
+  });
+  const add = el('button', { type: 'button', className: 'quiet' }, t(`a.add.${one}`));
+  add.onclick = () => {
+    const added = (state.draft[list] ??= []).push({}) - 1;
+    state.touched.add(`${list}.added`);
+    renderForm();
+    document.querySelector<HTMLElement>(`[data-path="${list}.${added}.reason"]`)?.focus();
+  };
+  return [...rows, add, el('p', { className: 'hint', dataset: { hint: list } })];
 }
 
 function renderForm(): void {
@@ -302,7 +352,13 @@ function renderForm(): void {
     const shown = fields.filter((field) => asked(field) || (filled(field) && !paths.has(field.path)));
     return section(title, el('div', { className: 'fields' }, ...shown.map((field) => control(field, field.path))), collapsed ? shown.some(filled) : undefined);
   });
-  form.append(invoice!, seller!, buyer!, section('s.lines', renderLines()), payment!, more!);
+  // Discounts and charges on the whole invoice: folded away until there is one. An existing e-invoice shows them only where it has them.
+  const adjusted = Boolean(state.draft.discounts?.length || state.draft.charges?.length);
+  const adjustments =
+    state.mode === 'validate' && !adjusted
+      ? []
+      : [section('s.adjustments', el('div', { className: 'lines' }, ...renderAdjustments('discounts'), ...renderAdjustments('charges')), adjusted)];
+  form.append(invoice!, seller!, buyer!, section('s.lines', renderLines()), ...adjustments, payment!, more!);
   if (state.mode === 'validate') {
     // Read only rather than disabled: a field can still take the focus, which shows where its value stands on the page.
     for (const field of form.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('input, textarea')) field.readOnly = true;
@@ -359,25 +415,27 @@ const money = (n: number) =>
 function fieldLabel(path: string): string {
   const input = document.querySelector<HTMLElement>(`[data-path="${path}"]`);
   const label = input && document.querySelector(`label[for="${input.id}"]`)?.textContent;
-  // A line item is named by its number, also for a value of it the form does not show, such as its total.
-  const line = /^lines\.(\d+)(\.|$)/.exec(path);
-  if (line) return `${t('l.item', { n: Number(line[1]) + 1 })}${label ? `, ${label}` : ''}`;
+  // A line item is named by its number, also for a value of it the form does not show, such as its total. So is a discount or charge.
+  const item = /^(lines|discounts|charges)\.(\d+)(\.|$)/.exec(path);
+  const items: Record<string, string> = { lines: 'l.item', discounts: 'a.discount', charges: 'a.charge' };
+  if (item) return `${t(items[item[1]!]!, { n: Number(item[2]) + 1 })}${label ? `, ${label}` : ''}`;
   // Seller and buyer have fields of the same name: the party is named first.
   const who = /^(seller|buyer)\./.exec(path)?.[1];
   if (label) return who ? `${t(who === 'seller' ? 'xml.seller' : 's.buyer')}, ${label}` : label;
   return path.startsWith('totals.') ? t(`t.${path.slice(7)}`) : path === 'lines' ? t('s.lines') : '';
 }
 
-/** The field of a path; the first field of a line item for the path of the whole line, or of a value of it the form does not show. */
-const fieldOf = (path: string) =>
-  document.querySelector<HTMLElement>(`[data-path="${path}"], [data-path="${path}.name"]`) ??
-  document.querySelector<HTMLElement>(`[data-path="${path.replace(/^(lines\.\d+)\..*$/, '$1')}.name"]`);
+/** The field of a path; the first field of a line item, discount or charge for the path of all of it, or of a value of it the form does not show. */
+const fieldOf = (path: string) => {
+  const item = /^(lines|discounts|charges)\.\d+/.exec(path)?.[0];
+  return document.querySelector<HTMLElement>(`[data-path="${path}"]`) ?? (item ? document.querySelector<HTMLElement>(`[data-path^="${item}."]`) : null);
+};
 
 function validate(): void {
   const result = (state.result = check(state.draft, {
     ...(state.pdf ? { pdfText: state.pdfText } : {}),
     ...(shownFormat() === 'xrechnung' ? { rules: 'xrechnung' as const } : {}),
-    ...(state.mode === 'validate' ? { adjustedLines: state.adjustedLines ?? [] } : {}),
+    ...(state.mode === 'validate' ? { adjustedLines: state.adjustedLines ?? [], percentages: state.percentages ?? {} } : {}),
   }));
   // What nobody has looked at yet is said at its field. A model may have read a value the form has no field for: that one is not counted.
   // A suggestion is not on the PDF at all: it stands in the way of creating until it is confirmed or changed.
@@ -728,7 +786,7 @@ function suggestPaymentTerms(): void {
 }
 
 /** Findings that are about the file, not about a field of the form. */
-const FILE_CODES = new Set(['no-xml', 'xml-syntax', 'profile', 'pdf-a', 'pdf-fonts', 'pdf-actions', 'xml-discount']);
+const FILE_CODES = new Set(['no-xml', 'xml-syntax', 'profile', 'pdf-a', 'pdf-fonts', 'pdf-actions', 'xml-discount', 'xml-charge']);
 
 function setText(selector: string, key: string): void {
   const node = $(selector);
@@ -760,6 +818,7 @@ async function open(pdf: Uint8Array, fileName: string): Promise<void> {
       const result = await validateEInvoice(pdf, { pdfText: text });
       state.draft = result.invoice ?? {};
       state.adjustedLines = result.adjustedLines ?? [];
+      state.percentages = result.percentages ?? {};
       state.fileFindings = result.findings.filter((finding) => FILE_CODES.has(finding.code));
       $('#read-status').textContent = result.profile ? t('valid.profile', { p: result.profile }) : '';
     } else {

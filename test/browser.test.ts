@@ -296,6 +296,86 @@ describe.skipIf(!asked)('the web app in a browser', () => {
     );
   }, 120_000);
 
+  it('takes discounts and charges on the whole invoice into the totals, says what one lacks, and removes it', async () => {
+    const page = await open();
+    await read(page);
+    // The sample comes to 1499.00 at 19 %. Discounts and charges wait in a folded section until there is one.
+    await page.click('summary:has-text("Rabatte und Zuschläge")');
+    await page.click('text=Rabatt hinzufügen');
+    await page.fill('[data-path="discounts.0.percent"]', '10');
+    await page.click('text=Zuschlag hinzufügen');
+    await page.fill('[data-path="charges.0.amount"]', '10');
+    expect(await said(page)).toEqual(expect.arrayContaining([expect.stringMatching(/^Zuschlag 1, Grund: Ein Zuschlag braucht seinen Grund/)]));
+    await page.fill('[data-path="charges.0.reason"]', 'Fracht');
+    expect(await page.textContent('#totals')).toContain('1.359,10');
+    // Nothing chosen is nothing chosen: the charge follows the VAT of the line items.
+    expect(await page.inputValue('[data-path="charges.0.vatCategory"]')).toBe('');
+    // A discount added and left empty says so at its row, and can go again; the one below moves up with its words.
+    await page.click('text=Rabatt hinzufügen');
+    expect(await said(page)).toEqual(expect.arrayContaining([expect.stringMatching(/^Rabatt 2: Ein Rabatt oder Zuschlag braucht einen Prozentsatz/)]));
+    await page.click('[aria-label="Rabatt 1 entfernen"]');
+    expect(await page.inputValue('[data-path="discounts.0.percent"]')).toBe('');
+    expect(await said(page)).toEqual(expect.arrayContaining([expect.stringMatching(/^Rabatt 1: Ein Rabatt oder Zuschlag braucht einen Prozentsatz/)]));
+    await page.click('[aria-label="Rabatt 1 entfernen"]');
+    expect(await page.$$('[data-path^="discounts."]')).toHaveLength(0);
+    expect(await page.textContent('#totals')).toContain('1.509,00');
+  }, 120_000);
+
+  it('puts freight at 19 % on an invoice at 7 % into a VAT group of its own', async () => {
+    const page = await open();
+    await read(page);
+    for (const i of [0, 1]) await page.fill(`[data-path="lines.${i}.vatRate"]`, '7');
+    await page.click('summary:has-text("Rabatte und Zuschläge")');
+    await page.click('text=Zuschlag hinzufügen');
+    await page.fill('[data-path="charges.0.reason"]', 'Fracht');
+    await page.fill('[data-path="charges.0.amount"]', '10');
+    await page.fill('[data-path="charges.0.vatRate"]', '19');
+    expect(await page.inputValue('[data-path="charges.0.vatCategory"]')).toBe('');
+    // 1499.00 at 7 % and 10.00 at 19 %: 104.93 + 1.90 VAT.
+    expect(await page.textContent('#totals')).toContain('1.615,83');
+  }, 120_000);
+
+  it('shows the discounts and charges of an existing e-invoice, once each finding', async () => {
+    const invoice = sampleData() as any;
+    delete invoice.totals;
+    invoice.lines = [{ ...invoice.lines[0], quantity: 1 }];
+    invoice.charges = [{ amount: 5, reason: 'Fracht' }];
+    const embed = async (xml: string) => {
+      const doc = await PDFDocument.load(samplePdf());
+      await doc.attach(new TextEncoder().encode(xml), 'factur-x.xml', { mimeType: 'text/xml' });
+      return doc.save();
+    };
+    const xmlWith = async (discount: object) => (await createEInvoice({ pdf: samplePdf(), invoice: { ...invoice, discounts: [discount] } })).xml;
+    // Base 50, 10 %, amount 10 on lines of 100: only the base the XML states shows the contradiction.
+    const contradicting = (await xmlWith({ percent: 10 })).replace('<ram:BasisAmount>100.00</ram:BasisAmount>', '<ram:BasisAmount>50.00</ram:BasisAmount>');
+    const page = await open();
+    await read(page, upload('contradiction.pdf', await embed(contradicting)));
+    expect(await page.inputValue('[data-path="charges.0.reason"]')).toBe('Fracht');
+    expect(await page.isEditable('[data-path="charges.0.reason"]')).toBe(false);
+    expect((await said(page)).filter((text) => /dieses Rabatts nicht zusammen/.test(text))).toEqual([expect.stringMatching(/^Rabatt 1, Prozent: /)]);
+    // 10 % of 200, which is 20.00: it agrees, but not with the lines. The amount stays, and the page is searched for the percentage.
+    const otherBase = (await xmlWith({ percent: 20 }))
+      .replace(/<ram:CalculationPercent>20(\.0+)?<\/ram:CalculationPercent>/, '<ram:CalculationPercent>10</ram:CalculationPercent>')
+      .replace('<ram:BasisAmount>100.00</ram:BasisAmount>', '<ram:BasisAmount>200.00</ram:BasisAmount>');
+    const other = await open();
+    await read(other, upload('other-base.pdf', await embed(otherBase)));
+    expect(await other.inputValue('[data-path="discounts.0.amount"]')).toBe('20');
+    const discountFindings = (await said(other)).filter((text) => text.startsWith('Rabatt 1'));
+    expect(discountFindings).toEqual(['Rabatt 1, Prozent: Diese Angabe steht so nicht im PDF. Bitte prüfen.']);
+  }, 120_000);
+
+  it('words the discounts and charges in English, and keeps them within a phone', async () => {
+    const page = await open('en');
+    await page.setViewportSize({ width: 375, height: 800 });
+    await read(page);
+    await page.click('summary:has-text("Discounts and charges")');
+    await page.click('text=Add a discount');
+    await page.click('text=Add a charge');
+    expect(await page.textContent('#form')).toContain('Discount 1');
+    expect(await page.textContent('#form')).toContain('Charge 1');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+  }, 120_000);
+
   it('gives a long text the room it needs: the field grows with it and can be drawn larger', async () => {
     const page = await open();
     await read(page);
