@@ -216,6 +216,20 @@ describe('readInvoiceXml reads discounts and charges on the whole invoice', () =
     expect(read.percentages).toEqual({ 'discounts.0': 10 });
   });
 
+  it('guesses no VAT group for an entry whose XML names no VAT category', async () => {
+    const xml = (
+      await xmlOf(
+        sample((d) => {
+          Object.assign(d.lines[1], { vatCategory: 'Z', vatRate: 0 });
+          d.discounts = [{ amount: 10, vatRate: 19 }];
+        }),
+      )
+    ).replace(/<ram:CategoryTradeTax>[\s\S]*?<\/ram:CategoryTradeTax>/, '');
+    const { invoice } = readInvoiceXml(xml);
+    expect(invoice.discounts).toEqual([{ amount: 10, reason: '95' }]);
+    expect(check(invoice).findings).toContainEqual(expect.objectContaining({ path: 'discounts.0.vatRate', code: 'adjustment-group' }));
+  });
+
   it('names an entry whose percentage, base and amount disagree in the XML, whatever the lines say', async () => {
     // Base 50, 10 %, amount 10: against the lines (100.00) 10 % is 10 again, so only the XML shows the contradiction.
     const xml = (await oneLine([{ percent: 10 }])).replace('<ram:BasisAmount>100.00</ram:BasisAmount>', '<ram:BasisAmount>50.00</ram:BasisAmount>');

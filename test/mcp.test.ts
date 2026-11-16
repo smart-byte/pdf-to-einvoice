@@ -6,7 +6,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { Ajv } from 'ajv';
 import { describe, expect, it } from 'vitest';
-import type { Allowance, DocumentAllowance, Invoice } from '../src/index.js';
+import type { Adjustment, Allowance, DocumentAllowance, Invoice } from '../src/index.js';
 import { createServer } from '../src/mcp.js';
 import { readEmbeddedXml } from '../src/pdf.js';
 
@@ -75,6 +75,8 @@ describe('MCP server', () => {
     };
     expect(accepts(invoice)).toBe(true);
     expect(accepts({ ...invoice, charges: [{ ...freight, express: true }] })).toBe(false);
+    const placed: Adjustment = { list: 'charges', index: 0, category: 'S', rate: 19, amount: 9.9, reason: 'Fracht' };
+    expect(placed.list).toBe('charges');
     const properties = (schema.properties as any).invoice.properties;
     for (const list of ['discounts', 'charges']) {
       expect(Object.keys(properties[list].items.properties)).toEqual(['percent', 'amount', 'reason', 'vatCategory', 'vatRate']);

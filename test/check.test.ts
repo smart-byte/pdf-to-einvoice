@@ -226,6 +226,11 @@ describe('check', () => {
       expect(said((d) => (d.discounts = [{ percent: 5, reason: ' ' }]), 'discounts.0.reason')).toEqual([]);
     });
 
+    it('names discounts and charges where the totals of the PDF differ, since reading does not find them yet', () => {
+      const mismatch = check(withChange((d) => (d.totals.net = 1424.05))).findings.find((f) => f.path === 'totals.net');
+      expect(mismatch?.message).toMatch(/discounts or charges on the whole invoice/);
+    });
+
     it('wants a known VAT category and a rate that fits it', () => {
       expect(said((d) => (d.discounts = [{ amount: 5, vatCategory: 'X' }]), 'discounts.0.vatCategory')).toEqual(['error:format']);
       expect(said((d) => (d.discounts = [{ amount: 5, vatCategory: 'Z', vatRate: 7 }]), 'discounts.0.vatRate')).toEqual(['error:vat-rate']);

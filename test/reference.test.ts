@@ -58,6 +58,10 @@ const CASES: Record<string, InvoiceDraft> = {
     d.buyer = US_BUYER;
     d.currency = 'USD';
   }),
+  'not subject to VAT, with a charge in the same category': withoutVat('O', 'Not taxable in Germany (§ 3a (2) UStG).', (d) => {
+    d.buyer = US_BUYER;
+    d.charges = [{ amount: 5, reason: 'Porto' }];
+  }),
   'small business without VAT (§ 19 UStG)': withoutVat('E', 'No VAT charged: small business under § 19 UStG.', (d) => {
     delete d.seller.vatId;
     d.seller.taxNumber = '123/456/78901';

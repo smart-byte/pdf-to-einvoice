@@ -13,6 +13,11 @@ All notable changes to this project are documented here. The format follows
   split between rates. They are checked, written into the XML, read back from an e-invoice and entered in the web app.
 - `check` refuses category O beside any other VAT category (BR-O-11).
 
+### Changed
+
+- `calculate` throws for a discount or charge it cannot place in a VAT group; `check` says why. `readInvoiceXml` and
+  `validateEInvoice` return `percentages`, which `check` takes as an option.
+
 ## [0.2.0] - 2026-11-13
 
 ### Added

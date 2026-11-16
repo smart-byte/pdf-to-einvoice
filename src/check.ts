@@ -295,7 +295,7 @@ export function check(draft: InvoiceDraft, options: CheckOptions = {}): CheckRes
         error(
           `totals.${key}`,
           'totals-mismatch',
-          `The PDF says ${printed.toFixed(2)}, the lines${totals.adjustments.length ? ' with the discounts and charges' : ''} add up to ${totals[key].toFixed(2)}. The e-invoice must not contradict the PDF.`,
+          `The PDF says ${printed.toFixed(2)}, the lines${totals.adjustments.length ? ' with the discounts and charges' : ''} add up to ${totals[key].toFixed(2)}. The e-invoice must not contradict the PDF: check quantities and prices, and enter any discounts or charges on the whole invoice the PDF states.`,
         );
       }
     }

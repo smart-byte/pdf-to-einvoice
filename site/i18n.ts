@@ -327,7 +327,7 @@ export const STRINGS: Record<string, Entry> = {
   'e.adjustment.percent': { de: 'Ein Prozentsatz ist nie negativ; das Vorzeichen ergibt sich aus den Positionen.', en: '' },
   'e.charge-reason': { de: 'Ein Zuschlag braucht seinen Grund, so wie er auf der Rechnung steht, etwa Fracht.', en: '' },
   'e.adjustment-group': {
-    de: 'Mit diesen Angaben passt der Eintrag zu keiner oder zu mehreren Steuergruppen der Positionen. Bitte geben Sie Umsatzsteuer und Steuersatz an, zu denen er gehört; ein Betrag wird nicht auf mehrere Steuersätze verteilt.',
+    de: 'Mit diesen Angaben passt der Eintrag zu keiner oder zu mehreren Steuergruppen der Positionen. Bitte prüfen Sie Umsatzsteuer und Steuersatz: Ein Prozentsatz braucht Positionen in dieser Gruppe, ein Betrag genau eine Gruppe; er wird nicht auf mehrere Steuersätze verteilt.',
     en: '',
   },
   'e.adjustment-mismatch': {
@@ -351,7 +351,7 @@ export const STRINGS: Record<string, Entry> = {
     en: 'The XML states {b} for this line item, but quantity times price less a discount is {a}, and it names nothing else on the line that explains the difference.',
   },
   'e.totals-mismatch': {
-    de: 'Die Summe im PDF weicht von der Summe der Positionen ab. Die E-Rechnung darf dem PDF nicht widersprechen: Bitte prüfen Sie Mengen und Preise.',
+    de: 'Die Summe im PDF weicht von der berechneten Summe ab. Die E-Rechnung darf dem PDF nicht widersprechen: Bitte prüfen Sie Mengen und Preise, und tragen Sie Rabatte oder Zuschläge auf die ganze Rechnung ein, die das PDF nennt.',
     en: '',
   },
   'e.address': { de: 'Dieser Teil der Anschrift fehlt. §\u00a014 UStG verlangt die vollständige Anschrift.', en: '' },
@@ -369,6 +369,8 @@ export const STRINGS: Record<string, Entry> = {
   },
   'e.preceding-invoice': { de: 'Eine Korrektur oder Gutschrift sollte die ursprüngliche Rechnung nennen.', en: '' },
   'e.not-in-pdf': { de: 'Diese Angabe steht so nicht im PDF. Bitte prüfen.', en: '' },
+  // A percentage the field may not show, such as one the XML of an existing e-invoice states for a discount on another base.
+  'e.not-in-pdf.percent': { de: '„{v}“ steht so nicht im PDF. Bitte prüfen.', en: '' },
   'e.no-pdf-text': {
     de: 'Das PDF enthält keinen lesbaren Text (vermutlich ein Scan). Bitte prüfen Sie jede Angabe selbst.',
     en: '',

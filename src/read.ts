@@ -1,5 +1,5 @@
 import { XMLParser } from 'fast-xml-parser';
-import { lineBase, percentAgrees, slackOf } from './calculate.js';
+import { lineBase, micro, percentAgrees, slackOf } from './calculate.js';
 import type { Allowance, DocumentAllowance, InvoiceDraft, InvoiceType, VatCategory } from './model.js';
 
 type Node = Record<string, any> | string | undefined;
@@ -124,12 +124,13 @@ function adjustmentsOf(settlement: Node, lines: ReturnType<typeof line>[], curre
     const percent = number(entry, 'CalculationPercent');
     const base = number(entry, 'BasisAmount');
     const vatCategory = text(entry, 'CategoryTradeTax', 'CategoryCode') as VatCategory | undefined;
-    // Category O states no rate at all.
-    const vatRate = number(entry, 'CategoryTradeTax', 'RateApplicablePercent') ?? 0;
+    // Category O states no rate at all. Without any category (BR-32) there is no rate either, and no VAT group is guessed.
+    const vatRate = number(entry, 'CategoryTradeTax', 'RateApplicablePercent') ?? (vatCategory !== undefined ? 0 : undefined);
     const agrees = (from: number | undefined) =>
       from !== undefined && percent !== undefined && amount !== undefined && percentAgrees(from, percent, amount, slack);
     const group = lines.filter((l) => l.vatCategory === vatCategory && l.vatRate === vatRate);
-    const ownBase = group.every((l) => l.netAmount !== undefined) ? group.reduce((sum, l) => sum + l.netAmount!, 0) : undefined;
+    // Summed in millionths, never in floating point euros.
+    const ownBase = group.every((l) => l.netAmount !== undefined) ? Number(group.reduce((sum, l) => sum + micro(l.netAmount!), 0n)) / 1e6 : undefined;
     if (percent !== undefined && base !== undefined && !agrees(base)) read.contradictions.push(`${path}.percent`);
     else if (percent !== undefined && !agrees(ownBase)) read.percentages[path] = percent;
     read[list].push({

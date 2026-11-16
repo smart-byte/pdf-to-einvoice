@@ -1,4 +1,4 @@
-export { calculate, type Totals, type VatGroup } from './calculate.js';
+export { calculate, type Adjustment, type Totals, type VatGroup } from './calculate.js';
 export { check, type CheckOptions, type CheckResult, type Finding } from './check.js';
 export {
   createEInvoice,

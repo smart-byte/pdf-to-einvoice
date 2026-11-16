@@ -263,7 +263,7 @@ describe.skipIf(!asked)('the web app in a browser', () => {
     await read(page);
     await page.fill('[data-path="lines.1.discount.percent"]', '10');
     // The page does not show the percentage. `said` turns the no-break space of the label into a plain one.
-    expect(await said(page)).toEqual(expect.arrayContaining([expect.stringMatching(/^Position 2, Rabatt %: Diese Angabe steht so nicht im PDF/)]));
+    expect(await said(page)).toEqual(expect.arrayContaining([expect.stringMatching(/^Position 2, Rabatt %: „10 %“ steht so nicht im PDF/)]));
     // The hint below one field moves no field beside it. Both are measured at once: the page may still be scrolling.
     const [percent, amount] = await page.$$eval('[data-path^="lines.1.discount."]', (inputs) =>
       inputs.map((input) => Math.round(input.getBoundingClientRect().top)),
@@ -361,7 +361,7 @@ describe.skipIf(!asked)('the web app in a browser', () => {
     await read(other, upload('other-base.pdf', await embed(otherBase)));
     expect(await other.inputValue('[data-path="discounts.0.amount"]')).toBe('20');
     const discountFindings = (await said(other)).filter((text) => text.startsWith('Rabatt 1'));
-    expect(discountFindings).toEqual(['Rabatt 1, Prozent: Diese Angabe steht so nicht im PDF. Bitte prüfen.']);
+    expect(discountFindings).toEqual(['Rabatt 1, Prozent: „10 %“ steht so nicht im PDF. Bitte prüfen.']);
   }, 120_000);
 
   it('words the discounts and charges in English, and keeps them within a phone', async () => {
