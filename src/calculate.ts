@@ -167,15 +167,16 @@ function resolve(invoice: Adjustable, lineCents?: bigint[]) {
       const rate: number | undefined = category !== undefined && category !== 'S' ? 0 : e.vatRate;
       const matching = lineGroups.filter((g) => (category === undefined || g.category === category) && (rate === undefined || g.rate === rate));
       const named = [category, rate !== undefined ? `${rate} %` : undefined].filter(Boolean).join(' ');
-      const unplaced = (field: string, message: string) => {
-        error(at(field), 'adjustment-group', message);
+      const unplaced = (path: string, code: string, message: string) => {
+        error(path, code, message);
         resolved = false;
       };
 
       if (e.percent !== undefined) {
         if (!matching.length) {
           unplaced(
-            e.vatRate !== undefined ? 'vatRate' : 'vatCategory',
+            at(e.vatRate !== undefined ? 'vatRate' : 'vatCategory'),
+            'adjustment-group',
             `No line is in the VAT group ${named}, so the percentage has nothing to be taken of. Correct the VAT category or rate, or leave both out to take it of all lines.`,
           );
           return;
@@ -214,14 +215,15 @@ function resolve(invoice: Adjustable, lineCents?: bigint[]) {
       const where = e.vatRate === undefined ? 'vatRate' : 'vatCategory';
       if (matching.length > 1) {
         unplaced(
-          where,
+          at(where),
+          'adjustment-group',
           `The lines are in several VAT groups (${matching.map((g) => `${g.category} ${g.rate} %`).join(', ')}). State the VAT category and rate this ${what} belongs to; an amount is not split between them.`,
         );
         return;
       }
       const group = matching[0] ?? (category !== undefined && rate !== undefined ? { category, rate, cents: 0n } : undefined);
       if (!group) {
-        unplaced(where, `No line is in the VAT group ${named || 'it names'}. State the VAT category and rate this ${what} belongs to.`);
+        unplaced(at(where), 'adjustment-group', `No line is in the VAT group ${named || 'it names'}. State the VAT category and rate this ${what} belongs to.`);
         return;
       }
       const stated = toCents(e.amount);

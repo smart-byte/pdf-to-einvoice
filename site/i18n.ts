@@ -312,6 +312,25 @@ export const STRINGS: Record<string, Entry> = {
     de: 'Im XML passen Prozentsatz, Grundbetrag und Betrag dieses Rabatts nicht zusammen. Bitten Sie den Rechnungssteller um eine korrigierte E-Rechnung.',
     en: 'In the XML, the percentage, base and amount of this discount do not agree. Ask the issuer for a corrected e-invoice.',
   },
+  'e.adjustment': { de: 'Ein Rabatt oder Zuschlag braucht einen Prozentsatz oder einen Betrag.', en: '' },
+  'e.adjustment.percent': { de: 'Ein Prozentsatz ist nie negativ; das Vorzeichen ergibt sich aus den Positionen.', en: '' },
+  'e.charge-reason': { de: 'Ein Zuschlag braucht seinen Grund, so wie er auf der Rechnung steht, etwa Fracht.', en: '' },
+  'e.adjustment-group': {
+    de: 'Mit diesen Angaben passt der Eintrag zu keiner oder zu mehreren Steuergruppen der Positionen. Bitte geben Sie Umsatzsteuer und Steuersatz an, zu denen er gehört; ein Betrag wird nicht auf mehrere Steuersätze verteilt.',
+    en: '',
+  },
+  'e.adjustment-mismatch': {
+    de: 'Prozentsatz und Betrag passen nicht zusammen. Bei mehreren Steuersätzen muss der Betrag centgenau die Summe der gerundeten Beträge je Steuersatz sein. Bitte prüfen Sie beide.',
+    en: '',
+  },
+  'e.adjustment-sign': {
+    de: 'Der Betrag hat ein anderes Vorzeichen als die Positionen. Ergeben die Positionen einen negativen Betrag, ist auch der Rabatt oder Zuschlag negativ, etwa −10 für 10.',
+    en: '',
+  },
+  'e.category-o': {
+    de: 'Eine Rechnung mit nicht steuerbaren Umsätzen (Kategorie O) darf nichts in einer anderen Umsatzsteuer-Kategorie enthalten. Stellen Sie dafür eine eigene Rechnung aus oder korrigieren Sie die Kategorie.',
+    en: '',
+  },
   'e.line-net.xml': {
     de: 'Das XML nennt für diese Position {b}, Menge mal Preis abzüglich eines Rabatts ergibt aber {a}, und es nennt nichts sonst auf der Position, das den Unterschied erklärt.',
     en: 'The XML states {b} for this line item, but quantity times price less a discount is {a}, and it names nothing else on the line that explains the difference.',
