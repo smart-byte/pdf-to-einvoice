@@ -6,6 +6,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { Ajv } from 'ajv';
 import { describe, expect, it } from 'vitest';
+import type { Allowance, DocumentAllowance, Invoice } from '../src/index.js';
 import { createServer } from '../src/mcp.js';
 import { readEmbeddedXml } from '../src/pdf.js';
 
@@ -53,6 +54,32 @@ describe('MCP server', () => {
     const invoice = (tools.find((t) => t.name === 'create_einvoice')!.inputSchema.properties as any).invoice;
     expect(invoice.properties.seller.properties.vatId.type).toBe('string');
     expect(invoice.required).toContain('number');
+  });
+
+  it('takes discounts and charges on the whole invoice, each with its own VAT category and rate', async () => {
+    const { tools } = await (await connect()).listTools();
+    const schema = tools.find((t) => t.name === 'create_einvoice')!.inputSchema;
+    const accepts = (invoice: unknown) => new Ajv({ strict: false }).validate(schema, { pdf_path: '/tmp/a.pdf', output_path: '/tmp/b.pdf', invoice });
+    const loyalty: Allowance = { percent: 5, reason: 'Treuerabatt' };
+    const freight: DocumentAllowance = { amount: 9.9, reason: 'Fracht', vatCategory: 'S', vatRate: 19 };
+    const invoice: Invoice = {
+      number: 'RE-1',
+      issueDate: '2026-11-16',
+      typeCode: '380',
+      currency: 'EUR',
+      seller: { name: 'Muster GmbH', country: 'DE' },
+      buyer: { name: 'Beispiel AG', country: 'DE' },
+      lines: [{ name: 'Beratung', quantity: 1, unit: 'C62', unitPrice: 100, vatCategory: 'S', vatRate: 19 }],
+      discounts: [loyalty],
+      charges: [freight],
+    };
+    expect(accepts(invoice)).toBe(true);
+    expect(accepts({ ...invoice, charges: [{ ...freight, express: true }] })).toBe(false);
+    const properties = (schema.properties as any).invoice.properties;
+    for (const list of ['discounts', 'charges']) {
+      expect(Object.keys(properties[list].items.properties)).toEqual(['percent', 'amount', 'reason', 'vatCategory', 'vatRate']);
+      for (const field of Object.values<any>(properties[list].items.properties)) expect(field.description, list).toBeTruthy();
+    }
   });
 
   it('lets a client send an incomplete invoice to check_invoice, which is there to say what is missing', async () => {

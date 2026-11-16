@@ -16,6 +16,8 @@ export {
   INVOICE_TYPES,
   VAT_CATEGORIES,
   invoiceJsonSchema,
+  type Allowance,
+  type DocumentAllowance,
   type Invoice,
   type InvoiceDraft,
   type InvoiceType,

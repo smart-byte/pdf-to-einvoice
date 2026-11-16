@@ -46,12 +46,23 @@ export interface Party {
 
 /** A discount or charge: a percentage of its base, an amount, or both. */
 export interface Allowance {
-  /** Percentage of the base, e.g. 10 (BT-138). Not negative. */
+  /** Percentage of the base, e.g. 10 (BT-138, BT-94, BT-101). Not negative. */
   percent?: number;
-  /** Amount (BT-136), signed as in the standard: the line total is its base less this amount. */
+  /** Amount (BT-136, BT-92, BT-99), signed as in the standard: on a negative base it is negative too. */
   amount?: number;
-  /** Reason as printed, e.g. "Treuerabatt" (BT-139). */
+  /** Reason as printed, e.g. "Treuerabatt" or "Fracht" (BT-139, BT-97, BT-104). */
   reason?: string;
+}
+
+/**
+ * A discount or charge on the whole invoice (BG-20, BG-21). Its base is the sum of the lines in its VAT category and
+ * rate; where these are left out, the lines decide (see `calculate`).
+ */
+export interface DocumentAllowance extends Allowance {
+  /** BT-95, BT-102. */
+  vatCategory?: VatCategory;
+  /** VAT rate in percent (BT-96, BT-103). A rate above 0 without a category means S. */
+  vatRate?: number;
 }
 
 export interface Line {
@@ -116,6 +127,10 @@ export interface Invoice {
   seller: Party;
   buyer: Party;
   lines: Line[];
+  /** Discounts on the whole invoice (BG-20). */
+  discounts?: DocumentAllowance[];
+  /** Charges on the whole invoice, such as freight (BG-21). Each needs a reason. */
+  charges?: DocumentAllowance[];
   totals?: PrintedTotals;
 }
 
@@ -131,6 +146,23 @@ const date = (description: string) => ({
 });
 const text = (description: string) => ({ type: 'string', description });
 const amount = (description: string) => ({ type: 'number', description });
+const vatCategory = (description: string) => ({ type: 'string', enum: Object.keys(VAT_CATEGORIES), description });
+
+const adjustments = (what: string, reason: string) => ({
+  type: 'array',
+  description: `${what} on the whole invoice as printed, below the lines.`,
+  items: {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      percent: amount('Percentage of the lines it applies to, e.g. 5.'),
+      amount: amount('Amount. Negative where the lines it applies to add up to a negative amount.'),
+      reason: text(reason),
+      vatCategory: vatCategory('VAT category it is charged at. Leave out to follow the lines.'),
+      vatRate: amount('VAT rate in percent it is charged at, e.g. 19. Leave out to follow the lines.'),
+    },
+  },
+});
 
 const party = (who: string, extra: Record<string, unknown> = {}) => ({
   type: 'object',
@@ -226,15 +258,15 @@ export const invoiceJsonSchema = {
               reason: text('Reason as printed, e.g. "Treuerabatt".'),
             },
           },
-          vatCategory: {
-            type: 'string',
-            enum: Object.keys(VAT_CATEGORIES),
-            description: 'S standard rate (default), Z zero rated, E exempt, AE reverse charge, K intra-community supply, G export, O not subject to VAT.',
-          },
+          vatCategory: vatCategory(
+            'S standard rate (default), Z zero rated, E exempt, AE reverse charge, K intra-community supply, G export, O not subject to VAT.',
+          ),
           vatRate: amount('VAT rate in percent, e.g. 19.'),
         },
       },
     },
+    discounts: adjustments('Discounts', 'Reason as printed, e.g. "Treuerabatt".'),
+    charges: adjustments('Charges such as freight or packaging', 'Reason as printed, e.g. "Fracht". Required.'),
     totals: {
       type: 'object',
       additionalProperties: false,
