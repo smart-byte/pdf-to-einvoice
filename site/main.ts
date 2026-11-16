@@ -1,6 +1,7 @@
 import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.mjs';
 import pdfWorkerUrl from 'pdfjs-dist/legacy/build/pdf.worker.mjs?url';
 import sampleUrl from '../examples/sample-invoice.pdf?url';
+import { lineBase, percentOf } from '../src/calculate.js';
 import { check, type CheckResult, type Finding } from '../src/check.js';
 import { keepWhatThePdfShows } from '../src/ground.js';
 import { guessFromText, languageOf } from '../src/guess.js';
@@ -387,9 +388,11 @@ function describe(finding: { code: string; message: string; path?: string }): st
   const key = candidates.find((candidate) => candidate in STRINGS);
   if (!key || (lang !== 'de' && !STRINGS[key]?.en)) return finding.message;
   const line = state.draft.lines?.[Number(/^lines\.(\d+)\./.exec(path)?.[1])];
-  // What the line comes to: quantity times price, less its discount.
-  const product = Number(line?.quantity) * Number(line?.unitPrice);
-  const discount = line?.discount?.amount ?? (line?.discount?.percent != null ? (product * Number(line.discount.percent)) / 100 : 0);
+  // What the line comes to: quantity times price, less its discount, in cents as the XML has it (1 x 1.005 less 0.02
+  // is 0.99, not 0.985). Nothing is calculated with a value that is not a number yet.
+  const [quantity, unitPrice, percent] = [Number(line?.quantity), Number(line?.unitPrice), Number(line?.discount?.percent)];
+  const product = Number.isFinite(quantity) && Number.isFinite(unitPrice) ? lineBase(quantity, unitPrice) : NaN;
+  const discount = line?.discount?.amount ?? (Number.isFinite(product) && Number.isFinite(percent) ? percentOf(product, percent) : 0);
   return t(key, {
     a: line ? money(product - Number(discount)) : '',
     b: line ? money(Number(line.netAmount)) : '',

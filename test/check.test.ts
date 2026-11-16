@@ -88,6 +88,16 @@ describe('check', () => {
     expect(lineTotal(499.51, 'HUF')).toEqual(['error:line-net']);
   });
 
+  it('quotes the line total it expects in cents: 1 x 1.005 less 0.02 is 0.99', () => {
+    const result = check(
+      withChange((d) => {
+        delete d.totals;
+        Object.assign(d.lines[0], { quantity: 1, unitPrice: 1.005, discount: { amount: 0.02 }, netAmount: 0.5 });
+      }),
+    );
+    expect(result.findings.find((f) => f.code === 'line-net')?.message).toContain('is 0.99,');
+  });
+
   it('checks a line total against quantity times price less the discount', () => {
     const at = (netAmount: number) =>
       codesAt(

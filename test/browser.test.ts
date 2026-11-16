@@ -278,6 +278,24 @@ describe.skipIf(!asked)('the web app in a browser', () => {
     expect(await existing.inputValue('[data-path="lines.1.discount.amount"]')).toBe('49.9');
   }, 120_000);
 
+  it('quotes the line total of an existing e-invoice in cents, as the XML has it', async () => {
+    // 1 x 1.005 is 1.01 in cents, less a discount of 0.02 is 0.99; the XML states 0.50 for the line.
+    const invoice = sampleData() as any;
+    delete invoice.totals;
+    Object.assign(invoice.lines[0], { quantity: 1, unitPrice: 1.005, discount: { amount: 0.02 } });
+    const xml = (await createEInvoice({ pdf: samplePdf(), invoice })).xml.replace(
+      '<ram:LineTotalAmount>0.99</ram:LineTotalAmount>',
+      '<ram:LineTotalAmount>0.50</ram:LineTotalAmount>',
+    );
+    const doc = await PDFDocument.load(samplePdf());
+    await doc.attach(new TextEncoder().encode(xml), 'factur-x.xml', { mimeType: 'text/xml' });
+    const page = await open();
+    await read(page, upload('line-total.pdf', await doc.save()));
+    expect(await said(page)).toEqual(
+      expect.arrayContaining([expect.stringMatching(/^Position 1: Das XML nennt für diese Position 0,50 €, .* ergibt aber 0,99 €/)]),
+    );
+  }, 120_000);
+
   it('reports a discount of an existing e-invoice whose XML contradicts its own base', async () => {
     // Base 50, 10 %, amount 10, on a line of 1 x 100: only the base the XML states shows the contradiction.
     const invoice = sampleData() as any;
