@@ -212,6 +212,35 @@ describe('validateEInvoice', () => {
         change(d);
       });
 
+    it('reads freight that the profile EXTENDED states as a logistics service charge as a charge', async () => {
+      const created = await create(oneLine(100, (d) => (d.charges = [{ amount: 15, reason: 'Transportkosten', vatRate: 19 }])));
+      const xml = created.xml.replace(
+        /<ram:SpecifiedTradeAllowanceCharge>[\s\S]*?<\/ram:SpecifiedTradeAllowanceCharge>/,
+        '<ram:SpecifiedLogisticsServiceCharge><ram:Description>Transportkosten</ram:Description><ram:AppliedAmount>15.00</ram:AppliedAmount>' +
+          '<ram:AppliedTradeTax><ram:TypeCode>VAT</ram:TypeCode><ram:CategoryCode>S</ram:CategoryCode><ram:RateApplicablePercent>19.00</ram:RateApplicablePercent></ram:AppliedTradeTax></ram:SpecifiedLogisticsServiceCharge>',
+      );
+      expect(xml).not.toContain('SpecifiedTradeAllowanceCharge');
+      const result = await validateEInvoice(await pdfCarrying(xml));
+      expect(result.invoice?.charges).toEqual([{ amount: 15, reason: 'Transportkosten', vatCategory: 'S', vatRate: 19 }]);
+      expect(codes(result.findings)).not.toContain('totals-mismatch');
+    });
+
+    it('reads a percentage that carries the minus of a credit note as well as its base and amount as the same discount', async () => {
+      // Some generators write 10 % off -100.00 as -10 % of -100.00 = -10.00: the minus is the credit note's, not a contradiction.
+      const created = await create(
+        oneLine(100, (d) => {
+          Object.assign(d.lines[0], { quantity: -1, discount: { percent: 10 } });
+          d.discounts = [{ percent: 5 }];
+        }),
+      );
+      const xml = created.xml.replace(/<ram:CalculationPercent>(\d)/g, '<ram:CalculationPercent>-$1');
+      expect(xml.match(/<ram:CalculationPercent>-/g)).toHaveLength(2);
+      const result = await validateEInvoice(await pdfCarrying(xml));
+      expect(codes(result.findings)).not.toContain('xml-discount');
+      expect(result.invoice?.lines?.[0]?.discount).toMatchObject({ percent: 10, amount: -10 });
+      expect(result.invoice?.discounts?.[0]).toMatchObject({ percent: 5, amount: -4.5 });
+    });
+
     it('accepts its own e-invoice with both, in forints too, where a discount is half a forint off its percentage', async () => {
       const both = await create(oneLine(100, (d) => Object.assign(d, { discounts: [{ percent: 10 }], charges: [{ amount: 5, reason: 'Fracht' }] })));
       expect((await validateEInvoice(both.pdf)).findings.filter((f) => f.severity === 'error')).toEqual([]);

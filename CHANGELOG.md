@@ -10,6 +10,8 @@ All notable changes to this project are documented here. The format follows
 
 - A finding about a line total quotes the expected amount in cents, as the XML has it: 1 x 1.005 less 0.02 is 0.99,
   not 0.98.
+- Checking an e-invoice no longer calls a discount a contradiction whose percentage repeats the minus of a credit
+  note, and reads freight that the profile EXTENDED states as a logistics service charge.
 
 ## [0.3.0] - 2026-11-16
 
