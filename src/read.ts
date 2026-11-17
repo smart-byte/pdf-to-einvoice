@@ -154,6 +154,16 @@ function adjustmentsOf(settlement: Node, lines: ReturnType<typeof line>[], curre
       vatRate,
     });
   }
+  // The profile EXTENDED states freight apart, as a logistics service charge (BG-X-23): a charge on the whole invoice.
+  for (const entry of all(settlement, 'SpecifiedLogisticsServiceCharge')) {
+    const vatCategory = text(entry, 'AppliedTradeTax', 'CategoryCode') as VatCategory | undefined;
+    read.charges.push({
+      amount: number(entry, 'AppliedAmount'),
+      reason: text(entry, 'Description'),
+      vatCategory,
+      vatRate: number(entry, 'AppliedTradeTax', 'RateApplicablePercent') ?? (vatCategory !== undefined ? 0 : undefined),
+    });
+  }
   return read;
 }
 

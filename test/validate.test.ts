@@ -212,6 +212,19 @@ describe('validateEInvoice', () => {
         change(d);
       });
 
+    it('reads freight that the profile EXTENDED states as a logistics service charge as a charge', async () => {
+      const created = await create(oneLine(100, (d) => (d.charges = [{ amount: 15, reason: 'Transportkosten', vatRate: 19 }])));
+      const xml = created.xml.replace(
+        /<ram:SpecifiedTradeAllowanceCharge>[\s\S]*?<\/ram:SpecifiedTradeAllowanceCharge>/,
+        '<ram:SpecifiedLogisticsServiceCharge><ram:Description>Transportkosten</ram:Description><ram:AppliedAmount>15.00</ram:AppliedAmount>' +
+          '<ram:AppliedTradeTax><ram:TypeCode>VAT</ram:TypeCode><ram:CategoryCode>S</ram:CategoryCode><ram:RateApplicablePercent>19.00</ram:RateApplicablePercent></ram:AppliedTradeTax></ram:SpecifiedLogisticsServiceCharge>',
+      );
+      expect(xml).not.toContain('SpecifiedTradeAllowanceCharge');
+      const result = await validateEInvoice(await pdfCarrying(xml));
+      expect(result.invoice?.charges).toEqual([{ amount: 15, reason: 'Transportkosten', vatCategory: 'S', vatRate: 19 }]);
+      expect(codes(result.findings)).not.toContain('totals-mismatch');
+    });
+
     it('reads a percentage that carries the minus of a credit note as well as its base and amount as the same discount', async () => {
       // Some generators write 10 % off -100.00 as -10 % of -100.00 = -10.00: the minus is the credit note's, not a contradiction.
       const created = await create(
