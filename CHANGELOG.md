@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Security
+
+- fast-xml-parser 5.12.0, which reads an unterminated tag without quadratic CPU time (GHSA-474x-hrwr-fgx4).
+
 ## [0.3.1] - 2026-11-17
 
 ### Fixed
