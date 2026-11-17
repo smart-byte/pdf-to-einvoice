@@ -1,4 +1,4 @@
-import { calculate, micro, percentAgrees, percentOf, resolveAdjustments, slackOf, type Totals } from './calculate.js';
+import { calculate, lineBase, micro, percentAgrees, percentOf, resolveAdjustments, slackOf, type Totals } from './calculate.js';
 import { INVOICE_TYPES, VAT_CATEGORIES, type Invoice, type InvoiceDraft, type VatCategory } from './model.js';
 
 export interface Finding {
@@ -271,7 +271,8 @@ export function check(draft: InvoiceDraft, options: CheckOptions = {}): CheckRes
       if (!isNumber(line.netAmount)) return;
       const apart = micro(line.quantity) * micro(line.unitPrice) - (micro(discount?.amount ?? 0) + micro(totals.lineNet[i]!)) * 10n ** 6n;
       if ((apart < 0n ? -apart : apart) <= micro(slack) * 10n ** 6n) return;
-      const expected = (line.quantity * line.unitPrice - (discount?.amount ?? 0)).toFixed(2);
+      // In cents, as the XML has it: 1 x 1.005 is 1.01, not 1.005.
+      const expected = (lineBase(line.quantity, line.unitPrice) - (discount?.amount ?? 0)).toFixed(2);
       const stated = totals.lineNet[i]!.toFixed(2);
       if (!options.adjustedLines) {
         error(
