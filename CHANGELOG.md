@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-11-17
+
 ### Fixed
 
 - A finding about a line total quotes the expected amount in cents, as the XML has it: 1 x 1.005 less 0.02 is 0.99,
