@@ -3,7 +3,8 @@ import { extractionSchema, progressOf } from '../../site/app/model/answer.js';
 
 /** An answer as the grammar makes a model write it: every key of the schema, in its order, here with two line items. */
 function answerOf(schema: any = extractionSchema()): unknown {
-  if (schema.type === 'object') return Object.fromEntries(Object.entries(schema.properties).map(([key, value]) => [key, answerOf(value)]));
+  if (schema.type === 'object')
+    return Object.fromEntries(Object.entries(schema.properties).map(([key, value]) => [key, answerOf(value)]));
   if (schema.type === 'array') return [answerOf(schema.items), answerOf(schema.items)];
   return null;
 }

@@ -82,10 +82,15 @@ export async function readWithBrowserModel(
   signal?.throwIfAborted();
   if (engine?.id !== modelId) {
     stop();
-    const loading: Engine = { id: modelId, worker: new Worker(new URL('./llm-worker.ts', import.meta.url), { type: 'module' }) };
+    const loading: Engine = {
+      id: modelId,
+      worker: new Worker(new URL('./llm-worker.ts', import.meta.url), { type: 'module' }),
+    };
     engine = loading;
     // Only the model that is still in use says how far it has loaded.
-    loading.ready = CreateWebWorkerMLCEngine(loading.worker, modelId, { initProgressCallback: (report) => engine === loading && onProgress(report.progress) });
+    loading.ready = CreateWebWorkerMLCEngine(loading.worker, modelId, {
+      initProgressCallback: (report) => engine === loading && onProgress(report.progress),
+    });
     // A model that failed to load is not kept: the next reading starts afresh.
     loading.ready.catch(() => engine === loading && stop());
   }
@@ -129,13 +134,19 @@ export async function readWithEndpoint(text: string, endpoint: Endpoint, signal?
   const response = await fetch(`${endpoint.url.replace(/\/+$/, '')}/chat/completions`, {
     signal,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...(endpoint.key ? { Authorization: `Bearer ${endpoint.key}` } : {}) },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(endpoint.key ? { Authorization: `Bearer ${endpoint.key}` } : {}),
+    },
     body: JSON.stringify({
       model: endpoint.model,
       temperature: 0,
       response_format: { type: 'json_object' },
       messages: [
-        { role: 'system', content: `${RULES}\nAnswer with one JSON object that follows this JSON Schema:\n${JSON.stringify(extractionSchema())}` },
+        {
+          role: 'system',
+          content: `${RULES}\nAnswer with one JSON object that follows this JSON Schema:\n${JSON.stringify(extractionSchema())}`,
+        },
         { role: 'user', content: `Invoice text:\n"""\n${text}\n"""` },
       ],
     }),

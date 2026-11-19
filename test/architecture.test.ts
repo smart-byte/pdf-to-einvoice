@@ -30,10 +30,15 @@ const src = join(root, 'src');
 const IMPORT = /(?:\bfrom\s*|\bimport\s*\(\s*|^import\s+)'(\.{1,2}\/[^']+)'/gm;
 
 const sources = (dir: string) =>
-  (readdirSync(join(root, dir), { recursive: true }) as string[]).filter((file) => file.endsWith('.ts')).map((file) => join(root, dir, file));
+  (readdirSync(join(root, dir), { recursive: true }) as string[])
+    .filter((file) => file.endsWith('.ts'))
+    .map((file) => join(root, dir, file));
 
 /** The files of the project a source file imports, by relative path; `.js` stands for the `.ts` beside it. */
-const importsOf = (file: string) => [...readFileSync(file, 'utf8').matchAll(IMPORT)].map((match) => resolve(dirname(file), match[1]!.replace(/\.js$/, '.ts')));
+const importsOf = (file: string) =>
+  [...readFileSync(file, 'utf8').matchAll(IMPORT)].map((match) =>
+    resolve(dirname(file), match[1]!.replace(/\.js$/, '.ts')),
+  );
 
 const inSrc = (file: string) => relative(src, file).split('/');
 /** The folder under `src/` a file is in; `index.ts` for the public API. */
@@ -62,7 +67,9 @@ describe('the layers of src/', () => {
   const files = sources('src');
 
   it('puts every file into a layer', () => {
-    const stray = files.map((file) => relative(src, file)).filter((path) => path !== 'index.ts' && !((path.split('/')[0] ?? '') in LAYERS));
+    const stray = files
+      .map((file) => relative(src, file))
+      .filter((path) => path !== 'index.ts' && !((path.split('/')[0] ?? '') in LAYERS));
     expect(stray).toEqual([]);
   });
 
@@ -135,7 +142,9 @@ describe('the parts of site/', () => {
   const partOf = (file: string) => relative(site, file).split('/')[0]!;
 
   it('puts every script into a part', () => {
-    const stray = files.map((file) => relative(site, file)).filter((path) => !(path in SITE_CONFIG) && !((path.split('/')[0] ?? '') in SITE_PARTS));
+    const stray = files
+      .map((file) => relative(site, file))
+      .filter((path) => !(path in SITE_CONFIG) && !((path.split('/')[0] ?? '') in SITE_PARTS));
     expect(stray).toEqual([]);
   });
 

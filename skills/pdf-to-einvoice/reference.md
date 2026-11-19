@@ -18,7 +18,13 @@
     "country": "DE",
     "vatId": "DE123456789"
   },
-  "buyer": { "name": "Beispiel AG", "street": "Hauptstraße 5", "postalCode": "54321", "city": "Beispielstadt", "country": "DE" },
+  "buyer": {
+    "name": "Beispiel AG",
+    "street": "Hauptstraße 5",
+    "postalCode": "54321",
+    "city": "Beispielstadt",
+    "country": "DE"
+  },
   "lines": [{ "name": "Beratung", "quantity": 10, "unit": "HUR", "unitPrice": 100, "vatCategory": "S", "vatRate": 19 }],
   "totals": { "net": 1000, "vat": 190, "gross": 1190 }
 }

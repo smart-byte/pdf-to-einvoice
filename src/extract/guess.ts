@@ -13,7 +13,8 @@ import { after, cents, DATE, findIban, SEPARATOR, toIsoDate, vatIdsIn } from './
 // stays unread: less, never something invented. Ceiling: labels are still words, and a name is believed as printed;
 // add words here before reaching for anything smarter.
 
-const GERMAN_WORDS = /\b(rechnung\w*|mwst|ust|umsatzsteuer|mehrwertsteuer|netto|brutto|gesamt\w*|betrag|datum|menge|zahlbar|leistung\w*|lieferung)\b/gi;
+const GERMAN_WORDS =
+  /\b(rechnung\w*|mwst|ust|umsatzsteuer|mehrwertsteuer|netto|brutto|gesamt\w*|betrag|datum|menge|zahlbar|leistung\w*|lieferung)\b/gi;
 const ENGLISH_WORDS = /\b(invoice|vat|tax|subtotal|total|amount|date|quantity|payable|payment|due|delivery)\b/gi;
 
 /** The language an invoice is written in, judged by the words invoices use. English when nothing tells. */
@@ -26,7 +27,10 @@ function prune<T extends object>(object: T): T {
   if (Array.isArray(object)) return object.map((item) => prune(item)) as T;
   const entries = Object.entries(object)
     .map(([k, v]) => [k, v && typeof v === 'object' ? prune(v) : v] as const)
-    .filter(([, v]) => v !== undefined && !(typeof v === 'object' && !Array.isArray(v) && Object.keys(v as object).length === 0));
+    .filter(
+      ([, v]) =>
+        v !== undefined && !(typeof v === 'object' && !Array.isArray(v) && Object.keys(v as object).length === 0),
+    );
   return Object.fromEntries(entries) as T;
 }
 
@@ -56,15 +60,25 @@ export function guessFromText(text: string, options: GuessOptions = {}): Invoice
   // A VAT ID belongs to the party in whose address it stands. Otherwise the customer's is labelled as such.
   const vatIds = vatIdsIn(searched);
   const inAddress = (party: Found | undefined) => (party ? vatIdsIn(party.tail)[0]?.id : undefined);
-  const buyer: Partial<Party> = { ...believed(found.buyer), vatId: inAddress(found.buyer) ?? vatIds.find(({ customer }) => customer)?.id };
+  const buyer: Partial<Party> = {
+    ...believed(found.buyer),
+    vatId: inAddress(found.buyer) ?? vatIds.find(({ customer }) => customer)?.id,
+  };
   // Of the rest, one that stands beside the issuer's numbers or bank account, as in a footer, is the seller's.
   const others = vatIds.filter(({ id, customer }) => !customer && id !== buyer.vatId);
   const units = [...rows, ...(options.blocks ?? []).map((block) => block.join('   '))];
-  const besideIssuer = others.find(({ id }) => units.some((unit) => unit.replace(/ /g, '').includes(id) && ISSUER_OR_BANK.test(unit)));
-  const seller: Partial<Party> = { ...believed(found.seller), vatId: inAddress(found.seller) ?? (besideIssuer ?? others[0])?.id };
+  const besideIssuer = others.find(({ id }) =>
+    units.some((unit) => unit.replace(/ /g, '').includes(id) && ISSUER_OR_BANK.test(unit)),
+  );
+  const seller: Partial<Party> = {
+    ...believed(found.seller),
+    vatId: inAddress(found.seller) ?? (besideIssuer ?? others[0])?.id,
+  };
   seller.country ??= countryOfVatId(seller.vatId);
   // An address without a country is at home when VAT is charged: that is the ordinary domestic invoice.
-  buyer.country ??= countryOfVatId(buyer.vatId) ?? (buyer.postalCode && lines?.some((line) => (line.vatRate ?? 0) > 0) ? seller.country : undefined);
+  buyer.country ??=
+    countryOfVatId(buyer.vatId) ??
+    (buyer.postalCode && lines?.some((line) => (line.vatRate ?? 0) > 0) ? seller.country : undefined);
 
   // An invoice that shows no VAT at all charges none.
   const showsNoVat =
@@ -75,7 +89,8 @@ export function guessFromText(text: string, options: GuessOptions = {}): Invoice
   // elsewhere in the EU the buyer owes it, at home the seller is exempt. A person confirms this.
   const note = lines && showsNoVat ? readVatNote(rows) : undefined;
   const byCountry = buyer.country && (!EU.has(buyer.country) ? 'O' : buyer.country !== seller.country ? 'AE' : 'E');
-  const vatCategory = lines && showsNoVat ? (NOTE_CATEGORIES.find(([pattern]) => pattern.test(note ?? ''))?.[1] ?? byCountry) : undefined;
+  const vatCategory =
+    lines && showsNoVat ? (NOTE_CATEGORIES.find(([pattern]) => pattern.test(note ?? ''))?.[1] ?? byCountry) : undefined;
   if (lines && vatCategory) for (const line of lines) Object.assign(line, { vatCategory, vatRate: 0 });
   const vatExemptionReason = vatCategory ? note : undefined;
 
@@ -87,22 +102,31 @@ export function guessFromText(text: string, options: GuessOptions = {}): Invoice
     typeCode: readType(rows),
     buyerReference: readBuyerReference(searched),
     issueDate:
-      date(/rechnungs-?datum|belegdatum|invoice\s+date|date\s+of\s+issue|issue\s+date|date\s+de\s+(?:la\s+)?facture|date\s+d['’]émission/) ??
+      date(
+        /rechnungs-?datum|belegdatum|invoice\s+date|date\s+of\s+issue|issue\s+date|date\s+de\s+(?:la\s+)?facture|date\s+d['’]émission/,
+      ) ??
       dated ??
       date(/(?<![a-zäöü-])datum|(?<![a-z] ?)date/) ??
       beside,
     deliveryDate: date(/leistungsdatum|lieferdatum|date\s+of\s+(?:supply|delivery)|delivery\s+date|service\s+date/),
     ...readPeriod(searched, rows),
-    dueDate: date(/fällig(?:keit(?:s(?:datum|tag|termin))?|\s+am|\s+bis)?|zahlbar\s+bis|due(?:\s+date|\s+by|\s+on)?|payable\s+by|date\s+d['’]échéance/),
+    dueDate: date(
+      /fällig(?:keit(?:s(?:datum|tag|termin))?|\s+am|\s+bis)?|zahlbar\s+bis|due(?:\s+date|\s+by|\s+on)?|payable\s+by|date\s+d['’]échéance/,
+    ),
     paymentTerms: readPaymentTerms(rows),
     currency: findCurrency(text),
     iban,
     // A BIC belongs to an IBAN; with another kind of account it has no place in the invoice data.
-    bic: iban ? first(/\b(?:bic|swift)(?:[-/ ]?code)?/, new RegExp(`${SEPARATOR}([A-Z]{6}[A-Z0-9]{2}(?:[A-Z0-9]{3})?)\\b`)) : undefined,
+    bic: iban
+      ? first(/\b(?:bic|swift)(?:[-/ ]?code)?/, new RegExp(`${SEPARATOR}([A-Z]{6}[A-Z0-9]{2}(?:[A-Z0-9]{3})?)\\b`))
+      : undefined,
     vatExemptionReason,
     seller: {
       ...seller,
-      taxNumber: first(/steuernummer|steuer-?nr\.?|st\.?-?nr\.?|tax\s+(?:number|no\.?)/, new RegExp(`${SEPARATOR}(\\d{2,3}/\\d{3,4}/\\d{4,5}|\\d{10,13})`)),
+      taxNumber: first(
+        /steuernummer|steuer-?nr\.?|st\.?-?nr\.?|tax\s+(?:number|no\.?)/,
+        new RegExp(`${SEPARATOR}(\\d{2,3}/\\d{3,4}/\\d{4,5}|\\d{10,13})`),
+      ),
       ...contact.seller,
       // A contact named by its label counts before the person an address names in its second line.
       contactName: contact.seller.contactName ?? seller.contactName,

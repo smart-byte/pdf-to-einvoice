@@ -78,7 +78,13 @@ const SECTIONS: { title: string; fields: Field[]; collapsed?: boolean }[] = [
     title: 's.more',
     collapsed: true,
     fields: [
-      { path: 'typeCode', label: 'f.typeCode', type: 'select', options: Object.keys(INVOICE_TYPES).map((code) => [code, `type.${code}`]), wide: true },
+      {
+        path: 'typeCode',
+        label: 'f.typeCode',
+        type: 'select',
+        options: Object.keys(INVOICE_TYPES).map((code) => [code, `type.${code}`]),
+        wide: true,
+      },
       { path: 'precedingInvoiceNumber', label: 'f.precedingInvoiceNumber' },
       { path: 'precedingInvoiceDate', label: 'f.precedingInvoiceDate', type: 'date' },
       { path: 'orderReference', label: 'f.orderReference' },
@@ -94,11 +100,21 @@ const LINE_FIELDS: Field[] = [
   // A description may be a sentence: one line while it is short, more as it grows.
   { path: 'name', label: 'l.name', type: 'textarea', rows: 1, wide: true },
   { path: 'quantity', label: 'l.quantity', type: 'number' },
-  { path: 'unit', label: 'l.unit', type: 'select', options: ['C62', 'HUR', 'DAY', 'MON', 'KGM', 'MTR', 'LTR', 'LS'].map((code) => [code, `unit.${code}`]) },
+  {
+    path: 'unit',
+    label: 'l.unit',
+    type: 'select',
+    options: ['C62', 'HUR', 'DAY', 'MON', 'KGM', 'MTR', 'LTR', 'LS'].map((code) => [code, `unit.${code}`]),
+  },
   { path: 'unitPrice', label: 'l.unitPrice', type: 'number' },
   { path: 'discount.percent', label: 'l.discountPercent', type: 'number' },
   { path: 'discount.amount', label: 'l.discountAmount', type: 'number' },
-  { path: 'vatCategory', label: 'l.vatCategory', type: 'select', options: Object.keys(VAT_CATEGORIES).map((code) => [code, `vat.${code}`]) },
+  {
+    path: 'vatCategory',
+    label: 'l.vatCategory',
+    type: 'select',
+    options: Object.keys(VAT_CATEGORIES).map((code) => [code, `vat.${code}`]),
+  },
   { path: 'vatRate', label: 'l.vatRate', type: 'number' },
 ];
 
@@ -121,7 +137,8 @@ function control(field: Field, path: string): HTMLElement {
   if (field.type === 'select') {
     input = el('select', { id });
     if (field.blank) input.append(el('option', { value: '', selected: value === '' }, t(field.blank)));
-    for (const [code, label] of field.options!) input.append(el('option', { value: code, selected: String(value) === code }, t(label)));
+    for (const [code, label] of field.options!)
+      input.append(el('option', { value: code, selected: String(value) === code }, t(label)));
   } else if (field.type === 'textarea') {
     // A sentence wraps and the field grows with it, where one line would cut it off on a phone.
     input = el('textarea', { id, rows: field.rows ?? 2, value: String(value) });
@@ -148,7 +165,9 @@ function moveUp(list: string, i: number): void {
     if (!at || Number(at[1]) < i) return [path];
     return Number(at[1]) === i ? [] : [`${list}.${Number(at[1]) - 1}${at[2]}`];
   };
-  state.toCheck = new Map([...state.toCheck].flatMap(([path, why]) => moved(path).map((to): [string, typeof why] => [to, why])));
+  state.toCheck = new Map(
+    [...state.toCheck].flatMap(([path, why]) => moved(path).map((to): [string, typeof why] => [to, why])),
+  );
   state.touched = new Set([...state.touched].flatMap(moved));
   state.touched.add(`${list}.removed`);
 }
@@ -242,19 +261,31 @@ export function renderForm(): void {
   const filled = (field: Field) => !isEmpty(getPath(state.draft, field.path));
   const [invoice, seller, buyer, payment, more] = SECTIONS.map(({ title, fields, collapsed }) => {
     const shown = fields.filter((field) => asked(field) || (filled(field) && !paths.has(field.path)));
-    return section(title, el('div', { className: 'fields' }, ...shown.map((field) => control(field, field.path))), collapsed ? shown.some(filled) : undefined);
+    return section(
+      title,
+      el('div', { className: 'fields' }, ...shown.map((field) => control(field, field.path))),
+      collapsed ? shown.some(filled) : undefined,
+    );
   });
   // Discounts and charges on the whole invoice: folded away until there is one. An existing e-invoice shows them only where it has them.
   const adjusted = Boolean(state.draft.discounts?.length || state.draft.charges?.length);
   const adjustments =
     state.mode === 'validate' && !adjusted
       ? []
-      : [section('s.adjustments', el('div', { className: 'lines' }, ...renderAdjustments('discounts'), ...renderAdjustments('charges')), adjusted)];
+      : [
+          section(
+            's.adjustments',
+            el('div', { className: 'lines' }, ...renderAdjustments('discounts'), ...renderAdjustments('charges')),
+            adjusted,
+          ),
+        ];
   form.append(invoice!, seller!, buyer!, section('s.lines', renderLines()), ...adjustments, payment!, more!);
   if (state.mode === 'validate') {
     // Read only rather than disabled: a field can still take the focus, which shows where its value stands on the page.
-    for (const field of form.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('input, textarea')) field.readOnly = true;
-    for (const field of form.querySelectorAll<HTMLSelectElement | HTMLButtonElement>('select, button')) field.disabled = true;
+    for (const field of form.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('input, textarea'))
+      field.readOnly = true;
+    for (const field of form.querySelectorAll<HTMLSelectElement | HTMLButtonElement>('select, button'))
+      field.disabled = true;
     for (const details of form.querySelectorAll('details')) details.open = true;
   }
   // Whoever was typing while a model read the invoice goes on typing in the same field.

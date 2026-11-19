@@ -72,13 +72,24 @@ function checked(draft: InvoiceDraft, rules?: 'xrechnung', pdfText?: string) {
   const { findings, invoice, totals } = check(draft, { rules, pdfText });
   if (!invoice || !totals) {
     const errors = findings.filter((f) => f.severity === 'error');
-    throw new InvoiceError('invalid-invoice', message('invalid-invoice', { errors: errors.map((f) => f.message) }), findings);
+    throw new InvoiceError(
+      'invalid-invoice',
+      message('invalid-invoice', { errors: errors.map((f) => f.message) }),
+      findings,
+    );
   }
   return { findings, invoice, totals };
 }
 
 /** Has @e-invoice-eu/core write the invoice in one of its formats. What the library warns about joins the findings. */
-async function write(format: string, invoice: Invoice, totals: Totals, findings: Finding[], lang = 'en', pdf?: Uint8Array): Promise<string | Uint8Array> {
+async function write(
+  format: string,
+  invoice: Invoice,
+  totals: Totals,
+  findings: Finding[],
+  lang = 'en',
+  pdf?: Uint8Array,
+): Promise<string | Uint8Array> {
   const note = (text: unknown) => findings.push(warning('', 'generator.library', { text: String(text) }));
   try {
     const service = new InvoiceService({ log: () => {}, warn: note, error: note });
@@ -91,7 +102,10 @@ async function write(format: string, invoice: Invoice, totals: Totals, findings:
       postProcessor: async (xml: any) => {
         // @e-invoice-eu/core 3.4 writes the purchase order number (BT-13) for the EXTENDED profile only, although
         // EN 16931 has it. It is the last element of the trade agreement in everything this function writes.
-        const agreement = xml?.['rsm:CrossIndustryInvoice']?.['rsm:SupplyChainTradeTransaction']?.['ram:ApplicableHeaderTradeAgreement'];
+        const agreement =
+          xml?.['rsm:CrossIndustryInvoice']?.['rsm:SupplyChainTradeTransaction']?.[
+            'ram:ApplicableHeaderTradeAgreement'
+          ];
         if (invoice.orderReference && agreement && !agreement['ram:BuyerOrderReferencedDocument']) {
           agreement['ram:BuyerOrderReferencedDocument'] = { 'ram:IssuerAssignedID': invoice.orderReference };
         }
@@ -112,9 +126,21 @@ async function write(format: string, invoice: Invoice, totals: Totals, findings:
 /** The XML is the binding part: a value that was given but did not make it there must not go unnoticed. */
 function reportNotWritten(invoice: Invoice, xml: string, findings: Finding[]): void {
   const escaped = (value: string) => value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  const { lines, seller, buyer, discounts = [], charges = [], totals: _printed, typeCode: _type, currency: _currency, ...head } = invoice;
+  const {
+    lines,
+    seller,
+    buyer,
+    discounts = [],
+    charges = [],
+    totals: _printed,
+    typeCode: _type,
+    currency: _currency,
+    ...head
+  } = invoice;
   const given = [
-    ...[head, seller, buyer, ...lines.map(({ name, description }) => ({ name, description }))].flatMap((part) => Object.entries(part)),
+    ...[head, seller, buyer, ...lines.map(({ name, description }) => ({ name, description }))].flatMap((part) =>
+      Object.entries(part),
+    ),
     ...discounts.map((entry, i) => [`discounts.${i}.reason`, entry.reason] as const),
     ...charges.map((entry, i) => [`charges.${i}.reason`, entry.reason] as const),
   ];
@@ -151,7 +177,14 @@ export async function createEInvoice(options: CreateOptions): Promise<CreateResu
     findings.push(warning('', 'pdf-actions.create', { actions: info.forbiddenActions.join(', ') }));
   }
 
-  const pdf = (await write(xrechnung ? 'Factur-X-XRechnung' : 'Factur-X-EN16931', invoice, totals, findings, options.lang, options.pdf)) as Uint8Array;
+  const pdf = (await write(
+    xrechnung ? 'Factur-X-XRechnung' : 'Factur-X-EN16931',
+    invoice,
+    totals,
+    findings,
+    options.lang,
+    options.pdf,
+  )) as Uint8Array;
   const xml = await readEmbeddedXml(pdf);
   if (xml === null) throw new InvoiceError('generator', message('generator.no-xml'), findings);
   reportNotWritten(invoice, xml, findings);
@@ -165,7 +198,13 @@ export async function createEInvoice(options: CreateOptions): Promise<CreateResu
  */
 export async function createXRechnung(options: XRechnungOptions): Promise<XRechnungResult> {
   const { findings, invoice, totals } = checked(options.invoice, 'xrechnung');
-  const xml = (await write(options.syntax === 'cii' ? 'XRECHNUNG-CII' : 'XRECHNUNG-UBL', invoice, totals, findings, options.lang)) as string;
+  const xml = (await write(
+    options.syntax === 'cii' ? 'XRECHNUNG-CII' : 'XRECHNUNG-UBL',
+    invoice,
+    totals,
+    findings,
+    options.lang,
+  )) as string;
   reportNotWritten(invoice, xml, findings);
   return { xml, findings, totals };
 }

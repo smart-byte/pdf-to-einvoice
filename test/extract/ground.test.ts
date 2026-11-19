@@ -16,15 +16,25 @@ describe('keepWhatThePdfShows', () => {
       number: 'RE-2026-0042',
       issueDate: '2026-11-03',
       iban: 'DE02120300000000202051',
-      seller: { name: 'Muster Software GmbH', postalCode: '12345', country: 'DE', vatId: 'DE123456789', email: 'rechnung@muster-software.example' },
-      lines: [{ name: 'Beratung E-Rechnung', quantity: 10, unit: 'HUR', unitPrice: 100, vatCategory: 'S', vatRate: 19 }],
+      seller: {
+        name: 'Muster Software GmbH',
+        postalCode: '12345',
+        country: 'DE',
+        vatId: 'DE123456789',
+        email: 'rechnung@muster-software.example',
+      },
+      lines: [
+        { name: 'Beratung E-Rechnung', quantity: 10, unit: 'HUR', unitPrice: 100, vatCategory: 'S', vatRate: 19 },
+      ],
       totals: { net: 1000, gross: 1190 },
     };
     expect(keepWhatThePdfShows(draft, pdfText)).toEqual(draft);
   });
 
   it('drops a name the PDF does not show, such as a translated one', () => {
-    expect(keepWhatThePdfShows({ buyer: { name: 'Example AG', street: 'Hauptstraße 5' } }, pdfText)).toEqual({ buyer: { street: 'Hauptstraße 5' } });
+    expect(keepWhatThePdfShows({ buyer: { name: 'Example AG', street: 'Hauptstraße 5' } }, pdfText)).toEqual({
+      buyer: { street: 'Hauptstraße 5' },
+    });
   });
 
   it('drops invented identifiers, dates and amounts', () => {
@@ -40,18 +50,27 @@ describe('keepWhatThePdfShows', () => {
   it('drops a date that does not exist instead of failing on it', () => {
     // A small model writes such dates. "13/01/2026" is the 13th of January, not the first day of a 13th month.
     const text = `${pdfText}\nDatum 13/01/2026   Fällig 31.02.2026`;
-    expect(keepWhatThePdfShows({ number: 'RE-2026-0042', issueDate: '2026-13-01', dueDate: '2026-02-31', deliveryDate: '2026-00-10' }, text)).toEqual({
+    expect(
+      keepWhatThePdfShows(
+        { number: 'RE-2026-0042', issueDate: '2026-13-01', dueDate: '2026-02-31', deliveryDate: '2026-00-10' },
+        text,
+      ),
+    ).toEqual({
       number: 'RE-2026-0042',
     });
   });
 
   it('drops a value that sits in the wrong kind of field', () => {
-    const draft = { seller: { taxNumber: 'rechnung@muster-software.example', email: 'Beispielweg 1', vatId: 'Musterstadt' } };
+    const draft = {
+      seller: { taxNumber: 'rechnung@muster-software.example', email: 'Beispielweg 1', vatId: 'Musterstadt' },
+    };
     expect(keepWhatThePdfShows(draft, pdfText)).toEqual({});
   });
 
   it('keeps a country only when the PDF names it', () => {
-    expect(keepWhatThePdfShows({ seller: { country: 'DE' }, buyer: { country: 'AT' } }, pdfText)).toEqual({ seller: { country: 'DE' } });
+    expect(keepWhatThePdfShows({ seller: { country: 'DE' }, buyer: { country: 'AT' } }, pdfText)).toEqual({
+      seller: { country: 'DE' },
+    });
   });
 
   it('drops a VAT treatment whose rate is not printed', () => {
@@ -60,12 +79,16 @@ describe('keepWhatThePdfShows', () => {
   });
 
   it('drops a quantity that is not printed', () => {
-    expect(keepWhatThePdfShows({ lines: [{ quantity: 7 }, { quantity: 10 }] }, pdfText)).toEqual({ lines: [{}, { quantity: 10 }] });
+    expect(keepWhatThePdfShows({ lines: [{ quantity: 7 }, { quantity: 10 }] }, pdfText)).toEqual({
+      lines: [{}, { quantity: 10 }],
+    });
   });
 
   it('keeps a quantity printed with a thousands separator', () => {
     const text = `${pdfText}\n2  Schrauben   24.000 Stk.   0,01 €   240,00 €`;
-    expect(keepWhatThePdfShows({ lines: [{ quantity: 24000 }, { quantity: 2400 }] }, text)).toEqual({ lines: [{ quantity: 24000 }, {}] });
+    expect(keepWhatThePdfShows({ lines: [{ quantity: 24000 }, { quantity: 2400 }] }, text)).toEqual({
+      lines: [{ quantity: 24000 }, {}],
+    });
   });
 
   it('keeps a service period printed as its months, from the first day of the one to the last day of the other', () => {
@@ -90,8 +113,14 @@ describe('keepWhatThePdfShows', () => {
   });
 
   it('drops a buyer that carries the name of the seller', () => {
-    const draft = { seller: { name: 'Muster Software GmbH' }, buyer: { name: 'Muster Software GmbH', city: 'Beispielstadt' } };
-    expect(keepWhatThePdfShows(draft, pdfText)).toEqual({ seller: { name: 'Muster Software GmbH' }, buyer: { city: 'Beispielstadt' } });
+    const draft = {
+      seller: { name: 'Muster Software GmbH' },
+      buyer: { name: 'Muster Software GmbH', city: 'Beispielstadt' },
+    };
+    expect(keepWhatThePdfShows(draft, pdfText)).toEqual({
+      seller: { name: 'Muster Software GmbH' },
+      buyer: { city: 'Beispielstadt' },
+    });
   });
 
   it('drops a reason for charging no VAT when every line charges VAT', () => {
@@ -100,6 +129,8 @@ describe('keepWhatThePdfShows', () => {
   });
 
   it('drops fields a reader cannot verify against the page', () => {
-    expect(keepWhatThePdfShows({ typeCode: '389', buyerReference: 'Rechnung Nr. RE-2026-0042', note: 'Beispiel' }, pdfText)).toEqual({});
+    expect(
+      keepWhatThePdfShows({ typeCode: '389', buyerReference: 'Rechnung Nr. RE-2026-0042', note: 'Beispiel' }, pdfText),
+    ).toEqual({});
   });
 });

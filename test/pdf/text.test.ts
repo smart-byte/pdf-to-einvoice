@@ -61,7 +61,14 @@ describe('guessFromText', () => {
       currency: 'EUR',
       iban: 'DE02120300000000202051',
       bic: 'BYLADEM1001',
-      seller: { name: 'Muster Software GmbH', street: 'Beispielweg 1', postalCode: '12345', city: 'Musterstadt', country: 'DE', vatId: 'DE123456789' },
+      seller: {
+        name: 'Muster Software GmbH',
+        street: 'Beispielweg 1',
+        postalCode: '12345',
+        city: 'Musterstadt',
+        country: 'DE',
+        vatId: 'DE123456789',
+      },
       totals: { net: 1499, vat: 284.81, gross: 1783.81 },
     });
   });
@@ -87,11 +94,18 @@ describe('guessFromText', () => {
 
   it('takes a second VAT ID to be the buyer’s, and the countries from the prefixes', () => {
     const guess = guessFromText('USt-IdNr. DE123456789\nIhre USt-IdNr.: ATU12345678');
-    expect(guess).toEqual({ seller: { vatId: 'DE123456789', country: 'DE' }, buyer: { vatId: 'ATU12345678', country: 'AT' } });
+    expect(guess).toEqual({
+      seller: { vatId: 'DE123456789', country: 'DE' },
+      buyer: { vatId: 'ATU12345678', country: 'AT' },
+    });
   });
 
   it('reads a bare "Nr." as the invoice number and "Gesamt" as the total', () => {
-    expect(guessFromText('Beispiel AG   Nr.: 2617\nKunden-Nr.: 77\nGesamt 376,01 €')).toEqual({ number: '2617', currency: 'EUR', totals: { gross: 376.01 } });
+    expect(guessFromText('Beispiel AG   Nr.: 2617\nKunden-Nr.: 77\nGesamt 376,01 €')).toEqual({
+      number: '2617',
+      currency: 'EUR',
+      totals: { gross: 376.01 },
+    });
   });
 
   it('reads a date with slashes when only one reading is possible', () => {

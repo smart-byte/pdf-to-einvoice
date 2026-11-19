@@ -14,19 +14,28 @@ const POSTAL = /^(?:([A-Z]{1,2})[- ])?(\d{4} [A-Z]{2}(?= )|\d{4,5})\s+(\p{L}.*)$
 /** "Dover, DE 19901", with the country in front ("USA – Dover, DE 19901") or behind ("Dover, DE 19901, USA"). */
 const US_PLACE =
   /^(?:(?:USA|United States(?: of America)?)\s[–—-]\s)?([\p{L} .'-]+),\s[A-Z]{2}\s(\d{5}(?:-\d{4})?)(?:,\s(?:USA|United States(?: of America)?))?$/u;
-export const EU = new Set('AT BE BG CY CZ DE DK EE ES FI FR GR HR HU IE IT LT LU LV MT NL PL PT RO SE SI SK'.split(' '));
+export const EU = new Set(
+  'AT BE BG CY CZ DE DK EE ES FI FR GR HR HU IE IT LT LU LV MT NL PL PT RO SE SI SK'.split(' '),
+);
 /** The letters in front of a postal code: an ISO code, or the older sign of the country. */
 const COUNTRY_PREFIX: Record<string, string> = { D: 'DE', A: 'AT', F: 'FR', B: 'BE', L: 'LU', CH: 'CH' };
 /** VAT IDs start with the country code, except that Greece writes EL. */
-export const countryOfVatId = (vatId: string | undefined) => (vatId ? vatId.slice(0, 2).replace('EL', 'GR') : undefined);
+export const countryOfVatId = (vatId: string | undefined) =>
+  vatId ? vatId.slice(0, 2).replace('EL', 'GR') : undefined;
 
 /** The country a line names and nothing else, as "ÖSTERREICH" below an address. */
-const countryNamed = (line: string | undefined) => Object.entries(COUNTRY_NAMES).find(([, names]) => names.includes(line?.trim().toLowerCase() ?? ''))?.[0];
+const countryNamed = (line: string | undefined) =>
+  Object.entries(COUNTRY_NAMES).find(([, names]) => names.includes(line?.trim().toLowerCase() ?? ''))?.[0];
 
 /** Postal code, city and country, from the last line of an address. */
 function placeOf(line: string): Partial<Party> | undefined {
   const postal = POSTAL.exec(line);
-  if (postal) return { postalCode: postal[2], city: postal[3], country: COUNTRY_PREFIX[postal[1] ?? ''] ?? (EU.has(postal[1] ?? '') ? postal[1] : undefined) };
+  if (postal)
+    return {
+      postalCode: postal[2],
+      city: postal[3],
+      country: COUNTRY_PREFIX[postal[1] ?? ''] ?? (EU.has(postal[1] ?? '') ? postal[1] : undefined),
+    };
   const american = US_PLACE.exec(line);
   return american ? { postalCode: american[2], city: american[1]!.trim(), country: 'US' } : undefined;
 }
@@ -37,13 +46,16 @@ export function senderOf(cell: string): Partial<Party> | undefined {
   const segments = cell.split(new RegExp(`${SENDER_SEPARATOR.source}|,\\s`)).map((segment) => segment.trim());
   // A street may look like a place ("1500 chemin des vignes"); the place comes last.
   const i = lastIndex(segments, (segment) => POSTAL.test(segment));
-  return i >= 1 ? { name: segments[0], street: i >= 2 ? segments[i - 1] : undefined, ...placeOf(segments[i]!) } : undefined;
+  return i >= 1
+    ? { name: segments[0], street: i >= 2 ? segments[i - 1] : undefined, ...placeOf(segments[i]!) }
+    : undefined;
 }
 
 export type Role = 'seller' | 'buyer' | 'other';
 const BUYER =
   'bill(?:ed)?\\s+to|invoice\\s+to|sold\\s+to|rechnung\\s+an|rechnungsempfänger|rechnungsadresse|rechnungsanschrift|kunde|customer|client|buyer|käufer|leistungsempfänger|empfänger|destinataire|acheteur|adresse\\s+de\\s+facturation|billing\\s+address';
-const SELLER = 'verkäufer|lieferant|leistungserbringer|rechnungssteller|absender|seller|supplier|vendor|vendeur|fournisseur|from';
+const SELLER =
+  'verkäufer|lieferant|leistungserbringer|rechnungssteller|absender|seller|supplier|vendor|vendeur|fournisseur|from';
 /** A label on a line of its own, such as "Käufer:", "Käufer/Leistungsempfänger:" or "BILL TO". */
 const heading = (labels: string) => new RegExp(`^(?:${labels})(?:\\s*[/&]\\s*[\\p{L}-]+)*\\s*:?$`, 'iu');
 export const [BUYER_HEADING, SELLER_HEADING] = [heading(BUYER), heading(SELLER)];
@@ -56,7 +68,8 @@ export const KEY_VALUE = /\S\s*:\s*\S|^\p{L}[\p{L}.-]*\s+\d[\d ]{7,}$/u;
 export const DATE_OR_AMOUNT = /\d{1,2}[./]\d{1,2}[./]\d{2,4}|\d{4}-\d{2}-\d{2}|\d[.,]\d{2}(?!\d)/;
 /** The title of the document, alone or at the end of a cell ("Ihre Rechnung"), and with its number ("Rechnung 2301"). */
 /** The words that title an invoice, also as the end of a longer one ("Teilrechnung"). */
-const TITLE_WORD = '\\p{L}*rechnung|rechnungskorrektur|gutschrift|(?:partial|prepayment|advance|corrected)\\s+invoice|invoice|facture|avoir|credit\\s+note';
+const TITLE_WORD =
+  '\\p{L}*rechnung|rechnungskorrektur|gutschrift|(?:partial|prepayment|advance|corrected)\\s+invoice|invoice|facture|avoir|credit\\s+note';
 export const TITLE = new RegExp(`(?:^|\\s)(?:${TITLE_WORD})$`, 'iu');
 export const NAMED = new RegExp(`^(${TITLE_WORD})[ \\t]+([A-Z]{0,3}[-/]?\\d{2,}[\\w/-]*)$`, 'iu');
 /** The kinds of invoice a title names. A "Gutschrift" may be a credit note or an invoice the buyer issued, and stays open. */
@@ -67,16 +80,24 @@ export const TYPES: [RegExp, InvoiceType][] = [
   [/^(?:credit\s+note|avoir)$/i, '381'],
 ];
 const SALUTATION = /^(?:herrn?|frau|mr\.?|mrs\.?|ms\.?|monsieur|madame|mme\.?)$/i;
-const LEGAL_FORM = /(?:^|\s)(?:gmbh|mbh|ag|kg|ohg|gbr|e\.\s?[vk]\.|a\.\s?g\.|ltd\.?|inc\.?|llc|plc|sarl|sas|s\.a\.|b\.v\.)(?=\s|$)|&\s*co\b/i;
+const LEGAL_FORM =
+  /(?:^|\s)(?:gmbh|mbh|ag|kg|ohg|gbr|e\.\s?[vk]\.|a\.\s?g\.|ltd\.?|inc\.?|llc|plc|sarl|sas|s\.a\.|b\.v\.)(?=\s|$)|&\s*co\b/i;
 /** What only the issuer prints about itself: its tax number and its entry in the commercial register. */
-const ISSUER_SIGNS = /steuer-?(?:nr|nummer)|\bst\.?-?nr|tax\s+(?:number|no\b)|\bhr[ab]\b|amtsgericht|registergericht|handelsregister|siret/i;
+const ISSUER_SIGNS =
+  /steuer-?(?:nr|nummer)|\bst\.?-?nr|tax\s+(?:number|no\b)|\bhr[ab]\b|amtsgericht|registergericht|handelsregister|siret/i;
 /** What only the issuer prints beside its VAT ID: its numbers and its bank account. */
 export const ISSUER_OR_BANK = new RegExp(`${ISSUER_SIGNS.source}|\\b(?:iban|bic)\\b`, 'i');
 /** What a footer lists beside the issuer's name: its numbers, its VAT ID and its bank account. */
 const IDENTIFIERS = new RegExp(`${ISSUER_OR_BANK.source}|\\b(?:${VAT_ID_LABEL.source})`, 'i');
 
 export function roleOf(line: string): Role | undefined {
-  return BUYER_HEADING.test(line) ? 'buyer' : SELLER_HEADING.test(line) ? 'seller' : OTHER_HEADING.test(line) ? 'other' : undefined;
+  return BUYER_HEADING.test(line)
+    ? 'buyer'
+    : SELLER_HEADING.test(line)
+      ? 'seller'
+      : OTHER_HEADING.test(line)
+        ? 'other'
+        : undefined;
 }
 
 /** An address as found on the page, with what tells whose it is. */
@@ -137,7 +158,11 @@ function addressesIn(lines: string[]): Found[] {
     // An address abroad may name its country in a line of its own, below the place.
     const country = countryNamed(lines[i + 1]);
     const tail: string[] = [];
-    for (let k = i + (country ? 2 : 1); k < lines.length && tail.length < 4 && (KEY_VALUE.test(lines[k]!) || VAT_ID_LINE.test(lines[k]!)); k++)
+    for (
+      let k = i + (country ? 2 : 1);
+      k < lines.length && tail.length < 4 && (KEY_VALUE.test(lines[k]!) || VAT_ID_LINE.test(lines[k]!));
+      k++
+    )
       tail.push(lines[k]!);
     const [first, second] = above.length >= 3 ? above : [above[0]!];
     // "Herrn" above a name and a second line with the legal form belong to the name; another second line names a person.
@@ -182,17 +207,25 @@ export function readParties(rows: string[], blocks: string[][]): { seller?: Foun
     .sort((a, b) => b.signs - a.signs);
   const [best] = ranked;
   const seller =
-    best && best.signs >= 2 && ranked.every((other) => other.signs < best.signs || other.found.party.name === best.found.party.name) ? best.found : undefined;
+    best &&
+    best.signs >= 2 &&
+    ranked.every((other) => other.signs < best.signs || other.found.party.name === best.found.party.name)
+      ? best.found
+      : undefined;
 
   const isSellers = ({ party }: Found) =>
     seller !== undefined &&
     ([party.name, party.contactName, party.street].includes(seller.party.name) ||
-      (party.street !== undefined && party.street === seller.party.street && party.postalCode === seller.party.postalCode));
+      (party.street !== undefined &&
+        party.street === seller.party.street &&
+        party.postalCode === seller.party.postalCode));
   const labelled = addresses.filter((found) => found.role === 'buyer');
   // A name that stands beside a VAT ID, a tax number or a bank account, as in a footer, is the issuer's, even where
   // nothing else makes it the seller.
   const issuer = ({ party }: Found) => rows.some((row) => row.includes(party.name!) && IDENTIFIERS.test(row));
-  const left = labelled.length ? labelled : addresses.filter((found) => found.role === undefined && !isSellers(found) && !issuer(found));
+  const left = labelled.length
+    ? labelled
+    : addresses.filter((found) => found.role === undefined && !isSellers(found) && !issuer(found));
   const buyer = new Set(left.map((found) => found.party.name)).size === 1 ? left[0] : undefined;
 
   // An address may stand twice on a page, say in the letterhead and in the footer. Copies that differ in their spaces
@@ -204,7 +237,12 @@ export function readParties(rows: string[], blocks: string[][]): { seller?: Foun
     [...senders, ...addresses].some(
       ({ party }) =>
         party.postalCode === found.party.postalCode &&
-        WORDS.some((key) => party[key] !== undefined && party[key] !== found.party[key] && squeezed(party[key]) === squeezed(found.party[key])),
+        WORDS.some(
+          (key) =>
+            party[key] !== undefined &&
+            party[key] !== found.party[key] &&
+            squeezed(party[key]) === squeezed(found.party[key]),
+        ),
     )
       ? { ...found, broken: true }
       : found);
@@ -213,4 +251,6 @@ export function readParties(rows: string[], blocks: string[][]): { seller?: Foun
 
 /** What an address says, without its words where the page breaks them apart. */
 export const believed = (found?: Found): Partial<Party> =>
-  found?.broken ? Object.fromEntries(Object.entries(found.party).filter(([key]) => !(WORDS as readonly string[]).includes(key))) : { ...found?.party };
+  found?.broken
+    ? Object.fromEntries(Object.entries(found.party).filter(([key]) => !(WORDS as readonly string[]).includes(key)))
+    : { ...found?.party };

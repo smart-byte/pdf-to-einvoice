@@ -1,4 +1,13 @@
-import { calculate, lineBase, micro, percentAgrees, percentOf, resolveAdjustments, slackOf, type Totals } from './calculate.js';
+import {
+  calculate,
+  lineBase,
+  micro,
+  percentAgrees,
+  percentOf,
+  resolveAdjustments,
+  slackOf,
+  type Totals,
+} from './calculate.js';
 import { error, warning, type Finding } from './finding.js';
 import type { MessageKey, MessageParams } from './messages.js';
 import { INVOICE_TYPES, VAT_CATEGORIES, type Invoice, type InvoiceDraft, type VatCategory } from './model.js';
@@ -64,7 +73,8 @@ function withDefaults(draft: InvoiceDraft): Bag {
   d.lines = (Array.isArray(d.lines) ? d.lines : []).map((l: Bag) => {
     const line: Bag = { unit: 'C62', vatCategory: 'S', ...l };
     // A discount whose fields were all left empty is none.
-    if (line.discount && typeof line.discount === 'object' && Object.keys(line.discount).length === 0) delete line.discount;
+    if (line.discount && typeof line.discount === 'object' && Object.keys(line.discount).length === 0)
+      delete line.discount;
     return line;
   });
   return d;
@@ -143,7 +153,8 @@ function checkHeader(d: Bag): Finding[] {
   }
   if (!/^[A-Z]{3}$/.test(d.currency)) findings.push(error('currency', 'format.currency'));
   if (d.iban !== undefined && !isIban(d.iban)) findings.push(error('iban', 'format.iban'));
-  if (d.prepaidAmount !== undefined && !isNumber(d.prepaidAmount)) findings.push(error('prepaidAmount', 'format.number'));
+  if (d.prepaidAmount !== undefined && !isNumber(d.prepaidAmount))
+    findings.push(error('prepaidAmount', 'format.number'));
 
   if (d.seller.vatId === undefined && d.seller.taxNumber === undefined) {
     findings.push(error('seller.vatId', 'seller-tax-id'));
@@ -261,10 +272,19 @@ function checkVatTreatment(d: Bag, options: CheckOptions): Finding[] {
     findings.push(error('deliveryCountry', 'format.country'));
   }
   // BR-IC-12 wants the country an intra-community supply went to. As an XRechnung it is refused anyway.
-  if (categories.has('K') && d.deliveryCountry === undefined && d.buyer.country !== undefined && options.rules !== 'xrechnung') {
+  if (
+    categories.has('K') &&
+    d.deliveryCountry === undefined &&
+    d.buyer.country !== undefined &&
+    options.rules !== 'xrechnung'
+  ) {
     findings.push(warning('deliveryCountry', 'delivery-country', { country: d.buyer.country }));
   }
-  if ((categories.has('K') || categories.has('G')) && d.seller.vatId === undefined && d.seller.taxNumber !== undefined) {
+  if (
+    (categories.has('K') || categories.has('G')) &&
+    d.seller.vatId === undefined &&
+    d.seller.taxNumber !== undefined
+  ) {
     findings.push(error('seller.vatId', 'seller-tax-id.export'));
   }
   return findings;
@@ -288,7 +308,8 @@ function checkTotals(d: Bag, totals: Totals, options: CheckOptions): Finding[] {
   if (totals.due > 0 && d.dueDate === undefined && d.paymentTerms === undefined) {
     findings.push(error('dueDate', 'payment-terms'));
   }
-  for (const [i, line] of (d.lines as Bag[]).entries()) findings.push(...checkLineTotal(line, i, d.currency, totals, options));
+  for (const [i, line] of (d.lines as Bag[]).entries())
+    findings.push(...checkLineTotal(line, i, d.currency, totals, options));
   findings.push(...checkPrintedTotals(d, totals));
   return findings;
 }
@@ -314,13 +335,20 @@ function checkLineTotal(line: Bag, i: number, currency: string, totals: Totals, 
           stated: amount.toFixed(2),
         }),
       );
-    } else if (percent === undefined && discount.base !== 0 && amount !== 0 && Math.sign(discount.base) !== Math.sign(amount)) {
+    } else if (
+      percent === undefined &&
+      discount.base !== 0 &&
+      amount !== 0 &&
+      Math.sign(discount.base) !== Math.sign(amount)
+    ) {
       findings.push(warning(`lines.${i}.discount.amount`, 'discount-sign'));
     }
   }
 
   if (!isNumber(line.netAmount)) return findings;
-  const apart = micro(line.quantity) * micro(line.unitPrice) - (micro(discount?.amount ?? 0) + micro(totals.lineNet[i]!)) * 10n ** 6n;
+  const apart =
+    micro(line.quantity) * micro(line.unitPrice) -
+    (micro(discount?.amount ?? 0) + micro(totals.lineNet[i]!)) * 10n ** 6n;
   if ((apart < 0n ? -apart : apart) <= micro(slack) * 10n ** 6n) return findings;
   // In cents, as the XML has it: 1 x 1.005 is 1.01, not 1.005.
   const expected = (lineBase(line.quantity, line.unitPrice) - (discount?.amount ?? 0)).toFixed(2);
@@ -387,7 +415,10 @@ function xrechnungFindings(d: Bag): Finding[] {
   // BR-DE-18. The validator also wants a line break right after the last "#...#" of the text; `toUbl` ends the text with one.
   if (typeof d.paymentTerms === 'string') {
     const marked = d.paymentTerms.split(/\r?\n/).filter((line: string) => line.trim().startsWith('#'));
-    if (marked.some((line: string) => !SKONTO.test(line.trim())) || (marked.length > 0 && !/^\s*\n/.test(`${d.paymentTerms}\n`.split(/#.+#/).at(-1)!))) {
+    if (
+      marked.some((line: string) => !SKONTO.test(line.trim())) ||
+      (marked.length > 0 && !/^\s*\n/.test(`${d.paymentTerms}\n`.split(/#.+#/).at(-1)!))
+    ) {
       findings.push(error('paymentTerms', 'xrechnung-payment-terms'));
     }
   }
@@ -402,7 +433,9 @@ function xrechnungFindings(d: Bag): Finding[] {
   // Known limit: the data model has no delivery address, so such an invoice is refused instead of naming the buyer's address as the place of delivery.
   const intraCommunity = [
     ...d.lines.map((line: Bag, i: number) => [`lines.${i}`, line] as const),
-    ...(['discounts', 'charges'] as const).flatMap((list) => (Array.isArray(d[list]) ? d[list] : []).map((e: Bag, i: number) => [`${list}.${i}`, e] as const)),
+    ...(['discounts', 'charges'] as const).flatMap((list) =>
+      (Array.isArray(d[list]) ? d[list] : []).map((e: Bag, i: number) => [`${list}.${i}`, e] as const),
+    ),
   ].find(([, item]) => item?.vatCategory === 'K');
   if (intraCommunity) {
     findings.push(error(`${intraCommunity[0]}.vatCategory`, 'xrechnung-delivery-address.intra-community'));
@@ -474,7 +507,13 @@ export function amountSpellings(n: number): string[] {
   const decimals = Math.min(Math.max(2, String(n).split('.')[1]?.length ?? 0), 6);
   const [int, frac] = Math.abs(n).toFixed(decimals).split('.') as [string, string];
   const grouped = (sep: string) => int.replace(/\B(?=(\d{3})+(?!\d))/g, sep);
-  const spellings = [`${int},${frac}`, `${int}.${frac}`, `${grouped('.')},${frac}`, `${grouped(',')}.${frac}`, `${grouped("'")}.${frac}`];
+  const spellings = [
+    `${int},${frac}`,
+    `${int}.${frac}`,
+    `${grouped('.')},${frac}`,
+    `${grouped(',')}.${frac}`,
+    `${grouped("'")}.${frac}`,
+  ];
   // Known limit: a whole number matches any occurrence of its digits ("100" in "1000"); tighten with word boundaries if that hides real mismatches.
   return frac === '00' ? [...spellings, int, grouped('.'), grouped(',')] : spellings;
 }
@@ -490,7 +529,12 @@ export function percentSpellings(p: number): string[] {
  * Reports values that the text of the PDF does not contain. Known limit: it tells whether a value stands in the text,
  * not where. An address entered for the wrong party passes, because each of its words stands somewhere on the page.
  */
-function compareWithPdf(d: Bag, totals: Totals | undefined, pdfText: string, percentages: Record<string, number> = {}): Finding[] {
+function compareWithPdf(
+  d: Bag,
+  totals: Totals | undefined,
+  pdfText: string,
+  percentages: Record<string, number> = {},
+): Finding[] {
   const haystack = pdfText.replace(/\s+/g, '').toLowerCase();
   if (!haystack) {
     return [warning('', 'no-pdf-text')];
@@ -509,7 +553,8 @@ function compareWithPdf(d: Bag, totals: Totals | undefined, pdfText: string, per
   }
   // A name may wrap, and in a table its rows mix with other columns: every word has to be there, in any order.
   const expectWords = (path: string, value: unknown) => {
-    if (typeof value === 'string' && !value.split(/\s+/).every((word) => haystack.includes(word.toLowerCase()))) expect(path, [value], value);
+    if (typeof value === 'string' && !value.split(/\s+/).every((word) => haystack.includes(word.toLowerCase())))
+      expect(path, [value], value);
   };
   for (const who of ['seller', 'buyer']) {
     for (const part of ['name', 'street', 'postalCode', 'city']) expectWords(`${who}.${part}`, get(`${who}.${part}`));
@@ -523,8 +568,10 @@ function compareWithPdf(d: Bag, totals: Totals | undefined, pdfText: string, per
     if (isNumber(line.unitPrice)) expect(`lines.${i}.unitPrice`, amountSpellings(line.unitPrice), line.unitPrice);
     // What a page prints of a discount: its percentage, from which the amount follows, or else its amount.
     const discount = line.discount;
-    if (isNumber(discount?.percent)) expect(`lines.${i}.discount.percent`, percentSpellings(discount.percent), `${discount.percent} %`);
-    else if (isNumber(discount?.amount)) expect(`lines.${i}.discount.amount`, amountSpellings(discount.amount), discount.amount);
+    if (isNumber(discount?.percent))
+      expect(`lines.${i}.discount.percent`, percentSpellings(discount.percent), `${discount.percent} %`);
+    else if (isNumber(discount?.amount))
+      expect(`lines.${i}.discount.amount`, amountSpellings(discount.amount), discount.amount);
   });
   // Of a discount or charge on the whole invoice, too: never what is derived from it, such as its amount in each VAT group.
   for (const list of ['discounts', 'charges']) {

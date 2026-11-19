@@ -47,12 +47,24 @@ describe('calculate', () => {
 
   it('calculates VAT once per rate on the summed base, not per line', () => {
     // 7 % of 0.50 is 0.035, so rounding per line gives 3 x 0.04 = 0.12; on the base of 1.50 it is 0.105 -> 0.11.
-    const t = calculate(invoice([line({ unitPrice: 0.5, vatRate: 7 }), line({ unitPrice: 0.5, vatRate: 7 }), line({ unitPrice: 0.5, vatRate: 7 })]));
+    const t = calculate(
+      invoice([
+        line({ unitPrice: 0.5, vatRate: 7 }),
+        line({ unitPrice: 0.5, vatRate: 7 }),
+        line({ unitPrice: 0.5, vatRate: 7 }),
+      ]),
+    );
     expect(t.vat).toBe(0.11);
   });
 
   it('breaks VAT down by category and rate', () => {
-    const t = calculate(invoice([line({ unitPrice: 100, vatRate: 19 }), line({ unitPrice: 50, vatRate: 7 }), line({ unitPrice: 20, vatRate: 19 })]));
+    const t = calculate(
+      invoice([
+        line({ unitPrice: 100, vatRate: 19 }),
+        line({ unitPrice: 50, vatRate: 7 }),
+        line({ unitPrice: 20, vatRate: 19 }),
+      ]),
+    );
     expect(t.vatBreakdown).toEqual([
       { category: 'S', rate: 19, taxable: 120, tax: 22.8 },
       { category: 'S', rate: 7, taxable: 50, tax: 3.5 },
@@ -73,14 +85,18 @@ describe('calculate', () => {
   });
 
   it('takes an amount discount as given, also beside a percentage', () => {
-    expect(calculate(invoice([line({ quantity: 2, unitPrice: 249.5, discount: { amount: 50 } })])).lineNet).toEqual([449]);
+    expect(calculate(invoice([line({ quantity: 2, unitPrice: 249.5, discount: { amount: 50 } })])).lineNet).toEqual([
+      449,
+    ]);
     expect(calculate(invoice([line({ discount: { percent: 10, amount: 10.01 } })])).lineNet).toEqual([89.99]);
   });
 
   it('keeps the sign of a discount on a line with a negative quantity', () => {
     expect(calculate(invoice([line({ quantity: -1, discount: { percent: 10 } })])).lineNet).toEqual([-90]);
     expect(calculate(invoice([line({ quantity: -1, discount: { amount: -10 } })])).lineNet).toEqual([-90]);
-    expect(calculate(invoice([line({ quantity: -1, unitPrice: 0.05, discount: { percent: 10 } })])).lineDiscounts).toEqual([{ base: -0.05, amount: -0.01 }]);
+    expect(
+      calculate(invoice([line({ quantity: -1, unitPrice: 0.05, discount: { percent: 10 } })])).lineDiscounts,
+    ).toEqual([{ base: -0.05, amount: -0.01 }]);
   });
 
   it('compares a discount with its percentage before rounding, as Peppol R040 does', () => {
@@ -123,7 +139,9 @@ describe('discounts and charges on the whole invoice', () => {
   it('puts an amount on the one VAT group the lines have', () => {
     const t = calculate(invoice([line()], { discounts: [{ amount: 15, reason: 'Treuerabatt' }] }));
     expect(t).toMatchObject({ lineTotal: 100, allowances: 15, charges: 0, net: 85, vat: 16.15 });
-    expect(t.adjustments).toEqual([{ list: 'discounts', index: 0, category: 'S', rate: 19, amount: 15, reason: 'Treuerabatt' }]);
+    expect(t.adjustments).toEqual([
+      { list: 'discounts', index: 0, category: 'S', rate: 19, amount: 15, reason: 'Treuerabatt' },
+    ]);
   });
 
   it('gives a charge at a rate no line has a VAT group of its own (BR-S-08)', () => {
@@ -145,7 +163,8 @@ describe('discounts and charges on the whole invoice', () => {
 
   it('applies a percentage only to the VAT groups its category or rate names', () => {
     const lines = [at(7), at(19), line({ vatCategory: 'Z', vatRate: 0 })];
-    const of = (entry: DocumentAllowance) => calculate(invoice(lines, { discounts: [entry] })).adjustments.map((a) => `${a.category}${a.rate}:${a.amount}`);
+    const of = (entry: DocumentAllowance) =>
+      calculate(invoice(lines, { discounts: [entry] })).adjustments.map((a) => `${a.category}${a.rate}:${a.amount}`);
     expect(of({ percent: 10, vatRate: 19 })).toEqual(['S19:10']);
     expect(of({ percent: 10, vatCategory: 'S' })).toEqual(['S7:10', 'S19:10']);
     expect(of({ percent: 10, vatRate: 0 })).toEqual(['Z0:10']);
@@ -154,21 +173,33 @@ describe('discounts and charges on the whole invoice', () => {
 
   it('tells two categories at 0 % apart by the category', () => {
     const lines = [line({ vatCategory: 'Z', vatRate: 0 }), line({ vatCategory: 'E', vatRate: 0 })];
-    expect(calculate(invoice(lines, { discounts: [{ amount: 10, vatCategory: 'E' }] })).adjustments).toMatchObject([{ category: 'E', rate: 0, amount: 10 }]);
+    expect(calculate(invoice(lines, { discounts: [{ amount: 10, vatCategory: 'E' }] })).adjustments).toMatchObject([
+      { category: 'E', rate: 0, amount: 10 },
+    ]);
     expect(problems(lines, { discounts: [{ amount: 10, vatRate: 0 }] })).toEqual([
       { path: 'discounts.0.vatCategory', code: 'adjustment-group', severity: 'error' },
     ]);
   });
 
   it('keeps the signs of a credit note: a percentage of negative lines is negative, and so is a charge on them', () => {
-    const t = calculate(invoice([line({ quantity: -2, unitPrice: 50 })], { discounts: [{ percent: 10 }], charges: [freight({ amount: -5 })] }));
+    const t = calculate(
+      invoice([line({ quantity: -2, unitPrice: 50 })], {
+        discounts: [{ percent: 10 }],
+        charges: [freight({ amount: -5 })],
+      }),
+    );
     expect(t).toMatchObject({ lineTotal: -100, allowances: -10, charges: -5, net: -95, vat: -18.05 });
-    expect(resolveAdjustments(invoice([line({ quantity: -2, unitPrice: 50 })], { charges: [freight({ amount: -5 })] })).problems).toEqual([]);
+    expect(
+      resolveAdjustments(invoice([line({ quantity: -2, unitPrice: 50 })], { charges: [freight({ amount: -5 })] }))
+        .problems,
+    ).toEqual([]);
   });
 
   it('rounds each group amount half away from zero, down to 0.00', () => {
     expect(calculate(invoice([line({ unitPrice: 0.05 })], { discounts: [{ percent: 10 }] })).allowances).toBe(0.01);
-    expect(calculate(invoice([line({ quantity: -1, unitPrice: 0.05 })], { discounts: [{ percent: 10 }] })).allowances).toBe(-0.01);
+    expect(
+      calculate(invoice([line({ quantity: -1, unitPrice: 0.05 })], { discounts: [{ percent: 10 }] })).allowances,
+    ).toBe(-0.01);
     const t = calculate(invoice([line({ unitPrice: 0.04 })], { discounts: [{ percent: 10 }] }));
     expect(t).toMatchObject({ allowances: 0, net: 0.04 });
     expect(t.adjustments).toHaveLength(1);
@@ -182,16 +213,22 @@ describe('discounts and charges on the whole invoice', () => {
   });
 
   it('takes the stated amount beside a percentage on one group if it is within R040, measured before rounding', () => {
-    expect(calculate(invoice([line({ unitPrice: 0.15 })], { discounts: [{ percent: 10, amount: 0.03 }] })).allowances).toBe(0.03);
+    expect(
+      calculate(invoice([line({ unitPrice: 0.15 })], { discounts: [{ percent: 10, amount: 0.03 }] })).allowances,
+    ).toBe(0.03);
     expect(problems([line({ unitPrice: 0.15 })], { discounts: [{ percent: 10, amount: 0.03 }] })).toEqual([]);
     expect(problems([line({ unitPrice: 0.15 })], { discounts: [{ percent: 10, amount: 0.04 }] })).toEqual([
       { path: 'discounts.0.amount', code: 'adjustment-mismatch', severity: 'error' },
     ]);
-    expect(problems([line({ unitPrice: 0.15 })], { currency: 'HUF', discounts: [{ percent: 10, amount: 0.5 }] })).toEqual([]);
+    expect(
+      problems([line({ unitPrice: 0.15 })], { currency: 'HUF', discounts: [{ percent: 10, amount: 0.5 }] }),
+    ).toEqual([]);
   });
 
   it('wants the amount beside a percentage on several groups to be their rounded sum, to the cent', () => {
-    expect(calculate(invoice(mixed, { discounts: [{ percent: 10, amount: 20 }] })).adjustments.map((a) => a.amount)).toEqual([10, 10]);
+    expect(
+      calculate(invoice(mixed, { discounts: [{ percent: 10, amount: 20 }] })).adjustments.map((a) => a.amount),
+    ).toEqual([10, 10]);
     expect(problems(mixed, { discounts: [{ percent: 10, amount: 20 }] })).toEqual([]);
     expect(problems(mixed, { discounts: [{ percent: 10, amount: 20.01 }] })).toEqual([
       { path: 'discounts.0.amount', code: 'adjustment-mismatch', severity: 'error' },
@@ -205,14 +242,18 @@ describe('discounts and charges on the whole invoice', () => {
     const error = (path: string) => [{ path, code: 'adjustment-group', severity: 'error' }];
     expect(problems(mixed, { discounts: [{ amount: 10 }] })).toEqual(error('discounts.0.vatRate'));
     expect(problems(mixed, { discounts: [{ amount: 10, vatCategory: 'S' }] })).toEqual(error('discounts.0.vatRate'));
-    expect(problems([line({ vatCategory: 'Z', vatRate: 0 })], { charges: [freight({ vatCategory: 'S' })] })).toEqual(error('charges.0.vatRate'));
+    expect(problems([line({ vatCategory: 'Z', vatRate: 0 })], { charges: [freight({ vatCategory: 'S' })] })).toEqual(
+      error('charges.0.vatRate'),
+    );
     expect(problems([line()], { charges: [freight({ vatRate: 0 })] })).toEqual(error('charges.0.vatCategory'));
     expect(problems([at(19)], { discounts: [{ percent: 10, vatRate: 7 }] })).toEqual(error('discounts.0.vatRate'));
     expect(() => calculate(invoice(mixed, { discounts: [{ amount: 10 }] }))).toThrow(/several VAT/);
   });
 
   it('refuses a negative VAT rate, and reports every fault of an entry in the order of its fields', () => {
-    expect(problems([line()], { discounts: [{ amount: 5, vatRate: -19 }] })).toEqual([{ path: 'discounts.0.vatRate', code: 'vat-rate', severity: 'error' }]);
+    expect(problems([line()], { discounts: [{ amount: 5, vatRate: -19 }] })).toEqual([
+      { path: 'discounts.0.vatRate', code: 'vat-rate', severity: 'error' },
+    ]);
     expect(problems([line()], { charges: [{ percent: -5, vatRate: 'x' as unknown as number }] })).toEqual([
       { path: 'charges.0.vatRate', code: 'format', severity: 'error' },
       { path: 'charges.0.percent', code: 'adjustment', severity: 'error' },

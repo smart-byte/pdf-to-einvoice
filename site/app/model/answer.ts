@@ -40,7 +40,9 @@ export function extractionSchema(schema: any = invoiceJsonSchema): any {
 /** The keys of the answer: those before the line items (with `lines` itself), those of one line item, and those after. */
 const KEYS = (() => {
   const count = (schema: any): number =>
-    schema.type === 'object' ? Object.values(schema.properties).reduce((n: number, value) => n + 1 + count(value), 0) : 0;
+    schema.type === 'object'
+      ? Object.values(schema.properties).reduce((n: number, value) => n + 1 + count(value), 0)
+      : 0;
   const { lines, ...rest } = extractionSchema().properties;
   const names = Object.keys(rest);
   const split = Object.keys(extractionSchema().properties).indexOf('lines');
@@ -60,7 +62,12 @@ export function progressOf(answer: string): { fraction: number; line: number } {
   const written = (text: string) => text.match(KEY)?.length ?? 0;
   const totals = answer.lastIndexOf('"totals"');
   if (totals >= 0)
-    return { fraction: answer.trimEnd().endsWith('}}') ? 1 : 0.9 + 0.1 * Math.min(1, written(answer.slice(totals)) / (KEYS.after + 1)), line: 0 };
+    return {
+      fraction: answer.trimEnd().endsWith('}}')
+        ? 1
+        : 0.9 + 0.1 * Math.min(1, written(answer.slice(totals)) / (KEYS.after + 1)),
+      line: 0,
+    };
   const keys = written(answer);
   if (keys <= KEYS.before) return { fraction: (0.6 * keys) / KEYS.before, line: 0 };
   const line = Math.ceil((keys - KEYS.before) / KEYS.line);

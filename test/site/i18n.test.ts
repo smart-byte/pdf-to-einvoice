@@ -7,12 +7,16 @@ import type { InvoiceDraft } from '../../src/domain/model.js';
 /** Every code the library can put on a finding or an `InvoiceError`: the catalog of its texts lists each one. */
 const libraryCodes = () => new Set(Object.keys(MESSAGES).map((key) => codeOf(key as MessageKey)));
 
-const sample = (): InvoiceDraft => JSON.parse(readFileSync(new URL('../../examples/sample-invoice.json', import.meta.url), 'utf8'));
+const sample = (): InvoiceDraft =>
+  JSON.parse(readFileSync(new URL('../../examples/sample-invoice.json', import.meta.url), 'utf8'));
 
 describe('German texts', () => {
   it('finds every code the library produces in the catalog of its texts', () => {
     // Drafts that are wrong in many ways at once: what the library says about them must be in the catalog.
-    const empty = check({ typeCode: '386', lines: [{ vatCategory: 'K', vatRate: 19 }] } as InvoiceDraft, { rules: 'xrechnung', pdfText: '' });
+    const empty = check({ typeCode: '386', lines: [{ vatCategory: 'K', vatRate: 19 }] } as InvoiceDraft, {
+      rules: 'xrechnung',
+      pdfText: '',
+    });
     const odd = check(
       {
         ...sample(),
@@ -46,7 +50,9 @@ describe('German texts', () => {
     vi.stubGlobal('location', new URL('https://pdf-to-einvoice.app/'));
     const { STRINGS } = await import('../../site/shared/i18n.js');
     // A text may have variants, `e.format.country` beside `e.format`: the code is what stands before them.
-    const translated = new Set(Object.keys(STRINGS).flatMap((key) => (key.startsWith('e.') ? [key.split('.')[1]!] : [])));
+    const translated = new Set(
+      Object.keys(STRINGS).flatMap((key) => (key.startsWith('e.') ? [key.split('.')[1]!] : [])),
+    );
     expect([...translated].filter((code) => !libraryCodes().has(code))).toEqual([]);
     vi.unstubAllGlobals();
   });

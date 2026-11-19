@@ -1,5 +1,15 @@
 import type { Party } from '../../domain/model.js';
-import { BUYER_HEADING, cells, DATE_OR_AMOUNT, type Found, type Role, roleOf, SELLER_HEADING, senderOf, TITLE } from './parties.js';
+import {
+  BUYER_HEADING,
+  cells,
+  DATE_OR_AMOUNT,
+  type Found,
+  type Role,
+  roleOf,
+  SELLER_HEADING,
+  senderOf,
+  TITLE,
+} from './parties.js';
 import { after, CUSTOMER, SEPARATOR } from './values.js';
 
 // Contact data. A contact is read for a party only where a heading, a label or the party's recognised address
@@ -12,17 +22,20 @@ const EMAIL_LABEL = /^(.*?)(?:e-?mail(?:[- ]?(?:adresse|address))?|courriel)\s*:
 const CUSTOMER_EMAIL_SUFFIX =
   /(?:e-?mail(?:[- ]?(?:adresse|address))?|courriel)\s+(?:(?:des|der|du|de|of(?:\s+the)?)\s+)?(?:kunden?|käufers?|buyers?|customers?|clients?)\s*:?\s*$/i;
 /** "Tel.", "Telefon-Nr.", "Phone", "Mobil"; not a fax, which "Telefax" and "Tel./Fax" name. */
-const PHONE_LABEL = /(?<![a-zäöü])(?:tele(?:fon|phone)|tel|phone|fon|mobil(?:e|telefon)?|handy)(?:\.?[-\s]?(?:nr|nummer|number|no))?(?![a-zäöü])\.?/;
+const PHONE_LABEL =
+  /(?<![a-zäöü])(?:tele(?:fon|phone)|tel|phone|fon|mobil(?:e|telefon)?|handy)(?:\.?[-\s]?(?:nr|nummer|number|no))?(?![a-zäöü])\.?/;
 /** Digits in groups, one space apart at most: three spaces start the next column. */
 const PHONE = new RegExp(`${SEPARATOR}(\\+{0,2}[\\d(](?:[\\d()/.-]| (?=[\\d(/-]))*\\d)`);
-const CONTACT_LABEL = /(?:ihre?\s+)?ansprechpartner(?:in)?|(?:sach)?bearbeiter(?:in)?|kontaktperson|contact\s+person|your\s+contact/;
+const CONTACT_LABEL =
+  /(?:ihre?\s+)?ansprechpartner(?:in)?|(?:sach)?bearbeiter(?:in)?|kontaktperson|contact\s+person|your\s+contact/;
 /** A name of two to four words that start with a capital, with its titles. One word may be anything. */
 const PERSON = new RegExp(
   `${SEPARATOR}((?:(?:Herrn?|Frau|Mrs?\\.?|Ms\\.?|Dr\\.?|Prof\\.?)\\s)*\\p{Lu}[\\p{L}.'’-]*(?:\\s\\p{Lu}[\\p{L}.'’-]*){1,3})(?=\\s{2}|\\s*$|,)`,
   'u',
 );
 /** The heading of an address that is neither party's, such as "Lieferadresse:" or "Ship to". */
-const OTHER_ADDRESS = /^(?!.*(?:mail|web|internet|bank)).*(?:adresse|address|anschrift|empfänger|(?:ship(?:ped)?|deliver(?:ed)?)\s+to)\s*:?$/i;
+const OTHER_ADDRESS =
+  /^(?!.*(?:mail|web|internet|bank)).*(?:adresse|address|anschrift|empfänger|(?:ship(?:ped)?|deliver(?:ed)?)\s+to)\s*:?$/i;
 
 /** A value where it stands on the page, with whose it is as far as that place tells. */
 interface Mention {
@@ -41,7 +54,9 @@ function headedBy(lines: string[], i: number): Mention['role'] {
   for (let j = i - 1; j >= 0 && j >= i - 10; j--) {
     const line = lines[j]!;
     if (!line || DATE_OR_AMOUNT.test(line) || TITLE.test(line)) return undefined;
-    const roles = cells(line).map((cell) => (BUYER_HEADING.test(cell) ? 'buyer' : SELLER_HEADING.test(cell) ? 'seller' : undefined));
+    const roles = cells(line).map((cell) =>
+      BUYER_HEADING.test(cell) ? 'buyer' : SELLER_HEADING.test(cell) ? 'seller' : undefined,
+    );
     if (roles.some(Boolean)) return roles.length === 1 ? roles[0] : 'unclear';
     if (roles.length === 1 && OTHER_ADDRESS.test(line)) return 'other';
   }
@@ -61,15 +76,23 @@ function theOne(mentions: Mention[], who: 'seller' | 'buyer', columns: boolean):
   }
   const entries = [...values.values()];
   const address = `${who}-address`;
-  const own = entries.filter(({ roles }) => roles.has(who) && [...roles].every((role) => role === who || role === address));
+  const own = entries.filter(
+    ({ roles }) => roles.has(who) && [...roles].every((role) => role === who || role === address),
+  );
   if (own.length) return own.length === 1 ? own[0]!.value : undefined;
   // A value merely near an address is weaker evidence than a heading. If the page prints another value of the
   // same kind, neither is chosen on that basis alone.
-  return entries.length === 1 && entries[0]!.roles.size === 1 && entries[0]!.roles.has(address) ? entries[0]!.value : undefined;
+  return entries.length === 1 && entries[0]!.roles.size === 1 && entries[0]!.roles.has(address)
+    ? entries[0]!.value
+    : undefined;
 }
 
 /** E-mail address, phone number and contact of the seller, and the e-mail address of the buyer. */
-export function readContact(searched: string, columns: boolean, parties: { seller?: Found; buyer?: Found }): { seller: Partial<Party>; buyer: Partial<Party> } {
+export function readContact(
+  searched: string,
+  columns: boolean,
+  parties: { seller?: Found; buyer?: Found },
+): { seller: Partial<Party>; buyer: Partial<Party> } {
   const lines = searched.split('\n');
   /** What the cell of the value says before it. */
   const before = (at: number) =>
@@ -95,7 +118,10 @@ export function readContact(searched: string, columns: boolean, parties: { selle
       if (!line || DATE_OR_AMOUNT.test(line) || TITLE.test(line) || roleOf(line)) break;
       const parts = cells(line);
       const matches = parts.map(partyIn).filter((found) => found !== undefined);
-      if (matches.length) return parts.length === 1 && matches.length === 1 && matches[0] !== 'unclear' ? `${matches[0]!}-address` : 'unclear';
+      if (matches.length)
+        return parts.length === 1 && matches.length === 1 && matches[0] !== 'unclear'
+          ? `${matches[0]!}-address`
+          : 'unclear';
     }
     return undefined;
   };
@@ -110,7 +136,11 @@ export function readContact(searched: string, columns: boolean, parties: { selle
     };
   });
   const labelled = (label: RegExp, value: RegExp, key: (found: string) => string) =>
-    after(searched, label, value).map(({ hit, at }): Mention => ({ value: hit[1]!, key: key(hit[1]!), role: role(at, CUSTOMER.test(before(at))) }));
+    after(searched, label, value).map(({ hit, at }): Mention => ({
+      value: hit[1]!,
+      key: key(hit[1]!),
+      role: role(at, CUSTOMER.test(before(at))),
+    }));
   const digits = (found: string) => found.replace(/\D/g, '');
   // A phone number has six digits at least and fifteen with its country code, or one more where the zero of the area
   // code is printed as well: "+49 (0) 30 …".
@@ -118,7 +148,11 @@ export function readContact(searched: string, columns: boolean, parties: { selle
   const contacts = labelled(CONTACT_LABEL, PERSON, (found) => found.toLowerCase());
 
   return {
-    seller: { contactName: theOne(contacts, 'seller', columns), phone: theOne(phones, 'seller', columns), email: theOne(emails, 'seller', columns) },
+    seller: {
+      contactName: theOne(contacts, 'seller', columns),
+      phone: theOne(phones, 'seller', columns),
+      email: theOne(emails, 'seller', columns),
+    },
     buyer: { email: theOne(emails, 'buyer', columns) },
   };
 }

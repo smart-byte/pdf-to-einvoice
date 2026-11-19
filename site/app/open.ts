@@ -12,7 +12,10 @@ import { state } from './state.js';
 import { closeXml } from './xml.js';
 
 /** Payment terms suggested when the PDF states neither a due date nor terms, in the language of the invoice. */
-const USUAL_PAYMENT_TERMS = { de: 'Zahlbar innerhalb von 14 Tagen ab Rechnungsdatum.', en: 'Payable within 14 days of the invoice date.' };
+const USUAL_PAYMENT_TERMS = {
+  de: 'Zahlbar innerhalb von 14 Tagen ab Rechnungsdatum.',
+  en: 'Payable within 14 days of the invoice date.',
+};
 
 /** EN 16931 wants a due date or payment terms. Where the PDF has neither, the usual terms are put in as a suggestion the user has to confirm. */
 function suggestPaymentTerms(): void {
@@ -22,7 +25,16 @@ function suggestPaymentTerms(): void {
 }
 
 /** Findings that are about the file, not about a field of the form. */
-const FILE_CODES = new Set(['no-xml', 'xml-syntax', 'profile', 'pdf-a', 'pdf-fonts', 'pdf-actions', 'xml-discount', 'xml-charge']);
+const FILE_CODES = new Set([
+  'no-xml',
+  'xml-syntax',
+  'profile',
+  'pdf-a',
+  'pdf-fonts',
+  'pdf-actions',
+  'xml-discount',
+  'xml-charge',
+]);
 
 async function open(pdf: Uint8Array, fileName: string): Promise<void> {
   const status = $('#drop-status');
@@ -59,7 +71,9 @@ async function open(pdf: Uint8Array, fileName: string): Promise<void> {
       // confirms it at the first line.
       if ((state.draft.lines?.[0]?.vatCategory ?? 'S') !== 'S') state.toCheck.set('lines.0.vatCategory', 'inferred');
       suggestPaymentTerms();
-      $('#read-status').textContent = text.trim() ? t(found === 1 ? 'read.found.one' : 'read.found', { n: found }) : t('read.none');
+      $('#read-status').textContent = text.trim()
+        ? t(found === 1 ? 'read.found.one' : 'read.found', { n: found })
+        : t('read.none');
     }
     document.body.dataset.mode = state.mode;
     setText('#work-title', state.mode === 'validate' ? 'valid.title' : 'work.title');
@@ -68,7 +82,8 @@ async function open(pdf: Uint8Array, fileName: string): Promise<void> {
     $('#ai-status').textContent = '';
     renderForm();
     // Reading with a model is offered openly when the patterns left a lot to fill in.
-    $<HTMLDetailsElement>('.reader details').open = (state.result?.findings.filter((finding) => finding.severity === 'error').length ?? 0) > 2;
+    $<HTMLDetailsElement>('.reader details').open =
+      (state.result?.findings.filter((finding) => finding.severity === 'error').length ?? 0) > 2;
     show('work');
     await preview(pdf);
     status.textContent = '';
@@ -99,5 +114,6 @@ drop.addEventListener('drop', async (event) => {
   const file = event.dataTransfer?.files[0];
   if (file) await open(new Uint8Array(await file.arrayBuffer()), file.name);
 });
-$('#sample').onclick = async () => open(new Uint8Array(await (await fetch(sampleUrl)).arrayBuffer()), 'sample-invoice.pdf');
+$('#sample').onclick = async () =>
+  open(new Uint8Array(await (await fetch(sampleUrl)).arrayBuffer()), 'sample-invoice.pdf');
 $('#other').onclick = () => show('start');

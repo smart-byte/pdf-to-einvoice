@@ -2,7 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { locate, pageToShow, type Piece } from '../../site/app/locate.js';
 
 /** A piece of text: 10 high and, unless told otherwise, 10 wide per character. `y` is its upper edge. */
-const piece = (text: string, x: number, y: number, width = text.length * 10): Piece => ({ text, x, y, width, height: 10 });
+const piece = (text: string, x: number, y: number, width = text.length * 10): Piece => ({
+  text,
+  x,
+  y,
+  width,
+  height: 10,
+});
 
 const page: Piece[] = [
   piece('Muster Software GmbH', 80, 40),
@@ -53,7 +59,9 @@ describe('locate', () => {
 
   it('finds a date however it is printed', () => {
     expect(locate(page, '2026-11-03')).toEqual([{ x: 520, y: 120, width: 100, height: 10 }]);
-    expect(locate([piece('Datum: 3. November 2026', 0, 0)], '2026-11-03')).toEqual([{ x: 70, y: 0, width: 160, height: 10 }]);
+    expect(locate([piece('Datum: 3. November 2026', 0, 0)], '2026-11-03')).toEqual([
+      { x: 70, y: 0, width: 160, height: 10 },
+    ]);
   });
 
   it('finds an amount however it is printed', () => {
@@ -112,20 +120,26 @@ describe('locate', () => {
     expect(locate(page, 100, { beside: name })).toEqual([]);
     expect(locate(page, 100, { beside: [] })).toEqual([]);
     // A quantity printed in front of the name is still found.
-    expect(locate([piece('3 x', 0, 0), piece('Wartung', 50, 0)], 3, { beside: [{ x: 50, y: 0, width: 70, height: 10 }] })).toEqual([
-      { x: 0, y: 0, width: 10, height: 10 },
-    ]);
+    expect(
+      locate([piece('3 x', 0, 0), piece('Wartung', 50, 0)], 3, { beside: [{ x: 50, y: 0, width: 70, height: 10 }] }),
+    ).toEqual([{ x: 0, y: 0, width: 10, height: 10 }]);
   });
 
   it('places a part of a piece by the widths of its letters when it can measure them', () => {
     const narrow = (text: string) => [...text].reduce((sum, letter) => sum + (letter === 'i' ? 1 : 3), 0);
     // "iiii " is 7 wide, "WWWW" 12, of 19 in all.
-    expect(locate([piece('iiii WWWW', 0, 0, 190)], 'WWWW', { widthOf: narrow })).toEqual([{ x: 70, y: 0, width: 120, height: 10 }]);
+    expect(locate([piece('iiii WWWW', 0, 0, 190)], 'WWWW', { widthOf: narrow })).toEqual([
+      { x: 70, y: 0, width: 120, height: 10 },
+    ]);
   });
 });
 
 describe('pageToShow', () => {
-  const pages = [[piece('RE-2026-0042', 0, 0)], [piece('Gesamtbetrag', 0, 0), piece('RE-2026-0042', 0, 20)], [piece('Gesamtbetrag', 0, 0)]];
+  const pages = [
+    [piece('RE-2026-0042', 0, 0)],
+    [piece('Gesamtbetrag', 0, 0), piece('RE-2026-0042', 0, 20)],
+    [piece('Gesamtbetrag', 0, 0)],
+  ];
   const has = (value: string) => (on: Piece[]) => locate(on, value).length > 0;
 
   it('stays on the page that is shown when the value stands there, also where an earlier page has it too', () => {

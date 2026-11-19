@@ -19,9 +19,14 @@ export function describe(finding: { code: string; message: string; path?: string
   const line = state.draft.lines?.[Number(/^lines\.(\d+)\./.exec(path)?.[1])];
   // What the line comes to: quantity times price, less its discount, in cents as the XML has it (1 x 1.005 less 0.02
   // is 0.99, not 0.985). Nothing is calculated with a value that is not a number yet.
-  const [quantity, unitPrice, percent] = [Number(line?.quantity), Number(line?.unitPrice), Number(line?.discount?.percent)];
+  const [quantity, unitPrice, percent] = [
+    Number(line?.quantity),
+    Number(line?.unitPrice),
+    Number(line?.discount?.percent),
+  ];
   const product = Number.isFinite(quantity) && Number.isFinite(unitPrice) ? lineBase(quantity, unitPrice) : NaN;
-  const discount = line?.discount?.amount ?? (Number.isFinite(product) && Number.isFinite(percent) ? percentOf(product, percent) : 0);
+  const discount =
+    line?.discount?.amount ?? (Number.isFinite(product) && Number.isFinite(percent) ? percentOf(product, percent) : 0);
   return t(key, {
     a: line ? money(product - Number(discount)) : '',
     b: line ? money(Number(line.netAmount)) : '',

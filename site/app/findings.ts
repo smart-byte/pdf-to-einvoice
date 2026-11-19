@@ -11,7 +11,10 @@ import { describe, fieldLabel, money } from './wording.js';
 /** The field of a path; the first field of a line item, discount or charge for the path of all of it, or of a value of it the form does not show. */
 const fieldOf = (path: string) => {
   const item = /^(lines|discounts|charges)\.\d+/.exec(path)?.[0];
-  return document.querySelector<HTMLElement>(`[data-path="${path}"]`) ?? (item ? document.querySelector<HTMLElement>(`[data-path^="${item}."]`) : null);
+  return (
+    document.querySelector<HTMLElement>(`[data-path="${path}"]`) ??
+    (item ? document.querySelector<HTMLElement>(`[data-path^="${item}."]`) : null)
+  );
 };
 
 /** Checks the form and shows the result: a hint at each field, the totals, and a summary with what is left to do. */
@@ -19,7 +22,9 @@ export function validate(): void {
   const result = (state.result = check(state.draft, {
     ...(state.pdf ? { pdfText: state.pdfText } : {}),
     ...(shownFormat() === 'xrechnung' ? { rules: 'xrechnung' as const } : {}),
-    ...(state.mode === 'validate' ? { adjustedLines: state.adjustedLines ?? [], percentages: state.percentages ?? {} } : {}),
+    ...(state.mode === 'validate'
+      ? { adjustedLines: state.adjustedLines ?? [], percentages: state.percentages ?? {} }
+      : {}),
   }));
   const unchecked = uncheckedFindings();
   const findings = findingsToShow(result, unchecked);
@@ -54,7 +59,8 @@ function uncheckedFindings(): Finding[] {
 function findingsToShow(result: CheckResult, unchecked: Finding[]): Finding[] {
   // Where XRechnung demands a part of the address, the warning that it is missing would only say the same again.
   const demanded = (finding: Finding) =>
-    finding.code === 'address' && result.findings.some((other) => other.code === 'xrechnung-address' && other.path === finding.path);
+    finding.code === 'address' &&
+    result.findings.some((other) => other.code === 'xrechnung-address' && other.path === finding.path);
   return [...result.findings.filter((finding) => !demanded(finding)), ...state.fileFindings, ...unchecked];
 }
 
@@ -108,7 +114,8 @@ function renderTotals(result: CheckResult, findings: Finding[]): void {
     );
     // An existing e-invoice states its totals in its XML; for a PDF they are what the page prints.
     const printedAs = state.mode === 'validate' ? 't.printed.xml' : 't.printed';
-    if (mismatch && typeof printed[key] === 'number') row.append(el('dd', { className: 'total__printed' }, t(printedAs, { v: money(printed[key]!) })));
+    if (mismatch && typeof printed[key] === 'number')
+      row.append(el('dd', { className: 'total__printed' }, t(printedAs, { v: money(printed[key]!) })));
     // A total has no field to focus: pointing at it shows where it stands, on whichever page that is.
     row.onmouseenter = () => {
       const path = `totals.${key}`;
@@ -129,7 +136,11 @@ function summarise(findings: Finding[], unchecked: Finding[]): { errors: Finding
   const errors = findings.filter((f) => f.severity === 'error');
   const added = unchecked.filter((f) => f.code === 'model');
   const warnings = findings.filter((f) => f.severity === 'warning' && !added.includes(f));
-  if (added.length) warnings.push({ ...added[0]!, message: t(added.length === 1 ? 'sum.model.one' : 'sum.model', { n: added.length }) });
+  if (added.length)
+    warnings.push({
+      ...added[0]!,
+      message: t(added.length === 1 ? 'sum.model.one' : 'sum.model', { n: added.length }),
+    });
   return { errors, warnings };
 }
 
@@ -139,10 +150,15 @@ function renderSummary(errors: Finding[], warnings: Finding[]): void {
   summary.replaceChildren();
   summary.className = `summary summary--${errors.length ? 'error' : warnings.length ? 'warning' : 'ok'}`;
   const count = (key: string, n: number) => (n ? t(n === 1 ? `${key}.one` : key, { n }) : '');
-  const headline = [count(state.mode === 'validate' ? 'valid.errors' : 'sum.errors', errors.length), count('sum.warnings', warnings.length)]
+  const headline = [
+    count(state.mode === 'validate' ? 'valid.errors' : 'sum.errors', errors.length),
+    count('sum.warnings', warnings.length),
+  ]
     .filter(Boolean)
     .join(' · ');
-  summary.append(el('p', { className: 'summary__title' }, headline || t(state.mode === 'validate' ? 'sum.valid' : 'sum.ok')));
+  summary.append(
+    el('p', { className: 'summary__title' }, headline || t(state.mode === 'validate' ? 'sum.valid' : 'sum.ok')),
+  );
   const list = el('ul');
   for (const finding of [...errors, ...warnings]) {
     // The sentence about what a model added speaks for all those values; it leads to the first of them.

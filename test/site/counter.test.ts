@@ -29,7 +29,11 @@ describe('the page counter of the project website', () => {
   });
 
   it('adds the name of what happened and its kind, and nothing else', () => {
-    expect(visitOf(page, 'created', { format: 'pdf' })).toEqual({ ...visitOf(page), name: 'created', data: { format: 'pdf' } });
+    expect(visitOf(page, 'created', { format: 'pdf' })).toEqual({
+      ...visitOf(page),
+      name: 'created',
+      data: { format: 'pdf' },
+    });
   });
 
   it('is served from the one host a counted page talks to', () => {

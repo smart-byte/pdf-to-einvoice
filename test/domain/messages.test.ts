@@ -15,7 +15,9 @@ describe('the catalog of messages', () => {
   });
 
   it('writes every key as a code in lower case, with at most one variant', () => {
-    expect(Object.keys(MESSAGES).filter((key) => !/^[a-z]+(?:-[a-z]+)*(?:\.[a-z]+(?:-[a-z]+)*)?$/.test(key))).toEqual([]);
+    expect(Object.keys(MESSAGES).filter((key) => !/^[a-z]+(?:-[a-z]+)*(?:\.[a-z]+(?:-[a-z]+)*)?$/.test(key))).toEqual(
+      [],
+    );
   });
 
   it('is the only place a finding gets its text: nothing in src/ builds one by hand', () => {

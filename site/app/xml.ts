@@ -32,26 +32,41 @@ async function renderXml(): Promise<void> {
   try {
     const invoice = structuredClone(state.draft);
     const { createEInvoice, createXRechnung } = await import('../../src/generate/create.js');
-    const { xml, totals } = shownFormat() === 'xrechnung' ? await createXRechnung({ invoice }) : await createEInvoice({ pdf: state.pdf, invoice });
+    const { xml, totals } =
+      shownFormat() === 'xrechnung'
+        ? await createXRechnung({ invoice })
+        : await createEInvoice({ pdf: state.pdf, invoice });
     // The data has changed again in the meantime: the newer run shows its XML.
     if (run !== xmlRun) return;
-    const date = (iso: unknown) => new Intl.DateTimeFormat(lang, { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(`${iso}T00:00:00Z`));
+    const date = (iso: unknown) =>
+      new Intl.DateTimeFormat(lang, { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(`${iso}T00:00:00Z`));
     // Where a value stands in CII (the PDF) and in UBL (the XRechnung): the path that is not in the XML finds nothing.
     const inXml = (cii: string[], ubl: string[]) => fragment(xml, ...cii) ?? fragment(xml, ...ubl);
     const rows: [label: string, value: string, written: string | undefined][] = [
       [t('f.number'), String(invoice.number), inXml(['rsm:ExchangedDocument', 'ram:ID'], ['cbc:ID'])],
-      [t('f.issueDate'), date(invoice.issueDate), inXml(['rsm:ExchangedDocument', 'ram:IssueDateTime', 'udt:DateTimeString'], ['cbc:IssueDate'])],
-      [t('xml.seller'), String(invoice.seller?.name), inXml(['ram:SellerTradeParty', 'ram:Name'], ['cac:AccountingSupplierParty', 'cbc:RegistrationName'])],
+      [
+        t('f.issueDate'),
+        date(invoice.issueDate),
+        inXml(['rsm:ExchangedDocument', 'ram:IssueDateTime', 'udt:DateTimeString'], ['cbc:IssueDate']),
+      ],
+      [
+        t('xml.seller'),
+        String(invoice.seller?.name),
+        inXml(['ram:SellerTradeParty', 'ram:Name'], ['cac:AccountingSupplierParty', 'cbc:RegistrationName']),
+      ],
       [t('t.vat'), money(totals.vat), inXml(['ram:TaxTotalAmount'], ['cac:TaxTotal', 'cbc:TaxAmount'])],
       [t('t.gross'), money(totals.gross), inXml(['ram:GrandTotalAmount'], ['cbc:TaxInclusiveAmount'])],
     ];
     // In a narrow column the XML breaks where a tag ends, not in the middle of a name.
-    const code = (written: string) => el('code', {}, ...written.split(/(?<=>)(?!$)|(?=<\/)/).flatMap((part, i) => (i ? [el('wbr'), part] : [part])));
+    const code = (written: string) =>
+      el('code', {}, ...written.split(/(?<=>)(?!$)|(?=<\/)/).flatMap((part, i) => (i ? [el('wbr'), part] : [part])));
     pair
       .querySelector('tbody')!
       .replaceChildren(
         ...rows.flatMap(([label, value, written]) =>
-          written ? [el('tr', {}, el('td', {}, `${label} `, el('strong', {}, value)), el('td', {}, code(written)))] : [],
+          written
+            ? [el('tr', {}, el('td', {}, `${label} `, el('strong', {}, value)), el('td', {}, code(written)))]
+            : [],
         ),
       );
     $('#xml-code').textContent = xml;

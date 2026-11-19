@@ -193,7 +193,8 @@ const party = (who: string, extra: Record<string, unknown> = {}) => ({
 export const invoiceJsonSchema = {
   $schema: 'https://json-schema.org/draft/2020-12/schema',
   title: 'Invoice',
-  description: 'Invoice data as printed on the PDF. Copy values exactly; leave out anything the document does not state.',
+  description:
+    'Invoice data as printed on the PDF. Copy values exactly; leave out anything the document does not state.',
   type: 'object',
   additionalProperties: false,
   required: ['number', 'issueDate', 'seller', 'buyer', 'lines'],
@@ -203,7 +204,8 @@ export const invoiceJsonSchema = {
     typeCode: {
       type: 'string',
       enum: Object.keys(INVOICE_TYPES),
-      description: '380 invoice (default), 381 credit note, 384 corrected invoice, 389 self-billed invoice, 326 partial invoice, 386 prepayment invoice.',
+      description:
+        '380 invoice (default), 381 credit note, 384 corrected invoice, 389 self-billed invoice, 326 partial invoice, 386 prepayment invoice.',
     },
     currency: {
       type: 'string',
@@ -245,7 +247,9 @@ export const invoiceJsonSchema = {
           name: text('Item or service name.'),
           description: text('Further description.'),
           quantity: amount('Quantity.'),
-          unit: text('UN/ECE Rec. 20 unit code: C62 piece (default), HUR hour, DAY day, MON month, KGM kilogram, MTR metre, LTR litre, LS lump sum.'),
+          unit: text(
+            'UN/ECE Rec. 20 unit code: C62 piece (default), HUR hour, DAY day, MON month, KGM kilogram, MTR metre, LTR litre, LS lump sum.',
+          ),
           unitPrice: amount('Net price per unit, without VAT.'),
           netAmount: amount('Net line total as printed.'),
           discount: {

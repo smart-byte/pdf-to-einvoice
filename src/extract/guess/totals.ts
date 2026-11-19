@@ -20,7 +20,10 @@ export const TOTALS_CELL = /(?:summe|betrag)(?![\p{L}])|\btotal\b/iu;
 /** An amount that stands on its own: not part of a date, a longer number or a percentage. */
 const PRINTED_AMOUNT = new RegExp(`(?<![\\d.,])${MONEY}(?![.,]?\\d)(?!\\s?%)`, 'g');
 // Known limit: the standard and reduced rates of the EU and Switzerland as of 2026; a rate that is not listed reads as no rate.
-const RATES = [0, 2.1, 2.6, 3.8, 4, 4.8, 5, 5.5, 6, 7, 8, 8.1, 9, 9.5, 10, 12, 13, 13.5, 14, 15, 17, 18, 19, 20, 21, 22, 23, 24, 25, 25.5, 27];
+const RATES = [
+  0, 2.1, 2.6, 3.8, 4, 4.8, 5, 5.5, 6, 7, 8, 8.1, 9, 9.5, 10, 12, 13, 13.5, 14, 15, 17, 18, 19, 20, 21, 22, 23, 24, 25,
+  25.5, 27,
+];
 /** No invoice carries more VAT than the highest rate; one with several rates carries less. */
 const MAX_VAT_SHARE = 0.3;
 
@@ -42,7 +45,11 @@ export function readTotals(searched: string, text: string): Totals {
   const labelled = (label: RegExp) => after(searched, label, AMOUNT).map(({ hit }) => cents(toNumber(hit[1]!)));
   const hits = { net: labelled(NET_LABEL), vat: labelled(VAT_LABEL), gross: labelled(GROSS_LABEL) };
   const [net, vat, gross] = [hits.net[0], hits.vat[0], hits.gross[0]];
-  const first = { net: net === undefined ? net : net / 100, vat: vat === undefined ? vat : vat / 100, gross: gross === undefined ? gross : gross / 100 };
+  const first = {
+    net: net === undefined ? net : net / 100,
+    vat: vat === undefined ? vat : vat / 100,
+    gross: gross === undefined ? gross : gross / 100,
+  };
   if (net !== undefined && vat !== undefined && net + vat === gross) return first;
   // The same amount as net and as gross, and no VAT: an invoice without VAT, whatever else adds up on the page.
   if (net !== undefined && net === gross && vat === undefined) return { net: first.net, gross: first.gross };
@@ -52,8 +59,14 @@ export function readTotals(searched: string, text: string): Totals {
   for (const n of printed) {
     for (const v of printed) {
       // VAT of nothing is believed when a label says so; "0,00" alone may be anything.
-      if (n === 0 || !printed.has(n + v) || v / n < 0 || v / n > MAX_VAT_SHARE || (v === 0 && !hits.vat.includes(0))) continue;
-      sums.push({ net: n / 100, vat: v / 100, gross: (n + v) / 100, score: +hits.net.includes(n) + +hits.vat.includes(v) + +hits.gross.includes(n + v) });
+      if (n === 0 || !printed.has(n + v) || v / n < 0 || v / n > MAX_VAT_SHARE || (v === 0 && !hits.vat.includes(0)))
+        continue;
+      sums.push({
+        net: n / 100,
+        vat: v / 100,
+        gross: (n + v) / 100,
+        score: +hits.net.includes(n) + +hits.vat.includes(v) + +hits.gross.includes(n + v),
+      });
     }
   }
   sums.sort((a, b) => b.score - a.score);
@@ -65,7 +78,8 @@ export function readTotals(searched: string, text: string): Totals {
   // Labelled amounts that cannot belong together are not believed either. Net and gross may: the VAT between them
   // is printed in parts where an invoice has several rates.
   const share = (part: number, whole: number) => part / whole >= 0 && part / whole <= MAX_VAT_SHARE;
-  if (net !== undefined && gross !== undefined) return share(gross - net, net) ? { net: first.net, gross: first.gross } : {};
+  if (net !== undefined && gross !== undefined)
+    return share(gross - net, net) ? { net: first.net, gross: first.gross } : {};
   const whole = net ?? gross;
   return vat === undefined || whole === undefined || share(vat, whole) ? first : {};
 }

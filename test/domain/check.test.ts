@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { check, percentSpellings } from '../../src/domain/check.js';
 import type { InvoiceDraft } from '../../src/domain/model.js';
 
-const sample = (): InvoiceDraft => JSON.parse(readFileSync(new URL('../../examples/sample-invoice.json', import.meta.url), 'utf8'));
+const sample = (): InvoiceDraft =>
+  JSON.parse(readFileSync(new URL('../../examples/sample-invoice.json', import.meta.url), 'utf8'));
 
 /** The sample with one change applied. */
 const withChange = (change: (draft: any) => void): InvoiceDraft => {
@@ -215,7 +216,11 @@ describe('check', () => {
         .map((f) => `${f.severity}:${f.code}`);
 
     it('takes them into the totals', () => {
-      const result = check(adjusted((d) => Object.assign(d, { discounts: [{ percent: 10 }], charges: [{ amount: 10, reason: 'Fracht' }] })));
+      const result = check(
+        adjusted((d) =>
+          Object.assign(d, { discounts: [{ percent: 10 }], charges: [{ amount: 10, reason: 'Fracht' }] }),
+        ),
+      );
       expect(result.findings).toEqual([]);
       expect(result.totals).toMatchObject({ lineTotal: 1499, allowances: 149.9, charges: 10, net: 1359.1 });
     });
@@ -225,14 +230,20 @@ describe('check', () => {
       expect(said((d) => (d.discounts = [null]), 'discounts.0')).toEqual(['error:adjustment']);
       expect(said((d) => (d.discounts = [{ percent: -5 }]), 'discounts.0.percent')).toEqual(['error:adjustment']);
       expect(said((d) => (d.discounts = [{ percent: '10 %' }]), 'discounts.0.percent')).toEqual(['error:format']);
-      expect(said((d) => (d.charges = [{ amount: Number.NaN, reason: 'Fracht' }]), 'charges.0.amount')).toEqual(['error:format']);
-      expect(said((d) => (d.charges = [{ amount: 5, reason: 'Fracht', vatRate: 'neunzehn' }]), 'charges.0.vatRate')).toEqual(['error:format']);
+      expect(said((d) => (d.charges = [{ amount: Number.NaN, reason: 'Fracht' }]), 'charges.0.amount')).toEqual([
+        'error:format',
+      ]);
+      expect(
+        said((d) => (d.charges = [{ amount: 5, reason: 'Fracht', vatRate: 'neunzehn' }]), 'charges.0.vatRate'),
+      ).toEqual(['error:format']);
       expect(said((d) => (d.charges = 'Fracht 5,00'), 'charges')).toEqual(['error:format']);
     });
 
     it('wants the reason of a charge, but not of a discount', () => {
       expect(said((d) => (d.charges = [{ amount: 5 }]), 'charges.0.reason')).toEqual(['error:charge-reason']);
-      expect(said((d) => (d.charges = [{ amount: 5, reason: ' ' }]), 'charges.0.reason')).toEqual(['error:charge-reason']);
+      expect(said((d) => (d.charges = [{ amount: 5, reason: ' ' }]), 'charges.0.reason')).toEqual([
+        'error:charge-reason',
+      ]);
       expect(said((d) => (d.discounts = [{ percent: 5, reason: ' ' }]), 'discounts.0.reason')).toEqual([]);
     });
 
@@ -242,9 +253,15 @@ describe('check', () => {
     });
 
     it('wants a known VAT category and a rate that fits it', () => {
-      expect(said((d) => (d.discounts = [{ amount: 5, vatCategory: 'X' }]), 'discounts.0.vatCategory')).toEqual(['error:format']);
-      expect(said((d) => (d.discounts = [{ amount: 5, vatCategory: 'Z', vatRate: 7 }]), 'discounts.0.vatRate')).toEqual(['error:vat-rate']);
-      expect(said((d) => (d.discounts = [{ amount: 5, vatCategory: 'S', vatRate: 0 }]), 'discounts.0.vatRate')).toEqual(['error:vat-rate']);
+      expect(said((d) => (d.discounts = [{ amount: 5, vatCategory: 'X' }]), 'discounts.0.vatCategory')).toEqual([
+        'error:format',
+      ]);
+      expect(said((d) => (d.discounts = [{ amount: 5, vatCategory: 'Z', vatRate: 7 }]), 'discounts.0.vatRate')).toEqual(
+        ['error:vat-rate'],
+      );
+      expect(said((d) => (d.discounts = [{ amount: 5, vatCategory: 'S', vatRate: 0 }]), 'discounts.0.vatRate')).toEqual(
+        ['error:vat-rate'],
+      );
     });
 
     it('does not guess the VAT group of an amount, and gives neither totals nor data while it cannot be placed', () => {
@@ -325,7 +342,9 @@ describe('check', () => {
       expect(said(charge('AE'), 'vatExemptionReason')).toEqual(['error:exemption-reason']);
       expect(said(charge('AE'), 'buyer.vatId')).toEqual(['error:buyer-vat-id']);
       expect(said(charge('K'), 'deliveryCountry')).toEqual(['warning:delivery-country']);
-      expect(said(charge('K'), 'charges.0.vatCategory', { rules: 'xrechnung' })).toEqual(['error:xrechnung-delivery-address']);
+      expect(said(charge('K'), 'charges.0.vatCategory', { rules: 'xrechnung' })).toEqual([
+        'error:xrechnung-delivery-address',
+      ]);
       expect(
         said((d) => {
           charge('G')(d);
@@ -344,7 +363,10 @@ describe('check', () => {
           { amount: -3, reason: 'Gutschrift', vatRate: 19 },
         ];
       });
-      const notInPdf = (text: string) => check(draft, { pdfText: text }).findings.filter((f) => f.code === 'not-in-pdf' && /^(discounts|charges)/.test(f.path));
+      const notInPdf = (text: string) =>
+        check(draft, { pdfText: text }).findings.filter(
+          (f) => f.code === 'not-in-pdf' && /^(discounts|charges)/.test(f.path),
+        );
       expect(notInPdf(pdfText)).toEqual([]);
       expect(notInPdf('Fracht 9,90').map((f) => f.path)).toEqual(['discounts.0.percent', 'charges.1.amount']);
     });
@@ -365,14 +387,17 @@ describe('check', () => {
     ).toEqual(['error:required']);
   });
 
-  it.each(['number', 'issueDate', 'seller.name', 'seller.country', 'buyer.name', 'buyer.country'])('requires %s', (path) => {
-    const draft = withChange((d) => {
-      const keys = path.split('.');
-      const last = keys.pop()!;
-      delete keys.reduce((o, k) => o[k], d)[last];
-    });
-    expect(codesAt(draft, path)).toEqual(['error:required']);
-  });
+  it.each(['number', 'issueDate', 'seller.name', 'seller.country', 'buyer.name', 'buyer.country'])(
+    'requires %s',
+    (path) => {
+      const draft = withChange((d) => {
+        const keys = path.split('.');
+        const last = keys.pop()!;
+        delete keys.reduce((o, k) => o[k], d)[last];
+      });
+      expect(codesAt(draft, path)).toEqual(['error:required']);
+    },
+  );
 
   it('requires at least one line', () => {
     expect(
@@ -593,10 +618,13 @@ describe('check against the PDF text', () => {
     ).toEqual(['warning:not-in-pdf']);
   });
 
-  it.each(['09.08.23', '9.8.23', '09/08/23', '08/09/23'])('finds a date the PDF prints with a two-digit year, as %s', (printed) => {
-    const draft = withChange((d) => (d.dueDate = '2023-08-09'));
-    expect(codesAt(draft, 'dueDate', { pdfText: `${pdfText}\nFällig ${printed}` })).toEqual([]);
-  });
+  it.each(['09.08.23', '9.8.23', '09/08/23', '08/09/23'])(
+    'finds a date the PDF prints with a two-digit year, as %s',
+    (printed) => {
+      const draft = withChange((d) => (d.dueDate = '2023-08-09'));
+      expect(codesAt(draft, 'dueDate', { pdfText: `${pdfText}\nFällig ${printed}` })).toEqual([]);
+    },
+  );
 
   it('warns about a unit price the PDF does not show', () => {
     const draft = withChange((d) => {
@@ -624,7 +652,10 @@ describe('check against the PDF text', () => {
   });
 
   it('finds a line name whose words are spread over several table rows', () => {
-    const wrapped = pdfText.replace('1  Beratung E-Rechnung   10 Std.   100,00 €   1.000,00 €', '1  Beratung   10 Std.   100,00 €   1.000,00 €\n   E-Rechnung');
+    const wrapped = pdfText.replace(
+      '1  Beratung E-Rechnung   10 Std.   100,00 €   1.000,00 €',
+      '1  Beratung   10 Std.   100,00 €   1.000,00 €\n   E-Rechnung',
+    );
     expect(check(sample(), { pdfText: wrapped }).findings).toEqual([]);
   });
 
@@ -652,7 +683,8 @@ describe('check with the XRechnung rules', () => {
       d.buyer.email = 'einkauf@beispiel.example';
       change(d);
     });
-  const found = (draft: InvoiceDraft) => check(draft, { rules: 'xrechnung' }).findings.map((f) => `${f.severity} ${f.path}: ${f.code}`);
+  const found = (draft: InvoiceDraft) =>
+    check(draft, { rules: 'xrechnung' }).findings.map((f) => `${f.severity} ${f.path}: ${f.code}`);
   const remove = (path: string) => (d: any) => {
     const keys = path.split('.');
     const last = keys.pop()!;
@@ -706,17 +738,23 @@ describe('check with the XRechnung rules', () => {
   it('reads a payment terms line that starts with # as a cash discount in the fixed form', () => {
     const terms = (paymentTerms: string) => found(xrechnung((d) => (d.paymentTerms = paymentTerms)));
     expect(terms('#Rabatt nach Vereinbarung')).toEqual(['error paymentTerms: xrechnung-payment-terms']);
-    expect(terms('Zahlbar in 30 Tagen.\n#SKONTO#TAGE=14#PROZENT=2#')).toEqual(['error paymentTerms: xrechnung-payment-terms']);
+    expect(terms('Zahlbar in 30 Tagen.\n#SKONTO#TAGE=14#PROZENT=2#')).toEqual([
+      'error paymentTerms: xrechnung-payment-terms',
+    ]);
     expect(terms('Zahlbar in 30 Tagen.\n#SKONTO#TAGE=14#PROZENT=2.00#')).toEqual([]);
     expect(terms('#SKONTO#TAGE=14#PROZENT=2.00#BASISBETRAG=1000.00#\nSonst 30 Tage netto.')).toEqual([]);
     expect(terms('Rechnung #42 zahlbar in 14 Tagen')).toEqual([]);
     // After the last #...# of the text the validator wants a line break, whatever that line is.
-    expect(terms('#SKONTO#TAGE=14#PROZENT=2.00#\nRechnungen #42 und #43 zahlbar in 30 Tagen')).toEqual(['error paymentTerms: xrechnung-payment-terms']);
+    expect(terms('#SKONTO#TAGE=14#PROZENT=2.00#\nRechnungen #42 und #43 zahlbar in 30 Tagen')).toEqual([
+      'error paymentTerms: xrechnung-payment-terms',
+    ]);
     expect(terms('Rechnungen #42 und #43 zahlbar in 30 Tagen\n  #SKONTO#TAGE=14#PROZENT=2.00#')).toEqual([]);
   });
 
   it('refuses a country of delivery, which XRechnung takes with city and postal code only', () => {
-    expect(found(xrechnung((d) => (d.deliveryCountry = 'AT')))).toEqual(['error deliveryCountry: xrechnung-delivery-address']);
+    expect(found(xrechnung((d) => (d.deliveryCountry = 'AT')))).toEqual([
+      'error deliveryCountry: xrechnung-delivery-address',
+    ]);
   });
 
   it('refuses an intra-community supply, which needs a delivery address the data cannot hold', () => {
@@ -731,8 +769,12 @@ describe('check with the XRechnung rules', () => {
 
   it('warns about what XRechnung only recommends', () => {
     expect(found(xrechnung((d) => (d.typeCode = '386')))).toEqual(['warning typeCode: xrechnung-type-code']);
-    expect(found(xrechnung((d) => (d.seller.phone = 'auf Anfrage')))).toEqual(['warning seller.phone: xrechnung-phone']);
-    expect(found(xrechnung((d) => (d.seller.email = 'rechnung@muster')))).toEqual(['warning seller.email: xrechnung-email']);
+    expect(found(xrechnung((d) => (d.seller.phone = 'auf Anfrage')))).toEqual([
+      'warning seller.phone: xrechnung-phone',
+    ]);
+    expect(found(xrechnung((d) => (d.seller.email = 'rechnung@muster')))).toEqual([
+      'warning seller.email: xrechnung-email',
+    ]);
     expect(
       check(
         xrechnung((d) => (d.typeCode = '386')),

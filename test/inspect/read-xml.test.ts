@@ -78,7 +78,11 @@ describe('readInvoiceXml returns what createEInvoice wrote', () => {
   it('for a credit note that names the invoice it refers to', async () => {
     const invoice = await roundTrip(
       sample((d) => {
-        Object.assign(d, { typeCode: '381', precedingInvoiceNumber: 'RE-2026-0040', precedingInvoiceDate: '2026-10-01' });
+        Object.assign(d, {
+          typeCode: '381',
+          precedingInvoiceNumber: 'RE-2026-0040',
+          precedingInvoiceDate: '2026-10-01',
+        });
         for (const line of d.lines) line.quantity = -line.quantity;
       }),
     );
@@ -90,8 +94,19 @@ describe('readInvoiceXml returns what createEInvoice wrote', () => {
       sample((d) => {
         Object.assign(d, { note: 'Vielen Dank für Ihren Auftrag.', buyerReference: '04011000-12345-06' });
         Object.assign(d.seller, { phone: '+49 30 1234567', contactName: 'Erika Muster', taxNumber: '12/345/67890' });
-        Object.assign(d.buyer, { name: 'Beispiel & Söhne AG', email: 'einkauf@beispiel.example', phone: '030 7654321', contactName: 'Max Kunde' });
-        Object.assign(d.lines[0], { description: 'Workshop <vor Ort>', quantity: 1.5, unit: 'DAY', unitPrice: 899.99, netAmount: 1349.99 });
+        Object.assign(d.buyer, {
+          name: 'Beispiel & Söhne AG',
+          email: 'einkauf@beispiel.example',
+          phone: '030 7654321',
+          contactName: 'Max Kunde',
+        });
+        Object.assign(d.lines[0], {
+          description: 'Workshop <vor Ort>',
+          quantity: 1.5,
+          unit: 'DAY',
+          unitPrice: 899.99,
+          netAmount: 1349.99,
+        });
       }),
     );
   });
@@ -208,7 +223,10 @@ describe('readInvoiceXml reads discounts and charges on the whole invoice', () =
   it('keeps an amount and leaves out a percentage that does not give it from the lines of its VAT group', async () => {
     // The XML takes 10 % of 200.00, which is 20.00; the lines of its VAT group come to 100.00.
     const xml = (await oneLine([{ percent: 20 }]))
-      .replace(/<ram:CalculationPercent>20(\.0+)?<\/ram:CalculationPercent>/, '<ram:CalculationPercent>10</ram:CalculationPercent>')
+      .replace(
+        /<ram:CalculationPercent>20(\.0+)?<\/ram:CalculationPercent>/,
+        '<ram:CalculationPercent>10</ram:CalculationPercent>',
+      )
       .replace('<ram:BasisAmount>100.00</ram:BasisAmount>', '<ram:BasisAmount>200.00</ram:BasisAmount>');
     const read = readInvoiceXml(xml);
     expect(read.invoice.discounts).toEqual([{ amount: 20, reason: '95', vatCategory: 'S', vatRate: 19 }]);
@@ -227,12 +245,17 @@ describe('readInvoiceXml reads discounts and charges on the whole invoice', () =
     ).replace(/<ram:CategoryTradeTax>[\s\S]*?<\/ram:CategoryTradeTax>/, '');
     const { invoice } = readInvoiceXml(xml);
     expect(invoice.discounts).toEqual([{ amount: 10, reason: '95' }]);
-    expect(check(invoice).findings).toContainEqual(expect.objectContaining({ path: 'discounts.0.vatRate', code: 'adjustment-group' }));
+    expect(check(invoice).findings).toContainEqual(
+      expect.objectContaining({ path: 'discounts.0.vatRate', code: 'adjustment-group' }),
+    );
   });
 
   it('names an entry whose percentage, base and amount disagree in the XML, whatever the lines say', async () => {
     // Base 50, 10 %, amount 10: against the lines (100.00) 10 % is 10 again, so only the XML shows the contradiction.
-    const xml = (await oneLine([{ percent: 10 }])).replace('<ram:BasisAmount>100.00</ram:BasisAmount>', '<ram:BasisAmount>50.00</ram:BasisAmount>');
+    const xml = (await oneLine([{ percent: 10 }])).replace(
+      '<ram:BasisAmount>100.00</ram:BasisAmount>',
+      '<ram:BasisAmount>50.00</ram:BasisAmount>',
+    );
     const read = readInvoiceXml(xml);
     expect(read.contradictions).toEqual(['discounts.0.percent']);
     expect(read.percentages).toEqual({});
@@ -254,7 +277,12 @@ describe('readInvoiceXml', () => {
         }),
       ),
     );
-    expect(invoice).toMatchObject({ number: '0042', buyerReference: '1e3', seller: { postalCode: '01067' }, buyer: { postalCode: '54321' } });
+    expect(invoice).toMatchObject({
+      number: '0042',
+      buyerReference: '1e3',
+      seller: { postalCode: '01067' },
+      buyer: { postalCode: '54321' },
+    });
     expect(invoice.lines?.[1]).toMatchObject({ quantity: 2, unitPrice: 249.5, netAmount: 499, vatRate: 19 });
   });
 
@@ -264,7 +292,8 @@ describe('readInvoiceXml', () => {
   });
 
   it('reads the purchase order number', async () => {
-    const order = '<ram:BuyerOrderReferencedDocument><ram:IssuerAssignedID>PO-0007</ram:IssuerAssignedID></ram:BuyerOrderReferencedDocument>';
+    const order =
+      '<ram:BuyerOrderReferencedDocument><ram:IssuerAssignedID>PO-0007</ram:IssuerAssignedID></ram:BuyerOrderReferencedDocument>';
     const xml = (await xmlOf(sample())).replace('</ram:BuyerTradeParty>', `</ram:BuyerTradeParty>${order}`);
     expect(readInvoiceXml(xml).invoice.orderReference).toBe('PO-0007');
   });
@@ -281,7 +310,10 @@ describe('readInvoiceXml', () => {
   });
 
   it('takes the VAT total in the invoice currency when a second one is given in the accounting currency', async () => {
-    const xml = (await xmlOf(sample())).replace('<ram:TaxTotalAmount ', '<ram:TaxTotalAmount currencyID="GBP">250.00</ram:TaxTotalAmount><ram:TaxTotalAmount ');
+    const xml = (await xmlOf(sample())).replace(
+      '<ram:TaxTotalAmount ',
+      '<ram:TaxTotalAmount currencyID="GBP">250.00</ram:TaxTotalAmount><ram:TaxTotalAmount ',
+    );
     expect(readInvoiceXml(xml).invoice.totals?.vat).toBe(284.81);
   });
 
@@ -336,6 +368,8 @@ describe('readInvoiceXml', () => {
   });
 
   it('refuses what is not well-formed XML', () => {
-    expect(() => readInvoiceXml('<rsm:CrossIndustryInvoice><ram:ID>1</rsm:CrossIndustryInvoice>')).toThrow(/not well-formed/);
+    expect(() => readInvoiceXml('<rsm:CrossIndustryInvoice><ram:ID>1</rsm:CrossIndustryInvoice>')).toThrow(
+      /not well-formed/,
+    );
   });
 });

@@ -14,7 +14,8 @@ import { extractLayout, extractText } from '../pdf/text.js';
 export const reason = (e: unknown) => (e instanceof Error ? e.message : String(e));
 export const readPdf = async (path: string) => new Uint8Array(await readFile(path));
 
-export const packageVersion = (): string => JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')).version;
+export const packageVersion = (): string =>
+  JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')).version;
 
 export async function readJson(path: string): Promise<InvoiceDraft> {
   const text = await readFile(path, 'utf8');
@@ -62,7 +63,8 @@ export async function createFile(
   profile?: CreateOptions['profile'],
 ): Promise<{ outputPath: string; findings: Finding[]; totals: Totals }> {
   const output = resolve(outputPath);
-  if (sameFile(output, pdfPath)) throw new Error('The output path is the input PDF. Choose another output path; the input is never overwritten.');
+  if (sameFile(output, pdfPath))
+    throw new Error('The output path is the input PDF. Choose another output path; the input is never overwritten.');
   if (!overwrite && existsSync(output)) throw Object.assign(new Error(`${output} already exists.`), { code: 'EEXIST' });
 
   const result = await createEInvoice({ pdf: await readPdf(pdfPath), invoice, profile });

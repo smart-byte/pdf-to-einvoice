@@ -44,7 +44,9 @@ export default defineConfig({
     {
       name: 'content-security-policy',
       apply: 'build',
-      transformIndexHtml: () => [{ tag: 'meta', attrs: { 'http-equiv': 'Content-Security-Policy', content: POLICY }, injectTo: 'head-prepend' }],
+      transformIndexHtml: () => [
+        { tag: 'meta', attrs: { 'http-equiv': 'Content-Security-Policy', content: POLICY }, injectTo: 'head-prepend' },
+      ],
     },
   ],
   root: page('.'),

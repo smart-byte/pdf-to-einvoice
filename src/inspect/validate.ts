@@ -57,8 +57,22 @@ export async function validateEInvoice(pdf: Uint8Array, options: { pdfText?: str
   findings.push(...contradictionFindings(contradictions));
   // A line may state what `check` knows nothing of, a surcharge for one: its total is then explained, see `adjustedLines`.
   const checked = check(invoice, { ...options, adjustedLines, percentages });
-  findings.push(...checked.findings.map((finding) => (finding.code === 'totals-mismatch' ? reworded(finding, invoice, checked.totals) : finding)));
-  return { isEInvoice, profile, xml, invoice, adjustedLines, contradictions, percentages, totals: checked.totals, findings };
+  findings.push(
+    ...checked.findings.map((finding) =>
+      finding.code === 'totals-mismatch' ? reworded(finding, invoice, checked.totals) : finding,
+    ),
+  );
+  return {
+    isEInvoice,
+    profile,
+    xml,
+    invoice,
+    adjustedLines,
+    contradictions,
+    percentages,
+    totals: checked.totals,
+    findings,
+  };
 }
 
 /** The data of the XML, and whether its profile is one built on EN 16931. */
@@ -76,7 +90,12 @@ function readXml(xml: string): { read?: ReturnType<typeof readInvoiceXml>; isEIn
   return {
     read,
     isEInvoice: false,
-    findings: [error('', 'profile', { declared: read.profile ? `the profile "${read.profile}"` : 'no profile', expected: EN16931 })],
+    findings: [
+      error('', 'profile', {
+        declared: read.profile ? `the profile "${read.profile}"` : 'no profile',
+        expected: EN16931,
+      }),
+    ],
   };
 }
 

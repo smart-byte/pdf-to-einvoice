@@ -12,7 +12,8 @@ export function setPath(object: any, path: string, value: unknown): void {
 }
 
 export const isEmpty = (value: unknown) => value === undefined || value === null || value === '';
-const hasContent = (lines: unknown) => Array.isArray(lines) && lines.some((line) => Object.values(line ?? {}).some((v) => !isEmpty(v)));
+const hasContent = (lines: unknown) =>
+  Array.isArray(lines) && lines.some((line) => Object.values(line ?? {}).some((v) => !isEmpty(v)));
 
 /**
  * Copies the values of `extra` into the draft, except where the user has already typed. With `onlyEmpty`, values
@@ -44,10 +45,13 @@ function toNumber(value: unknown): unknown {
   if (typeof value !== 'string') return value;
   const digits = value.replace(/[^\d,.-]/g, '');
   const decimal = Math.max(digits.lastIndexOf(','), digits.lastIndexOf('.'));
-  const number = Number(decimal < 0 ? digits : `${digits.slice(0, decimal).replace(/[,.]/g, '')}.${digits.slice(decimal + 1)}`);
+  const number = Number(
+    decimal < 0 ? digits : `${digits.slice(0, decimal).replace(/[,.]/g, '')}.${digits.slice(decimal + 1)}`,
+  );
   return Number.isFinite(number) && digits ? number : value;
 }
-const normalise = (line: any) => Object.fromEntries(Object.entries(line ?? {}).map(([k, v]) => [k, NUMERIC.test(k) ? toNumber(v) : v]));
+const normalise = (line: any) =>
+  Object.fromEntries(Object.entries(line ?? {}).map(([k, v]) => [k, NUMERIC.test(k) ? toNumber(v) : v]));
 /** Turns the number-like strings of a model answer into numbers, everywhere in the draft. */
 export const normaliseDraft = (draft: any): InvoiceDraft => ({
   ...draft,

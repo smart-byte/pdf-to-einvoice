@@ -42,7 +42,11 @@ function placesOf(path: string, on: Piece[]): Rect[] {
   const line = /^(lines\.\d+)\.(\w+)$/.exec(path);
   // The numbers of a line item are looked for next to its name: a "2" elsewhere on the page is not its quantity.
   // Known limit: the rate is looked for as "19 %" anywhere, since most invoices print it with the totals only; "7,5 %" is not found.
-  return !line || line[2] === 'name' ? find(value) : line[2] === 'vatRate' ? find(`${value} %`) : find(value, find(getPath(state.draft, `${line[1]}.name`)));
+  return !line || line[2] === 'name'
+    ? find(value)
+    : line[2] === 'vatRate'
+      ? find(`${value} %`)
+      : find(value, find(getPath(state.draft, `${line[1]}.name`)));
 }
 
 /** Marks on the page that is shown, where the values of the form are printed there. A value that stands on another page gets its mark when that page is shown. */
@@ -54,7 +58,12 @@ export function renderMarks(): void {
     for (const rect of rects) {
       const box = { left: `${rect.x}%`, top: `${rect.y}%`, width: `${rect.width}%`, height: `${rect.height}%` };
       const twin = taken.size === taken.add(Object.values(box).join()).size;
-      const mark = el('button', { type: 'button', className: `mark${twin ? ' mark--twin' : ''}`, tabIndex: -1, title: t('mark.title', { f: label }) });
+      const mark = el('button', {
+        type: 'button',
+        className: `mark${twin ? ' mark--twin' : ''}`,
+        tabIndex: -1,
+        title: t('mark.title', { f: label }),
+      });
       mark.dataset.for = path;
       Object.assign(mark.style, box);
       // How far down the page the mark is: the band of light uncovers it when it gets there.
@@ -69,7 +78,8 @@ export function renderMarks(): void {
     const path = input.dataset.path!;
     place(path, fieldLabel(path), placesOf(path, on));
   }
-  for (const key of ['net', 'vat', 'gross'] as const) place(`totals.${key}`, t(`t.${key}`), placesOf(`totals.${key}`, on));
+  for (const key of ['net', 'vat', 'gross'] as const)
+    place(`totals.${key}`, t(`t.${key}`), placesOf(`totals.${key}`, on));
   // A value printed inside another one, such as the due date in the sentence of the payment terms, lies on top of it:
   // both marks can be pointed at.
   const inside = (inner: Rect, outer: Rect) =>
@@ -86,7 +96,9 @@ export function renderMarks(): void {
 export function turnTo(path: string): void {
   const page = pageToShow(pagePieces, shown, (on) => placesOf(path, on).length > 0);
   if (page === undefined || page === shown) return;
-  void showPage(page).then(() => ($('#page-live').textContent = t('page.turned', { n: page + 1, f: fieldLabel(path) })));
+  void showPage(page).then(
+    () => ($('#page-live').textContent = t('page.turned', { n: page + 1, f: fieldLabel(path) })),
+  );
 }
 
 $('#form').addEventListener('focusin', (event) => {
@@ -159,7 +171,9 @@ async function drawPage(index: number): Promise<void> {
   wanted = index;
   const page = await pdf.doc.getPage(index + 1);
   const canvas = $<HTMLCanvasElement>('#preview');
-  const viewport = page.getViewport({ scale: (Math.min(720, canvas.parentElement!.clientWidth) / page.getViewport({ scale: 1 }).width) * devicePixelRatio });
+  const viewport = page.getViewport({
+    scale: (Math.min(720, canvas.parentElement!.clientWidth) / page.getViewport({ scale: 1 }).width) * devicePixelRatio,
+  });
   // The preview is not on the screen (another view is shown): it has no width to draw a page into.
   if (!viewport.width) return;
   // Drawn beside the stage and put on it when done: turning on while a page is still being drawn leaves no half page behind.
@@ -190,7 +204,8 @@ export async function preview(pdf: Uint8Array): Promise<void> {
   await showPage(0);
   // The other pages are read in the background, so that a value that stands on one of them can be turned to.
   void (async () => {
-    for (let index = 1; index < mine.doc.numPages && opened === mine; index++) pagePieces[index] ??= await piecesOf(await mine.doc.getPage(index + 1));
+    for (let index = 1; index < mine.doc.numPages && opened === mine; index++)
+      pagePieces[index] ??= await piecesOf(await mine.doc.getPage(index + 1));
   })().catch(() => {
     // The PDF was closed while its pages were read: nothing is left to read.
   });

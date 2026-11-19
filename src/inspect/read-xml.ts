@@ -6,7 +6,12 @@ type Node = Record<string, any> | string | undefined;
 
 // Every value stays a string, so "0042" or a postal code is not turned into a number; amounts are converted where
 // they are read. Character references such as &#228; are decoded only with htmlEntities.
-const parser = new XMLParser({ ignoreAttributes: false, removeNSPrefix: true, parseTagValue: false, htmlEntities: true });
+const parser = new XMLParser({
+  ignoreAttributes: false,
+  removeNSPrefix: true,
+  parseTagValue: false,
+  htmlEntities: true,
+});
 
 /**
  * The percentage of a discount or charge, without its sign. Some generators repeat the minus of a credit note there:
@@ -39,9 +44,11 @@ function number(node: Node, ...path: string[]): number | undefined {
 }
 
 /** CII dates are YYYYMMDD (format 102). Any other notation is passed on as it is and fails the date check. */
-const date = (node: Node, ...path: string[]) => text(node, ...path, 'DateTimeString')?.replace(/^(\d{4})(\d{2})(\d{2})$/, '$1-$2-$3');
+const date = (node: Node, ...path: string[]) =>
+  text(node, ...path, 'DateTimeString')?.replace(/^(\d{4})(\d{2})(\d{2})$/, '$1-$2-$3');
 
-const attribute = (node: Node, name: string): string | undefined => (typeof node === 'object' ? node[`@_${name}`] : undefined);
+const attribute = (node: Node, name: string): string | undefined =>
+  typeof node === 'object' ? node[`@_${name}`] : undefined;
 
 function party(node: Node, who: 'seller' | 'buyer') {
   const address = at(node, 'PostalTradeAddress');
@@ -61,7 +68,9 @@ function party(node: Node, who: 'seller' | 'buyer') {
     // Without any tax registration, the plain identifier of the seller is its tax ID (see BR-O-02 in ubl.ts).
     vatId: taxId('VA') ?? (/^[A-Z]{2}[A-Z0-9]{2,12}$/.test(plainId ?? '') ? plainId : undefined),
     taxNumber: taxId('FC') ?? (/^\d[\d/ -]{7,}$/.test(plainId ?? '') ? plainId : undefined),
-    email: text(contact, 'EmailURIUniversalCommunication', 'URIID') ?? (attribute(endpoint, 'schemeID') === 'EM' ? text(endpoint) : undefined),
+    email:
+      text(contact, 'EmailURIUniversalCommunication', 'URIID') ??
+      (attribute(endpoint, 'schemeID') === 'EM' ? text(endpoint) : undefined),
     phone: text(contact, 'TelephoneUniversalCommunication', 'CompleteNumber'),
     contactName: text(contact, 'PersonName'),
   };
@@ -92,7 +101,9 @@ function line(item: Node) {
 function lineOf(item: Node, currency: string | undefined) {
   const read = line(item);
   const entries = all(at(item, 'SpecifiedLineTradeSettlement'), 'SpecifiedTradeAllowanceCharge');
-  const perUnit = [undefined, 1].includes(number(item, 'SpecifiedLineTradeAgreement', 'NetPriceProductTradePrice', 'BasisQuantity'));
+  const perUnit = [undefined, 1].includes(
+    number(item, 'SpecifiedLineTradeAgreement', 'NetPriceProductTradePrice', 'BasisQuantity'),
+  );
   const [entry] = entries;
   if (entries.length !== 1 || text(entry, 'ChargeIndicator', 'Indicator') !== 'false' || !perUnit) {
     return { line: read, adjusted: entries.length > 0 || !perUnit, contradicts: false };
@@ -102,8 +113,12 @@ function lineOf(item: Node, currency: string | undefined) {
   const base = number(entry, 'BasisAmount');
   const slack = slackOf(currency);
   const agrees = (from: number | undefined, sign = 1) =>
-    from !== undefined && percent !== undefined && amount !== undefined && percentAgrees(from, sign * percent, amount, slack);
-  const ownBase = read.quantity !== undefined && read.unitPrice !== undefined ? lineBase(read.quantity, read.unitPrice) : undefined;
+    from !== undefined &&
+    percent !== undefined &&
+    amount !== undefined &&
+    percentAgrees(from, sign * percent, amount, slack);
+  const ownBase =
+    read.quantity !== undefined && read.unitPrice !== undefined ? lineBase(read.quantity, read.unitPrice) : undefined;
   const discount: Allowance = {
     ...(agrees(ownBase) ? { percent } : {}),
     ...(amount !== undefined ? { amount } : {}),
@@ -138,13 +153,20 @@ function adjustmentsOf(settlement: Node, lines: ReturnType<typeof line>[], curre
     const base = number(entry, 'BasisAmount');
     const vatCategory = text(entry, 'CategoryTradeTax', 'CategoryCode') as VatCategory | undefined;
     // Category O states no rate at all. Without any category (BR-32) there is no rate either, and no VAT group is guessed.
-    const vatRate = number(entry, 'CategoryTradeTax', 'RateApplicablePercent') ?? (vatCategory !== undefined ? 0 : undefined);
+    const vatRate =
+      number(entry, 'CategoryTradeTax', 'RateApplicablePercent') ?? (vatCategory !== undefined ? 0 : undefined);
     const agrees = (from: number | undefined, sign = 1) =>
-      from !== undefined && percent !== undefined && amount !== undefined && percentAgrees(from, sign * percent, amount, slack);
+      from !== undefined &&
+      percent !== undefined &&
+      amount !== undefined &&
+      percentAgrees(from, sign * percent, amount, slack);
     const group = lines.filter((l) => l.vatCategory === vatCategory && l.vatRate === vatRate);
     // Summed in millionths, never in floating point euros.
-    const ownBase = group.every((l) => l.netAmount !== undefined) ? Number(group.reduce((sum, l) => sum + micro(l.netAmount!), 0n)) / 1e6 : undefined;
-    if (percent !== undefined && base !== undefined && !agrees(base) && !(signed && agrees(base, -1))) read.contradictions.push(`${path}.percent`);
+    const ownBase = group.every((l) => l.netAmount !== undefined)
+      ? Number(group.reduce((sum, l) => sum + micro(l.netAmount!), 0n)) / 1e6
+      : undefined;
+    if (percent !== undefined && base !== undefined && !agrees(base) && !(signed && agrees(base, -1)))
+      read.contradictions.push(`${path}.percent`);
     else if (percent !== undefined && !agrees(ownBase)) read.percentages[path] = percent;
     read[list].push({
       ...(agrees(ownBase) ? { percent } : {}),
@@ -218,7 +240,10 @@ export function readInvoiceXml(xml: string): {
   return {
     profile: text(root, 'ExchangedDocumentContext', 'GuidelineSpecifiedDocumentContextParameter', 'ID'),
     adjustedLines: lines.flatMap((read, i) => (read.adjusted ? [i] : [])),
-    contradictions: [...lines.flatMap((read, i) => (read.contradicts ? [`lines.${i}.discount.percent`] : [])), ...contradictions],
+    contradictions: [
+      ...lines.flatMap((read, i) => (read.contradicts ? [`lines.${i}.discount.percent`] : [])),
+      ...contradictions,
+    ],
     percentages,
     invoice: {
       number: text(document, 'ID'),
@@ -226,8 +251,19 @@ export function readInvoiceXml(xml: string): {
       typeCode: text(document, 'TypeCode') as InvoiceType | undefined,
       currency,
       dueDate: date(terms, 'DueDateDateTime'),
-      deliveryDate: date(transaction, 'ApplicableHeaderTradeDelivery', 'ActualDeliverySupplyChainEvent', 'OccurrenceDateTime'),
-      deliveryCountry: text(transaction, 'ApplicableHeaderTradeDelivery', 'ShipToTradeParty', 'PostalTradeAddress', 'CountryID'),
+      deliveryDate: date(
+        transaction,
+        'ApplicableHeaderTradeDelivery',
+        'ActualDeliverySupplyChainEvent',
+        'OccurrenceDateTime',
+      ),
+      deliveryCountry: text(
+        transaction,
+        'ApplicableHeaderTradeDelivery',
+        'ShipToTradeParty',
+        'PostalTradeAddress',
+        'CountryID',
+      ),
       periodStart: date(settlement, 'BillingSpecifiedPeriod', 'StartDateTime'),
       periodEnd: date(settlement, 'BillingSpecifiedPeriod', 'EndDateTime'),
       buyerReference: text(agreement, 'BuyerReference'),

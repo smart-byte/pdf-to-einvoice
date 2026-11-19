@@ -61,12 +61,19 @@ const MONTH_NAMED = new RegExp(`\\b(?:im|für|for|in)\\s+${MONTH}\\s+(\\d{4})\\b
 export function readPeriod(text: string, rows: string[]): { periodStart?: string; periodEnd?: string } {
   const months = (year: string, from: number, to: number) => {
     if (from < 1 || to > 12) return undefined;
-    return { periodStart: `${year}-${pad(from)}-01`, periodEnd: `${year}-${pad(to)}-${new Date(Date.UTC(Number(year), to, 0)).getUTCDate()}` };
+    return {
+      periodStart: `${year}-${pad(from)}-01`,
+      periodEnd: `${year}-${pad(to)}-${new Date(Date.UTC(Number(year), to, 0)).getUTCDate()}`,
+    };
   };
   // "September 2026 bis Januar 2027": from the first day of the one month to the last day of the other.
   for (const { hit: m } of after(text, PERIOD_LABEL, MONTH_RANGE)) {
-    const [from, to] = [months(m[2]!, monthNumber(m[1]!), monthNumber(m[1]!)), months(m[4]!, monthNumber(m[3]!), monthNumber(m[3]!))];
-    if (from && to && from.periodStart < to.periodEnd) return { periodStart: from.periodStart, periodEnd: to.periodEnd };
+    const [from, to] = [
+      months(m[2]!, monthNumber(m[1]!), monthNumber(m[1]!)),
+      months(m[4]!, monthNumber(m[3]!), monthNumber(m[3]!)),
+    ];
+    if (from && to && from.periodStart < to.periodEnd)
+      return { periodStart: from.periodStart, periodEnd: to.periodEnd };
   }
   for (const { hit: m } of after(text, PERIOD_LABEL, PERIOD)) {
     const quarter = Number(m[1] ?? m[3]);
@@ -83,7 +90,8 @@ export function readPeriod(text: string, rows: string[]): { periodStart?: string
   }
   const titled = rows.findIndex((row) => cells(row).some((cell) => TITLE.test(cell)));
   const named =
-    rows.map((row) => MONTH_ROW.exec(row.trim())).find(Boolean) ?? (titled < 0 ? null : MONTH_NAMED.exec(`${rows[titled]}\n${rows[titled + 1] ?? ''}`));
+    rows.map((row) => MONTH_ROW.exec(row.trim())).find(Boolean) ??
+    (titled < 0 ? null : MONTH_NAMED.exec(`${rows[titled]}\n${rows[titled + 1] ?? ''}`));
   return (named && months(named[2]!, monthNumber(named[1]!), monthNumber(named[1]!))) || {};
 }
 
@@ -108,11 +116,20 @@ const NUMBER_LABEL = new RegExp(
 export function readNumber(searched: string, rows: string[]): { number?: string; dated?: string; beside?: string } {
   const date = (hit: RegExpExecArray | null | undefined) => (hit ? toIsoDate(hit, false) : undefined);
   // Digits in groups ("100 200 300") are one number.
-  const [labelled] = after(searched, NUMBER_LABEL, new RegExp(`${SEPARATOR}(\\d{2,4}(?: \\d{2,4})+(?=\\s{3}|$)|[A-Za-z0-9][\\w/.-]*\\d[\\w/-]*)`));
+  const [labelled] = after(
+    searched,
+    NUMBER_LABEL,
+    new RegExp(`${SEPARATOR}(\\d{2,4}(?: \\d{2,4})+(?=\\s{3}|$)|[A-Za-z0-9][\\w/.-]*\\d[\\w/-]*)`),
+  );
   const titles = rows.map(cells).filter((parts) => parts.some((cell) => TITLE.test(cell) || NAMED.test(cell)));
-  const dated = labelled && after(searched, new RegExp(`${escape(labelled.hit[1]!)}\\s+(?:vom|von|issued\\s+(?:at|on)|dated|du|of)`), DATE)[0]?.hit;
+  const dated =
+    labelled &&
+    after(searched, new RegExp(`${escape(labelled.hit[1]!)}\\s+(?:vom|von|issued\\s+(?:at|on)|dated|du|of)`), DATE)[0]
+      ?.hit;
   return {
-    number: labelled?.hit[1]!.replace(/ /g, '') ?? titles.flatMap((parts) => parts.map((cell) => NAMED.exec(cell)?.[2])).find(Boolean),
+    number:
+      labelled?.hit[1]!.replace(/ /g, '') ??
+      titles.flatMap((parts) => parts.map((cell) => NAMED.exec(cell)?.[2])).find(Boolean),
     dated: date(dated),
     beside: titles.flatMap((parts) => parts.map((cell) => date(DATE.exec(cell)))).find(Boolean),
   };
@@ -131,7 +148,8 @@ const LEITWEG_LABEL = /leitweg\w*[-\s]?(?:id|nr\.?|nummer)/;
 /** Coarse address, fine address and check digits, as a Leitweg-ID is built. */
 const LEITWEG = new RegExp(`${SEPARATOR}(\\d{2,12}(?:-[A-Za-z0-9]{1,30})?-\\d{2})(?![\\w-])`);
 /** What EN 16931 calls the field (BT-10). "Ihr Zeichen" or "Your reference" may be anything, often the number of an order. */
-const REFERENCE_LABEL = /referenz\s+des\s+käufers|käuferreferenz(?:-?\s?(?:nr\.?|nummer))?|buyer(?:['’]?s)?\s+reference/;
+const REFERENCE_LABEL =
+  /referenz\s+des\s+käufers|käuferreferenz(?:-?\s?(?:nr\.?|nummer))?|buyer(?:['’]?s)?\s+reference/;
 /** What stands in the cell after a label: three spaces start the next column. */
 const REST_OF_CELL = new RegExp(`${SEPARATOR}(\\S+(?: {1,2}\\S+)*)`);
 

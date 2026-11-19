@@ -29,6 +29,15 @@ interface State {
   percentages?: Record<string, number>;
 }
 export type Format = 'pdf' | 'xrechnung';
-export const state: State = { fileName: '', pdfText: '', draft: {}, touched: new Set(), fileFindings: [], mode: 'create', format: 'pdf', toCheck: new Map() };
+export const state: State = {
+  fileName: '',
+  pdfText: '',
+  draft: {},
+  touched: new Set(),
+  fileFindings: [],
+  mode: 'create',
+  format: 'pdf',
+  toCheck: new Map(),
+};
 /** The format the form is shown and checked for. An existing e-invoice is looked at as it is. */
 export const shownFormat = (): Format => (state.mode === 'validate' ? 'pdf' : state.format);

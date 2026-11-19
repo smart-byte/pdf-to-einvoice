@@ -38,7 +38,10 @@ export function keepWhatThePdfShows(draft: unknown, pdfText: string): InvoiceDra
   const edge = /^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu;
   const words = new Set(lower.split(/[\s,;·|]+/).flatMap((word) => [word, word.replace(edge, '')]));
   const text: Rule = (v) =>
-    typeof v === 'string' && v.split(/[\s,;]+/).every((word) => words.has(word.toLowerCase()) || words.has(word.toLowerCase().replace(edge, '')));
+    typeof v === 'string' &&
+    v
+      .split(/[\s,;]+/)
+      .every((word) => words.has(word.toLowerCase()) || words.has(word.toLowerCase().replace(edge, '')));
   const exact: Rule = (v) => typeof v === 'string' && shows([v]);
   const shaped =
     (pattern: RegExp): Rule =>
@@ -49,7 +52,11 @@ export function keepWhatThePdfShows(draft: unknown, pdfText: string): InvoiceDra
   // An amount has to stand on its own: "3.11" inside the date "03.11.2026" is not one.
   const amount: Rule = (v) =>
     typeof v === 'number' &&
-    amountSpellings(v).some((spelling) => new RegExp(`(?<![\\d.,])${escape(spelling)}(?![.,]?\\d)`).test(pdfText.replace(/(\d)[ \u00a0](?=\d{3}\b)/g, '$1')));
+    amountSpellings(v).some((spelling) =>
+      new RegExp(`(?<![\\d.,])${escape(spelling)}(?![.,]?\\d)`).test(
+        pdfText.replace(/(\d)[ \u00a0](?=\d{3}\b)/g, '$1'),
+      ),
+    );
   // A bare number is only believed where it stands on its own, not inside a longer one. "24.000" shows 24000.
   const count: Rule = (v) => {
     if (typeof v !== 'number') return false;
@@ -67,15 +74,21 @@ export function keepWhatThePdfShows(draft: unknown, pdfText: string): InvoiceDra
       if (d !== (which === 'first' ? 1 : new Date(Date.UTC(y, m, 0)).getUTCDate())) return false;
       const [mm, names] = [String(m).padStart(2, '0'), (MONTHS[m - 1] ?? []).map(escape).join('|')];
       // The month alone, not a day in it ("15. September 2026", "15.09.2026").
-      return new RegExp(`(?<!\\d\\.?\\s*)\\b(?:${names})\\.?\\s*${y}\\b|(?<![\\d./-])${mm}[./]${y}(?!\\d)|(?<![\\d-])${y}-${mm}(?![-\\d])`).test(lower);
+      return new RegExp(
+        `(?<!\\d\\.?\\s*)\\b(?:${names})\\.?\\s*${y}\\b|(?<![\\d./-])${mm}[./]${y}(?!\\d)|(?<![\\d-])${y}-${mm}(?![-\\d])`,
+      ).test(lower);
     };
-  const rate: Rule = (v) => typeof v === 'number' && new RegExp(`(?<![\\d.,])${escape(String(v)).replace('\\.', '[.,]')}(?:[.,]0+)?\\s?%`).test(pdfText);
+  const rate: Rule = (v) =>
+    typeof v === 'number' &&
+    new RegExp(`(?<![\\d.,])${escape(String(v)).replace('\\.', '[.,]')}(?:[.,]0+)?\\s?%`).test(pdfText);
   const country: Rule = (v, party) =>
     typeof v === 'string' &&
     ((COUNTRY_NAMES[v] ?? []).some((name) => lower.includes(name)) ||
       new RegExp(`\\b${escape(v)}-\\d`).test(pdfText) ||
       (typeof party.vatId === 'string' && party.vatId.startsWith(v) && shows([party.vatId])));
-  const currency: Rule = (v) => typeof v === 'string' && (new RegExp(`\\b${escape(v)}\\b`).test(pdfText) || pdfText.includes(CURRENCY_SIGNS[v] ?? '\0'));
+  const currency: Rule = (v) =>
+    typeof v === 'string' &&
+    (new RegExp(`\\b${escape(v)}\\b`).test(pdfText) || pdfText.includes(CURRENCY_SIGNS[v] ?? '\0'));
   const any: Rule = () => true;
 
   const party: Record<string, Rule> = {
@@ -88,7 +101,10 @@ export function keepWhatThePdfShows(draft: unknown, pdfText: string): InvoiceDra
     vatId: shaped(/^[A-Z]{2}[A-Z0-9]{2,12}$/),
     taxNumber: shaped(/^\d[\d/-]{7,}$/),
     email: shaped(/^[^@\s]+@[^@\s]+\.[^@\s]+$/),
-    phone: (v) => typeof v === 'string' && v.replace(/\D/g, '').length >= 6 && lower.replace(/\D/g, '').includes(v.replace(/\D/g, '')),
+    phone: (v) =>
+      typeof v === 'string' &&
+      v.replace(/\D/g, '').length >= 6 &&
+      lower.replace(/\D/g, '').includes(v.replace(/\D/g, '')),
   };
   const line: Record<string, Rule> = {
     name: text,

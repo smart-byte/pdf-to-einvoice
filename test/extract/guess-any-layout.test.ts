@@ -34,9 +34,21 @@ const parcel = {
   ].join('\n'),
   blocks: [
     ['Rechnung', 'Musterpost AG - 12345 Musterstadt', 'Erika Muster', 'Hauptstraße 5', '54321 Beispielstadt'],
-    ['Rechnungsnummer M0012345X', 'Kundennummer', 'Warenkorb ID 7ABC', 'Rechnungsdatum 21.10.2026', 'Auftragsdatum 20.10.2026'],
+    [
+      'Rechnungsnummer M0012345X',
+      'Kundennummer',
+      'Warenkorb ID 7ABC',
+      'Rechnungsdatum 21.10.2026',
+      'Auftragsdatum 20.10.2026',
+    ],
     ['Musterpost AG', '12345 Musterstadt'],
-    ['Kontoverbindung', 'Musterbank', 'Gläubiger-Identifikationsnummer:', 'DE98ZZZ09999999999', 'IBAN: DE02 1203 0000 0000 2020 51'],
+    [
+      'Kontoverbindung',
+      'Musterbank',
+      'Gläubiger-Identifikationsnummer:',
+      'DE98ZZZ09999999999',
+      'IBAN: DE02 1203 0000 0000 2020 51',
+    ],
     ['Sitz Musterstadt', 'Amtsgericht Musterstadt', 'HRB 12345', 'USt-ldNr.: DE 123456789', 'StNr 123/4567/8901'],
   ],
 };
@@ -157,7 +169,10 @@ const boutique = {
     'IBAN : FR76 3000 6000 0112 3456 7890 189 - BIC : AGRIFRPP',
   ].join('\n'),
   blocks: [
-    ['Moulin Exemple SARL - 1500 chemin des vignes - 84000 Villexemple - France', 'TVA : FR12345678901 - SIRET : 12345678900010'],
+    [
+      'Moulin Exemple SARL - 1500 chemin des vignes - 84000 Villexemple - France',
+      'TVA : FR12345678901 - SIRET : 12345678900010',
+    ],
     ['Facture FA-2026-0042'],
     ['Adresse de livraison', 'Boutique Exemple', '12 rue du Port', '13001 Villemodèle', 'France'],
     ['Boutique Exemple', 'Jeanne Exemple', '12 rue du Port', '13001 Villemodèle', 'France'],
@@ -193,9 +208,18 @@ describe('guessFromText with the blocks of the page', () => {
       issueDate: '2026-10-21',
       currency: 'EUR',
       iban: 'DE02120300000000202051',
-      seller: { name: 'Musterpost AG', postalCode: '12345', city: 'Musterstadt', country: 'DE', vatId: 'DE123456789', taxNumber: '123/4567/8901' },
+      seller: {
+        name: 'Musterpost AG',
+        postalCode: '12345',
+        city: 'Musterstadt',
+        country: 'DE',
+        vatId: 'DE123456789',
+        taxNumber: '123/4567/8901',
+      },
       buyer: { name: 'Erika Muster', street: 'Hauptstraße 5', postalCode: '54321', city: 'Beispielstadt' },
-      lines: [{ name: '5 kg - Paket - Inland', quantity: 1, unit: 'C62', unitPrice: 7.49, vatCategory: 'S', vatRate: 0 }],
+      lines: [
+        { name: '5 kg - Paket - Inland', quantity: 1, unit: 'C62', unitPrice: 7.49, vatCategory: 'S', vatRate: 0 },
+      ],
       totals: { net: 7.49, vat: 0, gross: 7.49 },
     });
   });
@@ -224,7 +248,13 @@ describe('guessFromText with the blocks of the page', () => {
         country: 'DE',
         vatId: 'DE123456789',
       },
-      buyer: { name: 'Erika Muster', street: 'Hauptstraße 5', postalCode: '54321', city: 'Beispielstadt', country: 'DE' },
+      buyer: {
+        name: 'Erika Muster',
+        street: 'Hauptstraße 5',
+        postalCode: '54321',
+        city: 'Beispielstadt',
+        country: 'DE',
+      },
       lines: [{ name: 'Monatspauschale', quantity: 1, unit: 'C62', unitPrice: 10, vatCategory: 'S', vatRate: 19 }],
       totals: { net: 10, vat: 1.9, gross: 11.9 },
     });
@@ -292,13 +322,33 @@ describe('guessFromText on parties under their labels', () => {
   });
 
   it('reads the name above a labelled value that stands inside the address', () => {
-    const text = ['Käufer :', 'Beispiel AG', 'Handelsname: 12345678900010', 'Erika Muster', 'Hauptstraße 5', 'DE 54321 Beispielstadt'];
+    const text = [
+      'Käufer :',
+      'Beispiel AG',
+      'Handelsname: 12345678900010',
+      'Erika Muster',
+      'Hauptstraße 5',
+      'DE 54321 Beispielstadt',
+    ];
     expect(guessFromText(text.join('\n')).buyer).toEqual({ ...BEISPIEL, contactName: 'Erika Muster', country: 'DE' });
   });
 
   it('takes the first line under a heading for the name, also above a person and a department', () => {
-    const text = ['Verkäufer:', 'Muster Software GmbH', 'Max Mustermann', 'Einkauf', 'Beispielweg 1', 'DE 12345 Musterstadt', 'Telefon : +49301234567'];
-    expect(guessFromText(text.join('\n')).seller).toEqual({ ...MUSTER, contactName: 'Max Mustermann', country: 'DE', phone: '+49301234567' });
+    const text = [
+      'Verkäufer:',
+      'Muster Software GmbH',
+      'Max Mustermann',
+      'Einkauf',
+      'Beispielweg 1',
+      'DE 12345 Musterstadt',
+      'Telefon : +49301234567',
+    ];
+    expect(guessFromText(text.join('\n')).seller).toEqual({
+      ...MUSTER,
+      contactName: 'Max Mustermann',
+      country: 'DE',
+      phone: '+49301234567',
+    });
   });
 
   it('does not take a line that holds an identifier for the name', () => {
@@ -339,19 +389,31 @@ describe('guessFromText on seller and buyer without labels', () => {
   });
 
   it('reads a sender line of two parts', () => {
-    expect(guessFromText('Musterpost AG - 12345 Musterstadt').seller).toEqual({ name: 'Musterpost AG', postalCode: '12345', city: 'Musterstadt' });
+    expect(guessFromText('Musterpost AG - 12345 Musterstadt').seller).toEqual({
+      name: 'Musterpost AG',
+      postalCode: '12345',
+      city: 'Musterstadt',
+    });
   });
 
   it('keeps a salutation and a second line with the legal form in the name', () => {
-    expect(guessFromText('Herrn\nErik Beispiel\nHauptstraße 5\n54321 Beispielstadt').buyer).toMatchObject({ name: 'Herrn Erik Beispiel' });
+    expect(guessFromText('Herrn\nErik Beispiel\nHauptstraße 5\n54321 Beispielstadt').buyer).toMatchObject({
+      name: 'Herrn Erik Beispiel',
+    });
     const insurer = 'Beispielhafte Hilfe\nVersicherungsverein Beispielstadt a.G.\nHauptstraße 5\n54321 Beispielstadt';
-    expect(guessFromText(insurer).buyer).toEqual({ ...BEISPIEL, name: 'Beispielhafte Hilfe Versicherungsverein Beispielstadt a.G.' });
+    expect(guessFromText(insurer).buyer).toEqual({
+      ...BEISPIEL,
+      name: 'Beispielhafte Hilfe Versicherungsverein Beispielstadt a.G.',
+    });
   });
 });
 
 describe('guessFromText on identifiers', () => {
   it('recognises a German VAT ID by its shape, without a label or with a misspelt one', () => {
-    expect(guessFromText('Amtsgericht Musterstadt · HRB 12345 · DE123456789').seller).toEqual({ vatId: 'DE123456789', country: 'DE' });
+    expect(guessFromText('Amtsgericht Musterstadt · HRB 12345 · DE123456789').seller).toEqual({
+      vatId: 'DE123456789',
+      country: 'DE',
+    });
     expect(guessFromText('USt-ldNr.: DE 123 456 789').seller).toEqual({ vatId: 'DE123456789', country: 'DE' });
   });
 
@@ -362,7 +424,9 @@ describe('guessFromText on identifiers', () => {
   });
 
   it('takes a VAT ID that is labelled as the customer’s for the buyer’s, never for the seller’s', () => {
-    expect(guessFromText('Customer VAT Number   ESB98765432')).toEqual({ buyer: { vatId: 'ESB98765432', country: 'ES' } });
+    expect(guessFromText('Customer VAT Number   ESB98765432')).toEqual({
+      buyer: { vatId: 'ESB98765432', country: 'ES' },
+    });
   });
 
   it('does not cut an IBAN down to a part that happens to pass the check', () => {
@@ -370,9 +434,17 @@ describe('guessFromText on identifiers', () => {
   });
 
   it('reads the number of a document whose title is not "Rechnung"', () => {
-    expect(guessFromText('Rechnungskorrektur Nr. RK-2026-7 vom 22.08.2026')).toEqual({ number: 'RK-2026-7', issueDate: '2026-08-22' });
-    expect(guessFromText('Gutschrift (Selbst ausgestellte Rechnung) Nr. 4711 vom\n09.04.2026')).toEqual({ number: '4711', issueDate: '2026-04-09' });
-    expect(guessFromText('Rechnung des Versicherers Nr. 12.345.678.9-2026-3 vom\n14.10.2026')).toMatchObject({ number: '12.345.678.9-2026-3' });
+    expect(guessFromText('Rechnungskorrektur Nr. RK-2026-7 vom 22.08.2026')).toEqual({
+      number: 'RK-2026-7',
+      issueDate: '2026-08-22',
+    });
+    expect(guessFromText('Gutschrift (Selbst ausgestellte Rechnung) Nr. 4711 vom\n09.04.2026')).toEqual({
+      number: '4711',
+      issueDate: '2026-04-09',
+    });
+    expect(guessFromText('Rechnung des Versicherers Nr. 12.345.678.9-2026-3 vom\n14.10.2026')).toMatchObject({
+      number: '12.345.678.9-2026-3',
+    });
   });
 
   it('does not take the number of an order for the number of the invoice', () => {
@@ -410,7 +482,10 @@ describe('guessFromText on totals', () => {
   });
 
   it('keeps net and gross where the VAT between them is printed in parts', () => {
-    expect(guessFromText('Netto 200,00\nMwSt. 19 % 19,00\nMwSt. 7 % 7,00\nGesamt 226,00').totals).toEqual({ net: 200, gross: 226 });
+    expect(guessFromText('Netto 200,00\nMwSt. 19 % 19,00\nMwSt. 7 % 7,00\nGesamt 226,00').totals).toEqual({
+      net: 200,
+      gross: 226,
+    });
   });
 
   it('does not believe a sum of other amounts against the labels', () => {
@@ -419,7 +494,9 @@ describe('guessFromText on totals', () => {
   });
 
   it('does not take the first cell of the next row for the value of a column heading', () => {
-    expect(guessFromText('Menge   Produkt   Preis   Gesamtbetrag\n1,00   Design   160,00 €   160,00 €').totals).toBeUndefined();
+    expect(
+      guessFromText('Menge   Produkt   Preis   Gesamtbetrag\n1,00   Design   160,00 €   160,00 €').totals,
+    ).toBeUndefined();
   });
 });
 
@@ -428,7 +505,9 @@ describe('guessFromText on payment terms', () => {
 
   it('reads the sentence that says when to pay, as it is printed', () => {
     expect(terms('Zahlbar innerhalb von 14 Tagen ohne Abzug.')).toBe('Zahlbar innerhalb von 14 Tagen ohne Abzug.');
-    expect(terms('Payment is due within 30 days of the invoice date.')).toBe('Payment is due within 30 days of the invoice date.');
+    expect(terms('Payment is due within 30 days of the invoice date.')).toBe(
+      'Payment is due within 30 days of the invoice date.',
+    );
     expect(terms('Paiement à 30 jours fin de mois.')).toBe('Paiement à 30 jours fin de mois.');
   });
 
@@ -438,15 +517,23 @@ describe('guessFromText on payment terms', () => {
   });
 
   it('joins a sentence that wraps into the next row', () => {
-    expect(terms('Bitte überweisen Sie den Rechnungsbetrag innerhalb von 14 Tagen', 'auf das unten genannte Konto.', 'Vielen Dank.')).toBe(
-      'Bitte überweisen Sie den Rechnungsbetrag innerhalb von 14 Tagen auf das unten genannte Konto.',
-    );
+    expect(
+      terms(
+        'Bitte überweisen Sie den Rechnungsbetrag innerhalb von 14 Tagen',
+        'auf das unten genannte Konto.',
+        'Vielen Dank.',
+      ),
+    ).toBe('Bitte überweisen Sie den Rechnungsbetrag innerhalb von 14 Tagen auf das unten genannte Konto.');
   });
 
   it('joins a row that ends in the middle of the terms with the next one, also where that starts with a capital', () => {
-    expect(terms('Zahlbar innerhalb 30 Tagen netto bis 04.12.2026, 3%', 'Skonto innerhalb 10 Tagen bis 14.11.2026', 'Zu- und Abschläge:')).toBe(
-      'Zahlbar innerhalb 30 Tagen netto bis 04.12.2026, 3% Skonto innerhalb 10 Tagen bis 14.11.2026',
-    );
+    expect(
+      terms(
+        'Zahlbar innerhalb 30 Tagen netto bis 04.12.2026, 3%',
+        'Skonto innerhalb 10 Tagen bis 14.11.2026',
+        'Zu- und Abschläge:',
+      ),
+    ).toBe('Zahlbar innerhalb 30 Tagen netto bis 04.12.2026, 3% Skonto innerhalb 10 Tagen bis 14.11.2026');
     expect(terms('Zahlbar sofort rein netto', 'Vielen Dank für Ihren Auftrag')).toBe('Zahlbar sofort rein netto');
   });
 
@@ -470,7 +557,14 @@ describe('guessFromText on table rows', () => {
       seller: { vatId: 'DE123456789', country: 'DE' },
       lines: [
         { name: 'Layout (hours)', quantity: 2, unit: 'C62', unitPrice: 90, vatCategory: 'S', vatRate: 7 },
-        { name: 'Stickers: various colours, ~ 50 mm', quantity: 300, unit: 'C62', unitPrice: 0.35, vatCategory: 'S', vatRate: 19 },
+        {
+          name: 'Stickers: various colours, ~ 50 mm',
+          quantity: 300,
+          unit: 'C62',
+          unitPrice: 0.35,
+          vatCategory: 'S',
+          vatRate: 19,
+        },
         { name: 'Flyer (pieces)', quantity: 500, unit: 'C62', unitPrice: 0.045, vatCategory: 'S', vatRate: 19 },
       ],
       totals: { net: 307.5, vat: 36.83, gross: 344.33 },
@@ -528,7 +622,11 @@ describe('guessFromText on table rows', () => {
   });
 
   it('does not take a subtotal at the end of a page or a carry-over at the start of the next for the end of the table', () => {
-    expect(names(overTwoPages(['Zwischensumme   500,00 €'], ['Übertrag   500,00 €']))).toEqual(['Wartung Januar', 'Wartung Februar', 'Wartung März']);
+    expect(names(overTwoPages(['Zwischensumme   500,00 €'], ['Übertrag   500,00 €']))).toEqual([
+      'Wartung Januar',
+      'Wartung Februar',
+      'Wartung März',
+    ]);
     expect(names(overTwoPages(['Übertrag   500,00 €'], ['Übertrag   500,00 €']))).toHaveLength(3);
   });
 
@@ -553,7 +651,11 @@ describe('guessFromText on table rows', () => {
       'Umsatzsteuer 19 %   38,00 €',
       'Gesamtbetrag   238,00 €',
     ].join('\n');
-    const blocks = [['Bezeichnung', 'Wartung Januar'], ['Vielen Dank für Ihren Auftrag'], ['Nettobetrag', 'Umsatzsteuer 19 %', 'Gesamtbetrag']];
+    const blocks = [
+      ['Bezeichnung', 'Wartung Januar'],
+      ['Vielen Dank für Ihren Auftrag'],
+      ['Nettobetrag', 'Umsatzsteuer 19 %', 'Gesamtbetrag'],
+    ];
     expect(names(text, blocks)).toEqual(['Wartung Januar']);
   });
 
@@ -563,7 +665,9 @@ describe('guessFromText on table rows', () => {
 
   it('takes the text below a row for its name, not the text above, when the row holds more than number and amount', () => {
     const text = 'Lieferung frei Haus\n2   5,00   3 Stk   15,00\n10-\nTage-Pass\nNettosumme   15,00';
-    expect(guessFromText(text).lines).toEqual([{ name: '10-Tage-Pass', quantity: 3, unit: 'C62', unitPrice: 5, vatCategory: 'S' }]);
+    expect(guessFromText(text).lines).toEqual([
+      { name: '10-Tage-Pass', quantity: 3, unit: 'C62', unitPrice: 5, vatCategory: 'S' },
+    ]);
   });
 
   it('reads no quantity that does not give the row total', () => {

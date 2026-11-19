@@ -24,7 +24,8 @@ export const monthNumber = (name: string) => MONTHS.findIndex((m) => new RegExp(
 export const cents = (n: number) => Math.round(n * 100);
 export const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 /** The index of the last item that passes the test, or -1. */
-export const lastIndex = <T>(items: T[], test: (item: T) => unknown) => items.reduce((last, item, i) => (test(item) ? i : last), -1);
+export const lastIndex = <T>(items: T[], test: (item: T) => unknown) =>
+  items.reduce((last, item, i) => (test(item) ? i : last), -1);
 
 export function toIsoDate(m: RegExpExecArray, dayFirst: boolean): string | undefined {
   if (m[1]) return `${m[1]}-${m[2]}-${m[3]}`;
@@ -101,12 +102,18 @@ export const CUSTOMER = /(?:customer|client|kunden?-?|käufers?|buyer(?:'s)?|ihr
 /** The VAT IDs of a text in the order they are printed, each once: after a label ("DE123456789", "DE 123 456 789") or by the German shape. */
 export function vatIdsIn(text: string): { id: string; customer: boolean }[] {
   const found = [
-    ...after(text, VAT_ID_LABEL, new RegExp(`${SEPARATOR}([A-Z]{2}(?: ?[A-Z0-9]){8,12})\\b`)).map(({ hit, label, at }) => ({
-      id: hit[1]!.replace(/ /g, ''),
-      at,
-      customer: CUSTOMER.test(text.slice(Math.max(0, at - 20), at)) || CUSTOMER.test(label),
+    ...after(text, VAT_ID_LABEL, new RegExp(`${SEPARATOR}([A-Z]{2}(?: ?[A-Z0-9]){8,12})\\b`)).map(
+      ({ hit, label, at }) => ({
+        id: hit[1]!.replace(/ /g, ''),
+        at,
+        customer: CUSTOMER.test(text.slice(Math.max(0, at - 20), at)) || CUSTOMER.test(label),
+      }),
+    ),
+    ...[...text.matchAll(GERMAN_VAT_ID)].map((match) => ({
+      id: match[0].replace(/ /g, ''),
+      at: match.index,
+      customer: false,
     })),
-    ...[...text.matchAll(GERMAN_VAT_ID)].map((match) => ({ id: match[0].replace(/ /g, ''), at: match.index, customer: false })),
   ].sort((a, b) => a.at - b.at);
   return found.filter((entry, i) => found.findIndex((other) => other.id === entry.id) === i);
 }

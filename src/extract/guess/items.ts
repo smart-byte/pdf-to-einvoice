@@ -64,7 +64,8 @@ function itemOf(parts: string[], table: number): Item {
   // A unit in a column of its own belongs to the quantity before it: "8   Std.".
   const before = parts.slice(numbered ? 1 : 0, -1).reduce<string[]>((joined, cell) => {
     const last = joined.at(-1);
-    if (last !== undefined && /^-?\d+(?:[.,]\d+)?$/.test(last) && UNITS.some(([pattern]) => pattern.test(cell))) joined[joined.length - 1] = `${last} ${cell}`;
+    if (last !== undefined && /^-?\d+(?:[.,]\d+)?$/.test(last) && UNITS.some(([pattern]) => pattern.test(cell)))
+      joined[joined.length - 1] = `${last} ${cell}`;
     else joined.push(cell);
     return joined;
   }, []);
@@ -80,20 +81,29 @@ function itemOf(parts: string[], table: number): Item {
   let others = figures.filter((figure) => figure.mark !== '%');
   // "10,00 €   1,90 €   11,90 €": net, VAT and gross of the row.
   const [net, vat] = others.filter((figure) => figure.money).slice(-2);
-  if (net && vat && cents(net.value) + cents(vat.value) === cents(item.total) && rateOf(net.value, vat.value) !== undefined) {
+  if (
+    net &&
+    vat &&
+    cents(net.value) + cents(vat.value) === cents(item.total) &&
+    rateOf(net.value, vat.value) !== undefined
+  ) {
     item.total = net.value;
     others = others.filter((figure) => figure !== net && figure !== vat);
   }
 
   // Nothing but the total, or the total once more: one unit at that price.
-  if (others.every((figure) => cents(figure.value) === cents(item.total))) return { ...item, quantity: 1, unit: 'C62', unitPrice: item.total };
+  if (others.every((figure) => cents(figure.value) === cents(item.total)))
+    return { ...item, quantity: 1, unit: 'C62', unitPrice: item.total };
   const isPrice = (figure: Figure) => IS_CURRENCY.test(figure.mark);
   const hasUnit = (figure: Figure) => figure.mark !== '' && !isPrice(figure);
   for (const [i, a] of others.entries()) {
     for (const b of others.slice(i + 1)) {
       if (Math.round(a.value * b.value * 100) !== cents(item.total)) continue;
       // Known limit: where neither a currency nor a unit nor a whole number tells, the quantity is taken to come first.
-      const swap = isPrice(a) || hasUnit(b) || (!hasUnit(a) && !isPrice(b) && !Number.isInteger(a.value) && Number.isInteger(b.value));
+      const swap =
+        isPrice(a) ||
+        hasUnit(b) ||
+        (!hasUnit(a) && !isPrice(b) && !Number.isInteger(a.value) && Number.isInteger(b.value));
       const [quantity, price] = swap ? [b, a] : [a, b];
       return { ...item, quantity: quantity.value, unit: unitOf(quantity.mark), unitPrice: price.value };
     }
@@ -138,7 +148,12 @@ function splitAmounts(cell: string): string[] {
 
 /** Joins the lines a text wraps into: with a space, or without one where a hyphen holds two of them together ("Wartungs-", "Vertrag"). */
 const unwrap = (lines: string[]) =>
-  lines.slice(1).reduce((text, line) => (/[\p{L}\d]-$/u.test(text) || /^-\p{L}/u.test(line) ? text + line : `${text} ${line}`), lines[0] ?? '');
+  lines
+    .slice(1)
+    .reduce(
+      (text, line) => (/[\p{L}\d]-$/u.test(text) || /^-\p{L}/u.test(line) ? text + line : `${text} ${line}`),
+      lines[0] ?? '',
+    );
 
 /**
  * The line items: rows with a name and an amount that add up to the printed total, wherever they stand. A
@@ -160,7 +175,9 @@ export function readItems(rows: string[], totals: Totals, blocks: string[][] | u
 
   // A rate that the rows do not carry is the one the totals name, if they name exactly one.
   const totalRates = new Set(
-    rows.filter((row) => TOTALS_ROW.test(row)).flatMap((row) => [...row.matchAll(/(\d{1,2}(?:[.,]\d+)?)\s?%/g)].map((m) => toNumber(m[1]!))),
+    rows
+      .filter((row) => TOTALS_ROW.test(row))
+      .flatMap((row) => [...row.matchAll(/(\d{1,2}(?:[.,]\d+)?)\s?%/g)].map((m) => toNumber(m[1]!))),
   );
   const onlyRate = totalRates.size === 1 ? [...totalRates][0] : undefined;
   const lines = run.map((item) => ({ ...item, vatRate: item.vatRate ?? onlyRate, net: cents(item.total) }));
@@ -208,7 +225,8 @@ function itemsThatAddUp(
   let open: Item | undefined;
   const heads = new Set<string>();
   const closeLoose = () => {
-    if (open && loose.length <= MAX_WRAPPED) open.name = unwrap([open.name, ...loose].filter((part): part is string => Boolean(part)));
+    if (open && loose.length <= MAX_WRAPPED)
+      open.name = unwrap([open.name, ...loose].filter((part): part is string => Boolean(part)));
     loose = [];
   };
   for (const row of rows) {
@@ -257,9 +275,15 @@ function itemsThatAddUp(
     // The same text may name several items: they stand in the blocks in the order of the rows.
     const nth = seen.get(item.cell) ?? 0;
     seen.set(item.cell, nth + 1);
-    const place = blocks.flatMap((block) => block.flatMap((line, i) => (line === item.cell ? [{ block, i }] : [])))[nth];
+    const place = blocks.flatMap((block) => block.flatMap((line, i) => (line === item.cell ? [{ block, i }] : [])))[
+      nth
+    ];
     const more: string[] = [];
-    for (let k = (place?.i ?? 0) + 1; place && more.length < MAX_WRAPPED && item.below.includes(place.block[k]!) && !KEY_VALUE.test(place.block[k]!); k++)
+    for (
+      let k = (place?.i ?? 0) + 1;
+      place && more.length < MAX_WRAPPED && item.below.includes(place.block[k]!) && !KEY_VALUE.test(place.block[k]!);
+      k++
+    )
       more.push(place.block[k]!);
     // Where the block of the name is known, it says what the name is: text below it in another column is none of it.
     if (place) item.name = unwrap([item.cell, ...more]);
@@ -273,7 +297,10 @@ function itemsThatAddUp(
 
 /** What the printed reason for charging no VAT says the sale is. The exemptions of § 4 UStG other than 1a and 1b are E. */
 export const NOTE_CATEGORIES: [RegExp, VatCategory][] = [
-  [/innergemeinschaftlich\w*\s+(?:waren)?lieferung|intra-?community\s+(?:supply|delivery)|livraison\s+intracommunautaire|§\s?4\s?nr\.?\s?1\s?b\b/i, 'K'],
+  [
+    /innergemeinschaftlich\w*\s+(?:waren)?lieferung|intra-?community\s+(?:supply|delivery)|livraison\s+intracommunautaire|§\s?4\s?nr\.?\s?1\s?b\b/i,
+    'K',
+  ],
   [/ausfuhr\w*|\bexport(?:s|ed)?\b|exportation|§\s?4\s?nr\.?\s?1\s?a\b/i, 'G'],
   [/steuerschuldnerschaft|reverse[- ]charge|autoliquidation|§\s?13b/i, 'AE'],
   [/kleinunternehmer|§\s?19\b|§\s?4\s?nr\.?\s?\d/i, 'E'],
@@ -284,7 +311,9 @@ export const NOTE_CATEGORIES: [RegExp, VatCategory][] = [
 export function readVatNote(rows: string[]): string | undefined {
   const start = rows.findIndex(
     (row) =>
-      /\b(vat|umsatzsteuer|mehrwertsteuer|steuerschuld\w*|reverse[- ]charge|steuerfrei\w*|steuerbefreit\w*|nicht steuerbar)\b|§\s?\d+\w*\s.*ustg/i.test(row) &&
+      /\b(vat|umsatzsteuer|mehrwertsteuer|steuerschuld\w*|reverse[- ]charge|steuerfrei\w*|steuerbefreit\w*|nicht steuerbar)\b|§\s?\d+\w*\s.*ustg/i.test(
+        row,
+      ) &&
       !TOTALS_ROW.test(row) &&
       !cells(row).some(senderOf) &&
       !/\b[A-Z]{2} ?\d[\d ]{7,}/.test(row),
@@ -292,7 +321,11 @@ export function readVatNote(rows: string[]): string | undefined {
   if (start < 0) return undefined;
   const note = [rows[start]!.replace(/^\s*(note|hinweis|anmerkung)\s*:\s*/i, '')];
   // The sentence goes on while a row starts in lower case and the one before it did not end.
-  for (let i = start + 1; i < rows.length && note.length <= MAX_WRAPPED && !/[.!?]$/.test(note.at(-1)!) && /^[\p{Ll}\d§(]/u.test(rows[i]!); i++)
+  for (
+    let i = start + 1;
+    i < rows.length && note.length <= MAX_WRAPPED && !/[.!?]$/.test(note.at(-1)!) && /^[\p{Ll}\d§(]/u.test(rows[i]!);
+    i++
+  )
     note.push(rows[i]!);
   return note.join(' ').replace(/\s+/g, ' ').trim();
 }

@@ -91,7 +91,9 @@ function linesInCents(lines: Line[]) {
     const amount = l.discount.amount != null ? toCents(l.discount.amount) : percentCents(base, l.discount.percent ?? 0);
     return { base, amount };
   });
-  const lineCents = lines.map((l, i) => (l.netAmount != null ? toCents(l.netAmount) : baseCents(l.quantity, l.unitPrice) - (discounts[i]?.amount ?? 0n)));
+  const lineCents = lines.map((l, i) =>
+    l.netAmount != null ? toCents(l.netAmount) : baseCents(l.quantity, l.unitPrice) - (discounts[i]?.amount ?? 0n),
+  );
   return { discounts, lineCents };
 }
 
@@ -132,7 +134,8 @@ interface Placed {
 const LISTS = ['discounts', 'charges'] as const;
 const WHAT = { discounts: 'discount', charges: 'charge' } as const;
 
-const pathOf = (list: List, index: number, field?: string) => (field ? `${list}.${index}.${field}` : `${list}.${index}`);
+const pathOf = (list: List, index: number, field?: string) =>
+  field ? `${list}.${index}.${field}` : `${list}.${index}`;
 
 /** The lines summed by VAT category and rate, in the order the groups first appear. */
 function groupLines(lines: Line[], lineCents: bigint[]): Group[] {
@@ -178,12 +181,22 @@ function checkEntry(raw: unknown, list: List, index: number): { checked?: Checke
     if (category === undefined && e.vatRate > 0) category = 'S';
     if (e.vatRate < 0) refuse(at('vatRate'), 'vat-rate.negative');
     else if (category === 'S' && e.vatRate === 0) refuse(at('vatRate'), 'vat-rate.standard');
-    else if (category !== undefined && category !== 'S' && e.vatRate !== 0) refuse(at('vatRate'), 'vat-rate.zero', { category });
+    else if (category !== undefined && category !== 'S' && e.vatRate !== 0)
+      refuse(at('vatRate'), 'vat-rate.zero', { category });
   }
   if (!usable) return { problems };
 
   const rate: number | undefined = category !== undefined && category !== 'S' ? 0 : e.vatRate;
-  const checked = { list, index, category, rate, vatRate: e.vatRate, percent: e.percent, amount: e.amount, reason: e.reason } as Checked;
+  const checked = {
+    list,
+    index,
+    category,
+    rate,
+    vatRate: e.vatRate,
+    percent: e.percent,
+    amount: e.amount,
+    reason: e.reason,
+  } as Checked;
   return { checked, problems };
 }
 
@@ -198,7 +211,11 @@ function placePercent(entry: Checked & { percent: number }, matching: Group[], n
   if (!matching.length) {
     return {
       entries: [],
-      problems: [error(at(entry.vatRate !== undefined ? 'vatRate' : 'vatCategory'), 'adjustment-group.percent', { group: named })],
+      problems: [
+        error(at(entry.vatRate !== undefined ? 'vatRate' : 'vatCategory'), 'adjustment-group.percent', {
+          group: named,
+        }),
+      ],
       placed: false,
     };
   }
@@ -211,7 +228,13 @@ function placePercent(entry: Checked & { percent: number }, matching: Group[], n
       const part = parts[0]!;
       if (!percentAgrees(fromCents(part.g.cents), percent, fromCents(stated), slack)) {
         problems.push(
-          error(at('amount'), 'adjustment-mismatch', { percent, base: money(part.g.cents), expected: money(part.cents), what, stated: money(stated) }),
+          error(at('amount'), 'adjustment-mismatch', {
+            percent,
+            base: money(part.g.cents),
+            expected: money(part.cents),
+            what,
+            stated: money(stated),
+          }),
         );
       }
       // The stated amount is the one written, as on a line.
@@ -231,7 +254,16 @@ function placePercent(entry: Checked & { percent: number }, matching: Group[], n
       }
     }
   }
-  const entries = parts.map((p) => ({ list, index, category: p.g.category, rate: p.g.rate, cents: p.cents, base: p.g.cents, percent, reason: entry.reason }));
+  const entries = parts.map((p) => ({
+    list,
+    index,
+    category: p.g.category,
+    rate: p.g.rate,
+    cents: p.cents,
+    base: p.g.cents,
+    percent,
+    reason: entry.reason,
+  }));
   return { entries, problems, placed: true };
 }
 
@@ -246,11 +278,17 @@ function placeAmount(entry: Checked & { amount: number }, matching: Group[], nam
   if (matching.length > 1) {
     return {
       entries: [],
-      problems: [error(where, 'adjustment-group.several', { groups: matching.map((g) => `${g.category} ${g.rate} %`).join(', '), what })],
+      problems: [
+        error(where, 'adjustment-group.several', {
+          groups: matching.map((g) => `${g.category} ${g.rate} %`).join(', '),
+          what,
+        }),
+      ],
       placed: false,
     };
   }
-  const group = matching[0] ?? (category !== undefined && rate !== undefined ? { category, rate, cents: 0n } : undefined);
+  const group =
+    matching[0] ?? (category !== undefined && rate !== undefined ? { category, rate, cents: 0n } : undefined);
   if (!group) {
     return {
       entries: [],
@@ -264,15 +302,23 @@ function placeAmount(entry: Checked & { amount: number }, matching: Group[], nam
   if (group.cents !== 0n && stated !== 0n && group.cents < 0n !== stated < 0n) {
     problems.push(warning(pathOf(list, index, 'amount'), 'adjustment-sign', { what }));
   }
-  return { entries: [{ list, index, category: group.category, rate: group.rate, cents: stated, reason: entry.reason }], problems, placed: true };
+  return {
+    entries: [{ list, index, category: group.category, rate: group.rate, cents: stated, reason: entry.reason }],
+    problems,
+    placed: true,
+  };
 }
 
 /** One checked entry into the VAT groups its category and rate match: by percentage or by amount. */
 function place(entry: Checked, groups: Group[], slack: number): Placed {
   const { category, rate } = entry;
-  const matching = groups.filter((g) => (category === undefined || g.category === category) && (rate === undefined || g.rate === rate));
+  const matching = groups.filter(
+    (g) => (category === undefined || g.category === category) && (rate === undefined || g.rate === rate),
+  );
   const named = [category, rate !== undefined ? `${rate} %` : undefined].filter(Boolean).join(' ');
-  return entry.percent !== undefined ? placePercent(entry, matching, named, slack) : placeAmount(entry, matching, named);
+  return entry.percent !== undefined
+    ? placePercent(entry, matching, named, slack)
+    : placeAmount(entry, matching, named);
 }
 
 /**
@@ -324,7 +370,10 @@ const adjustmentOf = ({ cents, base, percent, reason, ...entry }: Entry): Adjust
  * them. `resolved` is false while any of them cannot be placed; `calculate` then refuses the invoice. Never throws.
  * With `lines` false (their numbers are not all there yet) only what each entry needs by itself is checked.
  */
-export function resolveAdjustments(invoice: Adjustable, lines = true): { adjustments: Adjustment[]; problems: Finding[]; resolved: boolean } {
+export function resolveAdjustments(
+  invoice: Adjustable,
+  lines = true,
+): { adjustments: Adjustment[]; problems: Finding[]; resolved: boolean } {
   const { entries, problems, resolved } = resolve(invoice, lines ? linesInCents(invoice.lines).lineCents : undefined);
   return { adjustments: entries.map(adjustmentOf), problems, resolved };
 }

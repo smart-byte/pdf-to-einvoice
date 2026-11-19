@@ -62,7 +62,13 @@ describe('guessFromText on the layout of a German invoice', () => {
   });
 
   it('takes the country of the buyer from the seller when VAT is charged and the address names none', () => {
-    expect(guessFromText(hours).buyer).toEqual({ name: 'Beispiel AG', street: 'Hauptstraße 5', postalCode: '54321', city: 'Beispielstadt', country: 'DE' });
+    expect(guessFromText(hours).buyer).toEqual({
+      name: 'Beispiel AG',
+      street: 'Hauptstraße 5',
+      postalCode: '54321',
+      city: 'Beispielstadt',
+      country: 'DE',
+    });
   });
 
   it('reads a slashed date after a German label as day first', () => {
@@ -75,7 +81,14 @@ describe('guessFromText on the layout of a German invoice', () => {
 
   it('reads a table row without quantity and price as one unit at the row total, joined with the row it wraps into', () => {
     expect(guessFromText(royalties).lines).toEqual([
-      { name: 'Lizenzgebühren gemäß Report für das 2. Quartal 2026 Beispielspiel', quantity: 1, unit: 'C62', unitPrice: 351.41, vatCategory: 'S', vatRate: 7 },
+      {
+        name: 'Lizenzgebühren gemäß Report für das 2. Quartal 2026 Beispielspiel',
+        quantity: 1,
+        unit: 'C62',
+        unitPrice: 351.41,
+        vatCategory: 'S',
+        vatRate: 7,
+      },
     ]);
   });
 
@@ -107,7 +120,10 @@ describe('guessFromText on the layout of a German invoice', () => {
   });
 
   it('reads a row that holds nothing but a month as the service period', () => {
-    expect(guessFromText('Beispiel AG\nDecember 2024\nInvoice 2410')).toMatchObject({ periodStart: '2024-12-01', periodEnd: '2024-12-31' });
+    expect(guessFromText('Beispiel AG\nDecember 2024\nInvoice 2410')).toMatchObject({
+      periodStart: '2024-12-01',
+      periodEnd: '2024-12-31',
+    });
   });
 
   it('does not take a month inside a sentence, or one that does not exist, for a service period', () => {
@@ -121,7 +137,9 @@ describe('languageOf', () => {
   });
 
   it('recognises an English invoice', () => {
-    expect(languageOf('Invoice No: INV-7\nInvoice date: November 3, 2026\nSubtotal $1,499.00\nTotal amount due $1,499.00')).toBe('en');
+    expect(
+      languageOf('Invoice No: INV-7\nInvoice date: November 3, 2026\nSubtotal $1,499.00\nTotal amount due $1,499.00'),
+    ).toBe('en');
   });
 
   it('falls back to English when the text gives no clue', () => {

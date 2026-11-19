@@ -10,7 +10,8 @@ const require = createRequire(import.meta.url);
 const here = (path) => new URL(path, import.meta.url);
 const invoice = JSON.parse(readFileSync(here('../examples/sample-invoice.json'), 'utf8'));
 
-const money = (n) => `${new Intl.NumberFormat('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n)} €`;
+const money = (n) =>
+  `${new Intl.NumberFormat('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n)} €`;
 const day = (iso) => iso.split('-').reverse().join('.');
 const UNITS = { HUR: 'Std.', C62: 'Stk.' };
 
@@ -26,7 +27,8 @@ const muted = rgb(0.39, 0.44, 0.39);
 const accent = rgb(0.91, 0.4, 0.21);
 const text = (s, x, y, { size = 9.5, f = regular, color = ink, right = false } = {}) =>
   page.drawText(s, { x: right ? x - f.widthOfTextAtSize(s, size) : x, y, size, font: f, color });
-const rule = (y, color = rgb(0.88, 0.9, 0.85)) => page.drawLine({ start: { x: 56, y }, end: { x: 539, y }, thickness: 0.8, color });
+const rule = (y, color = rgb(0.88, 0.9, 0.85)) =>
+  page.drawLine({ start: { x: 56, y }, end: { x: 539, y }, thickness: 0.8, color });
 
 const { seller, buyer } = invoice;
 page.drawRectangle({ x: 56, y: 770, width: 18, height: 18, color: accent });
@@ -78,8 +80,14 @@ y -= 34;
 
 text(`${invoice.paymentTerms} Fällig am ${day(invoice.dueDate)}.`, 56, y - 30);
 rule(86);
-text(`${seller.name} · ${seller.street} · ${seller.postalCode} ${seller.city} · ${seller.email}`, 56, 70, { size: 7.5, color: muted });
-text(`IBAN ${invoice.iban.replace(/(.{4})/g, '$1 ').trim()} · BIC ${invoice.bic} · USt-IdNr. ${seller.vatId}`, 56, 58, { size: 7.5, color: muted });
+text(`${seller.name} · ${seller.street} · ${seller.postalCode} ${seller.city} · ${seller.email}`, 56, 70, {
+  size: 7.5,
+  color: muted,
+});
+text(`IBAN ${invoice.iban.replace(/(.{4})/g, '$1 ').trim()} · BIC ${invoice.bic} · USt-IdNr. ${seller.vatId}`, 56, 58, {
+  size: 7.5,
+  color: muted,
+});
 
 doc.setTitle(`Rechnung ${invoice.number}`);
 writeFileSync(here('../examples/sample-invoice.pdf'), await doc.save());

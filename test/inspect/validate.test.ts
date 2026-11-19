@@ -63,7 +63,10 @@ describe('validateEInvoice', () => {
 
   it('reports a PDF without invoice XML and stops', async () => {
     const result = await validateEInvoice(samplePdf(), { pdfText: await extractText(samplePdf()) });
-    expect(result).toEqual({ isEInvoice: false, findings: [expect.objectContaining({ severity: 'error', code: 'no-xml' })] });
+    expect(result).toEqual({
+      isEInvoice: false,
+      findings: [expect.objectContaining({ severity: 'error', code: 'no-xml' })],
+    });
   });
 
   it('reports a value of the XML that the visible PDF does not show', async () => {
@@ -93,7 +96,10 @@ describe('validateEInvoice', () => {
       const xml = (await create()).xml;
       const changed = xml
         .replace(/<ram:ChargeAmount>100(\.0+)?<\/ram:ChargeAmount>/, '<ram:ChargeAmount>115.00</ram:ChargeAmount>')
-        .replace('<ram:SpecifiedTradeSettlementLineMonetarySummation>', `${extra}<ram:SpecifiedTradeSettlementLineMonetarySummation>`);
+        .replace(
+          '<ram:SpecifiedTradeSettlementLineMonetarySummation>',
+          `${extra}<ram:SpecifiedTradeSettlementLineMonetarySummation>`,
+        );
       expect(changed).not.toBe(xml);
       return validateEInvoice(await pdfCarrying(changed));
     };
@@ -131,7 +137,9 @@ describe('validateEInvoice', () => {
   });
 
   it('reports XML that is not a Cross Industry Invoice', async () => {
-    const result = await validateEInvoice(await pdfCarrying('<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"/>'));
+    const result = await validateEInvoice(
+      await pdfCarrying('<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"/>'),
+    );
     expect(result.isEInvoice).toBe(false);
     expect(result.invoice).toBeUndefined();
     expect(result.findings[0]).toMatchObject({ severity: 'error', code: 'xml-syntax' });
@@ -148,7 +156,9 @@ describe('validateEInvoice', () => {
       )
     ).xml.replace('<ram:BasisAmount>100.00</ram:BasisAmount>', '<ram:BasisAmount>50.00</ram:BasisAmount>');
     const result = await validateEInvoice(await pdfCarrying(xml));
-    expect(result.findings).toContainEqual(expect.objectContaining({ path: 'lines.0.discount.percent', code: 'xml-discount', severity: 'error' }));
+    expect(result.findings).toContainEqual(
+      expect.objectContaining({ path: 'lines.0.discount.percent', code: 'xml-discount', severity: 'error' }),
+    );
   });
 
   it('reports base 50, 10 % and an amount of 40', async () => {
@@ -185,7 +195,10 @@ describe('validateEInvoice', () => {
         }),
       )
     ).xml
-      .replace(/<ram:CalculationPercent>20(\.0+)?<\/ram:CalculationPercent>/, '<ram:CalculationPercent>10</ram:CalculationPercent>')
+      .replace(
+        /<ram:CalculationPercent>20(\.0+)?<\/ram:CalculationPercent>/,
+        '<ram:CalculationPercent>10</ram:CalculationPercent>',
+      )
       .replace('<ram:BasisAmount>100.00</ram:BasisAmount>', '<ram:BasisAmount>200.00</ram:BasisAmount>');
     const result = await validateEInvoice(await pdfCarrying(xml));
     expect(codes(result.findings)).not.toContain('xml-discount');
@@ -213,7 +226,9 @@ describe('validateEInvoice', () => {
       });
 
     it('reads freight that the profile EXTENDED states as a logistics service charge as a charge', async () => {
-      const created = await create(oneLine(100, (d) => (d.charges = [{ amount: 15, reason: 'Transportkosten', vatRate: 19 }])));
+      const created = await create(
+        oneLine(100, (d) => (d.charges = [{ amount: 15, reason: 'Transportkosten', vatRate: 19 }])),
+      );
       const xml = created.xml.replace(
         /<ram:SpecifiedTradeAllowanceCharge>[\s\S]*?<\/ram:SpecifiedTradeAllowanceCharge>/,
         '<ram:SpecifiedLogisticsServiceCharge><ram:Description>Transportkosten</ram:Description><ram:AppliedAmount>15.00</ram:AppliedAmount>' +
@@ -221,7 +236,9 @@ describe('validateEInvoice', () => {
       );
       expect(xml).not.toContain('SpecifiedTradeAllowanceCharge');
       const result = await validateEInvoice(await pdfCarrying(xml));
-      expect(result.invoice?.charges).toEqual([{ amount: 15, reason: 'Transportkosten', vatCategory: 'S', vatRate: 19 }]);
+      expect(result.invoice?.charges).toEqual([
+        { amount: 15, reason: 'Transportkosten', vatCategory: 'S', vatRate: 19 },
+      ]);
       expect(codes(result.findings)).not.toContain('totals-mismatch');
     });
 
@@ -242,9 +259,15 @@ describe('validateEInvoice', () => {
     });
 
     it('accepts its own e-invoice with both, in forints too, where a discount is half a forint off its percentage', async () => {
-      const both = await create(oneLine(100, (d) => Object.assign(d, { discounts: [{ percent: 10 }], charges: [{ amount: 5, reason: 'Fracht' }] })));
+      const both = await create(
+        oneLine(100, (d) =>
+          Object.assign(d, { discounts: [{ percent: 10 }], charges: [{ amount: 5, reason: 'Fracht' }] }),
+        ),
+      );
       expect((await validateEInvoice(both.pdf)).findings.filter((f) => f.severity === 'error')).toEqual([]);
-      const forints = await create(oneLine(4990, (d) => Object.assign(d, { currency: 'HUF', discounts: [{ percent: 10, amount: 499.5 }] })));
+      const forints = await create(
+        oneLine(4990, (d) => Object.assign(d, { currency: 'HUF', discounts: [{ percent: 10, amount: 499.5 }] })),
+      );
       expect(codes((await validateEInvoice(forints.pdf)).findings)).not.toContain('xml-discount');
       expect(codes((await validateEInvoice(forints.pdf)).findings)).not.toContain('adjustment-mismatch');
     });
@@ -255,7 +278,9 @@ describe('validateEInvoice', () => {
         '<ram:BasisAmount>50.00</ram:BasisAmount>',
       );
       const result = await validateEInvoice(await pdfCarrying(xml));
-      expect(result.findings).toContainEqual(expect.objectContaining({ path: 'discounts.0.percent', code: 'xml-discount', severity: 'error' }));
+      expect(result.findings).toContainEqual(
+        expect.objectContaining({ path: 'discounts.0.percent', code: 'xml-discount', severity: 'error' }),
+      );
       expect(result.contradictions).toEqual(['discounts.0.percent']);
     });
 
@@ -264,7 +289,9 @@ describe('validateEInvoice', () => {
         '<ram:ActualAmount>5.00</ram:ActualAmount>',
         '<ram:ActualAmount>40.00</ram:ActualAmount>',
       );
-      const finding = (await validateEInvoice(await pdfCarrying(xml))).findings.find((f) => f.path === 'charges.0.percent');
+      const finding = (await validateEInvoice(await pdfCarrying(xml))).findings.find(
+        (f) => f.path === 'charges.0.percent',
+      );
       expect(finding).toMatchObject({ code: 'xml-charge', severity: 'error' });
       expect(finding!.message).toContain('charge');
       expect(finding!.message).not.toContain('discount');
@@ -272,14 +299,19 @@ describe('validateEInvoice', () => {
 
     it('accepts a percentage of another base that agrees, and looks for it on the page instead of the amount', async () => {
       const xml = (await create(oneLine(100, (d) => (d.discounts = [{ percent: 20 }])))).xml
-        .replace(/<ram:CalculationPercent>20(\.0+)?<\/ram:CalculationPercent>/, '<ram:CalculationPercent>10</ram:CalculationPercent>')
+        .replace(
+          /<ram:CalculationPercent>20(\.0+)?<\/ram:CalculationPercent>/,
+          '<ram:CalculationPercent>10</ram:CalculationPercent>',
+        )
         .replace('<ram:BasisAmount>100.00</ram:BasisAmount>', '<ram:BasisAmount>200.00</ram:BasisAmount>');
       const pdf = await pdfCarrying(xml);
       const result = await validateEInvoice(pdf, { pdfText: 'Rabatt 10 %' });
       expect(result.findings.filter((f) => f.path.startsWith('discounts'))).toEqual([]);
       expect(result.percentages).toEqual({ 'discounts.0': 10 });
       const missing = await validateEInvoice(pdf, { pdfText: 'Rabatt' });
-      expect(missing.findings.filter((f) => f.path.startsWith('discounts')).map((f) => `${f.path}:${f.code}`)).toEqual(['discounts.0.percent:not-in-pdf']);
+      expect(missing.findings.filter((f) => f.path.startsWith('discounts')).map((f) => `${f.path}:${f.code}`)).toEqual([
+        'discounts.0.percent:not-in-pdf',
+      ]);
     });
   });
 });

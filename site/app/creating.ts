@@ -38,7 +38,12 @@ $('#create').onclick = async () => {
     // No language is passed on. The library that writes the XML asks the server for a catalogue of translations in
     // whatever language it is given, and ships none: for English, its default here, the site answers with an empty
     // one (public/assets/locale).
-    const result = await createEInvoice({ pdf: state.pdf!, invoice: state.draft, pdfText: state.pdfText, ...(xr ? { profile: 'xrechnung' as const } : {}) });
+    const result = await createEInvoice({
+      pdf: state.pdf!,
+      invoice: state.draft,
+      pdfText: state.pdfText,
+      ...(xr ? { profile: 'xrechnung' as const } : {}),
+    });
     // A public body takes the XRechnung as a file of its own; the PDF that carries it too is the copy that keeps the look.
     const plain = xr ? await createXRechnung({ invoice: state.draft }) : undefined;
     downloads.forEach((url) => URL.revokeObjectURL(url));
@@ -47,7 +52,10 @@ $('#create').onclick = async () => {
     link('#download-pdf', result.pdf as BlobPart, 'application/pdf', `${base}.einvoice.pdf`);
     link('#download-xml', plain?.xml ?? result.xml, 'application/xml', plain ? `${base}.xrechnung.xml` : `${base}.xml`);
     // The main file comes first, and the checksum is that of the main file.
-    const [main, copy] = [$<HTMLAnchorElement>(xr ? '#download-xml' : '#download-pdf'), $<HTMLAnchorElement>(xr ? '#download-pdf' : '#download-xml')];
+    const [main, copy] = [
+      $<HTMLAnchorElement>(xr ? '#download-xml' : '#download-pdf'),
+      $<HTMLAnchorElement>(xr ? '#download-pdf' : '#download-xml'),
+    ];
     main.className = 'primary';
     copy.className = 'quiet';
     main.parentElement!.prepend(main, copy);
@@ -56,12 +64,18 @@ $('#create').onclick = async () => {
     setText('#done-title', xr ? 'done.title.xr' : 'done.title');
     setText('#done-lead', xr ? 'done.lead.xr' : 'done.lead');
     $('#done-stamp').textContent = xr ? 'XRechnung' : 'EN 16931';
-    const digest = await crypto.subtle.digest('SHA-256', (plain ? new TextEncoder().encode(plain.xml) : result.pdf) as BufferSource);
+    const digest = await crypto.subtle.digest(
+      'SHA-256',
+      (plain ? new TextEncoder().encode(plain.xml) : result.pdf) as BufferSource,
+    );
     $('#checksum-file').textContent = main.download;
     $('#checksum').textContent = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
     // Both files are written from the same data: what is said about it is said once.
     const findings = [...result.findings, ...(plain?.findings ?? [])].filter(
-      (finding, i, all) => all.findIndex((other) => other.code === finding.code && other.path === finding.path && other.message === finding.message) === i,
+      (finding, i, all) =>
+        all.findIndex(
+          (other) => other.code === finding.code && other.path === finding.path && other.message === finding.message,
+        ) === i,
     );
     noted = findings;
     renderNotes();

@@ -9,7 +9,18 @@ import { invoiceJsonSchema } from '../domain/model.js';
 import { createXRechnung, InvoiceError } from '../generate/create.js';
 import { readEmbeddedXml } from '../pdf/file.js';
 import { extractText } from '../pdf/text.js';
-import { CHOICES, createFile, createXRechnungFile, describePdf, packageVersion, readJson, readPdf, reason, sameFile, validateFile } from './files.js';
+import {
+  CHOICES,
+  createFile,
+  createXRechnungFile,
+  describePdf,
+  packageVersion,
+  readJson,
+  readPdf,
+  reason,
+  sameFile,
+  validateFile,
+} from './files.js';
 
 export interface Io {
   stdout: (text: string) => void;
@@ -51,7 +62,10 @@ const formatFinding = (f: Finding) => `${f.severity}${f.path ? ` ${f.path}` : ''
 
 function printFindings({ findings, totals }: { findings: Finding[]; totals?: Totals }, io: Io): void {
   io.stdout(findings.length ? `${findings.map(formatFinding).join('\n')}\n` : 'No findings.\n');
-  if (totals) io.stdout(`${(['net', 'vat', 'gross', 'due'] as const).map((key) => `${key} ${totals[key].toFixed(2)}`).join('\n')}\n`);
+  if (totals)
+    io.stdout(
+      `${(['net', 'vat', 'gross', 'due'] as const).map((key) => `${key} ${totals[key].toFixed(2)}`).join('\n')}\n`,
+    );
 }
 
 const OPTIONS = {
@@ -66,7 +80,9 @@ const OPTIONS = {
   version: { type: 'boolean', short: 'v' },
 } as const;
 
-type Values = { output?: string; force?: boolean; pdf?: string; json?: boolean } & { [K in keyof typeof CHOICES]?: (typeof CHOICES)[K][number] };
+type Values = { output?: string; force?: boolean; pdf?: string; json?: boolean } & {
+  [K in keyof typeof CHOICES]?: (typeof CHOICES)[K][number];
+};
 type Command = { args: number; run: (args: string[], values: Values, io: Io) => Promise<number> };
 
 const COMMANDS: Record<string, Command> = {
@@ -84,7 +100,9 @@ const COMMANDS: Record<string, Command> = {
     async run([dataPath], values, io) {
       const invoice = await readJson(dataPath!);
       if (values.output !== undefined && sameFile(values.output, dataPath!)) {
-        throw new Error('The output path is the data file. Choose another output path; the input is never overwritten.');
+        throw new Error(
+          'The output path is the data file. Choose another output path; the input is never overwritten.',
+        );
       }
       const result =
         values.output === undefined
@@ -130,7 +148,9 @@ const COMMANDS: Record<string, Command> = {
       if (values.json) {
         io.stdout(`${JSON.stringify(result, null, 2)}\n`);
       } else {
-        io.stdout(`${result.isEInvoice ? 'E-invoice' : 'Not an e-invoice'}${result.profile ? `, profile ${result.profile}` : ''}\n`);
+        io.stdout(
+          `${result.isEInvoice ? 'E-invoice' : 'Not an e-invoice'}${result.profile ? `, profile ${result.profile}` : ''}\n`,
+        );
         printFindings(result, io);
       }
       return result.isEInvoice && !result.findings.some((f) => f.severity === 'error') ? 0 : 1;
@@ -169,7 +189,8 @@ export async function run(argv: string[], io: Io): Promise<number> {
   const { positionals } = parsed;
   for (const [option, choices] of Object.entries(CHOICES)) {
     const value = parsed.values[option as keyof typeof CHOICES];
-    if (value !== undefined && !(choices as readonly string[]).includes(value)) return misuse(`--${option} takes ${choices.join(' or ')}, not ${value}.`);
+    if (value !== undefined && !(choices as readonly string[]).includes(value))
+      return misuse(`--${option} takes ${choices.join(' or ')}, not ${value}.`);
   }
   const values = parsed.values as Values & { help?: boolean; version?: boolean };
   const [name, ...args] = positionals;
@@ -204,7 +225,10 @@ export async function run(argv: string[], io: Io): Promise<number> {
 // Run only as the program, not when imported. Both sides go through realpath because npm starts the bin via a symlink.
 if (process.argv[1] && realpathSync.native(process.argv[1]) === realpathSync.native(fileURLToPath(import.meta.url))) {
   // No top-level await: `mcp` imports a module that imports this one, which must have finished loading by then.
-  void run(process.argv.slice(2), { stdout: (text) => process.stdout.write(text), stderr: (text) => process.stderr.write(text) }).then((code) => {
+  void run(process.argv.slice(2), {
+    stdout: (text) => process.stdout.write(text),
+    stderr: (text) => process.stderr.write(text),
+  }).then((code) => {
     process.exitCode = code;
   });
 }

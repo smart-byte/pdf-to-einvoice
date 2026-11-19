@@ -1,5 +1,15 @@
 import { readFileSync } from 'node:fs';
-import { PDFArray, PDFBool, PDFDict, PDFDocument, PDFName, PDFRawStream, PDFString, StandardFonts, decodePDFRawStream } from '@cantoo/pdf-lib';
+import {
+  PDFArray,
+  PDFBool,
+  PDFDict,
+  PDFDocument,
+  PDFName,
+  PDFRawStream,
+  PDFString,
+  StandardFonts,
+  decodePDFRawStream,
+} from '@cantoo/pdf-lib';
 import { describe, expect, it } from 'vitest';
 import { createEInvoice, createXRechnung, InvoiceError } from '../../src/generate/create.js';
 import { readEmbeddedXml } from '../../src/pdf/file.js';
@@ -36,7 +46,10 @@ const failure = (promise: Promise<unknown>) =>
 
 describe('createEInvoice', () => {
   it('compares the data with the text of the PDF it is given', async () => {
-    const { findings } = await createEInvoice({ pdf: samplePdf(), invoice: sample((d) => (d.buyer.city = 'Anderswo')) });
+    const { findings } = await createEInvoice({
+      pdf: samplePdf(),
+      invoice: sample((d) => (d.buyer.city = 'Anderswo')),
+    });
     expect(findings).toMatchObject([{ path: 'buyer.city', severity: 'warning', code: 'not-in-pdf' }]);
     expect((await createEInvoice({ pdf: samplePdf(), invoice: sample() })).findings).toEqual([]);
   });
@@ -54,7 +67,9 @@ describe('createEInvoice', () => {
 
   it('declares the EN 16931 profile', async () => {
     const { xml } = await createEInvoice({ pdf: samplePdf(), invoice: sample() });
-    expect(xml).toMatch(/<ram:GuidelineSpecifiedDocumentContextParameter>\s*<ram:ID>urn:cen\.eu:en16931:2017<\/ram:ID>/);
+    expect(xml).toMatch(
+      /<ram:GuidelineSpecifiedDocumentContextParameter>\s*<ram:ID>urn:cen\.eu:en16931:2017<\/ram:ID>/,
+    );
   });
 
   it('writes a line discount with its percentage, base and reason code', async () => {
@@ -122,7 +137,14 @@ describe('createEInvoice', () => {
       d.lines[1].description = 'Twelve months';
     });
     const { xml, findings } = await createEInvoice({ pdf: samplePdf(), invoice });
-    for (const value of [...Object.values(values), '+49 30 1234567', 'Erika Muster', 'Twelve months', 'rechnung@muster-software.example', 'BYLADEM1001']) {
+    for (const value of [
+      ...Object.values(values),
+      '+49 30 1234567',
+      'Erika Muster',
+      'Twelve months',
+      'rechnung@muster-software.example',
+      'BYLADEM1001',
+    ]) {
       expect(xml).toContain(`>${value}<`);
     }
     expect(xml).toMatch(/<ram:BuyerOrderReferencedDocument>\s*<ram:IssuerAssignedID>PO-77</);
@@ -208,26 +230,36 @@ describe('createEInvoice for sales without VAT', () => {
       d.deliveryCountry = 'IT';
     });
     const { xml, findings } = await createEInvoice({ pdf: samplePdf(), invoice });
-    expect(xml).toMatch(/<ram:ShipToTradeParty>[\s\S]*<ram:CountryID>IT<\/ram:CountryID>[\s\S]*<\/ram:ShipToTradeParty>/);
+    expect(xml).toMatch(
+      /<ram:ShipToTradeParty>[\s\S]*<ram:CountryID>IT<\/ram:CountryID>[\s\S]*<\/ram:ShipToTradeParty>/,
+    );
     expect(findings.filter((finding) => finding.code === 'delivery-country')).toEqual([]);
   });
 
   it('names the buyer country as the place of delivery of an intra-community supply', async () => {
     const invoice = withoutVat('K', (d) => Object.assign(d.buyer, { country: 'AT', vatId: 'ATU12345678' }));
     const { xml } = await createEInvoice({ pdf: samplePdf(), invoice });
-    expect(xml).toMatch(/<ram:ShipToTradeParty>[\s\S]*<ram:CountryID>AT<\/ram:CountryID>[\s\S]*<\/ram:ShipToTradeParty>/);
+    expect(xml).toMatch(
+      /<ram:ShipToTradeParty>[\s\S]*<ram:CountryID>AT<\/ram:CountryID>[\s\S]*<\/ram:ShipToTradeParty>/,
+    );
   });
 });
 
 describe('createEInvoice repairs what PDF/A forbids', () => {
   // A 1x1 PNG.
-  const PNG = Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='), (c) => c.charCodeAt(0));
+  const PNG = Uint8Array.from(
+    atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='),
+    (c) => c.charCodeAt(0),
+  );
   const interpolated = async (pdf: Uint8Array) => {
     const doc = await PDFDocument.load(pdf);
     return doc.context
       .enumerateIndirectObjects()
       .map(([, object]) => (object instanceof PDFRawStream ? object.dict : object))
-      .filter((object): object is PDFDict => object instanceof PDFDict && object.get(PDFName.of('Subtype')) === PDFName.of('Image'))
+      .filter(
+        (object): object is PDFDict =>
+          object instanceof PDFDict && object.get(PDFName.of('Subtype')) === PDFName.of('Image'),
+      )
       .map((image) => image.get(PDFName.of('Interpolate'))?.toString())
       .filter(Boolean);
   };
@@ -235,13 +267,16 @@ describe('createEInvoice repairs what PDF/A forbids', () => {
   /** The sample with a script at every place a PDF can hold one, and a link that is allowed. */
   const withScripts = async () => {
     const doc = await PDFDocument.load(samplePdf(), { updateMetadata: false });
-    const script = doc.context.register(doc.context.obj({ Type: 'Action', S: 'JavaScript', JS: PDFString.of("app.alert('x')") }));
+    const script = doc.context.register(
+      doc.context.obj({ Type: 'Action', S: 'JavaScript', JS: PDFString.of("app.alert('x')") }),
+    );
     doc.catalog.set(PDFName.of('OpenAction'), script);
     doc.catalog.set(PDFName.of('AA'), doc.context.obj({ WC: script }));
     doc.catalog.set(PDFName.of('Names'), doc.context.obj({ JavaScript: { Names: [PDFString.of('start'), script] } }));
     const page = doc.getPage(0).node;
     page.set(PDFName.of('AA'), doc.context.obj({ O: { S: 'Launch', F: PDFString.of('calc.exe') } }));
-    const link = (action: PDFDict) => doc.context.register(doc.context.obj({ Type: 'Annot', Subtype: 'Link', Rect: [0, 0, 10, 10], F: 4, A: action }));
+    const link = (action: PDFDict) =>
+      doc.context.register(doc.context.obj({ Type: 'Annot', Subtype: 'Link', Rect: [0, 0, 10, 10], F: 4, A: action }));
     const allowed = doc.context.obj({ S: 'URI', URI: PDFString.of('https://example.com') });
     const forbidden = doc.context.obj({ S: 'JavaScript', JS: PDFString.of('1') });
     page.set(PDFName.of('Annots'), doc.context.obj([link(allowed), link(forbidden)]));
@@ -289,7 +324,8 @@ describe('createEInvoice repairs what PDF/A forbids', () => {
 });
 
 describe('createEInvoice states no place of supply that nobody named', () => {
-  const shipToCountry = (xml: string) => /<ram:ShipToTradeParty>[\s\S]*?<ram:CountryID>(\w+)<\/ram:CountryID>/.exec(xml)?.[1];
+  const shipToCountry = (xml: string) =>
+    /<ram:ShipToTradeParty>[\s\S]*?<ram:CountryID>(\w+)<\/ram:CountryID>/.exec(xml)?.[1];
   const withPeriod = (d: any) => {
     delete d.deliveryDate;
     Object.assign(d, { periodStart: '2026-10-01', periodEnd: '2026-10-31' });
@@ -353,7 +389,9 @@ describe('XRechnung', () => {
     it('writes a Cross Industry Invoice that declares XRechnung 3.0 when asked for CII', async () => {
       const { xml, findings } = await createXRechnung({ invoice: xrechnung(), syntax: 'cii' });
       expect(xml).toContain('<rsm:CrossIndustryInvoice');
-      expect(xml).toMatch(new RegExp(`<ram:GuidelineSpecifiedDocumentContextParameter>\\s*<ram:ID>${XRECHNUNG_3_0}</ram:ID>`));
+      expect(xml).toMatch(
+        new RegExp(`<ram:GuidelineSpecifiedDocumentContextParameter>\\s*<ram:ID>${XRECHNUNG_3_0}</ram:ID>`),
+      );
       expect(xml).toContain('<ram:BuyerReference>99000000-BEISPIEL-00</ram:BuyerReference>');
       expect(findings).toEqual([]);
     });
@@ -377,7 +415,12 @@ describe('XRechnung', () => {
 
     it('writes every optional value it is given, in both syntaxes', async () => {
       const invoice = xrechnung((d) => {
-        Object.assign(d, { orderReference: 'PO-77', note: 'Thank you.', precedingInvoiceNumber: 'RE-2026-0001', precedingInvoiceDate: '2026-09-09' });
+        Object.assign(d, {
+          orderReference: 'PO-77',
+          note: 'Thank you.',
+          precedingInvoiceNumber: 'RE-2026-0001',
+          precedingInvoiceDate: '2026-09-09',
+        });
         Object.assign(d, { periodStart: '2026-10-01', periodEnd: '2026-10-30', prepaidAmount: 100.5 });
         Object.assign(d.seller, { taxNumber: '123/456/78901' });
         Object.assign(d.buyer, { vatId: 'DE987654321', phone: '+49 40 7654321', contactName: 'Max Beispiel' });
@@ -394,7 +437,9 @@ describe('XRechnung', () => {
       const xml = await both(invoice);
       // A date reads 2026-11-17 in UBL and 20261117 in CII.
       expect(given.filter((value) => !xml.ubl.includes(`>${value}<`))).toEqual([]);
-      expect(given.filter((value) => !xml.cii.includes(`>${value}<`) && !xml.cii.includes(`>${value.replaceAll('-', '')}<`))).toEqual([]);
+      expect(
+        given.filter((value) => !xml.cii.includes(`>${value}<`) && !xml.cii.includes(`>${value.replaceAll('-', '')}<`)),
+      ).toEqual([]);
       expect(xml.ubl).toContain('<cbc:PrepaidAmount currencyID="EUR">100.50</cbc:PrepaidAmount>');
       expect(xml.cii).toContain('<ram:TotalPrepaidAmount>100.50</ram:TotalPrepaidAmount>');
     });
@@ -407,8 +452,12 @@ describe('XRechnung', () => {
         }),
       );
       // 1 stands for "instrument not defined" in the code list of payment means (UNTDID 4461).
-      expect(xml.ubl).toMatch(/<cac:PaymentMeans>\s*<cbc:PaymentMeansCode>1<\/cbc:PaymentMeansCode>\s*<\/cac:PaymentMeans>/);
-      expect(xml.cii).toMatch(/<ram:SpecifiedTradeSettlementPaymentMeans>\s*<ram:TypeCode>1<\/ram:TypeCode>\s*<\/ram:SpecifiedTradeSettlementPaymentMeans>/);
+      expect(xml.ubl).toMatch(
+        /<cac:PaymentMeans>\s*<cbc:PaymentMeansCode>1<\/cbc:PaymentMeansCode>\s*<\/cac:PaymentMeans>/,
+      );
+      expect(xml.cii).toMatch(
+        /<ram:SpecifiedTradeSettlementPaymentMeans>\s*<ram:TypeCode>1<\/ram:TypeCode>\s*<\/ram:SpecifiedTradeSettlementPaymentMeans>/,
+      );
     });
 
     it('gives the rate 0 in the VAT breakdown of a sale that is not subject to VAT, and none on its lines', async () => {
@@ -422,7 +471,9 @@ describe('XRechnung', () => {
       expect(xml.ubl.match(/<cbc:Percent>/g)).toHaveLength(1);
       expect(xml.ubl).toMatch(/<cac:TaxSubtotal>[\s\S]*<cbc:Percent>0<\/cbc:Percent>[\s\S]*<\/cac:TaxSubtotal>/);
       expect(xml.cii.match(/<ram:RateApplicablePercent>/g)).toHaveLength(1);
-      expect(xml.cii).toMatch(/<ram:ApplicableHeaderTradeSettlement>[\s\S]*<ram:RateApplicablePercent>0<\/ram:RateApplicablePercent>/);
+      expect(xml.cii).toMatch(
+        /<ram:ApplicableHeaderTradeSettlement>[\s\S]*<ram:RateApplicablePercent>0<\/ram:RateApplicablePercent>/,
+      );
     });
 
     it('names no place of delivery, of which it would know the country alone', async () => {
@@ -440,7 +491,9 @@ describe('XRechnung', () => {
       const { xml } = await createXRechnung({ invoice: xrechnung((d) => (d.typeCode = '381')) });
       expect(xml).toContain('<CreditNote xmlns="urn:oasis:names:specification:ubl:schema:xsd:CreditNote-2"');
       expect(xml).toContain('<cbc:CreditNoteTypeCode>381</cbc:CreditNoteTypeCode>');
-      expect(xml).toMatch(/<cbc:PaymentMeansCode>58<\/cbc:PaymentMeansCode>\s*<cbc:PaymentDueDate>2026-11-17<\/cbc:PaymentDueDate>/);
+      expect(xml).toMatch(
+        /<cbc:PaymentMeansCode>58<\/cbc:PaymentMeansCode>\s*<cbc:PaymentDueDate>2026-11-17<\/cbc:PaymentDueDate>/,
+      );
     });
 
     it('writes discounts and charges on the whole invoice, one for each VAT group, with the totals of the standard', async () => {
@@ -520,7 +573,9 @@ describe('XRechnung', () => {
       expect(xml).toContain('Fracht &amp; Verpackung');
       expect(findings).toEqual([]);
       const error = await failure(createXRechnung({ invoice: xrechnung((d) => (d.charges = [{ amount: 5 }])) }));
-      expect(error?.findings).toContainEqual(expect.objectContaining({ path: 'charges.0.reason', code: 'charge-reason' }));
+      expect(error?.findings).toContainEqual(
+        expect.objectContaining({ path: 'charges.0.reason', code: 'charge-reason' }),
+      );
     });
 
     it('ends payment terms that grant a cash discount with a line break, as XRechnung wants it', async () => {
@@ -528,14 +583,18 @@ describe('XRechnung', () => {
       const xml = await both(invoice);
       expect((await createXRechnung({ invoice })).findings).toEqual([]);
       expect(xml.ubl).toContain('<cbc:Note>Zahlbar in 30 Tagen.\n#SKONTO#TAGE=14#PROZENT=2.00#\n</cbc:Note>');
-      expect(xml.cii).toContain('<ram:Description>Zahlbar in 30 Tagen.\n#SKONTO#TAGE=14#PROZENT=2.00#\n</ram:Description>');
+      expect(xml.cii).toContain(
+        '<ram:Description>Zahlbar in 30 Tagen.\n#SKONTO#TAGE=14#PROZENT=2.00#\n</ram:Description>',
+      );
     });
   });
 
   describe('createEInvoice with the profile xrechnung', () => {
     it('attaches XML that declares XRechnung 3.0', async () => {
       const result = await createEInvoice({ pdf: samplePdf(), invoice: xrechnung(), profile: 'xrechnung' });
-      expect(result.xml).toMatch(new RegExp(`<ram:GuidelineSpecifiedDocumentContextParameter>\\s*<ram:ID>${XRECHNUNG_3_0}</ram:ID>`));
+      expect(result.xml).toMatch(
+        new RegExp(`<ram:GuidelineSpecifiedDocumentContextParameter>\\s*<ram:ID>${XRECHNUNG_3_0}</ram:ID>`),
+      );
       expect(await readEmbeddedXml(result.pdf)).toBe(result.xml);
       expect(result.findings).toEqual([]);
     });
@@ -543,7 +602,12 @@ describe('XRechnung', () => {
     it('applies the XRechnung rules to the data', async () => {
       const error = await failure(createEInvoice({ pdf: samplePdf(), invoice: sample(), profile: 'xrechnung' }));
       expect(error?.code).toBe('invalid-invoice');
-      expect(error?.findings.map((f) => f.path)).toEqual(['buyerReference', 'seller.contactName', 'seller.phone', 'buyer.email']);
+      expect(error?.findings.map((f) => f.path)).toEqual([
+        'buyerReference',
+        'seller.contactName',
+        'seller.phone',
+        'buyer.email',
+      ]);
     });
 
     it('writes the XML as createXRechnung does', async () => {

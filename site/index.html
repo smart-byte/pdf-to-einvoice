@@ -42,10 +42,14 @@
     <a class="skip" href="#main" data-i18n="nav.skip">Skip to content</a>
     <svg class="defs" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.2A8.2 8.2 0 0 1 9.8 4a8.2 8.2 0 1 0 10.2 10.2z" /></symbol>
+        <symbol id="i-moon" viewBox="0 0 24 24">
+          <path d="M20 14.2A8.2 8.2 0 0 1 9.8 4a8.2 8.2 0 1 0 10.2 10.2z" />
+        </symbol>
         <symbol id="i-sun" viewBox="0 0 24 24">
           <circle cx="12" cy="12" r="4" />
-          <path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4" />
+          <path
+            d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"
+          />
         </symbol>
         <symbol id="i-github" viewBox="0 0 24 24">
           <path
@@ -64,7 +68,15 @@
       <div class="nav__in">
         <a class="brand" href="./">
           <svg class="brand__mark" viewBox="0 0 32 32" aria-hidden="true">
-            <rect class="brand__copy" x="10.5" y="3" width="16.5" height="21.5" rx="1.5" transform="rotate(9 18.7 13.7)" />
+            <rect
+              class="brand__copy"
+              x="10.5"
+              y="3"
+              width="16.5"
+              height="21.5"
+              rx="1.5"
+              transform="rotate(9 18.7 13.7)"
+            />
             <rect class="brand__page" x="5" y="7.5" width="16.5" height="21.5" rx="1.5" />
             <path d="M9 13.5h5.5M9 18h8.5M9 22.5h4.5" />
           </svg>
@@ -80,8 +92,16 @@
             <button type="button" data-lang="de">DE</button>
             <button type="button" data-lang="en">EN</button>
           </div>
-          <button type="button" class="tool tool--icon" id="theme" data-i18n-label="nav.theme" aria-label="Dark theme" aria-pressed="false">
-            <svg class="i i--moon" aria-hidden="true"><use href="#i-moon" /></svg><svg class="i i--sun" aria-hidden="true"><use href="#i-sun" /></svg>
+          <button
+            type="button"
+            class="tool tool--icon"
+            id="theme"
+            data-i18n-label="nav.theme"
+            aria-label="Dark theme"
+            aria-pressed="false"
+          >
+            <svg class="i i--moon" aria-hidden="true"><use href="#i-moon" /></svg
+            ><svg class="i i--sun" aria-hidden="true"><use href="#i-sun" /></svg>
           </button>
           <a class="tool" href="https://github.com/smart-byte/pdf-to-einvoice"
             ><svg class="i" aria-hidden="true"><use href="#i-github" /></svg><span>GitHub</span></a
@@ -92,17 +112,20 @@
 
     <main id="main">
       <noscript>
-        <p class="noscript" lang="de">Dieses Werkzeug läuft vollständig in Ihrem Browser und braucht dafür JavaScript.</p>
+        <p class="noscript" lang="de">
+          Dieses Werkzeug läuft vollständig in Ihrem Browser und braucht dafür JavaScript.
+        </p>
         <p class="noscript" lang="en">This tool runs entirely in your browser and needs JavaScript for that.</p>
       </noscript>
       <section class="hero" id="start">
         <div class="hero__text">
           <h1>
-            <span data-i18n="hero.a">Turn the invoice PDF you already have into an</span> <mark data-i18n="hero.mark">e-invoice</mark
-            ><span data-i18n="hero.z">.</span>
+            <span data-i18n="hero.a">Turn the invoice PDF you already have into an</span>
+            <mark data-i18n="hero.mark">e-invoice</mark><span data-i18n="hero.z">.</span>
           </h1>
           <p class="lead" data-i18n="hero.lead">
-            Your invoice looks as it did. The invoice data is added in machine-readable form, as XML following EN 16931 (ZUGFeRD / Factur-X).
+            Your invoice looks as it did. The invoice data is added in machine-readable form, as XML following EN 16931
+            (ZUGFeRD / Factur-X).
           </p>
           <p class="private" data-i18n="hero.private">Nothing is uploaded. Everything happens in your browser.</p>
           <ul class="facts">
@@ -110,10 +133,12 @@
               <svg class="i" aria-hidden="true"><use href="#i-check" /></svg><span data-i18n="fact.free">Free</span>
             </li>
             <li>
-              <svg class="i" aria-hidden="true"><use href="#i-check" /></svg><span data-i18n="fact.open">Open source (MIT)</span>
+              <svg class="i" aria-hidden="true"><use href="#i-check" /></svg
+              ><span data-i18n="fact.open">Open source (MIT)</span>
             </li>
             <li>
-              <svg class="i" aria-hidden="true"><use href="#i-check" /></svg><span data-i18n="fact.account">No sign-up</span>
+              <svg class="i" aria-hidden="true"><use href="#i-check" /></svg
+              ><span data-i18n="fact.account">No sign-up</span>
             </li>
           </ul>
         </div>
@@ -145,7 +170,10 @@
               <span class="mini__name"><i></i>Muster Software GmbH</span>
               <span class="mini__to">Beispiel AG<br />Hauptstraße 5<br />54321 Beispielstadt</span>
               <span class="mini__meta">Rechnung Nr. <mark>RE-2026-0042</mark><br />Datum <mark>03.11.2026</mark></span>
-              <span class="mini__rows"><span>Beratung E-Rechnung</span><span>1.000,00 €</span><span>Softwarelizenz (Jahr)</span><span>499,00 €</span></span>
+              <span class="mini__rows"
+                ><span>Beratung E-Rechnung</span><span>1.000,00 €</span><span>Softwarelizenz (Jahr)</span
+                ><span>499,00 €</span></span
+              >
               <span class="mini__sum"
                 ><span>Umsatzsteuer 19 %</span><span><mark>284,81 €</mark></span
                 ><b>Gesamtbetrag</b><b><mark>1.783,81 €</mark></b></span
@@ -164,7 +192,9 @@
         <header class="work__head">
           <div>
             <h2 id="work-title" data-i18n="work.title">Check and complete the data</h2>
-            <p id="work-lead" data-i18n="work.lead">In an e-invoice the XML is what counts legally. Compare every value with your PDF.</p>
+            <p id="work-lead" data-i18n="work.lead">
+              In an e-invoice the XML is what counts legally. Compare every value with your PDF.
+            </p>
           </div>
           <button type="button" class="quiet" id="other" data-i18n="work.other">Choose another PDF</button>
         </header>
@@ -177,33 +207,57 @@
                    Both are aids for the eye: the form itself says everything to a screen reader. -->
               <div class="scan" id="scan" aria-hidden="true" hidden></div>
               <div class="marks" id="marks" aria-hidden="true"></div>
-              <div class="stamp" id="work-stamp" aria-hidden="true" hidden>EN 16931<small data-i18n="stamp.note">Plausibility checked</small></div>
+              <div class="stamp" id="work-stamp" aria-hidden="true" hidden>
+                EN 16931<small data-i18n="stamp.note">Plausibility checked</small>
+              </div>
             </div>
             <!-- Shown for a PDF with more than one page. -->
             <div class="pager" id="pager" hidden>
-              <button type="button" class="tool tool--icon" id="page-prev" data-i18n-label="page.prev" aria-label="Previous page">
+              <button
+                type="button"
+                class="tool tool--icon"
+                id="page-prev"
+                data-i18n-label="page.prev"
+                aria-label="Previous page"
+              >
                 <svg class="i i--back" aria-hidden="true"><use href="#i-next" /></svg>
               </button>
               <span id="page-now"></span>
-              <button type="button" class="tool tool--icon" id="page-next" data-i18n-label="page.next" aria-label="Next page">
+              <button
+                type="button"
+                class="tool tool--icon"
+                id="page-next"
+                data-i18n-label="page.next"
+                aria-label="Next page"
+              >
                 <svg class="i" aria-hidden="true"><use href="#i-next" /></svg>
               </button>
             </div>
             <p class="hidden-visually" id="page-live" role="status"></p>
             <p class="muted" id="file-name"></p>
-            <p class="muted" id="marks-note" data-i18n="mark.note" hidden>Marked in yellow: where each value is printed. Click a mark to go to its field.</p>
+            <p class="muted" id="marks-note" data-i18n="mark.note" hidden>
+              Marked in yellow: where each value is printed. Click a mark to go to its field.
+            </p>
           </aside>
 
           <div class="work__data">
             <fieldset class="format">
               <legend data-i18n="format.title">Create as</legend>
               <div class="segments">
-                <label><input type="radio" name="format" value="pdf" checked /><span data-i18n="format.pdf">E-invoice (PDF)</span></label>
-                <label><input type="radio" name="format" value="xrechnung" /><span data-i18n="format.xrechnung">XRechnung (public sector)</span></label>
+                <label
+                  ><input type="radio" name="format" value="pdf" checked /><span data-i18n="format.pdf"
+                    >E-invoice (PDF)</span
+                  ></label
+                >
+                <label
+                  ><input type="radio" name="format" value="xrechnung" /><span data-i18n="format.xrechnung"
+                    >XRechnung (public sector)</span
+                  ></label
+                >
               </div>
               <p class="hint" id="format-note" data-i18n="format.note" hidden>
-                For invoices to public bodies and other public-sector buyers. It also needs the Leitweg-ID or another buyer reference, a contact person with
-                phone and email, and the buyer's email address.
+                For invoices to public bodies and other public-sector buyers. It also needs the Leitweg-ID or another
+                buyer reference, a contact person with phone and email, and the buyer's email address.
               </p>
             </fieldset>
             <div class="reader">
@@ -211,8 +265,8 @@
               <details>
                 <summary data-i18n="ai.title">Read with AI</summary>
                 <p data-i18n="ai.lead">
-                  A language model reads names, addresses and line items from the text of your invoice. The models in the list run on your device; your invoice
-                  does not leave the browser.
+                  A language model reads names, addresses and line items from the text of your invoice. The models in
+                  the list run on your device; your invoice does not leave the browser.
                 </p>
                 <div class="fields">
                   <div class="field field--wide">
@@ -220,7 +274,8 @@
                     <select id="ai-model" aria-describedby="ai-model-note"></select>
                     <!-- How large the chosen model is, or what an own service has to be. -->
                     <p class="hint" id="ai-model-note">
-                      The model (about 1 GB) is downloaded from huggingface.co and raw.githubusercontent.com on first use and kept in the browser.
+                      The model (about 1 GB) is downloaded from huggingface.co and raw.githubusercontent.com on first
+                      use and kept in the browser.
                     </p>
                   </div>
                 </div>
@@ -229,7 +284,8 @@
                     <label for="ai-url" data-i18n="ai.endpoint.url">Address</label>
                     <input id="ai-url" type="url" required placeholder="http://localhost:8080/v1" />
                     <p class="hint hint--warning" data-i18n="ai.endpoint.warn">
-                      The text of your invoice is sent to this address. If it is not on your device, the text leaves your device.
+                      The text of your invoice is sent to this address. If it is not on your device, the text leaves
+                      your device.
                     </p>
                   </div>
                   <div class="field">
@@ -248,8 +304,16 @@
                   <button type="button" class="quiet" id="ai-cancel" data-i18n="ai.cancel" hidden>Cancel</button>
                 </div>
                 <div class="loading" id="ai-loading" hidden>
-                  <progress id="ai-progress" max="1" value="0" data-i18n-label="ai.progress" aria-label="Progress of loading the model"></progress>
-                  <p class="hint" id="ai-wait" data-i18n="ai.wait">You can keep working while the model loads; it is kept for next time.</p>
+                  <progress
+                    id="ai-progress"
+                    max="1"
+                    value="0"
+                    data-i18n-label="ai.progress"
+                    aria-label="Progress of loading the model"
+                  ></progress>
+                  <p class="hint" id="ai-wait" data-i18n="ai.wait">
+                    You can keep working while the model loads; it is kept for next time.
+                  </p>
                 </div>
               </details>
             </div>
@@ -277,14 +341,22 @@
                 <summary data-i18n="xml.whole">Show the whole XML</summary>
                 <div class="xml">
                   <button type="button" class="quiet" id="xml-copy" data-i18n="xml.copy">Copy</button>
-                  <pre id="xml-code" tabindex="0" role="region" data-i18n-label="xml.label" aria-label="The XML of your e-invoice"></pre>
+                  <pre
+                    id="xml-code"
+                    tabindex="0"
+                    role="region"
+                    data-i18n-label="xml.label"
+                    aria-label="The XML of your e-invoice"
+                  ></pre>
                 </div>
               </details>
             </details>
 
             <div class="finish">
               <div class="summary" id="summary" role="status"></div>
-              <button type="button" class="primary" id="create" disabled data-i18n="create.run">Create e-invoice</button>
+              <button type="button" class="primary" id="create" disabled data-i18n="create.run">
+                Create e-invoice
+              </button>
               <p class="status" id="create-status" role="status"></p>
             </div>
           </div>
@@ -296,11 +368,15 @@
           <!-- The stamp lands on the preview only; the file itself is not marked. -->
           <div class="page">
             <canvas id="done-preview" aria-hidden="true"></canvas>
-            <div class="stamp" aria-hidden="true"><span id="done-stamp">EN 16931</span><small data-i18n="stamp.note">Plausibility checked</small></div>
+            <div class="stamp" aria-hidden="true">
+              <span id="done-stamp">EN 16931</span><small data-i18n="stamp.note">Plausibility checked</small>
+            </div>
           </div>
           <div class="done__text">
             <h2 id="done-title" data-i18n="done.title">Your e-invoice is ready.</h2>
-            <p id="done-lead" data-i18n="done.lead">The same invoice as before, now with its data inside as XML (ZUGFeRD / Factur-X, profile EN 16931).</p>
+            <p id="done-lead" data-i18n="done.lead">
+              The same invoice as before, now with its data inside as XML (ZUGFeRD / Factur-X, profile EN 16931).
+            </p>
             <ul class="notes" id="done-notes" hidden></ul>
             <p class="actions">
               <a class="primary" id="download-pdf" data-i18n="done.pdf">Download e-invoice</a>
@@ -310,7 +386,10 @@
               <button type="button" class="link" id="again" data-i18n="done.again">Change the data again</button>
               <button type="button" class="link" id="another" data-i18n="done.another">Convert another invoice</button>
             </p>
-            <p class="muted"><span data-i18n="done.checksum">Checksum (SHA-256) of</span> <span id="checksum-file"></span>: <code id="checksum"></code></p>
+            <p class="muted">
+              <span data-i18n="done.checksum">Checksum (SHA-256) of</span> <span id="checksum-file"></span>:
+              <code id="checksum"></code>
+            </p>
           </div>
         </div>
       </section>
@@ -319,7 +398,8 @@
         <div class="info__head">
           <h2 id="how-title" data-i18n="pair.title">What is added to your file</h2>
           <p data-i18n="pair.note">
-            People read the left side, software the right one. Both have to say the same, so the key values are compared with your PDF.
+            People read the left side, software the right one. Both have to say the same, so the key values are compared
+            with your PDF.
           </p>
         </div>
         <!-- The printed text is that of the sample invoice, so it stays German in both languages. -->
@@ -340,7 +420,9 @@
             <tr>
               <td>Rechnungsdatum <mark>03.11.2026</mark></td>
               <td>
-                <code>&lt;udt:DateTimeString format="102"&gt;<wbr /><b>20261103</b><wbr />&lt;/udt:DateTimeString&gt;</code>
+                <code
+                  >&lt;udt:DateTimeString format="102"&gt;<wbr /><b>20261103</b><wbr />&lt;/udt:DateTimeString&gt;</code
+                >
               </td>
             </tr>
             <tr>
@@ -362,7 +444,9 @@
       <section class="info" id="compare" aria-labelledby="compare-title">
         <div class="info__head">
           <h2 id="compare-title" data-i18n="cmp.title">Compared</h2>
-          <p data-i18n="cmp.lead">Many services convert PDF invoices too. The main difference is where your invoice is processed.</p>
+          <p data-i18n="cmp.lead">
+            Many services convert PDF invoices too. The main difference is where your invoice is processed.
+          </p>
         </div>
         <!-- A plain comparison without names: the column of this tool is set apart by its ink and a thin rule. On a phone
              each row lies stacked, and every answer names its side. -->
@@ -381,31 +465,39 @@
                 <span class="compare__who" data-i18n="cmp.them">Typical online converter</span
                 ><span data-i18n="cmp.1.them">On the provider's servers: the file is uploaded.</span>
               </td>
-              <td><span class="compare__who">pdf-to-einvoice</span><span data-i18n="cmp.1.us">On your device, in the browser. Nothing is uploaded.</span></td>
+              <td>
+                <span class="compare__who">pdf-to-einvoice</span
+                ><span data-i18n="cmp.1.us">On your device, in the browser. Nothing is uploaded.</span>
+              </td>
             </tr>
             <tr>
               <th scope="row" data-i18n="cmp.2">Who reads the data?</th>
               <td>
                 <span class="compare__who" data-i18n="cmp.them">Typical online converter</span
-                ><span data-i18n="cmp.2.them">Depending on the provider, an AI service in the cloud, also outside the EU, or you type everything in.</span>
+                ><span data-i18n="cmp.2.them"
+                  >Depending on the provider, an AI service in the cloud, also outside the EU, or you type everything
+                  in.</span
+                >
               </td>
               <td>
                 <span class="compare__who">pdf-to-einvoice</span
                 ><span data-i18n="cmp.2.us"
-                  >Rules on your device; on request also a language model that runs in your browser too, or a service whose address you enter yourself.</span
+                  >Rules on your device; on request also a language model that runs in your browser too, or a service
+                  whose address you enter yourself.</span
                 >
               </td>
             </tr>
             <tr>
               <th scope="row" data-i18n="cmp.3">Where does each value come from?</th>
               <td>
-                <span class="compare__who" data-i18n="cmp.them">Typical online converter</span><span data-i18n="cmp.3.them">You get a form to correct.</span>
+                <span class="compare__who" data-i18n="cmp.them">Typical online converter</span
+                ><span data-i18n="cmp.3.them">You get a form to correct.</span>
               </td>
               <td>
                 <span class="compare__who">pdf-to-einvoice</span
                 ><span data-i18n="cmp.3.us"
-                  >What was read from the PDF is marked on it. Numbers, names, addresses, dates, prices and totals are compared with its text: whether they are
-                  there, not where.</span
+                  >What was read from the PDF is marked on it. Numbers, names, addresses, dates, prices and totals are
+                  compared with its text: whether they are there, not where.</span
                 >
               </td>
             </tr>
@@ -415,13 +507,20 @@
                 <span class="compare__who" data-i18n="cmp.them">Typical online converter</span
                 ><span data-i18n="cmp.4.them">Depending on the provider, sign-up, ads or a subscription.</span>
               </td>
-              <td><span class="compare__who">pdf-to-einvoice</span><span data-i18n="cmp.4.us">No sign-up, no ads, no cookies.</span></td>
+              <td>
+                <span class="compare__who">pdf-to-einvoice</span
+                ><span data-i18n="cmp.4.us">No sign-up, no ads, no cookies.</span>
+              </td>
             </tr>
             <tr>
               <th scope="row" data-i18n="cmp.5">Source code</th>
-              <td><span class="compare__who" data-i18n="cmp.them">Typical online converter</span><span data-i18n="cmp.5.them">Mostly closed.</span></td>
               <td>
-                <span class="compare__who">pdf-to-einvoice</span><span data-i18n="cmp.5.us">Open (MIT licence): anyone can check what the page does.</span>
+                <span class="compare__who" data-i18n="cmp.them">Typical online converter</span
+                ><span data-i18n="cmp.5.them">Mostly closed.</span>
+              </td>
+              <td>
+                <span class="compare__who">pdf-to-einvoice</span
+                ><span data-i18n="cmp.5.us">Open (MIT licence): anyone can check what the page does.</span>
               </td>
             </tr>
             <tr>
@@ -441,7 +540,10 @@
                 <span class="compare__who" data-i18n="cmp.them">Typical online converter</span
                 ><span data-i18n="cmp.7.them">ZUGFeRD, often XRechnung and more.</span>
               </td>
-              <td><span class="compare__who">pdf-to-einvoice</span><span data-i18n="cmp.7.us">ZUGFeRD / Factur-X and XRechnung, following EN 16931.</span></td>
+              <td>
+                <span class="compare__who">pdf-to-einvoice</span
+                ><span data-i18n="cmp.7.us">ZUGFeRD / Factur-X and XRechnung, following EN 16931.</span>
+              </td>
             </tr>
             <tr>
               <th scope="row" data-i18n="cmp.8">Checking against the official rule sets</th>
@@ -451,7 +553,9 @@
               </td>
               <td>
                 <span class="compare__who">pdf-to-einvoice</span
-                ><span data-i18n="cmp.8.us">Its own plausibility check; not a complete check against the official rule sets.</span>
+                ><span data-i18n="cmp.8.us"
+                  >Its own plausibility check; not a complete check against the official rule sets.</span
+                >
               </td>
             </tr>
           </tbody>
@@ -525,8 +629,9 @@
         <div class="info__head">
           <h2 id="dev-title" data-i18n="dev.title">For developers and AI assistants</h2>
           <p data-i18n="dev.text">
-            The same core runs as a library, as a command line tool and as an MCP server that lets AI assistants convert invoices. All three run on your machine
-            and send nothing. An AI assistant reads the invoice itself, though: its content goes wherever the model of that assistant runs.
+            The same core runs as a library, as a command line tool and as an MCP server that lets AI assistants convert
+            invoices. All three run on your machine and send nothing. An AI assistant reads the invoice itself, though:
+            its content goes wherever the model of that assistant runs.
           </p>
           <dl class="links">
             <div>
@@ -550,14 +655,48 @@
         <div class="code">
           <div class="code__bar">
             <div class="tabs" role="tablist" data-i18n-label="dev.tabs" aria-label="Ways to use it">
-              <button type="button" role="tab" id="tab-lib" aria-controls="code-lib" aria-selected="true" data-i18n="dev.tab.lib">Library</button>
-              <button type="button" role="tab" id="tab-cli" aria-controls="code-cli" aria-selected="false" tabindex="-1" data-i18n="dev.tab.cli">
+              <button
+                type="button"
+                role="tab"
+                id="tab-lib"
+                aria-controls="code-lib"
+                aria-selected="true"
+                data-i18n="dev.tab.lib"
+              >
+                Library
+              </button>
+              <button
+                type="button"
+                role="tab"
+                id="tab-cli"
+                aria-controls="code-cli"
+                aria-selected="false"
+                tabindex="-1"
+                data-i18n="dev.tab.cli"
+              >
                 Command line
               </button>
-              <button type="button" role="tab" id="tab-mcp" aria-controls="code-mcp" aria-selected="false" tabindex="-1" data-i18n="dev.tab.mcp">
+              <button
+                type="button"
+                role="tab"
+                id="tab-mcp"
+                aria-controls="code-mcp"
+                aria-selected="false"
+                tabindex="-1"
+                data-i18n="dev.tab.mcp"
+              >
                 MCP server
               </button>
-              <button type="button" role="tab" id="tab-skill" aria-controls="code-skill" aria-selected="false" tabindex="-1">Skill</button>
+              <button
+                type="button"
+                role="tab"
+                id="tab-skill"
+                aria-controls="code-skill"
+                aria-selected="false"
+                tabindex="-1"
+              >
+                Skill
+              </button>
             </div>
             <button type="button" class="tool" id="code-copy">
               <svg class="i" aria-hidden="true"><use href="#i-copy" /></svg><span data-i18n="xml.copy">Copy</span>

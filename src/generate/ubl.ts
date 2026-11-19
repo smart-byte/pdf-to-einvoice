@@ -42,7 +42,10 @@ interface Context {
 }
 
 /** An amount with its currency, as two keys: the element and its attribute. */
-const money = (ctx: Context, key: string, n: number) => ({ [key]: amount(n), [`${key}@currencyID`]: ctx.invoice.currency });
+const money = (ctx: Context, key: string, n: number) => ({
+  [key]: amount(n),
+  [`${key}@currencyID`]: ctx.invoice.currency,
+});
 
 /**
  * Maps the invoice to the input format of @e-invoice-eu/core (UBL element
@@ -52,7 +55,10 @@ const money = (ctx: Context, key: string, n: number) => ({ [key]: amount(n), [`$
  * reports. The keys stand in the order UBL wants the elements.
  */
 export function toUbl(invoice: Invoice, totals: Totals, xrechnung = false): EInvoiceEuInvoice {
-  const categories = new Set([...invoice.lines.map((l) => l.vatCategory), ...totals.adjustments.map((a) => a.category)]);
+  const categories = new Set([
+    ...invoice.lines.map((l) => l.vatCategory),
+    ...totals.adjustments.map((a) => a.category),
+  ]);
   const ctx: Context = { invoice, totals, xrechnung, categories, vatIdsAllowed: !categories.has('O') };
   const delivery = deliveryOf(ctx);
 
@@ -65,17 +71,28 @@ export function toUbl(invoice: Invoice, totals: Totals, xrechnung = false): EInv
     'cbc:DocumentCurrencyCode': invoice.currency,
     'cbc:BuyerReference': invoice.buyerReference,
     'cac:InvoicePeriod':
-      invoice.periodStart || invoice.periodEnd ? compact({ 'cbc:StartDate': invoice.periodStart, 'cbc:EndDate': invoice.periodEnd }) : undefined,
+      invoice.periodStart || invoice.periodEnd
+        ? compact({ 'cbc:StartDate': invoice.periodStart, 'cbc:EndDate': invoice.periodEnd })
+        : undefined,
     'cac:OrderReference': invoice.orderReference ? { 'cbc:ID': invoice.orderReference } : undefined,
     'cac:BillingReference': invoice.precedingInvoiceNumber
-      ? [{ 'cac:InvoiceDocumentReference': compact({ 'cbc:ID': invoice.precedingInvoiceNumber, 'cbc:IssueDate': invoice.precedingInvoiceDate }) }]
+      ? [
+          {
+            'cac:InvoiceDocumentReference': compact({
+              'cbc:ID': invoice.precedingInvoiceNumber,
+              'cbc:IssueDate': invoice.precedingInvoiceDate,
+            }),
+          },
+        ]
       : undefined,
     'cac:AccountingSupplierParty': { 'cac:Party': supplierParty(ctx) },
     'cac:AccountingCustomerParty': { 'cac:Party': customerParty(ctx) },
     'cac:Delivery': Object.keys(delivery).length ? delivery : undefined,
     'cac:PaymentMeans': paymentMeans(ctx),
     'cac:PaymentTerms': paymentTerms(ctx),
-    'cac:AllowanceCharge': ctx.totals.adjustments.length ? ctx.totals.adjustments.map((a) => documentAllowance(ctx, a)) : undefined,
+    'cac:AllowanceCharge': ctx.totals.adjustments.length
+      ? ctx.totals.adjustments.map((a) => documentAllowance(ctx, a))
+      : undefined,
     'cac:TaxTotal': [taxTotal(ctx)],
     'cac:LegalMonetaryTotal': monetaryTotal(ctx),
     'cac:InvoiceLine': invoice.lines.map((line, i) => invoiceLine(ctx, line, i)),
@@ -89,7 +106,8 @@ function taxCategory(ctx: Context, category: string, rate: number, breakdown: bo
     'cbc:ID': category,
     // BR-O-05: no rate at all where VAT does not apply. XRechnung wants one in every VAT breakdown all the same (BR-DE-14).
     'cbc:Percent': category === 'O' && !(ctx.xrechnung && breakdown) ? undefined : decimal(rate),
-    'cbc:TaxExemptionReason': breakdown && category !== 'S' && category !== 'Z' ? ctx.invoice.vatExemptionReason : undefined,
+    'cbc:TaxExemptionReason':
+      breakdown && category !== 'S' && category !== 'Z' ? ctx.invoice.vatExemptionReason : undefined,
     'cac:TaxScheme': VAT,
   });
 }
@@ -118,7 +136,8 @@ function customerParty({ invoice: { buyer }, vatIdsAllowed }: Context): Bag {
     'cbc:EndpointID': buyer.email,
     'cbc:EndpointID@schemeID': buyer.email ? 'EM' : undefined,
     'cac:PostalAddress': address(buyer),
-    'cac:PartyTaxScheme': vatIdsAllowed && buyer.vatId ? { 'cbc:CompanyID': buyer.vatId, 'cac:TaxScheme': VAT } : undefined,
+    'cac:PartyTaxScheme':
+      vatIdsAllowed && buyer.vatId ? { 'cbc:CompanyID': buyer.vatId, 'cac:TaxScheme': VAT } : undefined,
     'cac:PartyLegalEntity': { 'cbc:RegistrationName': buyer.name },
     'cac:Contact': contact(buyer),
   });
@@ -137,7 +156,11 @@ function deliveryOf({ invoice, xrechnung, categories }: Context): Bag {
   return compact({
     'cbc:ActualDeliveryDate': invoice.deliveryDate,
     'cac:DeliveryLocation': stateCountry
-      ? { 'cac:Address': { 'cac:Country': { 'cbc:IdentificationCode': invoice.deliveryCountry ?? invoice.buyer.country } } }
+      ? {
+          'cac:Address': {
+            'cac:Country': { 'cbc:IdentificationCode': invoice.deliveryCountry ?? invoice.buyer.country },
+          },
+        }
       : undefined,
   });
 }
@@ -195,8 +218,12 @@ function monetaryTotal(ctx: Context): Bag {
     ...money(ctx, 'cbc:TaxExclusiveAmount', totals.net),
     ...money(ctx, 'cbc:TaxInclusiveAmount', totals.gross),
     // Written whenever there is a discount or charge, even at 0.00 (BR-CO-11, BR-CO-12).
-    ...(totals.adjustments.some((a) => a.list === 'discounts') ? money(ctx, 'cbc:AllowanceTotalAmount', totals.allowances) : {}),
-    ...(totals.adjustments.some((a) => a.list === 'charges') ? money(ctx, 'cbc:ChargeTotalAmount', totals.charges) : {}),
+    ...(totals.adjustments.some((a) => a.list === 'discounts')
+      ? money(ctx, 'cbc:AllowanceTotalAmount', totals.allowances)
+      : {}),
+    ...(totals.adjustments.some((a) => a.list === 'charges')
+      ? money(ctx, 'cbc:ChargeTotalAmount', totals.charges)
+      : {}),
     ...(totals.prepaid ? money(ctx, 'cbc:PrepaidAmount', totals.prepaid) : {}),
     ...money(ctx, 'cbc:PayableAmount', totals.due),
   });

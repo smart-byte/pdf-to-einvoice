@@ -41,7 +41,8 @@ function unembeddedFonts(doc: PDFDocument): string[] {
     // A Type0 font delegates to a descendant font, which is checked on its own; a Type3 font draws its glyphs itself.
     if (['Type0', 'Type3'].includes(name(object, 'Subtype') ?? '')) continue;
     const descriptor = object.lookupMaybe(PDFName.of('FontDescriptor'), PDFDict);
-    const embedded = descriptor && ['FontFile', 'FontFile2', 'FontFile3'].some((key) => descriptor.has(PDFName.of(key)));
+    const embedded =
+      descriptor && ['FontFile', 'FontFile2', 'FontFile3'].some((key) => descriptor.has(PDFName.of(key)));
     if (!embedded) missing.add(name(object, 'BaseFont') ?? 'unnamed font');
   }
   return [...missing].sort();
@@ -83,7 +84,9 @@ function forbiddenActions(doc: PDFDocument, remove = false): string[] {
     if (action instanceof PDFArray) return action.asArray().map(kindOf).find(Boolean);
     if (!(action instanceof PDFDict)) return undefined;
     const kind = name(action, 'S') ?? '';
-    return FORBIDDEN_ACTIONS.has(kind) || (kind === 'Named' && !PAGE_TURNS.has(name(action, 'N') ?? '')) ? kind : undefined;
+    return FORBIDDEN_ACTIONS.has(kind) || (kind === 'Named' && !PAGE_TURNS.has(name(action, 'N') ?? ''))
+      ? kind
+      : undefined;
   };
   /** Marks an action, its script, what follows it and the nodes of a list of scripts for leaving the file. */
   const forget = (value: PDFObject | undefined): void => {
@@ -93,7 +96,8 @@ function forbiddenActions(doc: PDFDocument, remove = false): string[] {
     }
     const object = resolved(value);
     if (object instanceof PDFArray) object.asArray().forEach(forget);
-    else if (object instanceof PDFDict) for (const key of ['JS', 'Next', 'Kids', 'Names']) forget(object.get(PDFName.of(key)));
+    else if (object instanceof PDFDict)
+      for (const key of ['JS', 'Next', 'Kids', 'Names']) forget(object.get(PDFName.of(key)));
   };
   const visit = (object: PDFObject): void => {
     const dict = object instanceof PDFRawStream ? object.dict : object;
@@ -108,7 +112,10 @@ function forbiddenActions(doc: PDFDocument, remove = false): string[] {
     // Additional actions are forbidden whatever they do (6.5.2); a list of scripts holds nothing else.
     const more = resolved(dict.get(PDFName.of('AA')));
     if (more instanceof PDFDict)
-      drop('AA', more.values().some(kindOf) ? more.values().map(kindOf) : ['additional actions'], [dict.get(PDFName.of('AA')), ...more.values()]);
+      drop('AA', more.values().some(kindOf) ? more.values().map(kindOf) : ['additional actions'], [
+        dict.get(PDFName.of('AA')),
+        ...more.values(),
+      ]);
     if (dict.has(PDFName.of('JavaScript'))) drop('JavaScript', ['JavaScript'], [dict.get(PDFName.of('JavaScript'))]);
     for (const key of ['OpenAction', 'A', 'Next']) {
       const kind = kindOf(dict.get(PDFName.of(key)));

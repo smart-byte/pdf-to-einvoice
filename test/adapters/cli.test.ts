@@ -202,9 +202,16 @@ describe('validate', () => {
     await cli('create', SAMPLE_PDF, SAMPLE_JSON, '-o', out);
     const result = await cli('validate', out);
     expect(result.code).toBe(0);
-    expect(result.stdout).toBe('E-invoice, profile urn:cen.eu:en16931:2017\nNo findings.\nnet 1499.00\nvat 284.81\ngross 1783.81\ndue 1783.81\n');
+    expect(result.stdout).toBe(
+      'E-invoice, profile urn:cen.eu:en16931:2017\nNo findings.\nnet 1499.00\nvat 284.81\ngross 1783.81\ndue 1783.81\n',
+    );
     const output = JSON.parse((await cli('validate', out, '--json')).stdout);
-    expect(output).toMatchObject({ isEInvoice: true, findings: [], invoice: { number: 'RE-2026-0042' }, totals: { gross: 1783.81 } });
+    expect(output).toMatchObject({
+      isEInvoice: true,
+      findings: [],
+      invoice: { number: 'RE-2026-0042' },
+      totals: { gross: 1783.81 },
+    });
     expect(output).not.toHaveProperty('xml');
   });
 
@@ -281,7 +288,9 @@ describe('XRechnung', () => {
       const result = await cli('xrechnung', xrechnungData());
       expect(result.code).toBe(0);
       expect(result.stderr).toBe('');
-      expect(result.stdout).toMatch(/^<\?xml[^\n]*\n<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"/);
+      expect(result.stdout).toMatch(
+        /^<\?xml[^\n]*\n<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"/,
+      );
       expect(result.stdout).toContain(`<cbc:CustomizationID>${XRECHNUNG_3_0}</cbc:CustomizationID>`);
       expect(result.stdout.endsWith('</Invoice>\n')).toBe(true);
     });
@@ -385,7 +394,9 @@ describe('XRechnung', () => {
     it('exits 0 for data that has it, also as JSON', async () => {
       expect((await cli('check', xrechnungData(), '--rules', 'xrechnung')).stdout).toMatch(/^No findings\./);
       const result = await cli('check', SAMPLE_JSON, '--rules', 'xrechnung', '--json');
-      expect(JSON.parse(result.stdout).findings.map((f: { code: string }) => f.code)).toContain('xrechnung-buyer-email');
+      expect(JSON.parse(result.stdout).findings.map((f: { code: string }) => f.code)).toContain(
+        'xrechnung-buyer-email',
+      );
     });
 
     it('exits 2 for rules it does not know', async () => {

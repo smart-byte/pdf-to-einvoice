@@ -12,7 +12,9 @@ const modelSelect = $<HTMLSelectElement>('#ai-model');
 /** Under the list: how large the chosen model is and where it comes from, or for an own service what it has to be, with its fields. */
 function showModel(): void {
   const model = MODELS.find((candidate) => candidate.id === modelSelect.value);
-  $('#ai-model-note').textContent = model ? t('ai.download', { size: new Intl.NumberFormat(lang).format(model.gigabytes) }) : t('ai.endpoint.note');
+  $('#ai-model-note').textContent = model
+    ? t('ai.download', { size: new Intl.NumberFormat(lang).format(model.gigabytes) })
+    : t('ai.endpoint.note');
   $('#ai-endpoint').hidden = model !== undefined;
 }
 export function renderModels(): void {
@@ -20,7 +22,11 @@ export function renderModels(): void {
   const chosen = modelSelect.value || DEFAULT_MODEL;
   modelSelect.replaceChildren(
     ...MODELS.map((model) =>
-      el('option', { value: model.id, selected: model.id === chosen }, `${model.id.replace(/-q4f16_1-MLC$/, '')} (${model.note[lang]})`),
+      el(
+        'option',
+        { value: model.id, selected: model.id === chosen },
+        `${model.id.replace(/-q4f16_1-MLC$/, '')} (${model.note[lang]})`,
+      ),
     ),
     el('option', { value: 'endpoint', selected: chosen === 'endpoint' }, t('ai.endpoint')),
   );
@@ -81,7 +87,11 @@ $('#ai-run').onclick = async () => {
     const read = viaEndpoint
       ? readWithEndpoint(
           state.pdfText,
-          { url: address.value, model: $<HTMLInputElement>('#ai-name').value, key: $<HTMLInputElement>('#ai-key').value },
+          {
+            url: address.value,
+            model: $<HTMLInputElement>('#ai-name').value,
+            key: $<HTMLInputElement>('#ai-key').value,
+          },
           abort.signal,
         )
       : readWithBrowserModel(state.pdfText, modelSelect.value, reading, abort.signal, (written) => reading(1, written));
@@ -97,7 +107,9 @@ $('#ai-run').onclick = async () => {
     const counted = added.filter((path) => document.querySelector(`[data-hint="${path}"]`)).length;
     status.textContent = counted ? t(counted === 1 ? 'ai.done.one' : 'ai.done', { n: counted }) : t('ai.done.none');
   } catch (error) {
-    status.textContent = abort.signal.aborted ? t('ai.cancelled') : t('ai.failed', { m: error instanceof Error ? error.message : String(error) });
+    status.textContent = abort.signal.aborted
+      ? t('ai.cancelled')
+      : t('ai.failed', { m: error instanceof Error ? error.message : String(error) });
   } finally {
     const refocus = document.activeElement === cancel;
     reading();

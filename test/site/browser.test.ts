@@ -47,14 +47,18 @@ describe.skipIf(!asked)('the web app in a browser', () => {
     const page = await (await browser.newContext({ acceptDownloads: true })).newPage();
     page.on('console', (message) => message.type() === 'error' && problems.push(`console: ${message.text()}`));
     page.on('pageerror', (error) => problems.push(`error: ${error.message}`));
-    page.on('response', (response) => response.status() >= 400 && problems.push(`${response.status()} ${response.url()}`));
+    page.on(
+      'response',
+      (response) => response.status() >= 400 && problems.push(`${response.status()} ${response.url()}`),
+    );
     // Nothing is uploaded: the page fetches its own files and nothing else. A request that carries data, in its body or
     // in its address, would be an upload, also one to its own host.
     page.on('request', (request) => {
       const url = request.url();
       if (!/^https?:/.test(url)) return;
       if (!url.startsWith(base)) problems.push(`request to ${url}`);
-      else if (request.method() !== 'GET' || request.postData() !== null) problems.push(`${request.method()} with data to ${url}`);
+      else if (request.method() !== 'GET' || request.postData() !== null)
+        problems.push(`${request.method()} with data to ${url}`);
       else if (new URL(url).search && !request.isNavigationRequest()) problems.push(`data in the address ${url}`);
     });
     await page.goto(`${base}?lang=${lang}`);
@@ -71,7 +75,8 @@ describe.skipIf(!asked)('the web app in a browser', () => {
     await page.click('#create');
     await page.waitForSelector('body[data-view="done"]', { timeout: 90_000 });
   };
-  const download = async (page: Page, link: string) => (await Promise.all([page.waitForEvent('download'), page.click(link)]))[0];
+  const download = async (page: Page, link: string) =>
+    (await Promise.all([page.waitForEvent('download'), page.click(link)]))[0];
   const said = (page: Page, selector = '#summary li') =>
     page.$$eval(selector, (items) => items.map((item) => (item as HTMLElement).innerText.replace(/\s+/g, ' ')));
   /** The sample as an intra-community supply to Austria. */
@@ -125,7 +130,9 @@ describe.skipIf(!asked)('the web app in a browser', () => {
     const page = await open();
     await read(page);
     await page.fill('[data-path="buyer.city"]', 'Anderswo');
-    expect(await said(page, '#summary li.warning')).toEqual([expect.stringMatching(/^Kunde, Ort: Diese Angabe steht so nicht im PDF/)]);
+    expect(await said(page, '#summary li.warning')).toEqual([
+      expect.stringMatching(/^Kunde, Ort: Diese Angabe steht so nicht im PDF/),
+    ]);
     await create(page);
     expect(await said(page, '#done-notes li')).toEqual([expect.stringMatching(/^Kunde, Ort: /)]);
     expect(await page.$eval('#done .stamp', (stamp) => (stamp as HTMLElement).hidden)).toBe(true);
@@ -137,7 +144,10 @@ describe.skipIf(!asked)('the web app in a browser', () => {
     expect(await page.$$eval('#totals .total--off', (rows) => rows.length)).toBe(0);
     await page.fill('[data-path="lines.0.quantity"]', '11');
     const off = await page.$$eval('#totals .total--off', (rows) =>
-      rows.map((row) => [row.querySelector('dt')!.textContent, row.querySelector('.total__printed')?.textContent ?? '']),
+      rows.map((row) => [
+        row.querySelector('dt')!.textContent,
+        row.querySelector('.total__printed')?.textContent ?? '',
+      ]),
     );
     // The sample prints net, VAT and gross, but no amount due of its own.
     expect(off.map(([name]) => name)).toEqual(['Netto', 'Umsatzsteuer', 'Gesamt']);
@@ -159,23 +169,41 @@ describe.skipIf(!asked)('the web app in a browser', () => {
     rows.forEach((row, i) => sheet.drawText(row, { x: 50, y: 760 - i * 24, size: 11, font }));
     const page = await open();
     await read(page, upload('no-terms.pdf', await doc.save()));
-    const suggestion = () => page.$eval('[data-hint="paymentTerms"]', (hint) => ({ text: hint.textContent, error: hint.classList.contains('hint--error') }));
-    expect(await page.inputValue('[data-path="paymentTerms"]')).toBe('Zahlbar innerhalb von 14 Tagen ab Rechnungsdatum.');
-    expect(await suggestion()).toMatchObject({ text: expect.stringContaining('Vorschlag, der nicht auf Ihrem PDF steht'), error: true });
+    const suggestion = () =>
+      page.$eval('[data-hint="paymentTerms"]', (hint) => ({
+        text: hint.textContent,
+        error: hint.classList.contains('hint--error'),
+      }));
+    expect(await page.inputValue('[data-path="paymentTerms"]')).toBe(
+      'Zahlbar innerhalb von 14 Tagen ab Rechnungsdatum.',
+    );
+    expect(await suggestion()).toMatchObject({
+      text: expect.stringContaining('Vorschlag, der nicht auf Ihrem PDF steht'),
+      error: true,
+    });
     expect(await page.isDisabled('#create')).toBe(true);
     await page.click('[data-hint="paymentTerms"] .ok');
     expect(await suggestion()).toEqual({ text: '', error: false });
-    expect(await page.inputValue('[data-path="paymentTerms"]')).toBe('Zahlbar innerhalb von 14 Tagen ab Rechnungsdatum.');
+    expect(await page.inputValue('[data-path="paymentTerms"]')).toBe(
+      'Zahlbar innerhalb von 14 Tagen ab Rechnungsdatum.',
+    );
   }, 120_000);
 
   it('leaves a script of the PDF out of the e-invoice and says so', async () => {
     const doc = await PDFDocument.load(samplePdf(), { updateMetadata: false });
-    doc.catalog.set(PDFName.of('OpenAction'), doc.context.obj({ Type: 'Action', S: 'JavaScript', JS: PDFString.of("app.alert('x')") }));
+    doc.catalog.set(
+      PDFName.of('OpenAction'),
+      doc.context.obj({ Type: 'Action', S: 'JavaScript', JS: PDFString.of("app.alert('x')") }),
+    );
     const page = await open();
     await read(page, upload('script.pdf', await doc.save()));
     await create(page);
-    expect(await said(page, '#done-notes li')).toEqual([expect.stringMatching(/^Ihr PDF enthielt Skripte oder automatische Aktionen/)]);
-    const created = await PDFDocument.load(await bytesOf(await download(page, '#download-pdf')), { updateMetadata: false });
+    expect(await said(page, '#done-notes li')).toEqual([
+      expect.stringMatching(/^Ihr PDF enthielt Skripte oder automatische Aktionen/),
+    ]);
+    const created = await PDFDocument.load(await bytesOf(await download(page, '#download-pdf')), {
+      updateMetadata: false,
+    });
     expect(created.catalog.get(PDFName.of('OpenAction'))).toBeUndefined();
   }, 120_000);
 
@@ -197,7 +225,10 @@ describe.skipIf(!asked)('the web app in a browser', () => {
     const xml = Buffer.from(await bytesOf(await download(page, '#download-xml'))).toString('utf8');
     expect(xml).toContain('urn:xeinkauf.de:kosit:xrechnung_3.0');
     expect(xml).toContain('<cbc:BuyerReference>12345678-0001-14</cbc:BuyerReference>');
-    expect(await validateEInvoice(await bytesOf(await download(page, '#download-pdf')))).toMatchObject({ isEInvoice: true, findings: [] });
+    expect(await validateEInvoice(await bytesOf(await download(page, '#download-pdf')))).toMatchObject({
+      isEInvoice: true,
+      findings: [],
+    });
   }, 120_000);
 
   it('fills in the contact data and the Leitweg-ID a page states, and shows them for the hybrid PDF too', async () => {
@@ -250,14 +281,18 @@ describe.skipIf(!asked)('the web app in a browser', () => {
     const page = await open();
     await read(page);
     await supplyToAustria(page);
-    const question = (await said(page, '#summary li.warning')).find((text) => text.includes('innergemeinschaftlichen Lieferung'));
+    const question = (await said(page, '#summary li.warning')).find((text) =>
+      text.includes('innergemeinschaftlichen Lieferung'),
+    );
     expect(question).toContain('Land Ihres Kunden');
     await page.click('#summary li.warning button:has-text("innergemeinschaftlichen")');
     expect(await page.evaluate(() => (document.activeElement as HTMLElement).dataset.path)).toBe('deliveryCountry');
     await page.fill('[data-path="deliveryCountry"]', 'IT');
     expect((await said(page)).some((text) => text.includes('innergemeinschaftlichen Lieferung'))).toBe(false);
     await page.click('label:has(input[name="format"][value="xrechnung"])');
-    expect((await said(page, '#summary li.error')).find((text) => text.startsWith('Land der Lieferung'))).toContain('nur mit Postleitzahl und Ort');
+    expect((await said(page, '#summary li.error')).find((text) => text.startsWith('Land der Lieferung'))).toContain(
+      'nur mit Postleitzahl und Ort',
+    );
   }, 120_000);
 
   it('shows an existing e-invoice with its verdict and lets nothing be changed', async () => {
@@ -277,7 +312,9 @@ describe.skipIf(!asked)('the web app in a browser', () => {
     await read(page);
     await page.fill('[data-path="lines.1.discount.percent"]', '10');
     // The page does not show the percentage. `said` turns the no-break space of the label into a plain one.
-    expect(await said(page)).toEqual(expect.arrayContaining([expect.stringMatching(/^Position 2, Rabatt %: „10 %“ steht so nicht im PDF/)]));
+    expect(await said(page)).toEqual(
+      expect.arrayContaining([expect.stringMatching(/^Position 2, Rabatt %: „10 %“ steht so nicht im PDF/)]),
+    );
     // The hint below one field moves no field beside it. Both are measured at once: the page may still be scrolling.
     const [percent, amount] = await page.$$eval('[data-path^="lines.1.discount."]', (inputs) =>
       inputs.map((input) => Math.round(input.getBoundingClientRect().top)),
@@ -306,7 +343,9 @@ describe.skipIf(!asked)('the web app in a browser', () => {
     const page = await open();
     await read(page, upload('line-total.pdf', await doc.save()));
     expect(await said(page)).toEqual(
-      expect.arrayContaining([expect.stringMatching(/^Position 1: Das XML nennt für diese Position 0,50 €, .* ergibt aber 0,99 €/)]),
+      expect.arrayContaining([
+        expect.stringMatching(/^Position 1: Das XML nennt für diese Position 0,50 €, .* ergibt aber 0,99 €/),
+      ]),
     );
   }, 120_000);
 
@@ -324,7 +363,9 @@ describe.skipIf(!asked)('the web app in a browser', () => {
     const page = await open();
     await read(page, upload('contradiction.pdf', await doc.save()));
     expect(await said(page)).toEqual(
-      expect.arrayContaining([expect.stringMatching(/Im XML passen Prozentsatz, Grundbetrag und Betrag dieses Rabatts nicht zusammen/)]),
+      expect.arrayContaining([
+        expect.stringMatching(/Im XML passen Prozentsatz, Grundbetrag und Betrag dieses Rabatts nicht zusammen/),
+      ]),
     );
   }, 120_000);
 
@@ -337,17 +378,23 @@ describe.skipIf(!asked)('the web app in a browser', () => {
     await page.fill('[data-path="discounts.0.percent"]', '10');
     await page.click('text=Zuschlag hinzufügen');
     await page.fill('[data-path="charges.0.amount"]', '10');
-    expect(await said(page)).toEqual(expect.arrayContaining([expect.stringMatching(/^Zuschlag 1, Grund: Ein Zuschlag braucht seinen Grund/)]));
+    expect(await said(page)).toEqual(
+      expect.arrayContaining([expect.stringMatching(/^Zuschlag 1, Grund: Ein Zuschlag braucht seinen Grund/)]),
+    );
     await page.fill('[data-path="charges.0.reason"]', 'Fracht');
     expect(await page.textContent('#totals')).toContain('1.359,10');
     // Nothing chosen is nothing chosen: the charge follows the VAT of the line items.
     expect(await page.inputValue('[data-path="charges.0.vatCategory"]')).toBe('');
     // A discount added and left empty says so at its row, and can go again; the one below moves up with its words.
     await page.click('text=Rabatt hinzufügen');
-    expect(await said(page)).toEqual(expect.arrayContaining([expect.stringMatching(/^Rabatt 2: Ein Rabatt oder Zuschlag braucht einen Prozentsatz/)]));
+    expect(await said(page)).toEqual(
+      expect.arrayContaining([expect.stringMatching(/^Rabatt 2: Ein Rabatt oder Zuschlag braucht einen Prozentsatz/)]),
+    );
     await page.click('[aria-label="Rabatt 1 entfernen"]');
     expect(await page.inputValue('[data-path="discounts.0.percent"]')).toBe('');
-    expect(await said(page)).toEqual(expect.arrayContaining([expect.stringMatching(/^Rabatt 1: Ein Rabatt oder Zuschlag braucht einen Prozentsatz/)]));
+    expect(await said(page)).toEqual(
+      expect.arrayContaining([expect.stringMatching(/^Rabatt 1: Ein Rabatt oder Zuschlag braucht einen Prozentsatz/)]),
+    );
     await page.click('[aria-label="Rabatt 1 entfernen"]');
     expect(await page.$$('[data-path^="discounts."]')).toHaveLength(0);
     expect(await page.textContent('#totals')).toContain('1.509,00');
@@ -377,17 +424,26 @@ describe.skipIf(!asked)('the web app in a browser', () => {
       await doc.attach(new TextEncoder().encode(xml), 'factur-x.xml', { mimeType: 'text/xml' });
       return doc.save();
     };
-    const xmlWith = async (discount: object) => (await createEInvoice({ pdf: samplePdf(), invoice: { ...invoice, discounts: [discount] } })).xml;
+    const xmlWith = async (discount: object) =>
+      (await createEInvoice({ pdf: samplePdf(), invoice: { ...invoice, discounts: [discount] } })).xml;
     // Base 50, 10 %, amount 10 on lines of 100: only the base the XML states shows the contradiction.
-    const contradicting = (await xmlWith({ percent: 10 })).replace('<ram:BasisAmount>100.00</ram:BasisAmount>', '<ram:BasisAmount>50.00</ram:BasisAmount>');
+    const contradicting = (await xmlWith({ percent: 10 })).replace(
+      '<ram:BasisAmount>100.00</ram:BasisAmount>',
+      '<ram:BasisAmount>50.00</ram:BasisAmount>',
+    );
     const page = await open();
     await read(page, upload('contradiction.pdf', await embed(contradicting)));
     expect(await page.inputValue('[data-path="charges.0.reason"]')).toBe('Fracht');
     expect(await page.isEditable('[data-path="charges.0.reason"]')).toBe(false);
-    expect((await said(page)).filter((text) => /dieses Rabatts nicht zusammen/.test(text))).toEqual([expect.stringMatching(/^Rabatt 1, Prozent: /)]);
+    expect((await said(page)).filter((text) => /dieses Rabatts nicht zusammen/.test(text))).toEqual([
+      expect.stringMatching(/^Rabatt 1, Prozent: /),
+    ]);
     // 10 % of 200, which is 20.00: it agrees, but not with the lines. The amount stays, and the page is searched for the percentage.
     const otherBase = (await xmlWith({ percent: 20 }))
-      .replace(/<ram:CalculationPercent>20(\.0+)?<\/ram:CalculationPercent>/, '<ram:CalculationPercent>10</ram:CalculationPercent>')
+      .replace(
+        /<ram:CalculationPercent>20(\.0+)?<\/ram:CalculationPercent>/,
+        '<ram:CalculationPercent>10</ram:CalculationPercent>',
+      )
       .replace('<ram:BasisAmount>100.00</ram:BasisAmount>', '<ram:BasisAmount>200.00</ram:BasisAmount>');
     const other = await open();
     await read(other, upload('other-base.pdf', await embed(otherBase)));
@@ -405,7 +461,9 @@ describe.skipIf(!asked)('the web app in a browser', () => {
     await page.click('text=Add a charge');
     expect(await page.textContent('#form')).toContain('Discount 1');
     expect(await page.textContent('#form')).toContain('Charge 1');
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth),
+    ).toBe(true);
   }, 120_000);
 
   it('gives a long text the room it needs: the field grows with it and can be drawn larger', async () => {
@@ -421,7 +479,9 @@ describe.skipIf(!asked)('the web app in a browser', () => {
     const short = await box('lines.0.name');
     expect(short).toMatchObject({ tag: 'TEXTAREA', cut: false, resize: 'vertical' });
     // One line high while the text is short, like the fields beside it.
-    expect(short.height).toBeLessThanOrEqual((await page.$eval('[data-path="lines.0.quantity"]', (field) => field.clientHeight)) + 2);
+    expect(short.height).toBeLessThanOrEqual(
+      (await page.$eval('[data-path="lines.0.quantity"]', (field) => field.clientHeight)) + 2,
+    );
     await page.fill(
       '[data-path="lines.0.name"]',
       'Beratung E-Rechnung: Analyse der bestehenden Rechnungsstellung, Einrichtung der Schnittstelle und Schulung der Mitarbeitenden vor Ort',
@@ -429,7 +489,8 @@ describe.skipIf(!asked)('the web app in a browser', () => {
     const long = await box('lines.0.name');
     expect(long.cut).toBe(false);
     expect(long.height).toBeGreaterThan(short.height);
-    for (const path of ['paymentTerms', 'vatExemptionReason']) expect(await box(path)).toMatchObject({ tag: 'TEXTAREA', resize: 'vertical' });
+    for (const path of ['paymentTerms', 'vatExemptionReason'])
+      expect(await box(path)).toMatchObject({ tag: 'TEXTAREA', resize: 'vertical' });
     // The description is still one value: it goes into the XML as it was typed.
     await page.click('#xml > summary');
     await page.waitForSelector('#xml-pair:not([hidden])');
@@ -461,16 +522,28 @@ describe.skipIf(!asked)('the web app in a browser', () => {
         return { unload: async () => {}, chat: { completions: { create: async () => pieces() } } };
       }`;
     const page = await open();
-    await page.route(/\/assets\/lib-[^/]+\.js$/, (route) => route.fulfill({ contentType: 'text/javascript', body: library }));
+    await page.route(/\/assets\/lib-[^/]+\.js$/, (route) =>
+      route.fulfill({ contentType: 'text/javascript', body: library }),
+    );
     await read(page);
     if (!(await page.isVisible('#ai-run'))) await page.click('.reader summary');
     await page.evaluate(() => {
       const seen: [string, number][] = ((window as any).seen = []);
-      const note = () => seen.push([document.querySelector('#ai-status')!.textContent!, document.querySelector<HTMLProgressElement>('#ai-progress')!.value]);
-      new MutationObserver(note).observe(document.querySelector('#ai-status')!, { childList: true, characterData: true, subtree: true });
+      const note = () =>
+        seen.push([
+          document.querySelector('#ai-status')!.textContent!,
+          document.querySelector<HTMLProgressElement>('#ai-progress')!.value,
+        ]);
+      new MutationObserver(note).observe(document.querySelector('#ai-status')!, {
+        childList: true,
+        characterData: true,
+        subtree: true,
+      });
     });
     await page.click('#ai-run');
-    await page.waitForFunction(() => document.querySelector('#ai-status')!.textContent!.startsWith('Fertig'), null, { timeout: 60_000 });
+    await page.waitForFunction(() => document.querySelector('#ai-status')!.textContent!.startsWith('Fertig'), null, {
+      timeout: 60_000,
+    });
     const seen: [string, number][] = await page.evaluate(() => (window as any).seen);
     const writing = seen.filter(([status]) => status.startsWith('Das Modell schreibt'));
     expect(writing.some(([status]) => /^Das Modell schreibt die Angaben\s… \d+\s%$/.test(status))).toBe(true);
@@ -485,7 +558,9 @@ describe.skipIf(!asked)('the web app in a browser', () => {
     const page = await open('en');
     for (const address of ['', 'privacy.html', 'legal-notice.html']) {
       await page.goto(`${base}${address}?lang=en`);
-      const origins = await page.$$eval('script[src]', (scripts) => scripts.map((script) => new URL((script as HTMLScriptElement).src).origin));
+      const origins = await page.$$eval('script[src]', (scripts) =>
+        scripts.map((script) => new URL((script as HTMLScriptElement).src).origin),
+      );
       expect(new Set(origins)).toEqual(new Set([new URL(base).origin]));
     }
     await page.goto(`${base}privacy.html?lang=en`);
@@ -504,7 +579,8 @@ describe.skipIf(!asked)('the web app in a browser', () => {
     await page.evaluate(() => {
       const widest = ((window as any).widest = { value: 0 });
       const look = () => {
-        if (document.body.dataset.view === 'done') widest.value = Math.max(widest.value, document.documentElement.scrollWidth - innerWidth);
+        if (document.body.dataset.view === 'done')
+          widest.value = Math.max(widest.value, document.documentElement.scrollWidth - innerWidth);
         requestAnimationFrame(look);
       };
       look();
@@ -519,10 +595,15 @@ describe.skipIf(!asked)('the web app in a browser', () => {
   it('has an address per language whose page is in that language before any script runs', async () => {
     const page = await open();
     const head = () =>
-      page.$$eval('meta[property^="og:"], meta[name="description"], meta[name^="twitter:"], link[rel="canonical"]', (tags) =>
-        Object.fromEntries(
-          tags.map((tag) => [tag.getAttribute('property') ?? tag.getAttribute('name') ?? 'canonical', tag.getAttribute('content') ?? tag.getAttribute('href')]),
-        ),
+      page.$$eval(
+        'meta[property^="og:"], meta[name="description"], meta[name^="twitter:"], link[rel="canonical"]',
+        (tags) =>
+          Object.fromEntries(
+            tags.map((tag) => [
+              tag.getAttribute('property') ?? tag.getAttribute('name') ?? 'canonical',
+              tag.getAttribute('content') ?? tag.getAttribute('href'),
+            ]),
+          ),
       );
     const heads: Record<string, Record<string, string | null>> = {};
     for (const [lang, chosenBefore, headline] of [
@@ -535,12 +616,23 @@ describe.skipIf(!asked)('the web app in a browser', () => {
       const html = await response!.text();
       expect(/<html lang="([a-z]+)"/.exec(html)?.[1]).toBe(lang);
       heads[lang] = await head();
-      expect(heads[lang]).toMatchObject({ canonical: `https://pdf-to-einvoice.app/${lang}`, 'og:url': `https://pdf-to-einvoice.app/${lang}` });
+      expect(heads[lang]).toMatchObject({
+        canonical: `https://pdf-to-einvoice.app/${lang}`,
+        'og:url': `https://pdf-to-einvoice.app/${lang}`,
+      });
       expect(await page.textContent('h1')).toContain(headline);
       // The title a search engine or a preview shows is the one the page shows.
       expect(/<title[^>]*>([^<]*)</.exec(html)?.[1]).toBe(await page.title());
     }
-    for (const key of ['description', 'og:title', 'og:description', 'og:image', 'og:image:alt', 'twitter:title', 'twitter:image']) {
+    for (const key of [
+      'description',
+      'og:title',
+      'og:description',
+      'og:image',
+      'og:image:alt',
+      'twitter:title',
+      'twitter:image',
+    ]) {
       expect(heads.de![key]).not.toBe(heads.en![key]);
     }
     const image = await page.request.get(heads.de!['og:image']!.replace('https://pdf-to-einvoice.app/', base));
@@ -549,10 +641,14 @@ describe.skipIf(!asked)('the web app in a browser', () => {
     await page.click('[data-lang="en"]');
     expect(new URL(page.url()).pathname).toBe('/en');
     // The sitemap names the addresses every start page names as its alternates.
-    const alternates = await page.$$eval('link[rel="alternate"][hreflang]', (links) => links.map((link) => (link as HTMLLinkElement).href));
+    const alternates = await page.$$eval('link[rel="alternate"][hreflang]', (links) =>
+      links.map((link) => (link as HTMLLinkElement).href),
+    );
     const sitemap = await (await page.request.get(`${base}sitemap.xml`)).text();
     expect([...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) => match[1]).sort()).toEqual(alternates.sort());
-    expect(await (await page.request.get(`${base}robots.txt`)).text()).toContain('Sitemap: https://pdf-to-einvoice.app/sitemap.xml');
+    expect(await (await page.request.get(`${base}robots.txt`)).text()).toContain(
+      'Sitemap: https://pdf-to-einvoice.app/sitemap.xml',
+    );
   }, 120_000);
 
   it('offers the next invoice after the download, in the language of the page', async () => {

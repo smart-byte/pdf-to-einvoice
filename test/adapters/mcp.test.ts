@@ -59,7 +59,8 @@ describe('MCP server', () => {
   it('takes discounts and charges on the whole invoice, each with its own VAT category and rate', async () => {
     const { tools } = await (await connect()).listTools();
     const schema = tools.find((t) => t.name === 'create_einvoice')!.inputSchema;
-    const accepts = (invoice: unknown) => new Ajv({ strict: false }).validate(schema, { pdf_path: '/tmp/a.pdf', output_path: '/tmp/b.pdf', invoice });
+    const accepts = (invoice: unknown) =>
+      new Ajv({ strict: false }).validate(schema, { pdf_path: '/tmp/a.pdf', output_path: '/tmp/b.pdf', invoice });
     const loyalty: Allowance = { percent: 5, reason: 'Treuerabatt' };
     const freight: DocumentAllowance = { amount: 9.9, reason: 'Fracht', vatCategory: 'S', vatRate: 19 };
     const invoice: Invoice = {
@@ -79,14 +80,22 @@ describe('MCP server', () => {
     expect(placed.list).toBe('charges');
     const properties = (schema.properties as any).invoice.properties;
     for (const list of ['discounts', 'charges']) {
-      expect(Object.keys(properties[list].items.properties)).toEqual(['percent', 'amount', 'reason', 'vatCategory', 'vatRate']);
-      for (const field of Object.values<any>(properties[list].items.properties)) expect(field.description, list).toBeTruthy();
+      expect(Object.keys(properties[list].items.properties)).toEqual([
+        'percent',
+        'amount',
+        'reason',
+        'vatCategory',
+        'vatRate',
+      ]);
+      for (const field of Object.values<any>(properties[list].items.properties))
+        expect(field.description, list).toBeTruthy();
     }
   });
 
   it('lets a client send an incomplete invoice to check_invoice, which is there to say what is missing', async () => {
     const { tools } = await (await connect()).listTools();
-    const accepts = (tool: string, input: unknown) => new Ajv({ strict: false }).validate(tools.find((t) => t.name === tool)!.inputSchema, input);
+    const accepts = (tool: string, input: unknown) =>
+      new Ajv({ strict: false }).validate(tools.find((t) => t.name === tool)!.inputSchema, input);
     expect(accepts('check_invoice', { invoice: { number: 'RE-1', lines: [] } })).toBe(true);
     expect(accepts('create_einvoice', { pdf_path: '/tmp/a.pdf', invoice: { number: 'RE-1', lines: [] } })).toBe(false);
   });
@@ -106,7 +115,9 @@ describe('MCP server', () => {
     const [manifest, entry] = [read('package.json'), read('server.json')];
     expect(entry.name).toBe(manifest.mcpName);
     expect(entry.version).toBe(manifest.version);
-    expect(entry.packages).toEqual([expect.objectContaining({ registryType: 'npm', identifier: manifest.name, version: manifest.version })]);
+    expect(entry.packages).toEqual([
+      expect.objectContaining({ registryType: 'npm', identifier: manifest.name, version: manifest.version }),
+    ]);
     expect(entry.description.length).toBeLessThanOrEqual(100);
   });
 
@@ -120,7 +131,9 @@ describe('MCP server', () => {
   });
 
   it('rejects a tool it does not have', async () => {
-    await expect((await connect()).callTool({ name: 'delete_everything', arguments: {} })).rejects.toThrow(/delete_everything/);
+    await expect((await connect()).callTool({ name: 'delete_everything', arguments: {} })).rejects.toThrow(
+      /delete_everything/,
+    );
   });
 });
 
@@ -161,7 +174,9 @@ describe('check_invoice', () => {
   });
 
   it('compares the data with the PDF when given its path', async () => {
-    const output = JSON.parse((await call('check_invoice', { invoice: sample((d) => (d.number = 'RE-2026-0043')), pdf_path: SAMPLE_PDF })).text);
+    const output = JSON.parse(
+      (await call('check_invoice', { invoice: sample((d) => (d.number = 'RE-2026-0043')), pdf_path: SAMPLE_PDF })).text,
+    );
     expect(output.ok).toBe(true);
     expect(output.findings).toMatchObject([{ path: 'number', code: 'not-in-pdf' }]);
   });
@@ -178,9 +193,16 @@ describe('create_einvoice', () => {
 
   it('returns the findings as a tool error for bad data and writes nothing', async () => {
     const out = join(tmp(), 'out.pdf');
-    const result = await call('create_einvoice', { pdf_path: SAMPLE_PDF, invoice: sample((d) => delete d.number), output_path: out });
+    const result = await call('create_einvoice', {
+      pdf_path: SAMPLE_PDF,
+      invoice: sample((d) => delete d.number),
+      output_path: out,
+    });
     expect(result.isError).toBe(true);
-    expect(JSON.parse(result.text)).toMatchObject({ error: 'invalid-invoice', findings: [{ path: 'number', severity: 'error' }] });
+    expect(JSON.parse(result.text)).toMatchObject({
+      error: 'invalid-invoice',
+      findings: [{ path: 'number', severity: 'error' }],
+    });
     expect(existsSync(out)).toBe(false);
   });
 
@@ -190,7 +212,12 @@ describe('create_einvoice', () => {
     const refused = await call('create_einvoice', { pdf_path: SAMPLE_PDF, invoice: sample(), output_path: out });
     expect(refused.isError).toBe(true);
     expect(readFileSync(out, 'utf8')).toBe('keep me');
-    const forced = await call('create_einvoice', { pdf_path: SAMPLE_PDF, invoice: sample(), output_path: out, overwrite: true });
+    const forced = await call('create_einvoice', {
+      pdf_path: SAMPLE_PDF,
+      invoice: sample(),
+      output_path: out,
+      overwrite: true,
+    });
     expect(forced.isError).toBe(false);
   });
 
@@ -219,7 +246,11 @@ describe('read_einvoice_xml', () => {
 describe('validate_einvoice', () => {
   it('returns profile, data, totals and what the PDF does not show, without the raw XML', async () => {
     const out = join(tmp(), 'out.pdf');
-    await call('create_einvoice', { pdf_path: SAMPLE_PDF, invoice: sample((d) => (d.number = 'RE-2026-0043')), output_path: out });
+    await call('create_einvoice', {
+      pdf_path: SAMPLE_PDF,
+      invoice: sample((d) => (d.number = 'RE-2026-0043')),
+      output_path: out,
+    });
     const result = await call('validate_einvoice', { pdf_path: out });
     const output = JSON.parse(result.text);
     expect(result.isError).toBe(false);
@@ -236,7 +267,10 @@ describe('validate_einvoice', () => {
   it('says that a plain PDF is not an e-invoice', async () => {
     const result = await call('validate_einvoice', { pdf_path: SAMPLE_PDF });
     expect(result.isError).toBe(false);
-    expect(JSON.parse(result.text)).toMatchObject({ isEInvoice: false, findings: [{ severity: 'error', code: 'no-xml' }] });
+    expect(JSON.parse(result.text)).toMatchObject({
+      isEInvoice: false,
+      findings: [{ severity: 'error', code: 'no-xml' }],
+    });
   });
 });
 
@@ -294,14 +328,24 @@ describe('XRechnung', () => {
   describe('create_einvoice with profile', () => {
     it('writes a PDF whose XML declares XRechnung 3.0', async () => {
       const out = join(tmp(), 'out.pdf');
-      const result = await call('create_einvoice', { pdf_path: SAMPLE_PDF, invoice: xrechnung(), output_path: out, profile: 'xrechnung' });
+      const result = await call('create_einvoice', {
+        pdf_path: SAMPLE_PDF,
+        invoice: xrechnung(),
+        output_path: out,
+        profile: 'xrechnung',
+      });
       expect(result.isError).toBe(false);
       expect(await readEmbeddedXml(new Uint8Array(readFileSync(out)))).toContain(`<ram:ID>${XRECHNUNG_3_0}</ram:ID>`);
     });
 
     it('returns what XRechnung lacks as a tool error and writes nothing', async () => {
       const out = join(tmp(), 'out.pdf');
-      const result = await call('create_einvoice', { pdf_path: SAMPLE_PDF, invoice: sample(), output_path: out, profile: 'xrechnung' });
+      const result = await call('create_einvoice', {
+        pdf_path: SAMPLE_PDF,
+        invoice: sample(),
+        output_path: out,
+        profile: 'xrechnung',
+      });
       expect(result.isError).toBe(true);
       expect(JSON.parse(result.text)).toMatchObject({
         error: 'invalid-invoice',
@@ -312,7 +356,12 @@ describe('XRechnung', () => {
 
     it('refuses a profile it does not know', async () => {
       const out = join(tmp(), 'out.pdf');
-      const result = await call('create_einvoice', { pdf_path: SAMPLE_PDF, invoice: sample(), output_path: out, profile: 'extended' });
+      const result = await call('create_einvoice', {
+        pdf_path: SAMPLE_PDF,
+        invoice: sample(),
+        output_path: out,
+        profile: 'extended',
+      });
       expect(result.isError).toBe(true);
       expect(result.text).toContain('profile');
       expect(existsSync(out)).toBe(false);
@@ -324,7 +373,11 @@ describe('XRechnung', () => {
       const out = join(tmp(), 'out.xml');
       const result = await call('create_xrechnung', { invoice: xrechnung(), output_path: out });
       expect(result.isError).toBe(false);
-      expect(JSON.parse(result.text)).toEqual({ output_path: out, findings: [], totals: expect.objectContaining({ due: 1783.81 }) });
+      expect(JSON.parse(result.text)).toEqual({
+        output_path: out,
+        findings: [],
+        totals: expect.objectContaining({ due: 1783.81 }),
+      });
       const xml = readFileSync(out, 'utf8');
       expect(xml).toContain('<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"');
       expect(xml).toContain(`<cbc:CustomizationID>${XRECHNUNG_3_0}</cbc:CustomizationID>`);
@@ -340,7 +393,10 @@ describe('XRechnung', () => {
       const out = join(tmp(), 'out.xml');
       const result = await call('create_xrechnung', { invoice: sample(), output_path: out });
       expect(result.isError).toBe(true);
-      expect(JSON.parse(result.text)).toMatchObject({ error: 'invalid-invoice', findings: [{ path: 'buyerReference', severity: 'error' }, {}, {}, {}] });
+      expect(JSON.parse(result.text)).toMatchObject({
+        error: 'invalid-invoice',
+        findings: [{ path: 'buyerReference', severity: 'error' }, {}, {}, {}],
+      });
       expect(existsSync(out)).toBe(false);
     });
 
@@ -357,7 +413,9 @@ describe('XRechnung', () => {
     });
 
     it('refuses a relative output path, a missing one and a syntax it does not know', async () => {
-      expect((await call('create_xrechnung', { invoice: xrechnung(), output_path: 'out.xml' })).text).toContain('absolute');
+      expect((await call('create_xrechnung', { invoice: xrechnung(), output_path: 'out.xml' })).text).toContain(
+        'absolute',
+      );
       expect((await call('create_xrechnung', { invoice: xrechnung() })).isError).toBe(true);
       const out = join(tmp(), 'out.xml');
       const result = await call('create_xrechnung', { invoice: xrechnung(), output_path: out, syntax: 'edifact' });

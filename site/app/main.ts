@@ -19,11 +19,13 @@ import { state } from './state.js';
 
 function applyLang(next: 'de' | 'en'): void {
   setLang(next);
-  for (const button of document.querySelectorAll<HTMLButtonElement>('[data-lang]')) button.setAttribute('aria-pressed', String(button.dataset.lang === next));
+  for (const button of document.querySelectorAll<HTMLButtonElement>('[data-lang]'))
+    button.setAttribute('aria-pressed', String(button.dataset.lang === next));
   renderModels();
   if (state.pdf) renderForm();
   renderNotes();
 }
-for (const button of document.querySelectorAll<HTMLButtonElement>('[data-lang]')) button.onclick = () => applyLang(button.dataset.lang as 'de' | 'en');
+for (const button of document.querySelectorAll<HTMLButtonElement>('[data-lang]'))
+  button.onclick = () => applyLang(button.dataset.lang as 'de' | 'en');
 applyLang(lang);
 countVisit();
