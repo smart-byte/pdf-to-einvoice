@@ -7,5 +7,6 @@
   } catch {
     // Private mode: the system setting decides.
   }
-  document.documentElement.dataset.theme = saved || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  document.documentElement.dataset.theme =
+    saved || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
 })();

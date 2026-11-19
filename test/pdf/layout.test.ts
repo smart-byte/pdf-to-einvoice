@@ -62,7 +62,10 @@ describe('extractLayout', () => {
         ['Sehr geehrte Frau Muster,', 60, 560, 12],
       ]),
     );
-    expect(layout.blocks).toEqual([['Erika Muster', 'Hauptstraße 5', '54321 Beispielstadt'], ['Sehr geehrte Frau Muster,']]);
+    expect(layout.blocks).toEqual([
+      ['Erika Muster', 'Hauptstraße 5', '54321 Beispielstadt'],
+      ['Sehr geehrte Frau Muster,'],
+    ]);
   });
 
   it('joins the pieces of a word that the PDF holds apart, and keeps words apart', async () => {
@@ -74,7 +77,12 @@ describe('extractLayout', () => {
     const width = (text: string) => font.widthOfTextAtSize(text, 12);
     page.drawText('Rechnung', { x: 60, y: 700, size: 12, font: other });
     page.drawText('RE-20', { x: 60 + other.widthOfTextAtSize('Rechnung ', 12), y: 700, size: 12, font });
-    page.drawText('26/508', { x: 60 + other.widthOfTextAtSize('Rechnung ', 12) + width('RE-20'), y: 700, size: 12, font: other });
+    page.drawText('26/508', {
+      x: 60 + other.widthOfTextAtSize('Rechnung ', 12) + width('RE-20'),
+      y: 700,
+      size: 12,
+      font: other,
+    });
     expect(await extractText(await doc.save())).toBe('Rechnung RE-2026/508');
   });
 
@@ -105,6 +113,11 @@ describe('extractLayout', () => {
   it('returns no text, blocks or pieces for a PDF without text', async () => {
     const doc = await PDFDocument.create();
     doc.addPage([595, 842]);
-    expect(await extractLayout(await doc.save())).toEqual({ text: '', blocks: [], pieces: [], pages: [{ width: 595, height: 842 }] });
+    expect(await extractLayout(await doc.save())).toEqual({
+      text: '',
+      blocks: [],
+      pieces: [],
+      pages: [{ width: 595, height: 842 }],
+    });
   });
 });

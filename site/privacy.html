@@ -29,19 +29,23 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Privacy policy / Datenschutzerklärung: pdf-to-einvoice" />
     <meta name="twitter:image" content="https://pdf-to-einvoice.app/og.png" />
-    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="./shared/favicon.svg" type="image/svg+xml" />
     <link rel="alternate" type="text/plain" href="./llms.txt" title="llms.txt" />
     <!-- Sets the theme before first paint. -->
     <script src="./theme.js"></script>
-    <script type="module" src="./legal.ts"></script>
+    <script type="module" src="./legal/legal.ts"></script>
   </head>
   <body>
     <svg class="defs" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.2A8.2 8.2 0 0 1 9.8 4a8.2 8.2 0 1 0 10.2 10.2z" /></symbol>
+        <symbol id="i-moon" viewBox="0 0 24 24">
+          <path d="M20 14.2A8.2 8.2 0 0 1 9.8 4a8.2 8.2 0 1 0 10.2 10.2z" />
+        </symbol>
         <symbol id="i-sun" viewBox="0 0 24 24">
           <circle cx="12" cy="12" r="4" />
-          <path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4" />
+          <path
+            d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"
+          />
         </symbol>
         <symbol id="i-github" viewBox="0 0 24 24">
           <path
@@ -59,7 +63,15 @@
       <div class="nav__in">
         <a class="brand" href="./">
           <svg class="brand__mark" viewBox="0 0 32 32" aria-hidden="true">
-            <rect class="brand__copy" x="10.5" y="3" width="16.5" height="21.5" rx="1.5" transform="rotate(9 18.7 13.7)" />
+            <rect
+              class="brand__copy"
+              x="10.5"
+              y="3"
+              width="16.5"
+              height="21.5"
+              rx="1.5"
+              transform="rotate(9 18.7 13.7)"
+            />
             <rect class="brand__page" x="5" y="7.5" width="16.5" height="21.5" rx="1.5" />
             <path d="M9 13.5h5.5M9 18h8.5M9 22.5h4.5" />
           </svg>
@@ -70,8 +82,16 @@
             <button type="button" data-lang="de">DE</button>
             <button type="button" data-lang="en">EN</button>
           </div>
-          <button type="button" class="tool tool--icon" id="theme" data-i18n-label="nav.theme" aria-label="Dark theme" aria-pressed="false">
-            <svg class="i i--moon" aria-hidden="true"><use href="#i-moon" /></svg><svg class="i i--sun" aria-hidden="true"><use href="#i-sun" /></svg>
+          <button
+            type="button"
+            class="tool tool--icon"
+            id="theme"
+            data-i18n-label="nav.theme"
+            aria-label="Dark theme"
+            aria-pressed="false"
+          >
+            <svg class="i i--moon" aria-hidden="true"><use href="#i-moon" /></svg
+            ><svg class="i i--sun" aria-hidden="true"><use href="#i-sun" /></svg>
           </button>
           <a class="tool" href="https://github.com/smart-byte/pdf-to-einvoice"
             ><svg class="i" aria-hidden="true"><use href="#i-github" /></svg><span>GitHub</span></a
@@ -83,8 +103,9 @@
       <section class="info legal" lang="en">
         <h1>Privacy policy</h1>
         <p>
-          This policy explains what personal data is processed when you visit this website, why, and what rights you have. The pdf-to-einvoice library, command
-          line tool and MCP server run on your own machine; this policy covers only the website.
+          This policy explains what personal data is processed when you visit this website, why, and what rights you
+          have. The pdf-to-einvoice library, command line tool and MCP server run on your own machine; this policy
+          covers only the website.
         </p>
         <ul>
           <!-- without-counter -->
@@ -92,11 +113,17 @@
           <!-- /without-counter -->
           <!-- with-counter -->
           <li>No cookies, accounts, contact forms or advertising.</li>
-          <li>Our own Umami server counts page views and created files without cookies or stored IP addresses, and you can opt out.</li>
+          <li>
+            Our own Umami server counts page views and created files without cookies or stored IP addresses, and you can
+            opt out.
+          </li>
           <!-- /with-counter -->
           <li>Invoices you open are processed in your browser. They are never uploaded.</li>
           <li>Cloudflare delivers the site and processes connection data to do so.</li>
-          <li>If you choose “Read with AI”, your browser downloads a language model from Hugging Face and GitHub. Your invoice is not sent there.</li>
+          <li>
+            If you choose “Read with AI”, your browser downloads a language model from Hugging Face and GitHub. Your
+            invoice is not sent there.
+          </li>
         </ul>
 
         <h2>Controller</h2>
@@ -110,63 +137,78 @@
 
         <h2>Hosting and delivery</h2>
         <p>
-          This is a static website served by Cloudflare, a service of Cloudflare, Inc., 101 Townsend St., San Francisco, CA 94107, USA. To deliver pages and
-          protect the site against attacks, Cloudflare processes what your browser sends with every request: your IP address, the requested address, date and
-          time, the referring page, your browser and operating system, and technical connection data.
+          This is a static website served by Cloudflare, a service of Cloudflare, Inc., 101 Townsend St., San Francisco,
+          CA 94107, USA. To deliver pages and protect the site against attacks, Cloudflare processes what your browser
+          sends with every request: your IP address, the requested address, date and time, the referring page, your
+          browser and operating system, and technical connection data.
         </p>
         <p>Legal basis: our legitimate interest in delivering the site securely and reliably (Art. 6(1)(f) GDPR).</p>
         <p>Processor: Cloudflare processes this data on our behalf under a data processing agreement (Art. 28 GDPR).</p>
         <p>
-          Transfer to the USA: Cloudflare, Inc. is certified under the EU-U.S. Data Privacy Framework (Art. 45 GDPR). We do not keep request logs ourselves;
-          Cloudflare keeps them only as long as delivery and security require. How Cloudflare handles this data is described in the
+          Transfer to the USA: Cloudflare, Inc. is certified under the EU-U.S. Data Privacy Framework (Art. 45 GDPR). We
+          do not keep request logs ourselves; Cloudflare keeps them only as long as delivery and security require. How
+          Cloudflare handles this data is described in the
           <a href="https://www.cloudflare.com/privacypolicy/">Cloudflare privacy policy</a>.
         </p>
 
         <h2>Your invoices</h2>
         <p>
-          The PDF you choose or drop is read, checked and turned into an e-invoice on your device. It is never uploaded, and we do not receive it, its name or
-          anything in it. The same goes for the data you type into the form and for the file you download.
+          The PDF you choose or drop is read, checked and turned into an e-invoice on your device. It is never uploaded,
+          and we do not receive it, its name or anything in it. The same goes for the data you type into the form and
+          for the file you download.
         </p>
 
         <h2>Reading with AI (optional)</h2>
         <p>
-          If you choose “Read with AI” with a model that runs in your browser, the browser downloads the model once: its files from huggingface.co and its
-          download servers under hf.co (Hugging Face, Inc., 20 Jay Street, Suite 620, Brooklyn, NY 11201, USA) and its program code from
-          raw.githubusercontent.com (GitHub, Inc.). Both receive your IP address and the technical data of the request, as with any download. Neither receives
-          your invoice: the model reads it on your device.
+          If you choose “Read with AI” with a model that runs in your browser, the browser downloads the model once: its
+          files from huggingface.co and its download servers under hf.co (Hugging Face, Inc., 20 Jay Street, Suite 620,
+          Brooklyn, NY 11201, USA) and its program code from raw.githubusercontent.com (GitHub, Inc.). Both receive your
+          IP address and the technical data of the request, as with any download. Neither receives your invoice: the
+          model reads it on your device.
         </p>
         <p>
-          The download starts only when you start it. Legal basis: our legitimate interest in offering the function you asked for (Art. 6(1)(f) GDPR). If you do
-          not use it, no request is made.
+          The download starts only when you start it. Legal basis: our legitimate interest in offering the function you
+          asked for (Art. 6(1)(f) GDPR). If you do not use it, no request is made.
         </p>
         <p>
-          If you enter the address of your own model service instead, the text of your invoice is sent to that address. That is your choice and under your
-          control; the page says so next to the field.
+          If you enter the address of your own model service instead, the text of your invoice is sent to that address.
+          That is your choice and under your control; the page says so next to the field.
         </p>
 
         <!-- with-counter -->
         <h2>Analytics with Umami</h2>
         <p>
-          We count page views with Umami, open-source analytics that we run ourselves at analytics.smart-byte.com on a server of Hetzner Online GmbH,
-          Industriestr. 25, 91710 Gunzenhausen, Germany, located in Finland. Hetzner processes this data on our behalf under a data processing agreement (Art.
-          28 GDPR); nobody else receives it. When a page loads, and when you create a file, a small script sends:
+          We count page views with Umami, open-source analytics that we run ourselves at analytics.smart-byte.com on a
+          server of Hetzner Online GmbH, Industriestr. 25, 91710 Gunzenhausen, Germany, located in Finland. Hetzner
+          processes this data on our behalf under a data processing agreement (Art. 28 GDPR); nobody else receives it.
+          When a page loads, and when you create a file, a small script sends:
         </p>
         <ul>
           <li>the page's address, without query string or fragment, and its title;</li>
           <li>the website you came from, which browsers usually share only as a domain;</li>
-          <li>that a file was created and whether it is an e-invoice or an XRechnung, but never anything of your invoice, its name or its content;</li>
+          <li>
+            that a file was created and whether it is an e-invoice or an XRechnung, but never anything of your invoice,
+            its name or its content;
+          </li>
           <li>your browser, operating system, device type, screen size, and language;</li>
           <li>your approximate location (country, region, and city), looked up from your IP address on our server.</li>
         </ul>
         <p>
-          Umami sets no cookies and stores nothing on your device. It does not store your IP address: to tell visits apart, it derives a pseudonymous identifier
-          from your IP address, your browser's user agent, and a salt that changes every day, so visits cannot be linked across days. We look at the results
-          only in aggregate, to see whether and how the site is used. We don't build profiles or combine this data with anything else.
+          Umami sets no cookies and stores nothing on your device. It does not store your IP address: to tell visits
+          apart, it derives a pseudonymous identifier from your IP address, your browser's user agent, and a salt that
+          changes every day, so visits cannot be linked across days. We look at the results only in aggregate, to see
+          whether and how the site is used. We don't build profiles or combine this data with anything else.
         </p>
         <ul>
-          <li><strong>Legal basis:</strong> our legitimate interest in understanding how the site is used (Art. 6(1)(f) GDPR).</li>
+          <li>
+            <strong>Legal basis:</strong> our legitimate interest in understanding how the site is used (Art. 6(1)(f)
+            GDPR).
+          </li>
           <li><strong>Retention:</strong> analytics records are deleted after 13 months.</li>
-          <li><strong>Your choice:</strong> Umami doesn't count browsers that send Do Not Track, and you can turn it off for this browser here.</li>
+          <li>
+            <strong>Your choice:</strong> Umami doesn't count browsers that send Do Not Track, and you can turn it off
+            for this browser here.
+          </li>
         </ul>
         <div class="optout" data-optout hidden>
           <p data-optout-state></p>
@@ -176,47 +218,59 @@
 
         <h2>Data stored in your browser</h2>
         <p>
-          The site remembers your language and, once you have switched it, the light or dark theme in your browser's local storage under <code>lang</code> and
-          <code>theme</code>. A model you downloaded is kept in the browser's cache so that it need not be downloaded again. Both stay on your device and are
-          never sent to us. They are strictly necessary for functions you use (§ 25(2) No. 2 TDDDG), so no consent is needed; you can delete them at any time in
-          your browser settings.
+          The site remembers your language and, once you have switched it, the light or dark theme in your browser's
+          local storage under <code>lang</code> and <code>theme</code>. A model you downloaded is kept in the browser's
+          cache so that it need not be downloaded again. Both stay on your device and are never sent to us. They are
+          strictly necessary for functions you use (§ 25(2) No. 2 TDDDG), so no consent is needed; you can delete them
+          at any time in your browser settings.
         </p>
         <!-- with-counter -->
-        <p>If you turn the counting of your visits off, the site notes that in the same place under <code>umami.disabled</code>.</p>
+        <p>
+          If you turn the counting of your visits off, the site notes that in the same place under
+          <code>umami.disabled</code>.
+        </p>
         <!-- /with-counter -->
 
         <h2>Email</h2>
         <p>
-          When you email us, we process your email address, your message, and anything you include, to answer you. The legal basis is Art. 6(1)(b) GDPR if your
-          message concerns a contract or its preparation, and otherwise our legitimate interest in answering inquiries (Art. 6(1)(f) GDPR). Our email runs on
-          Google Workspace (Google Ireland Limited, Gordon House, Barrow Street, Dublin 4, Ireland), which processes it on our behalf under a data processing
-          agreement. Google may process data in the USA; Google LLC is certified under the EU-U.S. Data Privacy Framework. We delete correspondence once it is
-          resolved, unless commercial or tax law requires us to keep it (up to six or ten years under § 257 HGB and § 147 AO).
+          When you email us, we process your email address, your message, and anything you include, to answer you. The
+          legal basis is Art. 6(1)(b) GDPR if your message concerns a contract or its preparation, and otherwise our
+          legitimate interest in answering inquiries (Art. 6(1)(f) GDPR). Our email runs on Google Workspace (Google
+          Ireland Limited, Gordon House, Barrow Street, Dublin 4, Ireland), which processes it on our behalf under a
+          data processing agreement. Google may process data in the USA; Google LLC is certified under the EU-U.S. Data
+          Privacy Framework. We delete correspondence once it is resolved, unless commercial or tax law requires us to
+          keep it (up to six or ten years under § 257 HGB and § 147 AO).
         </p>
 
         <h2>Links to other websites</h2>
-        <p>The site links to GitHub and npm. Your browser contacts those sites only when you follow a link, and their privacy policies apply there.</p>
+        <p>
+          The site links to GitHub and npm. Your browser contacts those sites only when you follow a link, and their
+          privacy policies apply there.
+        </p>
 
         <h2>Your rights</h2>
         <p>
-          You have the right to access your personal data (Art. 15 GDPR), to have it rectified (Art. 16) or erased (Art. 17), to restrict its processing (Art.
-          18), and to data portability (Art. 20). Write to <a href="mailto:info@smart-byte.com">info@smart-byte.com</a>. Because we keep no request logs and no
+          You have the right to access your personal data (Art. 15 GDPR), to have it rectified (Art. 16) or erased (Art.
+          17), to restrict its processing (Art. 18), and to data portability (Art. 20). Write to
+          <a href="mailto:info@smart-byte.com">info@smart-byte.com</a>. Because we keep no request logs and no
           identifiers tied to a person, we usually hold no data about your visit.
         </p>
         <p>
-          Right to object (Art. 21 GDPR). Where we process data on the basis of legitimate interests (Art. 6(1)(f) GDPR), you can object at any time on grounds
-          relating to your particular situation.
+          Right to object (Art. 21 GDPR). Where we process data on the basis of legitimate interests (Art. 6(1)(f)
+          GDPR), you can object at any time on grounds relating to your particular situation.
         </p>
         <p>
-          You can also lodge a complaint with a data protection supervisory authority (Art. 77 GDPR), in particular in the EU member state where you live or
-          work. The authority responsible for us is the Bayerisches Landesamt für Datenschutzaufsicht (BayLDA), Promenade 18, 91522 Ansbach, Germany,
+          You can also lodge a complaint with a data protection supervisory authority (Art. 77 GDPR), in particular in
+          the EU member state where you live or work. The authority responsible for us is the Bayerisches Landesamt für
+          Datenschutzaufsicht (BayLDA), Promenade 18, 91522 Ansbach, Germany,
           <a href="https://www.lda.bayern.de">www.lda.bayern.de</a>.
         </p>
 
         <h2>Other information</h2>
         <p>
-          You do not have to provide personal data. Without the connection data your browser sends, the site cannot be delivered. We do not use automated
-          decision-making or profiling (Art. 22 GDPR). We update this policy when the site or the law changes.
+          You do not have to provide personal data. Without the connection data your browser sends, the site cannot be
+          delivered. We do not use automated decision-making or profiling (Art. 22 GDPR). We update this policy when the
+          site or the law changes.
         </p>
         <p>Last updated: 11 November 2026</p>
       </section>
@@ -224,9 +278,9 @@
       <section class="info legal" lang="de" id="de">
         <h1>Datenschutzerklärung</h1>
         <p>
-          Diese Erklärung beschreibt, welche personenbezogenen Daten beim Besuch dieser Website verarbeitet werden, warum und welche Rechte Sie haben. Die
-          Bibliothek, das Kommandozeilenprogramm und der MCP-Server von pdf-to-einvoice laufen auf Ihrem eigenen Rechner; diese Erklärung betrifft nur die
-          Website.
+          Diese Erklärung beschreibt, welche personenbezogenen Daten beim Besuch dieser Website verarbeitet werden,
+          warum und welche Rechte Sie haben. Die Bibliothek, das Kommandozeilenprogramm und der MCP-Server von
+          pdf-to-einvoice laufen auf Ihrem eigenen Rechner; diese Erklärung betrifft nur die Website.
         </p>
         <ul>
           <!-- without-counter -->
@@ -235,13 +289,15 @@
           <!-- with-counter -->
           <li>Keine Cookies, Konten, Kontaktformulare oder Werbung.</li>
           <li>
-            Unser eigener Umami-Server zählt Seitenaufrufe und erstellte Dateien, ohne Cookies und ohne gespeicherte IP-Adressen; Sie können das abschalten.
+            Unser eigener Umami-Server zählt Seitenaufrufe und erstellte Dateien, ohne Cookies und ohne gespeicherte
+            IP-Adressen; Sie können das abschalten.
           </li>
           <!-- /with-counter -->
           <li>Rechnungen, die Sie öffnen, werden in Ihrem Browser verarbeitet. Sie werden nie hochgeladen.</li>
           <li>Cloudflare liefert die Website aus und verarbeitet dafür Verbindungsdaten.</li>
           <li>
-            Wenn Sie „Mit KI auslesen“ wählen, lädt Ihr Browser ein Sprachmodell von Hugging Face und GitHub. Ihre Rechnung wird dorthin nicht übertragen.
+            Wenn Sie „Mit KI auslesen“ wählen, lädt Ihr Browser ein Sprachmodell von Hugging Face und GitHub. Ihre
+            Rechnung wird dorthin nicht übertragen.
           </li>
         </ul>
 
@@ -256,69 +312,89 @@
 
         <h2>Hosting und Auslieferung</h2>
         <p>
-          Dies ist eine statische Website, ausgeliefert über Cloudflare, einen Dienst der Cloudflare, Inc., 101 Townsend St., San Francisco, CA 94107, USA. Um
-          Seiten auszuliefern und die Website vor Angriffen zu schützen, verarbeitet Cloudflare, was Ihr Browser bei jeder Anfrage sendet: Ihre IP-Adresse, die
-          angefragte Adresse, Datum und Uhrzeit, die verweisende Seite, Browser und Betriebssystem sowie technische Verbindungsdaten.
+          Dies ist eine statische Website, ausgeliefert über Cloudflare, einen Dienst der Cloudflare, Inc., 101 Townsend
+          St., San Francisco, CA 94107, USA. Um Seiten auszuliefern und die Website vor Angriffen zu schützen,
+          verarbeitet Cloudflare, was Ihr Browser bei jeder Anfrage sendet: Ihre IP-Adresse, die angefragte Adresse,
+          Datum und Uhrzeit, die verweisende Seite, Browser und Betriebssystem sowie technische Verbindungsdaten.
         </p>
-        <p>Rechtsgrundlage: unser berechtigtes Interesse an einer sicheren und zuverlässigen Auslieferung der Website (Art. 6 Abs. 1 lit. f DSGVO).</p>
-        <p>Auftragsverarbeitung: Cloudflare verarbeitet diese Daten in unserem Auftrag auf Grundlage eines Auftragsverarbeitungsvertrags (Art. 28 DSGVO).</p>
         <p>
-          Übermittlung in die USA: Die Cloudflare, Inc. ist nach dem EU-U.S. Data Privacy Framework zertifiziert (Art. 45 DSGVO). Wir selbst speichern keine
-          Zugriffsprotokolle; Cloudflare bewahrt sie nur so lange auf, wie es für Auslieferung und Sicherheit nötig ist. Wie Cloudflare mit diesen Daten umgeht,
-          steht in der <a href="https://www.cloudflare.com/de-de/privacypolicy/">Datenschutzerklärung von Cloudflare</a>.
+          Rechtsgrundlage: unser berechtigtes Interesse an einer sicheren und zuverlässigen Auslieferung der Website
+          (Art. 6 Abs. 1 lit. f DSGVO).
+        </p>
+        <p>
+          Auftragsverarbeitung: Cloudflare verarbeitet diese Daten in unserem Auftrag auf Grundlage eines
+          Auftragsverarbeitungsvertrags (Art. 28 DSGVO).
+        </p>
+        <p>
+          Übermittlung in die USA: Die Cloudflare, Inc. ist nach dem EU-U.S. Data Privacy Framework zertifiziert (Art.
+          45 DSGVO). Wir selbst speichern keine Zugriffsprotokolle; Cloudflare bewahrt sie nur so lange auf, wie es für
+          Auslieferung und Sicherheit nötig ist. Wie Cloudflare mit diesen Daten umgeht, steht in der
+          <a href="https://www.cloudflare.com/de-de/privacypolicy/">Datenschutzerklärung von Cloudflare</a>.
         </p>
 
         <h2>Ihre Rechnungen</h2>
         <p>
-          Das PDF, das Sie auswählen oder ablegen, wird auf Ihrem Gerät gelesen, geprüft und in eine E-Rechnung umgewandelt. Es wird nie hochgeladen; wir
-          erhalten weder die Datei noch ihren Namen noch ihren Inhalt. Dasselbe gilt für die Angaben, die Sie ins Formular eintragen, und für die Datei, die Sie
-          herunterladen.
+          Das PDF, das Sie auswählen oder ablegen, wird auf Ihrem Gerät gelesen, geprüft und in eine E-Rechnung
+          umgewandelt. Es wird nie hochgeladen; wir erhalten weder die Datei noch ihren Namen noch ihren Inhalt.
+          Dasselbe gilt für die Angaben, die Sie ins Formular eintragen, und für die Datei, die Sie herunterladen.
         </p>
 
         <h2>Auslesen mit KI (freiwillig)</h2>
         <p>
-          Wenn Sie „Mit KI auslesen“ mit einem Modell wählen, das in Ihrem Browser läuft, lädt der Browser das Modell einmalig herunter: die Modelldateien von
-          huggingface.co und dessen Download-Servern unter hf.co (Hugging Face, Inc., 20 Jay Street, Suite 620, Brooklyn, NY 11201, USA) und den zugehörigen
-          Programmcode von raw.githubusercontent.com (GitHub, Inc.). Beide erhalten dabei Ihre IP-Adresse und die technischen Daten der Anfrage, wie bei jedem
-          Download. Ihre Rechnung erhält keiner von beiden: Das Modell liest sie auf Ihrem Gerät.
+          Wenn Sie „Mit KI auslesen“ mit einem Modell wählen, das in Ihrem Browser läuft, lädt der Browser das Modell
+          einmalig herunter: die Modelldateien von huggingface.co und dessen Download-Servern unter hf.co (Hugging Face,
+          Inc., 20 Jay Street, Suite 620, Brooklyn, NY 11201, USA) und den zugehörigen Programmcode von
+          raw.githubusercontent.com (GitHub, Inc.). Beide erhalten dabei Ihre IP-Adresse und die technischen Daten der
+          Anfrage, wie bei jedem Download. Ihre Rechnung erhält keiner von beiden: Das Modell liest sie auf Ihrem Gerät.
         </p>
         <p>
-          Der Download beginnt nur, wenn Sie ihn starten. Rechtsgrundlage: unser berechtigtes Interesse, die von Ihnen gewünschte Funktion anzubieten (Art. 6
-          Abs. 1 lit. f DSGVO). Nutzen Sie die Funktion nicht, findet keine Anfrage statt.
+          Der Download beginnt nur, wenn Sie ihn starten. Rechtsgrundlage: unser berechtigtes Interesse, die von Ihnen
+          gewünschte Funktion anzubieten (Art. 6 Abs. 1 lit. f DSGVO). Nutzen Sie die Funktion nicht, findet keine
+          Anfrage statt.
         </p>
         <p>
-          Tragen Sie stattdessen die Adresse eines eigenen Modell-Dienstes ein, wird der Text Ihrer Rechnung an diese Adresse gesendet. Das ist Ihre
-          Entscheidung und liegt in Ihrer Hand; die Seite weist neben dem Feld darauf hin.
+          Tragen Sie stattdessen die Adresse eines eigenen Modell-Dienstes ein, wird der Text Ihrer Rechnung an diese
+          Adresse gesendet. Das ist Ihre Entscheidung und liegt in Ihrer Hand; die Seite weist neben dem Feld darauf
+          hin.
         </p>
 
         <!-- with-counter -->
         <h2>Reichweitenmessung mit Umami</h2>
         <p>
-          Wir zählen Seitenaufrufe mit Umami, einer Open-Source-Software, die wir selbst unter analytics.smart-byte.com betreiben, auf einem Server der Hetzner
-          Online GmbH, Industriestr. 25, 91710 Gunzenhausen, Deutschland, am Standort Finnland. Hetzner verarbeitet diese Daten in unserem Auftrag auf Grundlage
-          eines Auftragsverarbeitungsvertrags (Art. 28 DSGVO); niemand sonst erhält sie. Beim Laden einer Seite und wenn Sie eine Datei erstellen, sendet ein
-          kleines Skript:
+          Wir zählen Seitenaufrufe mit Umami, einer Open-Source-Software, die wir selbst unter analytics.smart-byte.com
+          betreiben, auf einem Server der Hetzner Online GmbH, Industriestr. 25, 91710 Gunzenhausen, Deutschland, am
+          Standort Finnland. Hetzner verarbeitet diese Daten in unserem Auftrag auf Grundlage eines
+          Auftragsverarbeitungsvertrags (Art. 28 DSGVO); niemand sonst erhält sie. Beim Laden einer Seite und wenn Sie
+          eine Datei erstellen, sendet ein kleines Skript:
         </p>
         <ul>
           <li>die Adresse der Seite, ohne Abfrageteil und Fragment, und ihren Titel;</li>
           <li>die Website, von der Sie kommen; Browser nennen meist nur deren Domain;</li>
           <li>
-            dass eine Datei erstellt wurde und ob es eine E-Rechnung oder eine XRechnung ist, aber nie etwas von Ihrer Rechnung, ihrem Namen oder ihrem Inhalt;
+            dass eine Datei erstellt wurde und ob es eine E-Rechnung oder eine XRechnung ist, aber nie etwas von Ihrer
+            Rechnung, ihrem Namen oder ihrem Inhalt;
           </li>
           <li>Browser, Betriebssystem, Gerätetyp, Bildschirmgröße und Sprache;</li>
-          <li>Ihren ungefähren Standort (Land, Region und Stadt), auf unserem Server aus Ihrer IP-Adresse ermittelt.</li>
+          <li>
+            Ihren ungefähren Standort (Land, Region und Stadt), auf unserem Server aus Ihrer IP-Adresse ermittelt.
+          </li>
         </ul>
         <p>
-          Umami setzt keine Cookies und speichert nichts auf Ihrem Gerät. Ihre IP-Adresse wird nicht gespeichert: Um Besuche zu unterscheiden, bildet Umami aus
-          IP-Adresse, Browserkennung und einem täglich wechselnden Zufallswert eine pseudonyme Kennung; Besuche lassen sich so nicht über mehrere Tage
-          verknüpfen. Wir sehen uns die Ergebnisse nur zusammengefasst an, um zu erkennen, ob und wie die Website genutzt wird. Wir bilden keine Profile und
-          führen die Daten mit nichts anderem zusammen.
+          Umami setzt keine Cookies und speichert nichts auf Ihrem Gerät. Ihre IP-Adresse wird nicht gespeichert: Um
+          Besuche zu unterscheiden, bildet Umami aus IP-Adresse, Browserkennung und einem täglich wechselnden
+          Zufallswert eine pseudonyme Kennung; Besuche lassen sich so nicht über mehrere Tage verknüpfen. Wir sehen uns
+          die Ergebnisse nur zusammengefasst an, um zu erkennen, ob und wie die Website genutzt wird. Wir bilden keine
+          Profile und führen die Daten mit nichts anderem zusammen.
         </p>
         <ul>
-          <li><strong>Rechtsgrundlage:</strong> unser berechtigtes Interesse zu verstehen, wie die Website genutzt wird (Art. 6 Abs. 1 lit. f DSGVO).</li>
+          <li>
+            <strong>Rechtsgrundlage:</strong> unser berechtigtes Interesse zu verstehen, wie die Website genutzt wird
+            (Art. 6 Abs. 1 lit. f DSGVO).
+          </li>
           <li><strong>Speicherdauer:</strong> Die Einträge werden nach 13 Monaten gelöscht.</li>
           <li>
-            <strong>Ihre Wahl:</strong> Umami zählt keine Browser, die „Do Not Track“ senden, und Sie können die Zählung für diesen Browser hier abschalten.
+            <strong>Ihre Wahl:</strong> Umami zählt keine Browser, die „Do Not Track“ senden, und Sie können die Zählung
+            für diesen Browser hier abschalten.
           </li>
         </ul>
         <div class="optout" data-optout hidden>
@@ -329,52 +405,65 @@
 
         <h2>In Ihrem Browser gespeicherte Daten</h2>
         <p>
-          Die Website merkt sich Ihre Sprache und, sobald Sie das Design umgeschaltet haben, das helle oder dunkle Design im lokalen Speicher des Browsers unter
-          <code>lang</code> und <code>theme</code>. Ein heruntergeladenes Modell bleibt im Cache des Browsers, damit es nicht erneut geladen werden muss. Beides
-          bleibt auf Ihrem Gerät und wird nie an uns gesendet. Beides ist für von Ihnen genutzte Funktionen unbedingt erforderlich (§ 25 Abs. 2 Nr. 2 TDDDG),
-          eine Einwilligung ist daher nicht nötig; Sie können es jederzeit in den Browser-Einstellungen löschen.
+          Die Website merkt sich Ihre Sprache und, sobald Sie das Design umgeschaltet haben, das helle oder dunkle
+          Design im lokalen Speicher des Browsers unter
+          <code>lang</code> und <code>theme</code>. Ein heruntergeladenes Modell bleibt im Cache des Browsers, damit es
+          nicht erneut geladen werden muss. Beides bleibt auf Ihrem Gerät und wird nie an uns gesendet. Beides ist für
+          von Ihnen genutzte Funktionen unbedingt erforderlich (§ 25 Abs. 2 Nr. 2 TDDDG), eine Einwilligung ist daher
+          nicht nötig; Sie können es jederzeit in den Browser-Einstellungen löschen.
         </p>
         <!-- with-counter -->
-        <p>Schalten Sie die Zählung Ihrer Besuche ab, merkt sich die Website das an derselben Stelle unter <code>umami.disabled</code>.</p>
+        <p>
+          Schalten Sie die Zählung Ihrer Besuche ab, merkt sich die Website das an derselben Stelle unter
+          <code>umami.disabled</code>.
+        </p>
         <!-- /with-counter -->
 
         <h2>E-Mail</h2>
         <p>
-          Wenn Sie uns eine E-Mail schreiben, verarbeiten wir Ihre E-Mail-Adresse, Ihre Nachricht und alles, was Sie mitschicken, um Ihnen zu antworten.
-          Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO, wenn Ihre Nachricht einen Vertrag oder dessen Anbahnung betrifft, sonst unser berechtigtes Interesse
-          an der Beantwortung von Anfragen (Art. 6 Abs. 1 lit. f DSGVO). Unsere E-Mail läuft über Google Workspace (Google Ireland Limited, Gordon House, Barrow
-          Street, Dublin 4, Irland), das sie in unserem Auftrag auf Grundlage eines Auftragsverarbeitungsvertrags verarbeitet. Google kann Daten in den USA
-          verarbeiten; die Google LLC ist nach dem EU-U.S. Data Privacy Framework zertifiziert. Wir löschen Korrespondenz, sobald sie erledigt ist, sofern
-          handels- oder steuerrechtliche Pflichten nicht eine längere Aufbewahrung verlangen (bis zu sechs oder zehn Jahre nach § 257 HGB und § 147 AO).
+          Wenn Sie uns eine E-Mail schreiben, verarbeiten wir Ihre E-Mail-Adresse, Ihre Nachricht und alles, was Sie
+          mitschicken, um Ihnen zu antworten. Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO, wenn Ihre Nachricht einen
+          Vertrag oder dessen Anbahnung betrifft, sonst unser berechtigtes Interesse an der Beantwortung von Anfragen
+          (Art. 6 Abs. 1 lit. f DSGVO). Unsere E-Mail läuft über Google Workspace (Google Ireland Limited, Gordon House,
+          Barrow Street, Dublin 4, Irland), das sie in unserem Auftrag auf Grundlage eines Auftragsverarbeitungsvertrags
+          verarbeitet. Google kann Daten in den USA verarbeiten; die Google LLC ist nach dem EU-U.S. Data Privacy
+          Framework zertifiziert. Wir löschen Korrespondenz, sobald sie erledigt ist, sofern handels- oder
+          steuerrechtliche Pflichten nicht eine längere Aufbewahrung verlangen (bis zu sechs oder zehn Jahre nach § 257
+          HGB und § 147 AO).
         </p>
 
         <h2>Links zu anderen Websites</h2>
         <p>
-          Die Website verlinkt auf GitHub und npm. Ihr Browser nimmt erst dann Kontakt zu diesen Seiten auf, wenn Sie einem Link folgen; dort gelten deren
-          Datenschutzerklärungen.
+          Die Website verlinkt auf GitHub und npm. Ihr Browser nimmt erst dann Kontakt zu diesen Seiten auf, wenn Sie
+          einem Link folgen; dort gelten deren Datenschutzerklärungen.
         </p>
 
         <h2>Ihre Rechte</h2>
         <p>
-          Sie haben das Recht auf Auskunft über Ihre personenbezogenen Daten (Art. 15 DSGVO), auf Berichtigung (Art. 16), Löschung (Art. 17), Einschränkung der
-          Verarbeitung (Art. 18) und Datenübertragbarkeit (Art. 20). Schreiben Sie an <a href="mailto:info@smart-byte.com">info@smart-byte.com</a>. Weil wir
-          keine Zugriffsprotokolle und keine personenbezogenen Kennungen speichern, liegen uns zu Ihrem Besuch in der Regel keine Daten vor.
+          Sie haben das Recht auf Auskunft über Ihre personenbezogenen Daten (Art. 15 DSGVO), auf Berichtigung (Art.
+          16), Löschung (Art. 17), Einschränkung der Verarbeitung (Art. 18) und Datenübertragbarkeit (Art. 20).
+          Schreiben Sie an <a href="mailto:info@smart-byte.com">info@smart-byte.com</a>. Weil wir keine
+          Zugriffsprotokolle und keine personenbezogenen Kennungen speichern, liegen uns zu Ihrem Besuch in der Regel
+          keine Daten vor.
         </p>
         <p>
-          Widerspruchsrecht (Art. 21 DSGVO). Soweit wir Daten auf Grundlage berechtigter Interessen verarbeiten (Art. 6 Abs. 1 lit. f DSGVO), können Sie aus
-          Gründen, die sich aus Ihrer besonderen Situation ergeben, jederzeit widersprechen.
+          Widerspruchsrecht (Art. 21 DSGVO). Soweit wir Daten auf Grundlage berechtigter Interessen verarbeiten (Art. 6
+          Abs. 1 lit. f DSGVO), können Sie aus Gründen, die sich aus Ihrer besonderen Situation ergeben, jederzeit
+          widersprechen.
         </p>
         <p>
-          Sie können sich außerdem bei einer Datenschutz-Aufsichtsbehörde beschweren (Art. 77 DSGVO), insbesondere in dem EU-Mitgliedstaat, in dem Sie wohnen
-          oder arbeiten. Für uns zuständig ist das Bayerische Landesamt für Datenschutzaufsicht (BayLDA), Promenade 18, 91522 Ansbach,
+          Sie können sich außerdem bei einer Datenschutz-Aufsichtsbehörde beschweren (Art. 77 DSGVO), insbesondere in
+          dem EU-Mitgliedstaat, in dem Sie wohnen oder arbeiten. Für uns zuständig ist das Bayerische Landesamt für
+          Datenschutzaufsicht (BayLDA), Promenade 18, 91522 Ansbach,
           <a href="https://www.lda.bayern.de">www.lda.bayern.de</a>.
         </p>
 
         <h2>Sonstiges</h2>
         <p>
-          Sie sind nicht verpflichtet, personenbezogene Daten bereitzustellen. Ohne die Verbindungsdaten, die Ihr Browser sendet, kann die Website nicht
-          ausgeliefert werden. Wir setzen keine automatisierte Entscheidungsfindung und kein Profiling ein (Art. 22 DSGVO). Wir aktualisieren diese Erklärung,
-          wenn sich die Website oder die Rechtslage ändert.
+          Sie sind nicht verpflichtet, personenbezogene Daten bereitzustellen. Ohne die Verbindungsdaten, die Ihr
+          Browser sendet, kann die Website nicht ausgeliefert werden. Wir setzen keine automatisierte
+          Entscheidungsfindung und kein Profiling ein (Art. 22 DSGVO). Wir aktualisieren diese Erklärung, wenn sich die
+          Website oder die Rechtslage ändert.
         </p>
         <p>Stand: 11. November 2026</p>
       </section>

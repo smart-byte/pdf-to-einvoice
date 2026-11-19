@@ -215,7 +215,9 @@
         <div class="name"><i></i>Muster Software GmbH</div>
         <div>Beispiel AG<br />Hauptstraße 5<br />54321 Beispielstadt</div>
         <div class="right">Rechnung Nr. <mark>RE-2026-0042</mark><br />Datum <mark>03.11.2026</mark></div>
-        <div class="rows"><span>Beratung E-Rechnung</span><span>1.000,00 €</span><span>Softwarelizenz (Jahr)</span><span>499,00 €</span></div>
+        <div class="rows">
+          <span>Beratung E-Rechnung</span><span>1.000,00 €</span><span>Softwarelizenz (Jahr)</span><span>499,00 €</span>
+        </div>
         <div class="sum">
           <span>Umsatzsteuer 19 %</span><span><mark>284,81 €</mark></span
           ><b>Gesamtbetrag</b><b><mark>1.783,81 €</mark></b>
@@ -226,7 +228,8 @@
       if (new URLSearchParams(location.search).get('lang') === 'de') {
         document.documentElement.lang = 'de';
         document.querySelector('h1').innerHTML = 'Aus Ihrer PDF-Rechnung wird eine <span>E-Rechnung</span>.';
-        document.querySelector('p').textContent = 'Ihr Layout bleibt. Die Daten kommen als XML nach EN 16931 dazu. Nichts wird hochgeladen.';
+        document.querySelector('p').textContent =
+          'Ihr Layout bleibt. Die Daten kommen als XML nach EN 16931 dazu. Nichts wird hochgeladen.';
       }
     </script>
   </body>

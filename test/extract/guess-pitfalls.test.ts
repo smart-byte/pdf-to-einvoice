@@ -72,30 +72,54 @@ function twoColumns(address: string[]) {
 
 describe('guessFromText with a customer abroad', () => {
   it('reads the country printed below the address, and the VAT ID below that as the customer’s', () => {
-    const guess = guessFromText(...letterhead(['Beispielkunde Handels GmbH', 'Hauptplatz 9', '1010 Wien'], 'ÖSTERREICH', 'ATU12345678'));
-    expect(guess.buyer).toMatchObject({ name: 'Beispielkunde Handels GmbH', postalCode: '1010', city: 'Wien', country: 'AT', vatId: 'ATU12345678' });
+    const guess = guessFromText(
+      ...letterhead(['Beispielkunde Handels GmbH', 'Hauptplatz 9', '1010 Wien'], 'ÖSTERREICH', 'ATU12345678'),
+    );
+    expect(guess.buyer).toMatchObject({
+      name: 'Beispielkunde Handels GmbH',
+      postalCode: '1010',
+      city: 'Wien',
+      country: 'AT',
+      vatId: 'ATU12345678',
+    });
     expect(guess.seller).toMatchObject({ vatId: 'DE123456789', country: 'DE' });
   });
 
   it('takes the VAT ID beside the bank account in the footer for the seller’s, where the customer’s address cannot be read', () => {
-    const guess = guessFromText(...letterhead(['Sample Ireland Limited', '2 Sample Quay', 'Dublin'], 'IRELAND', 'IE1234567T'));
+    const guess = guessFromText(
+      ...letterhead(['Sample Ireland Limited', '2 Sample Quay', 'Dublin'], 'IRELAND', 'IE1234567T'),
+    );
     expect(guess.seller).toMatchObject({ vatId: 'DE123456789', country: 'DE' });
   });
 
   it('reads a Dutch postal code with its letters', () => {
-    const guess = guessFromText(...letterhead(['Voorbeeld B.V.', 'Voorbeeldstraat 5', '1234 AB Voorbeeldstad'], 'NIEDERLANDE'));
-    expect(guess.buyer).toMatchObject({ name: 'Voorbeeld B.V.', postalCode: '1234 AB', city: 'Voorbeeldstad', country: 'NL' });
+    const guess = guessFromText(
+      ...letterhead(['Voorbeeld B.V.', 'Voorbeeldstraat 5', '1234 AB Voorbeeldstad'], 'NIEDERLANDE'),
+    );
+    expect(guess.buyer).toMatchObject({
+      name: 'Voorbeeld B.V.',
+      postalCode: '1234 AB',
+      city: 'Voorbeeldstad',
+      country: 'NL',
+    });
   });
 
   it('does not take the seller’s address for the customer’s when it cannot read the customer’s', () => {
-    const guess = guessFromText(...twoColumns(['Sample Trading Ltd', '7 Sample Road', 'Manchester', 'M1 1AA', 'UNITED KINGDOM']));
+    const guess = guessFromText(
+      ...twoColumns(['Sample Trading Ltd', '7 Sample Road', 'Manchester', 'M1 1AA', 'UNITED KINGDOM']),
+    );
     expect(guess.buyer?.name).toBeUndefined();
     expect(guess.buyer?.street).toBeUndefined();
   });
 
   it('reads the customer beside the seller’s column when the seller repeats in the footer', () => {
     const guess = guessFromText(...twoColumns(['Beispielkunde GmbH', 'Industriestraße 1', '90402 Nürnberg']));
-    expect(guess.buyer).toMatchObject({ name: 'Beispielkunde GmbH', street: 'Industriestraße 1', postalCode: '90402', city: 'Nürnberg' });
+    expect(guess.buyer).toMatchObject({
+      name: 'Beispielkunde GmbH',
+      street: 'Industriestraße 1',
+      postalCode: '90402',
+      city: 'Nürnberg',
+    });
   });
 });
 
@@ -109,7 +133,10 @@ describe('guessFromText with amounts', () => {
       'Gesamtbetrag   2.856,00 $',
       'Die Umsatzsteuer beträgt 390,24 € (Kurs 1 € = 1,1685 $).',
     ];
-    expect(guessFromText(text.join('\n'))).toMatchObject({ currency: 'USD', totals: { net: 2400, vat: 456, gross: 2856 } });
+    expect(guessFromText(text.join('\n'))).toMatchObject({
+      currency: 'USD',
+      totals: { net: 2400, vat: 456, gross: 2856 },
+    });
   });
 
   it('reads totals of nothing as nothing', () => {
@@ -154,7 +181,12 @@ describe('guessFromText with amounts', () => {
 
 describe('guessFromText with units', () => {
   const table = (...items: string[]) =>
-    ['Pos.   Bezeichnung   Menge   Einheit   Einzelpreis   Gesamt', ...items, 'Zwischensumme (netto)   1.000,00 €', 'Gesamtbetrag   1.000,00 €'].join('\n');
+    [
+      'Pos.   Bezeichnung   Menge   Einheit   Einzelpreis   Gesamt',
+      ...items,
+      'Zwischensumme (netto)   1.000,00 €',
+      'Gesamtbetrag   1.000,00 €',
+    ].join('\n');
 
   it('reads a unit that stands in a column of its own', () => {
     const text = table(
@@ -194,13 +226,18 @@ describe('guessFromText with the title of the document', () => {
   });
 
   it('takes the kind of invoice from the title only, not from a document the text names', () => {
-    const guess = guessFromText('Rechnung 2026-14   6. Oktober 2026\nDiese Rechnung ersetzt die Stornorechnung 2026-12.');
+    const guess = guessFromText(
+      'Rechnung 2026-14   6. Oktober 2026\nDiese Rechnung ersetzt die Stornorechnung 2026-12.',
+    );
     expect(guess).toMatchObject({ number: '2026-14' });
     expect(guess.typeCode).toBeUndefined();
   });
 
   it('reads a service period over several months', () => {
-    expect(guessFromText('Leistungszeitraum: September 2026 bis Januar 2027')).toMatchObject({ periodStart: '2026-09-01', periodEnd: '2027-01-31' });
+    expect(guessFromText('Leistungszeitraum: September 2026 bis Januar 2027')).toMatchObject({
+      periodStart: '2026-09-01',
+      periodEnd: '2027-01-31',
+    });
   });
 });
 
@@ -231,7 +268,9 @@ describe('guessFromText with an invoice that charges no VAT', () => {
 
   it('believes the printed reason before the country of the customer', () => {
     const address = ['Voorbeeld B.V.', 'Voorbeeldstraat 5', '1234 AB Voorbeeldstad', 'NIEDERLANDE'];
-    expect(guessFromText(invoice('Steuerfreie innergemeinschaftliche Lieferung.', address)).lines).toMatchObject([{ vatCategory: 'K', vatRate: 0 }]);
+    expect(guessFromText(invoice('Steuerfreie innergemeinschaftliche Lieferung.', address)).lines).toMatchObject([
+      { vatCategory: 'K', vatRate: 0 },
+    ]);
   });
 });
 
@@ -248,7 +287,14 @@ describe('guessFromText with words the text of the page breaks apart', () => {
     'Hauptstraße 5',
     'DE 54321 Beispielstadt',
   ];
-  const FOOTER = ['Beispiel Hand el GmbH', 'Muster str aße 3', '80331 München', 'Deutschland', 'Geschäftsführer : Max Muster', 'Handelsregister : HRB 12345'];
+  const FOOTER = [
+    'Beispiel Hand el GmbH',
+    'Muster str aße 3',
+    '80331 München',
+    'Deutschland',
+    'Geschäftsführer : Max Muster',
+    'Handelsregister : HRB 12345',
+  ];
   const BODY = [
     'Rechnung Nr. 2026-31 vom 05.10.2026',
     '1   Beratung   2   100,00   200,00',
@@ -268,10 +314,28 @@ describe('guessFromText with words the text of the page breaks apart', () => {
 });
 
 describe('guessFromText with payment terms', () => {
-  it.each(['Die Zahlung ist bis zum 31. Oktober 2026 fällig.', 'Die Zahlung ist sofort fällig.', 'Zahlung ist innerhalb von 14 Tagen zu leisten.'])(
-    'reads terms that start with the payment: %s',
-    (terms) => {
-      expect(guessFromText(`Rechnung 2026-21   6. Oktober 2026\n${terms}`).paymentTerms).toBe(terms);
-    },
-  );
+  it.each([
+    'Die Zahlung ist bis zum 31. Oktober 2026 fällig.',
+    'Die Zahlung ist sofort fällig.',
+    'Zahlung ist innerhalb von 14 Tagen zu leisten.',
+  ])('reads terms that start with the payment: %s', (terms) => {
+    expect(guessFromText(`Rechnung 2026-21   6. Oktober 2026\n${terms}`).paymentTerms).toBe(terms);
+  });
+});
+
+describe('guessFromText with numbers no invoice holds', () => {
+  it('reads no lines and no totals from amounts too large to calculate with, rather than failing', () => {
+    const huge = '9'.repeat(400);
+    const text = [
+      'Rechnung 2026-22   6. Oktober 2026',
+      `1   Gestaltung   ${huge} Std.   ${huge},00 €   ${huge},00 €`,
+      `Nettobetrag   ${huge},00 €`,
+      `Umsatzsteuer 19 %   ${huge},00 €`,
+      `Gesamtbetrag   ${huge},00 €`,
+    ].join('\n');
+    const guess = guessFromText(text);
+    expect(guess.number).toBe('2026-22');
+    expect(guess.lines).toBeUndefined();
+    expect(guess.totals).toBeUndefined();
+  });
 });

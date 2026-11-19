@@ -15,7 +15,12 @@ let refused = false;
 
 function wanted(): boolean {
   if (!COUNTER_WEBSITE_ID || refused || location.hostname !== DOMAIN) return false;
-  if ([navigator.doNotTrack, (window as { doNotTrack?: string }).doNotTrack].some((value) => value === '1' || value === 'yes')) return false;
+  if (
+    [navigator.doNotTrack, (window as { doNotTrack?: string }).doNotTrack].some(
+      (value) => value === '1' || value === 'yes',
+    )
+  )
+    return false;
   try {
     return localStorage.getItem(NOT_COUNTED) === null;
   } catch {

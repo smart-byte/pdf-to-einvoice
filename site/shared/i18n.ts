@@ -42,7 +42,10 @@ export const STRINGS: Record<string, Entry> = {
     en: 'In an e-invoice the XML is what counts legally. Compare every value with your PDF.',
   },
   'valid.title': { de: 'Eingebettete Rechnungsdaten geprüft', en: 'Embedded invoice data checked' },
-  'valid.profile': { de: 'Dieses PDF enthält bereits Rechnungsdaten als XML. Profil: {p}', en: 'This PDF already carries invoice data as XML. Profile: {p}' },
+  'valid.profile': {
+    de: 'Dieses PDF enthält bereits Rechnungsdaten als XML. Profil: {p}',
+    en: 'This PDF already carries invoice data as XML. Profile: {p}',
+  },
   'valid.errors': { de: 'Geprüft: {n} Fehler', en: 'Checked: {n} errors' },
   'valid.errors.one': { de: 'Geprüft: 1 Fehler', en: 'Checked: 1 error' },
   'valid.lead': {
@@ -62,7 +65,10 @@ export const STRINGS: Record<string, Entry> = {
   'page.now': { de: 'Seite {n} von {m}', en: 'Page {n} of {m}' },
   'page.prev': { de: 'Vorherige Seite', en: 'Previous page' },
   'page.next': { de: 'Nächste Seite', en: 'Next page' },
-  'page.turned': { de: 'Die Vorschau zeigt jetzt Seite {n}: Dort steht „{f}“.', en: 'The preview now shows page {n}: “{f}” is printed there.' },
+  'page.turned': {
+    de: 'Die Vorschau zeigt jetzt Seite {n}: Dort steht „{f}“.',
+    en: 'The preview now shows page {n}: “{f}” is printed there.',
+  },
 
   'mark.title': { de: 'Fundstelle: {f}', en: 'Found here: {f}' },
   'stamp.note': { de: 'Plausibilität geprüft', en: 'Plausibility checked' },
@@ -115,16 +121,28 @@ export const STRINGS: Record<string, Entry> = {
   'ai.writing': { de: 'Das Modell schreibt die Angaben\u00a0… {p}\u00a0%', en: 'The model is writing the data… {p}%' },
   'ai.writing.line': { de: 'Das Modell schreibt Position {n}\u00a0…', en: 'The model is writing line item {n}…' },
   'ai.progress.answer': { de: 'Fortschritt der Antwort des Modells', en: 'Progress of the answer of the model' },
-  'ai.done': { de: 'Fertig. Die KI hat {n} Angaben ergänzt: Bitte prüfen Sie sie.', en: 'Done. The AI added {n} values: please check them.' },
-  'ai.done.one': { de: 'Fertig. Die KI hat 1 Angabe ergänzt: Bitte prüfen Sie sie.', en: 'Done. The AI added 1 value: please check it.' },
-  'ai.done.none': { de: 'Fertig. Die KI hat nichts gefunden, was noch fehlte.', en: 'Done. The AI found nothing that was missing.' },
+  'ai.done': {
+    de: 'Fertig. Die KI hat {n} Angaben ergänzt: Bitte prüfen Sie sie.',
+    en: 'Done. The AI added {n} values: please check them.',
+  },
+  'ai.done.one': {
+    de: 'Fertig. Die KI hat 1 Angabe ergänzt: Bitte prüfen Sie sie.',
+    en: 'Done. The AI added 1 value: please check it.',
+  },
+  'ai.done.none': {
+    de: 'Fertig. Die KI hat nichts gefunden, was noch fehlte.',
+    en: 'Done. The AI found nothing that was missing.',
+  },
   'ai.nogpu': {
     de: 'Dieser Browser unterstützt kein WebGPU, das die Modelle im Browser brauchen. Nutzen Sie einen Browser mit WebGPU, oder wählen Sie einen eigenen Dienst.',
     en: 'This browser lacks WebGPU, which in-browser models need. Use a browser with WebGPU, or choose your own service.',
   },
   'ai.failed': { de: 'Das Auslesen ist fehlgeschlagen: {m}', en: 'Reading failed: {m}' },
   'ai.cancel': { de: 'Abbrechen', en: 'Cancel' },
-  'ai.cancelled': { de: 'Abgebrochen. Was die automatische Erkennung gefunden hat, bleibt.', en: 'Cancelled. What automatic reading found is kept.' },
+  'ai.cancelled': {
+    de: 'Abgebrochen. Was die automatische Erkennung gefunden hat, bleibt.',
+    en: 'Cancelled. What automatic reading found is kept.',
+  },
 
   's.invoice': { de: 'Rechnung', en: 'Invoice' },
   's.seller': { de: 'Rechnungssteller (Sie)', en: 'Seller (you)' },
@@ -182,7 +200,10 @@ export const STRINGS: Record<string, Entry> = {
   'l.add': { de: 'Position hinzufügen', en: 'Add a line item' },
   'l.remove': { de: 'Position {n} entfernen', en: 'Remove line item {n}' },
   'l.item': { de: 'Position {n}', en: 'Line item {n}' },
-  's.adjustments': { de: 'Rabatte und Zuschläge auf die ganze Rechnung', en: 'Discounts and charges on the whole invoice' },
+  's.adjustments': {
+    de: 'Rabatte und Zuschläge auf die ganze Rechnung',
+    en: 'Discounts and charges on the whole invoice',
+  },
   'a.discount': { de: 'Rabatt {n}', en: 'Discount {n}' },
   'a.charge': { de: 'Zuschlag {n}', en: 'Charge {n}' },
   'a.add.discount': { de: 'Rabatt hinzufügen', en: 'Add a discount' },
@@ -223,7 +244,10 @@ export const STRINGS: Record<string, Entry> = {
   't.due': { de: 'Zu zahlen', en: 'Amount due' },
   't.printed': { de: 'im PDF: {v}', en: 'on the PDF: {v}' },
   't.printed.xml': { de: 'laut XML: {v}', en: 'stated in the XML: {v}' },
-  't.empty': { de: 'Die Summen erscheinen, sobald die Positionen vollständig sind.', en: 'Totals appear once the line items are complete.' },
+  't.empty': {
+    de: 'Die Summen erscheinen, sobald die Positionen vollständig sind.',
+    en: 'Totals appear once the line items are complete.',
+  },
 
   'xml.title': { de: 'Was in Ihre Datei kommt', en: 'What goes into your file' },
   'xml.seller': { de: 'Rechnungssteller', en: 'Seller' },
@@ -253,17 +277,29 @@ export const STRINGS: Record<string, Entry> = {
     en: "The PDF shows no VAT; the VAT category was inferred from the buyer's country. Please check.",
   },
   'hint.model': { de: 'Von KI ergänzt: Bitte prüfen.', en: 'Added by AI: please check.' },
-  'hint.model.line': { de: 'Diese Position hat die KI ergänzt: Bitte prüfen.', en: 'AI added this line item: please check.' },
+  'hint.model.line': {
+    de: 'Diese Position hat die KI ergänzt: Bitte prüfen.',
+    en: 'AI added this line item: please check.',
+  },
   'hint.ok': { de: 'Passt', en: 'Correct' },
   'hint.ok.label': { de: '{f}: passt', en: '{f}: correct' },
-  'sum.model': { de: 'Die KI hat {n} Angaben ergänzt: Bitte prüfen Sie sie.', en: 'The AI added {n} values: please check them.' },
-  'sum.model.one': { de: 'Die KI hat 1 Angabe ergänzt: Bitte prüfen Sie sie.', en: 'The AI added 1 value: please check it.' },
+  'sum.model': {
+    de: 'Die KI hat {n} Angaben ergänzt: Bitte prüfen Sie sie.',
+    en: 'The AI added {n} values: please check them.',
+  },
+  'sum.model.one': {
+    de: 'Die KI hat 1 Angabe ergänzt: Bitte prüfen Sie sie.',
+    en: 'The AI added 1 value: please check it.',
+  },
   'sum.errors': { de: '{n} Angaben fehlen oder sind fehlerhaft', en: '{n} values are missing or wrong' },
   'sum.warnings': { de: '{n} Hinweise', en: '{n} things to check' },
   'create.run': { de: 'E-Rechnung erstellen', en: 'Create e-invoice' },
   'create.run.xr': { de: 'XRechnung erstellen', en: 'Create XRechnung' },
   'create.busy': { de: 'E-Rechnung wird erstellt\u00a0…', en: 'Creating the e-invoice…' },
-  'create.failed': { de: 'Die E-Rechnung konnte nicht erstellt werden: {m}', en: 'The e-invoice could not be created: {m}' },
+  'create.failed': {
+    de: 'Die E-Rechnung konnte nicht erstellt werden: {m}',
+    en: 'The e-invoice could not be created: {m}',
+  },
   'done.title': { de: 'Ihre E-Rechnung ist fertig.', en: 'Your e-invoice is ready.' },
   'done.lead': {
     de: 'Dieselbe Rechnung wie vorher, jetzt mit den Rechnungsdaten als XML in der Datei (ZUGFeRD / Factur-X, Profil EN 16931).',
@@ -289,20 +325,35 @@ export const STRINGS: Record<string, Entry> = {
   'e.format': { de: 'Diese Angabe hat nicht das richtige Format. Bitte prüfen Sie die Schreibweise.', en: '' },
   'e.format.country': { de: 'Bitte geben Sie das Land als Kürzel mit zwei Buchstaben an, z.\u00a0B. DE.', en: '' },
   'e.format.currency': { de: 'Bitte geben Sie die Währung als Kürzel mit drei Buchstaben an, z.\u00a0B. EUR.', en: '' },
-  'e.format.iban': { de: 'Diese IBAN ist ungültig: Die Prüfziffern passen nicht. Bitte vergleichen Sie sie mit Ihrem PDF.', en: '' },
+  'e.format.iban': {
+    de: 'Diese IBAN ist ungültig: Die Prüfziffern passen nicht. Bitte vergleichen Sie sie mit Ihrem PDF.',
+    en: '',
+  },
   'e.period-reversed': { de: 'Der Leistungszeitraum endet vor seinem Beginn. Bitte prüfen Sie beide Daten.', en: '' },
-  'e.negative-price': { de: 'Der Preis darf nicht negativ sein. Für eine Gutschrift geben Sie eine negative Menge ein.', en: '' },
+  'e.negative-price': {
+    de: 'Der Preis darf nicht negativ sein. Für eine Gutschrift geben Sie eine negative Menge ein.',
+    en: '',
+  },
   'e.seller-tax-id': {
     de: 'Der Rechnungssteller braucht eine USt-IdNr. oder eine Steuernummer, bei innergemeinschaftlicher Lieferung und Ausfuhr die USt-IdNr.',
     en: '',
   },
-  'e.payment-terms': { de: 'Ist ein Betrag zu zahlen, braucht die E-Rechnung ein Fälligkeitsdatum oder Zahlungsbedingungen.', en: '' },
+  'e.payment-terms': {
+    de: 'Ist ein Betrag zu zahlen, braucht die E-Rechnung ein Fälligkeitsdatum oder Zahlungsbedingungen.',
+    en: '',
+  },
   'e.vat-rate': {
     de: 'Der Steuersatz passt nicht zur gewählten Umsatzsteuer: Bei „mit Umsatzsteuer“ liegt er über 0, sonst bei 0.',
     en: '',
   },
-  'e.exemption-reason': { de: 'Bitte nennen Sie den Grund, warum keine Umsatzsteuer berechnet wird, so wie er auf der Rechnung steht.', en: '' },
-  'e.buyer-vat-id': { de: 'Für Reverse Charge und innergemeinschaftliche Lieferungen ist die USt-IdNr. des Kunden nötig.', en: '' },
+  'e.exemption-reason': {
+    de: 'Bitte nennen Sie den Grund, warum keine Umsatzsteuer berechnet wird, so wie er auf der Rechnung steht.',
+    en: '',
+  },
+  'e.buyer-vat-id': {
+    de: 'Für Reverse Charge und innergemeinschaftliche Lieferungen ist die USt-IdNr. des Kunden nötig.',
+    en: '',
+  },
   // An existing e-invoice: both sides of the contradiction are in its XML.
   'e.totals-mismatch.xml': {
     de: 'Die im XML angegebene Summe passt nicht zu seinen Positionen, Rabatten und Zuschlägen. Bitten Sie den Rechnungssteller um eine korrigierte E-Rechnung.',
@@ -314,7 +365,10 @@ export const STRINGS: Record<string, Entry> = {
   },
   'e.discount': { de: 'Ein Rabatt braucht einen Prozentsatz oder einen Betrag.', en: '' },
   'e.discount.percent': { de: 'Ein Prozentsatz ist nie negativ; das Vorzeichen ergibt sich aus der Position.', en: '' },
-  'e.discount-mismatch': { de: 'Prozentsatz und Betrag des Rabatts passen nicht zusammen. Bitte prüfen Sie beide.', en: '' },
+  'e.discount-mismatch': {
+    de: 'Prozentsatz und Betrag des Rabatts passen nicht zusammen. Bitte prüfen Sie beide.',
+    en: '',
+  },
   'e.discount-sign': {
     de: 'Der Rabatt hat ein anderes Vorzeichen als die Position. Auf einer Position mit negativem Betrag ist auch der Rabatt negativ, etwa −10 für 10 Nachlass.',
     en: '',
@@ -324,8 +378,14 @@ export const STRINGS: Record<string, Entry> = {
     en: 'In the XML, the percentage, base and amount of this discount do not agree. Ask the issuer for a corrected e-invoice.',
   },
   'e.adjustment': { de: 'Ein Rabatt oder Zuschlag braucht einen Prozentsatz oder einen Betrag.', en: '' },
-  'e.adjustment.percent': { de: 'Ein Prozentsatz ist nie negativ; das Vorzeichen ergibt sich aus den Positionen.', en: '' },
-  'e.charge-reason': { de: 'Ein Zuschlag braucht seinen Grund, so wie er auf der Rechnung steht, etwa Fracht.', en: '' },
+  'e.adjustment.percent': {
+    de: 'Ein Prozentsatz ist nie negativ; das Vorzeichen ergibt sich aus den Positionen.',
+    en: '',
+  },
+  'e.charge-reason': {
+    de: 'Ein Zuschlag braucht seinen Grund, so wie er auf der Rechnung steht, etwa Fracht.',
+    en: '',
+  },
   'e.adjustment-group': {
     de: 'Mit diesen Angaben passt der Eintrag zu keiner oder zu mehreren Steuergruppen der Positionen. Bitte prüfen Sie Umsatzsteuer und Steuersatz: Ein Prozentsatz braucht Positionen in dieser Gruppe, ein Betrag genau eine Gruppe; er wird nicht auf mehrere Steuersätze verteilt.',
     en: '',
@@ -409,8 +469,14 @@ export const STRINGS: Record<string, Entry> = {
     de: 'Die XRechnung kennt die Vorauszahlungsrechnung (Typ 386) nicht; der Empfänger nimmt sie womöglich nicht an. Klären Sie das vorher, oder wählen Sie eine andere Art des Dokuments.',
     en: '',
   },
-  'e.xrechnung-phone': { de: 'Das sieht nicht nach einer Telefonnummer aus: Die XRechnung erwartet mindestens drei Ziffern.', en: '' },
-  'e.xrechnung-email': { de: 'Das sieht nicht nach einer E-Mail-Adresse aus. Die XRechnung erwartet eine Adresse wie name@example.org.', en: '' },
+  'e.xrechnung-phone': {
+    de: 'Das sieht nicht nach einer Telefonnummer aus: Die XRechnung erwartet mindestens drei Ziffern.',
+    en: '',
+  },
+  'e.xrechnung-email': {
+    de: 'Das sieht nicht nach einer E-Mail-Adresse aus. Die XRechnung erwartet eine Adresse wie name@example.org.',
+    en: '',
+  },
   'e.pdf-fonts': {
     de: 'Im PDF sind nicht alle Schriften eingebettet. Das XML ist davon nicht betroffen, die Datei ist aber kein strenges PDF/A-3. Abhilfe: das PDF mit eingebetteten Schriften (oder als PDF/A) exportieren und die E-Rechnung daraus neu erstellen.',
     en: '',
@@ -424,9 +490,18 @@ export const STRINGS: Record<string, Entry> = {
     en: 'The file carries scripts or automatic actions. PDF/A forbids them: the file is not a strict PDF/A-3, and software may refuse it or warn about it.',
   },
   'e.generator': { de: 'Beim Schreiben des XML kam diese Meldung: {m}', en: '' },
-  'e.not-written': { de: '„{v}“ ließ sich nicht in das XML schreiben. Bitte melden Sie das als Fehler auf GitHub.', en: '' },
-  'e.invalid-invoice': { de: 'Die Angaben sind noch nicht vollständig oder fehlerhaft: Bitte beheben Sie, was die Prüfung nennt.', en: '' },
-  'e.already-einvoice': { de: 'Dieses PDF ist bereits eine E-Rechnung. Nehmen Sie das PDF ohne XML, um eine neue zu erstellen.', en: '' },
+  'e.not-written': {
+    de: '„{v}“ ließ sich nicht in das XML schreiben. Bitte melden Sie das als Fehler auf GitHub.',
+    en: '',
+  },
+  'e.invalid-invoice': {
+    de: 'Die Angaben sind noch nicht vollständig oder fehlerhaft: Bitte beheben Sie, was die Prüfung nennt.',
+    en: '',
+  },
+  'e.already-einvoice': {
+    de: 'Dieses PDF ist bereits eine E-Rechnung. Nehmen Sie das PDF ohne XML, um eine neue zu erstellen.',
+    en: '',
+  },
   'e.no-xml': { de: 'Das PDF enthält kein Rechnungs-XML: Es ist ein gewöhnliches PDF, keine E-Rechnung.', en: '' },
   'e.xml-syntax': {
     de: 'Das eingebettete XML lässt sich nicht als Rechnung lesen. Bitten Sie den Rechnungssteller um eine E-Rechnung nach ZUGFeRD 2 / Factur-X.',
@@ -458,8 +533,14 @@ export const STRINGS: Record<string, Entry> = {
   },
   'cmp.them': { de: 'Typischer Online-Konverter', en: 'Typical online converter' },
   'cmp.1': { de: 'Wo wird Ihre Rechnung verarbeitet?', en: 'Where is your invoice processed?' },
-  'cmp.1.them': { de: 'Auf den Servern des Anbieters: Die Datei wird hochgeladen.', en: "On the provider's servers: the file is uploaded." },
-  'cmp.1.us': { de: 'Auf Ihrem Gerät, im Browser. Nichts wird hochgeladen.', en: 'On your device, in the browser. Nothing is uploaded.' },
+  'cmp.1.them': {
+    de: 'Auf den Servern des Anbieters: Die Datei wird hochgeladen.',
+    en: "On the provider's servers: the file is uploaded.",
+  },
+  'cmp.1.us': {
+    de: 'Auf Ihrem Gerät, im Browser. Nichts wird hochgeladen.',
+    en: 'On your device, in the browser. Nothing is uploaded.',
+  },
   'cmp.2': { de: 'Wer liest die Angaben aus?', en: 'Who reads the data?' },
   'cmp.2.them': {
     de: 'Je nach Anbieter ein KI-Dienst in der Cloud, auch außerhalb der EU, oder Sie tippen alles ab.',
@@ -476,20 +557,32 @@ export const STRINGS: Record<string, Entry> = {
     en: 'What was read from the PDF is marked on it. Numbers, names, addresses, dates, prices and totals are compared with its text: whether they are there, not where.',
   },
   'cmp.4': { de: 'Konto, Werbung, Tracking', en: 'Account, ads, tracking' },
-  'cmp.4.them': { de: 'Je nach Anbieter Anmeldung, Werbung oder Abo.', en: 'Depending on the provider, sign-up, ads or a subscription.' },
+  'cmp.4.them': {
+    de: 'Je nach Anbieter Anmeldung, Werbung oder Abo.',
+    en: 'Depending on the provider, sign-up, ads or a subscription.',
+  },
   'cmp.4.us': { de: 'Keine Anmeldung, keine Werbung, keine Cookies.', en: 'No sign-up, no ads, no cookies.' },
   'cmp.5': { de: 'Quelltext', en: 'Source code' },
   'cmp.5.them': { de: 'Meist nicht einsehbar.', en: 'Mostly closed.' },
-  'cmp.5.us': { de: 'Offen (MIT-Lizenz): Jeder kann nachprüfen, was die Seite tut.', en: 'Open (MIT licence): anyone can check what the page does.' },
+  'cmp.5.us': {
+    de: 'Offen (MIT-Lizenz): Jeder kann nachprüfen, was die Seite tut.',
+    en: 'Open (MIT licence): anyone can check what the page does.',
+  },
   'cmp.6': { de: 'Für Software und KI-Assistenten', en: 'For software and AI assistants' },
-  'cmp.6.them': { de: 'Meist eine Schnittstelle, an die Rechnungen geschickt werden.', en: 'Mostly an API that invoices are sent to.' },
+  'cmp.6.them': {
+    de: 'Meist eine Schnittstelle, an die Rechnungen geschickt werden.',
+    en: 'Mostly an API that invoices are sent to.',
+  },
   'cmp.6.us': {
     de: 'Bibliothek, Kommandozeile und MCP-Server, alles auf dem eigenen Rechner.',
     en: 'Library, command line tool and MCP server, all on your own machine.',
   },
   'cmp.7': { de: 'Formate', en: 'Formats' },
   'cmp.7.them': { de: 'ZUGFeRD, oft auch XRechnung und weitere.', en: 'ZUGFeRD, often XRechnung and more.' },
-  'cmp.7.us': { de: 'ZUGFeRD / Factur-X und XRechnung nach EN 16931.', en: 'ZUGFeRD / Factur-X and XRechnung, following EN 16931.' },
+  'cmp.7.us': {
+    de: 'ZUGFeRD / Factur-X und XRechnung nach EN 16931.',
+    en: 'ZUGFeRD / Factur-X and XRechnung, following EN 16931.',
+  },
   'cmp.8': { de: 'Prüfung gegen die offiziellen Regelwerke', en: 'Checking against the official rule sets' },
   'cmp.8.them': { de: 'Teils mit eigenem Prüfwerkzeug.', en: 'Some offer their own validator.' },
   'cmp.8.us': {
@@ -498,20 +591,41 @@ export const STRINGS: Record<string, Entry> = {
   },
 
   'kinds.title': { de: 'Welche Rechnungsarten gehen?', en: 'Which kinds of invoices work?' },
-  'kind.1': { de: 'Inland mit Umsatzsteuer, auch mit mehreren Steuersätzen', en: 'Domestic with VAT, also with several rates' },
+  'kind.1': {
+    de: 'Inland mit Umsatzsteuer, auch mit mehreren Steuersätzen',
+    en: 'Domestic with VAT, also with several rates',
+  },
   'kind.1.xml': { de: 'Kategorie S mit dem Satz je Position', en: 'Category S with the rate of each line item' },
   'kind.2': { de: 'Kleinunternehmer ohne Umsatzsteuer (§\u00a019 UStG)', en: 'Small business without VAT (§ 19 UStG)' },
   'kind.2.xml': { de: 'Kategorie E mit Ihrem Befreiungshinweis', en: 'Category E with your exemption note' },
   'kind.3': { de: 'Leistung an ein Unternehmen im EU-Ausland', en: 'Service for a business in another EU country' },
-  'kind.3.xml': { de: 'Kategorie AE (Reverse Charge) mit der USt-IdNr. des Kunden', en: 'Category AE (reverse charge) with the VAT ID of the buyer' },
-  'kind.4': { de: 'Warenlieferung an ein Unternehmen im EU-Ausland', en: 'Goods delivered to a business in another EU country' },
+  'kind.3.xml': {
+    de: 'Kategorie AE (Reverse Charge) mit der USt-IdNr. des Kunden',
+    en: 'Category AE (reverse charge) with the VAT ID of the buyer',
+  },
+  'kind.4': {
+    de: 'Warenlieferung an ein Unternehmen im EU-Ausland',
+    en: 'Goods delivered to a business in another EU country',
+  },
   'kind.4.xml': { de: 'Kategorie K mit dem Bestimmungsland', en: 'Category K with the country of destination' },
   'kind.5': { de: 'Ausfuhr von Waren in ein Land außerhalb der EU', en: 'Export of goods outside the EU' },
   'kind.5.xml': { de: 'Kategorie G', en: 'Category G' },
-  'kind.6': { de: 'Leistung in die USA oder in ein anderes Land außerhalb der EU', en: 'Service for a buyer in the USA or elsewhere outside the EU' },
-  'kind.6.xml': { de: 'Kategorie O (nicht steuerbar), auch in US-Dollar', en: 'Category O (not subject to VAT), also in US dollars' },
-  'kind.7': { de: 'Gutschrift oder Korrektur einer früheren Rechnung', en: 'Credit note or correction of an earlier invoice' },
-  'kind.7.xml': { de: 'Typ 381 oder 384 mit Bezug auf die ursprüngliche Rechnung', en: 'Type 381 or 384 with a reference to the original invoice' },
+  'kind.6': {
+    de: 'Leistung in die USA oder in ein anderes Land außerhalb der EU',
+    en: 'Service for a buyer in the USA or elsewhere outside the EU',
+  },
+  'kind.6.xml': {
+    de: 'Kategorie O (nicht steuerbar), auch in US-Dollar',
+    en: 'Category O (not subject to VAT), also in US dollars',
+  },
+  'kind.7': {
+    de: 'Gutschrift oder Korrektur einer früheren Rechnung',
+    en: 'Credit note or correction of an earlier invoice',
+  },
+  'kind.7.xml': {
+    de: 'Typ 381 oder 384 mit Bezug auf die ursprüngliche Rechnung',
+    en: 'Type 381 or 384 with a reference to the original invoice',
+  },
 
   'limits.title': { de: 'Fragen und Antworten', en: 'Questions and answers' },
   // Each note answers one question; the number is that of its note.
@@ -532,7 +646,10 @@ export const STRINGS: Record<string, Entry> = {
     de: 'Ihre Rechnung verlässt den Browser nicht: nichts wird hochgeladen, und es gibt keine Cookies. Für „Mit KI auslesen“ lädt der Browser einmalig ein Modell von Hugging Face (huggingface.co, hf.co) und raw.githubusercontent.com; gelesen wird die Rechnung auf Ihrem Gerät. Die einzige Ausnahme bestimmen Sie selbst: Tragen Sie dort einen eigenen KI-Dienst ein, geht der Text der Rechnung an dessen Adresse.',
     en: 'Your invoice does not leave the browser: nothing is uploaded, and there are no cookies. For “Read with AI” the browser downloads a model once, from Hugging Face (huggingface.co, hf.co) and raw.githubusercontent.com; the invoice is read on your device. The one exception is yours to make: if you enter an AI service of your own there, the text of the invoice goes to its address.',
   },
-  'limits.4': { de: 'Diese Seite ist ein Werkzeug und keine Steuer- oder Rechtsberatung.', en: 'This page is a tool, not tax or legal advice.' },
+  'limits.4': {
+    de: 'Diese Seite ist ein Werkzeug und keine Steuer- oder Rechtsberatung.',
+    en: 'This page is a tool, not tax or legal advice.',
+  },
   'limits.5': {
     de: 'Die automatische Erkennung liest noch nicht aus jeder Rechnung alles, und sie kann sich irren. Wir arbeiten daran, dass Rechnungen jeder Art erkannt werden. Was fehlt, zeigt das Formular; ob ein erkannter Wert stimmt, prüfen Sie bitte selbst.',
     en: 'Automatic reading does not get everything from every invoice yet, and it can be wrong. We are working on reading invoices of every kind. The form shows what is missing; please check every value it read.',
@@ -543,17 +660,26 @@ export const STRINGS: Record<string, Entry> = {
     de: 'Derselbe Kern läuft als Bibliothek, als Kommandozeilenprogramm und als MCP-Server, über den KI-Assistenten Rechnungen umwandeln. Alle drei laufen auf Ihrem Rechner und senden nichts. Ein KI-Assistent liest die Rechnung aber selbst: Ihr Inhalt geht dorthin, wo sein Sprachmodell läuft.',
     en: 'The same core runs as a library, as a command line tool and as an MCP server that lets AI assistants convert invoices. All three run on your machine and send nothing. An AI assistant reads the invoice itself, though: its content goes wherever the model of that assistant runs.',
   },
-  'dev.npm': { de: 'Das Paket: Bibliothek, Kommandozeile, MCP-Server', en: 'The package: library, command line tool, MCP server' },
+  'dev.npm': {
+    de: 'Das Paket: Bibliothek, Kommandozeile, MCP-Server',
+    en: 'The package: library, command line tool, MCP server',
+  },
   'dev.github': { de: 'Quelltext, Dokumentation, Fehler melden', en: 'Source, documentation, issues' },
   'dev.llms': { de: 'Die Kurzfassung für Sprachmodelle', en: 'The short version for language models' },
-  'dev.schema': { de: 'Alle Felder der Rechnungsdaten als JSON Schema', en: 'Every field of the invoice data, as JSON Schema' },
+  'dev.schema': {
+    de: 'Alle Felder der Rechnungsdaten als JSON Schema',
+    en: 'Every field of the invoice data, as JSON Schema',
+  },
   'dev.tabs': { de: 'Wege, es zu nutzen', en: 'Ways to use it' },
   'dev.tab.lib': { de: 'Bibliothek', en: 'Library' },
   'dev.tab.cli': { de: 'Kommandozeile', en: 'Command line' },
   'dev.tab.mcp': { de: 'MCP-Server', en: 'MCP server' },
   // The privacy policy of a build with the page counter: whether visits are counted in this browser.
   'optout.on': { de: 'Ihre Besuche werden gezählt, ohne Cookies.', en: 'Your visits are counted, without cookies.' },
-  'optout.off': { de: 'Ihre Besuche werden in diesem Browser nicht gezählt.', en: 'Your visits are not counted in this browser.' },
+  'optout.off': {
+    de: 'Ihre Besuche werden in diesem Browser nicht gezählt.',
+    en: 'Your visits are not counted in this browser.',
+  },
   'optout.dnt': {
     de: 'Ihr Browser sendet „Do Not Track“: Ihre Besuche werden nicht gezählt.',
     en: 'Your browser sends Do Not Track, so your visits are not counted.',
@@ -604,5 +730,6 @@ export function setLang(next: Lang): void {
   if (route && route !== next) history.replaceState(null, '', next);
   document.documentElement.lang = next;
   for (const el of document.querySelectorAll<HTMLElement>('[data-i18n]')) el.textContent = t(el.dataset.i18n!);
-  for (const el of document.querySelectorAll<HTMLElement>('[data-i18n-label]')) el.setAttribute('aria-label', t(el.dataset.i18nLabel!));
+  for (const el of document.querySelectorAll<HTMLElement>('[data-i18n-label]'))
+    el.setAttribute('aria-label', t(el.dataset.i18nLabel!));
 }

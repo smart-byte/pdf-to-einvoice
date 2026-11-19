@@ -1,6 +1,30 @@
-import { calculate, lineBase, micro, percentAgrees, percentOf, resolveAdjustments, slackOf, type Totals } from './calculate.js';
-import type { Finding } from './finding.js';
-import { INVOICE_TYPES, VAT_CATEGORIES, type Invoice, type InvoiceDraft, type VatCategory } from './model.js';
+import { isNumber } from '../util/numbers.js';
+import { valueAt } from '../util/objects.js';
+import {
+  cents,
+  checkAdjustments,
+  lineAgrees,
+  lineBase,
+  percentAgrees,
+  percentOf,
+  slackOf,
+  tryCalculate,
+  type Totals,
+} from './calculate.js';
+import { error, warning, type Finding } from './finding.js';
+import type { MessageKey, MessageParams } from './messages.js';
+import { amountSpellings, dateSpellings, percentSpellings } from './spellings.js';
+import {
+  isInvoiceType,
+  isVatCategory,
+  type DocumentAllowance,
+  type Invoice,
+  type InvoiceDraft,
+  type Line,
+  type Party,
+  type Unchecked,
+  type VatCategory,
+} from './model.js';
 
 export interface CheckResult {
   findings: Finding[];
@@ -30,8 +54,6 @@ export interface CheckOptions {
   percentages?: Record<string, number>;
 }
 
-type Bag = Record<string, any>;
-
 /** Drops null, undefined and blank strings; trims the rest. */
 function clean(value: unknown): unknown {
   if (typeof value === 'string') return value.trim() || undefined;
@@ -47,33 +69,48 @@ function clean(value: unknown): unknown {
 
 const upper = (v: unknown) => (typeof v === 'string' ? v.toUpperCase() : v);
 const compact = (v: unknown) => (typeof v === 'string' ? v.replace(/\s+/g, '').toUpperCase() : v);
+/** Whether a value is a string the pattern matches. */
+const matches = (pattern: RegExp, v: unknown) => typeof v === 'string' && pattern.test(v);
 
-function withDefaults(draft: InvoiceDraft): Bag {
-  const d = clean(draft) as Bag;
-  d.typeCode = String(d.typeCode ?? '380');
-  d.currency = upper(d.currency ?? 'EUR');
-  d.iban = compact(d.iban);
-  d.bic = compact(d.bic);
-  d.deliveryCountry = upper(d.deliveryCountry);
-  for (const who of ['seller', 'buyer']) {
-    d[who] = { ...d[who] };
-    d[who].country = upper(d[who].country);
-    d[who].vatId = compact(d[who].vatId);
-  }
-  d.lines = (Array.isArray(d.lines) ? d.lines : []).map((l: Bag) => {
-    const line: Bag = { unit: 'C62', vatCategory: 'S', ...l };
-    // A discount whose fields were all left empty is none.
-    if (line.discount && typeof line.discount === 'object' && Object.keys(line.discount).length === 0) delete line.discount;
-    return line;
+/** Unchecked data with its defaults: both parties are objects, the lines a list of objects, the type a string. */
+type Prepared = Unchecked & {
+  typeCode: string;
+  seller: Unchecked<Party>;
+  buyer: Unchecked<Party>;
+  lines: Unchecked<Line>[];
+};
+
+function withDefaults(input: InvoiceDraft): Prepared {
+  const draft = clean(input) as Unchecked;
+  const party = (given: Unchecked<Party> | undefined): Unchecked<Party> => ({
+    ...given,
+    country: upper(given?.country),
+    vatId: compact(given?.vatId),
   });
-  return d;
+  return {
+    ...draft,
+    typeCode: String(draft.typeCode ?? '380'),
+    currency: upper(draft.currency ?? 'EUR'),
+    iban: compact(draft.iban),
+    bic: compact(draft.bic),
+    deliveryCountry: upper(draft.deliveryCountry),
+    seller: party(draft.seller),
+    buyer: party(draft.buyer),
+    lines: (Array.isArray(draft.lines) ? draft.lines : []).map((given: Unchecked<Line>) => {
+      const line: Unchecked<Line> = { unit: 'C62', vatCategory: 'S', ...given };
+      // A discount whose fields were all left empty is none.
+      if (line.discount && typeof line.discount === 'object' && Object.keys(line.discount).length === 0)
+        delete line.discount;
+      return line;
+    }),
+  };
 }
 
 /** Whether a value is a day of the calendar written as `YYYY-MM-DD`; `2026-02-31` is not. */
-export function isDate(v: unknown): boolean {
+export function isDate(v: unknown): v is string {
   if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
-  const d = new Date(`${v}T00:00:00Z`);
-  return !Number.isNaN(d.getTime()) && d.toISOString().startsWith(v);
+  const parsed = new Date(`${v}T00:00:00Z`);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().startsWith(v);
 }
 
 /** ISO 13616 mod-97 check. */
@@ -83,9 +120,30 @@ export function isIban(v: string): boolean {
   return BigInt(digits) % 97n === 1n;
 }
 
-const isNumber = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 const NEEDS_REASON: VatCategory[] = ['E', 'AE', 'K', 'G', 'O'];
-const DATE_FIELDS = ['issueDate', 'dueDate', 'deliveryDate', 'periodStart', 'periodEnd', 'precedingInvoiceDate'];
+
+/** Each discount and charge on the whole invoice with its path, `discounts.0`; none where the data holds no list. */
+const adjustmentsOf = (draft: Unchecked): (readonly [path: string, entry: Unchecked<DocumentAllowance>])[] =>
+  (['discounts', 'charges'] as const).flatMap((list) => {
+    const entries: unknown = draft[list];
+    return (Array.isArray(entries) ? entries : []).map(
+      (entry: Unchecked<DocumentAllowance>, i: number) => [`${list}.${i}`, entry] as const,
+    );
+  });
+
+/** What may have a VAT category, with its path: each line, then each discount and charge on the whole invoice. */
+const taxedOf = (draft: Prepared) => [
+  ...draft.lines.map((line, i) => [`lines.${i}`, line] as const),
+  ...adjustmentsOf(draft),
+];
+const DATE_FIELDS = [
+  'issueDate',
+  'dueDate',
+  'deliveryDate',
+  'periodStart',
+  'periodEnd',
+  'precedingInvoiceDate',
+] as const;
 
 /**
  * Checks invoice data against the rules an EN 16931 invoice has to meet and
@@ -93,212 +151,280 @@ const DATE_FIELDS = ['issueDate', 'dueDate', 'deliveryDate', 'periodStart', 'per
  * the PDF it was read from and against what XRechnung asks for on top. Never
  * throws on incomplete data.
  */
-export function check(draft: InvoiceDraft, options: CheckOptions = {}): CheckResult {
-  const d = withDefaults(draft);
+export function check(input: InvoiceDraft, options: CheckOptions = {}): CheckResult {
+  const draft = withDefaults(input);
+  const lines = checkLines(draft);
+  // The totals, with the discounts and charges on the whole invoice put into the VAT groups of the lines.
+  const { totals, problems } = lines.calculable
+    ? tryCalculate(draft as Invoice)
+    : { totals: undefined, problems: checkAdjustments(draft as Invoice) };
+
+  const findings = [
+    ...checkHeader(draft),
+    ...lines.findings,
+    ...problems,
+    ...checkVatTreatment(draft, options),
+    ...checkSupply(draft),
+    ...(totals ? checkTotals(draft, totals, options) : []),
+    ...(options.rules === 'xrechnung' ? xrechnungFindings(draft) : []),
+    ...(options.pdfText !== undefined ? compareWithPdf(draft, totals, options.pdfText, options.percentages) : []),
+  ];
+  const ok = !findings.some((f) => f.severity === 'error');
+  return { findings, totals, invoice: ok ? (draft as Invoice) : undefined };
+}
+
+/** The head of the invoice: its number and date, both parties, the formats of dates and codes, the seller's tax ID. */
+function checkHeader(draft: Prepared): Finding[] {
   const findings: Finding[] = [];
-  const add = (severity: Finding['severity'], path: string, code: string, message: string) => findings.push({ path, severity, code, message });
-  const error = (path: string, code: string, message: string) => add('error', path, code, message);
-  const warn = (path: string, code: string, message: string) => add('warning', path, code, message);
-  const get = (path: string) => path.split('.').reduce((o, k) => o?.[k], d as any);
   const require = (path: string, label: string) => {
-    if (get(path) === undefined) error(path, 'required', `${label} is missing.`);
+    if (valueAt(draft, path) === undefined) findings.push(error(path, 'required', { what: label }));
   };
 
   require('number', 'The invoice number');
   require('issueDate', 'The invoice date');
-  for (const [who, label] of [
-    ['seller', 'seller'],
-    ['buyer', 'buyer'],
-  ] as const) {
-    require(`${who}.name`, `The name of the ${label}`);
-    require(`${who}.country`, `The country of the ${label}`);
-    if (d[who].country !== undefined && !/^[A-Z]{2}$/.test(d[who].country)) {
-      error(`${who}.country`, 'format', 'Use the two-letter country code, e.g. DE.');
-    }
-    for (const [field, name] of [
-      ['street', 'street'],
-      ['postalCode', 'postal code'],
-      ['city', 'city'],
-    ] as const) {
-      if (d[who][field] === undefined) {
-        warn(`${who}.${field}`, 'address', `The ${name} of the ${label} is missing. German VAT law (§ 14 UStG) asks for the full address.`);
-      }
-    }
+  for (const who of ['seller', 'buyer'] as const) {
+    require(`${who}.name`, `The name of the ${who}`);
+    require(`${who}.country`, `The country of the ${who}`);
+    findings.push(...checkAddress(draft[who], who));
   }
 
   for (const field of DATE_FIELDS) {
-    if (d[field] !== undefined && !isDate(d[field])) error(field, 'format', 'Not a valid date. Use YYYY-MM-DD.');
+    if (draft[field] !== undefined && !isDate(draft[field])) findings.push(error(field, 'format.date'));
   }
-  if (isDate(d.periodStart) && isDate(d.periodEnd) && d.periodEnd < d.periodStart) {
-    error('periodEnd', 'period-reversed', 'The service period ends before it starts.');
+  if (isDate(draft.periodStart) && isDate(draft.periodEnd) && draft.periodEnd < draft.periodStart) {
+    findings.push(error('periodEnd', 'period-reversed'));
   }
-  if (!(d.typeCode in INVOICE_TYPES)) error('typeCode', 'format', `Unknown invoice type. Use one of ${Object.keys(INVOICE_TYPES).join(', ')}.`);
-  if (!/^[A-Z]{3}$/.test(d.currency)) error('currency', 'format', 'Use the three-letter currency code, e.g. EUR.');
-  if (d.iban !== undefined && !isIban(d.iban)) error('iban', 'format', 'The IBAN is not valid (check digits do not match).');
-  if (d.prepaidAmount !== undefined && !isNumber(d.prepaidAmount)) error('prepaidAmount', 'format', 'Not a number.');
+  if (!isInvoiceType(draft.typeCode)) {
+    findings.push(error('typeCode', 'format.type'));
+  }
+  if (!matches(/^[A-Z]{3}$/, draft.currency)) findings.push(error('currency', 'format.currency'));
+  if (draft.iban !== undefined && !(typeof draft.iban === 'string' && isIban(draft.iban)))
+    findings.push(error('iban', 'format.iban'));
+  if (draft.prepaidAmount !== undefined && !isNumber(draft.prepaidAmount))
+    findings.push(error('prepaidAmount', 'format.number'));
 
-  if (d.seller.vatId === undefined && d.seller.taxNumber === undefined) {
-    error('seller.vatId', 'seller-tax-id', 'The seller needs a VAT ID or a tax number.');
+  if (draft.seller.vatId === undefined && draft.seller.taxNumber === undefined) {
+    findings.push(error('seller.vatId', 'seller-tax-id'));
   }
+  return findings;
+}
 
-  if (d.lines.length === 0) error('lines', 'required', 'The invoice needs at least one line.');
-  // An amount that is not a number was reported above; nothing can be calculated with it.
-  let calculable = d.lines.length > 0 && (d.prepaidAmount === undefined || isNumber(d.prepaidAmount));
-  d.lines.forEach((line: Bag, i: number) => {
-    const at = (field: string) => `lines.${i}.${field}`;
-    if (line.name === undefined) error(at('name'), 'required', 'The line needs a description.');
-    for (const field of ['quantity', 'unitPrice', 'vatRate']) {
-      if (line[field] === undefined)
-        error(at(field), 'required', `The line needs a ${field === 'unitPrice' ? 'unit price' : field === 'vatRate' ? 'VAT rate' : field}.`);
-      else if (!isNumber(line[field])) error(at(field), 'format', 'Not a number.');
-      calculable &&= isNumber(line[field]);
+/** The country code of a party, and the parts of its address German VAT law asks for (§ 14 UStG). */
+function checkAddress(party: Unchecked<Party>, who: 'seller' | 'buyer'): Finding[] {
+  const findings: Finding[] = [];
+  if (party.country !== undefined && !matches(/^[A-Z]{2}$/, party.country)) {
+    findings.push(error(`${who}.country`, 'format.country'));
+  }
+  for (const [field, name] of [
+    ['street', 'street'],
+    ['postalCode', 'postal code'],
+    ['city', 'city'],
+  ] as const) {
+    if (party[field] === undefined) {
+      findings.push(warning(`${who}.${field}`, 'address', { part: name, who }));
     }
-    if (line.netAmount !== undefined && !isNumber(line.netAmount)) {
-      error(at('netAmount'), 'format', 'Not a number.');
-      calculable = false;
+  }
+  return findings;
+}
+
+/**
+ * Each line by itself. `calculable` tells whether the totals can be calculated: there is a line, and every number they
+ * need is one. An amount that is not a number is reported here; nothing can be calculated with it.
+ */
+function checkLines(draft: Prepared): { findings: Finding[]; calculable: boolean } {
+  const findings: Finding[] = [];
+  if (draft.lines.length === 0) findings.push(error('lines', 'required.lines'));
+  let calculable = draft.lines.length > 0 && (draft.prepaidAmount === undefined || isNumber(draft.prepaidAmount));
+  for (const [i, line] of draft.lines.entries()) {
+    const checked = checkLine(line, i);
+    findings.push(...checked.findings);
+    calculable &&= checked.calculable;
+  }
+  return { findings, calculable };
+}
+
+function checkLine(line: Unchecked<Line>, i: number): { findings: Finding[]; calculable: boolean } {
+  const findings: Finding[] = [];
+  const at = (field: string) => `lines.${i}.${field}`;
+  const NUMBERS = { quantity: 'quantity', unitPrice: 'unit price', vatRate: 'VAT rate' } as const;
+
+  if (line.name === undefined) findings.push(error(at('name'), 'required.line-name'));
+  for (const [field, what] of Object.entries(NUMBERS) as [keyof typeof NUMBERS, string][]) {
+    if (line[field] === undefined) findings.push(error(at(field), 'required.line-value', { what }));
+    else if (!isNumber(line[field])) findings.push(error(at(field), 'format.number'));
+  }
+  let calculable = isNumber(line.quantity) && isNumber(line.unitPrice) && isNumber(line.vatRate);
+  if (line.netAmount !== undefined && !isNumber(line.netAmount)) {
+    findings.push(error(at('netAmount'), 'format.number'));
+    calculable = false;
+  }
+  const discount = line.discount;
+  if (discount !== undefined) {
+    if (discount.percent === undefined && discount.amount === undefined) {
+      findings.push(error(at('discount'), 'discount'));
     }
-    const discount = line.discount;
-    if (discount !== undefined) {
-      if (discount.percent === undefined && discount.amount === undefined) error(at('discount'), 'discount', 'A discount needs a percentage or an amount.');
-      for (const field of ['percent', 'amount']) {
-        if (discount[field] !== undefined && !isNumber(discount[field])) {
-          error(at(`discount.${field}`), 'format', 'Not a number.');
-          calculable = false;
-        }
+    for (const field of ['percent', 'amount'] as const) {
+      if (discount[field] !== undefined && !isNumber(discount[field])) {
+        findings.push(error(at(`discount.${field}`), 'format.number'));
+        calculable = false;
       }
-      if (isNumber(discount.percent) && discount.percent < 0) {
-        error(at('discount.percent'), 'discount', 'A percentage is never negative; the sign comes from the line.');
-      }
     }
-    if (isNumber(line.unitPrice) && line.unitPrice < 0) {
-      error(at('unitPrice'), 'negative-price', 'The unit price must not be negative. Use a negative quantity for credits.');
+    if (isNumber(discount.percent) && discount.percent < 0) {
+      findings.push(error(at('discount.percent'), 'discount.negative'));
     }
-    if (!(line.vatCategory in VAT_CATEGORIES)) {
-      error(at('vatCategory'), 'format', `Unknown VAT category. Use one of ${Object.keys(VAT_CATEGORIES).join(', ')}.`);
-    } else if (isNumber(line.vatRate)) {
-      if (line.vatCategory === 'S' && line.vatRate <= 0) error(at('vatRate'), 'vat-rate', 'With VAT charged (category S), the rate must be above 0.');
-      if (line.vatCategory !== 'S' && line.vatRate !== 0) error(at('vatRate'), 'vat-rate', `Category ${line.vatCategory} carries no VAT: the rate must be 0.`);
+  }
+  if (isNumber(line.unitPrice) && line.unitPrice < 0) {
+    findings.push(error(at('unitPrice'), 'negative-price'));
+  }
+  if (!isVatCategory(line.vatCategory)) {
+    findings.push(error(at('vatCategory'), 'format.category'));
+  } else if (isNumber(line.vatRate)) {
+    if (line.vatCategory === 'S' && line.vatRate <= 0) {
+      findings.push(error(at('vatRate'), 'vat-rate.standard'));
     }
-  });
+    if (line.vatCategory !== 'S' && line.vatRate !== 0) {
+      findings.push(error(at('vatRate'), 'vat-rate.zero', { category: line.vatCategory }));
+    }
+  }
+  return { findings, calculable };
+}
 
-  // The discounts and charges on the whole invoice, put into the VAT groups of the lines.
-  const adjustments = resolveAdjustments(d as Invoice, calculable);
-  findings.push(...adjustments.problems);
+/** What the VAT categories of the invoice ask for: a reason for charging none, VAT IDs, the country of delivery. */
+function checkVatTreatment(draft: Prepared, options: CheckOptions): Finding[] {
+  const findings: Finding[] = [];
   // What has a VAT category: each line, and each discount or charge that states one (a rate above 0 alone means S).
-  const taxed: { path: string; category: VatCategory }[] = [
-    ...d.lines.map((l: Bag, i: number) => ({ path: `lines.${i}.vatCategory`, category: l.vatCategory })),
-    ...(['discounts', 'charges'] as const).flatMap((list) =>
-      (Array.isArray(d[list]) ? d[list] : []).map((e: Bag, i: number) => ({
-        path: `${list}.${i}.vatCategory`,
-        category: e?.vatCategory ?? (isNumber(e?.vatRate) && e.vatRate > 0 ? 'S' : undefined),
-      })),
-    ),
-  ].filter((item) => item.category in VAT_CATEGORIES);
+  const taxed = taxedOf(draft).flatMap(([path, item]) => {
+    const category = item?.vatCategory ?? (isNumber(item?.vatRate) && item.vatRate > 0 ? 'S' : undefined);
+    return isVatCategory(category) ? [{ path: `${path}.vatCategory`, category }] : [];
+  });
   const categories = new Set<VatCategory>(taxed.map((item) => item.category));
+
   // BR-O-11: what is not subject to VAT stands alone on its invoice.
   const odd = taxed.find((item) => (item.category === 'O') !== (taxed[0]?.category === 'O'));
   if (categories.has('O') && odd) {
-    error(
-      odd.path,
-      'category-o',
-      'An invoice with something not subject to VAT (category O) cannot also have anything in another VAT category. Issue a separate invoice for one of them, or correct the category.',
-    );
+    findings.push(error(odd.path, 'category-o'));
   }
-  if (NEEDS_REASON.some((c) => categories.has(c)) && d.vatExemptionReason === undefined) {
-    error('vatExemptionReason', 'exemption-reason', 'State why no VAT is charged, as printed on the invoice.');
+  if (NEEDS_REASON.some((c) => categories.has(c)) && draft.vatExemptionReason === undefined) {
+    findings.push(error('vatExemptionReason', 'exemption-reason'));
   }
-  if ((categories.has('AE') || categories.has('K')) && d.buyer.vatId === undefined) {
-    error('buyer.vatId', 'buyer-vat-id', 'Reverse charge and intra-community supplies need the VAT ID of the buyer.');
+  if ((categories.has('AE') || categories.has('K')) && draft.buyer.vatId === undefined) {
+    findings.push(error('buyer.vatId', 'buyer-vat-id'));
   }
-  if (d.deliveryCountry !== undefined && !/^[A-Z]{2}$/.test(d.deliveryCountry)) {
-    error('deliveryCountry', 'format', 'Use the two-letter country code, e.g. DE.');
+  if (draft.deliveryCountry !== undefined && !matches(/^[A-Z]{2}$/, draft.deliveryCountry)) {
+    findings.push(error('deliveryCountry', 'format.country'));
   }
   // BR-IC-12 wants the country an intra-community supply went to. As an XRechnung it is refused anyway.
-  if (categories.has('K') && d.deliveryCountry === undefined && d.buyer.country !== undefined && options.rules !== 'xrechnung') {
-    warn(
-      'deliveryCountry',
-      'delivery-country',
-      `An intra-community supply names the country the goods went to. The country of the buyer (${d.buyer.country}) is written; state the country of delivery if they went elsewhere.`,
-    );
+  if (
+    categories.has('K') &&
+    draft.deliveryCountry === undefined &&
+    typeof draft.buyer.country === 'string' &&
+    options.rules !== 'xrechnung'
+  ) {
+    findings.push(warning('deliveryCountry', 'delivery-country', { country: draft.buyer.country }));
   }
-  if ((categories.has('K') || categories.has('G')) && d.seller.vatId === undefined && d.seller.taxNumber !== undefined) {
-    error('seller.vatId', 'seller-tax-id', 'Intra-community supplies and exports need the VAT ID of the seller.');
+  if (
+    (categories.has('K') || categories.has('G')) &&
+    draft.seller.vatId === undefined &&
+    draft.seller.taxNumber !== undefined
+  ) {
+    findings.push(error('seller.vatId', 'seller-tax-id.export'));
   }
+  return findings;
+}
 
-  if (d.deliveryDate === undefined && d.periodStart === undefined && d.periodEnd === undefined) {
-    warn('deliveryDate', 'delivery-date', 'The date of supply is missing. German invoices must state it, even if it equals the invoice date.');
+/** The date of supply, and the invoice a correction refers to. */
+function checkSupply(draft: Prepared): Finding[] {
+  const findings: Finding[] = [];
+  if (draft.deliveryDate === undefined && draft.periodStart === undefined && draft.periodEnd === undefined) {
+    findings.push(warning('deliveryDate', 'delivery-date'));
   }
-  if (['381', '384'].includes(d.typeCode) && d.precedingInvoiceNumber === undefined) {
-    warn('precedingInvoiceNumber', 'preceding-invoice', 'A correction or credit note should name the invoice it refers to.');
+  if (['381', '384'].includes(draft.typeCode) && draft.precedingInvoiceNumber === undefined) {
+    findings.push(warning('precedingInvoiceNumber', 'preceding-invoice'));
   }
+  return findings;
+}
 
-  const totals = adjustments.resolved ? calculate(d as Invoice) : undefined;
-  if (totals) {
-    if (totals.due > 0 && d.dueDate === undefined && d.paymentTerms === undefined) {
-      error('dueDate', 'payment-terms', 'An invoice with an amount due needs a due date or payment terms.');
+/** The calculated totals against what the data states: payment terms for an amount due, line totals, printed totals. */
+function checkTotals(draft: Prepared, totals: Totals, options: CheckOptions): Finding[] {
+  const findings: Finding[] = [];
+  if (totals.due > 0 && draft.dueDate === undefined && draft.paymentTerms === undefined) {
+    findings.push(error('dueDate', 'payment-terms'));
+  }
+  for (const [i, line] of draft.lines.entries())
+    findings.push(...checkLineTotal(line, i, String(draft.currency), totals, options));
+  findings.push(...checkPrintedTotals(draft, totals));
+  return findings;
+}
+
+/**
+ * A line total is quantity times price less the discount, and a discount with both a percentage and an amount has to
+ * agree with itself. Two cents are allowed for rounding, half a forint where a currency has no cents.
+ */
+function checkLineTotal(
+  line: Unchecked<Line>,
+  i: number,
+  currency: string,
+  totals: Totals,
+  options: CheckOptions,
+): Finding[] {
+  const findings: Finding[] = [];
+  const slack = slackOf(currency);
+  const discount = totals.lineDiscounts[i];
+  if (discount && line.discount?.amount !== undefined) {
+    // The amount as the XML gets it, in cents: a stated 9.995 is written as 10.00.
+    const { percent } = line.discount;
+    const { amount } = discount;
+    if (isNumber(percent) && !percentAgrees(discount.base, percent, amount, slack)) {
+      findings.push(
+        error(`lines.${i}.discount.amount`, 'discount-mismatch', {
+          percent,
+          base: discount.base.toFixed(2),
+          expected: percentOf(discount.base, percent).toFixed(2),
+          stated: amount.toFixed(2),
+        }),
+      );
+    } else if (
+      percent === undefined &&
+      discount.base !== 0 &&
+      amount !== 0 &&
+      Math.sign(discount.base) !== Math.sign(amount)
+    ) {
+      findings.push(warning(`lines.${i}.discount.amount`, 'discount-sign'));
     }
-    // A line total is quantity times price less the discount. Two cents are allowed for rounding, half a forint where
-    // a currency has no cents.
-    const slack = slackOf(d.currency);
-    d.lines.forEach((line: Bag, i: number) => {
-      const discount = totals.lineDiscounts[i];
-      if (discount && line.discount.amount !== undefined) {
-        // The amount as the XML gets it, in cents: a stated 9.995 is written as 10.00.
-        const { percent } = line.discount;
-        const { amount } = discount;
-        if (percent !== undefined && !percentAgrees(discount.base, percent, amount, slack)) {
-          error(
-            `lines.${i}.discount.amount`,
-            'discount-mismatch',
-            `${percent} % of ${discount.base.toFixed(2)} is ${percentOf(discount.base, percent).toFixed(2)}, but the discount states ${amount.toFixed(2)}. Correct the percentage or the amount.`,
-          );
-        } else if (percent === undefined && discount.base !== 0 && amount !== 0 && Math.sign(discount.base) !== Math.sign(amount)) {
-          warn(
-            `lines.${i}.discount.amount`,
-            'discount-sign',
-            'The discount and its line have different signs. On a line with a negative amount the discount is negative too: -10 for 10 off.',
-          );
-        }
-      }
-      if (!isNumber(line.netAmount)) return;
-      const apart = micro(line.quantity) * micro(line.unitPrice) - (micro(discount?.amount ?? 0) + micro(totals.lineNet[i]!)) * 10n ** 6n;
-      if ((apart < 0n ? -apart : apart) <= micro(slack) * 10n ** 6n) return;
-      // In cents, as the XML has it: 1 x 1.005 is 1.01, not 1.005.
-      const expected = (lineBase(line.quantity, line.unitPrice) - (discount?.amount ?? 0)).toFixed(2);
-      const stated = totals.lineNet[i]!.toFixed(2);
-      if (!options.adjustedLines) {
-        error(
-          `lines.${i}.netAmount`,
-          'line-net',
-          `Quantity times unit price${discount ? ' less the discount' : ''} is ${expected}, but the line states ${stated}. Correct the quantity, the price or the discount.`,
-        );
-      } else if (!options.adjustedLines.includes(i)) {
-        warn(
-          `lines.${i}.netAmount`,
-          'line-net',
-          `The XML states ${stated} as the total of this line, but its quantity times its price${discount ? ' less its discount' : ''} is ${expected}, and it names nothing else on the line that explains the difference.`,
-        );
-      }
-    });
-    for (const key of ['net', 'vat', 'gross', 'due'] as const) {
-      const printed = d.totals?.[key];
-      if (printed === undefined) continue;
-      if (!isNumber(printed)) error(`totals.${key}`, 'format', 'Not a number.');
-      else if (Math.round(printed * 100) !== Math.round(totals[key] * 100)) {
-        error(
-          `totals.${key}`,
-          'totals-mismatch',
-          `The PDF says ${printed.toFixed(2)}, the lines${totals.adjustments.length ? ' with the discounts and charges' : ''} add up to ${totals[key].toFixed(2)}. The e-invoice must not contradict the PDF: check quantities and prices, and enter any discounts or charges on the whole invoice the PDF states.`,
-        );
-      }
-    }
   }
 
-  if (options.rules === 'xrechnung') findings.push(...xrechnungFindings(d));
-  if (options.pdfText !== undefined) findings.push(...compareWithPdf(d, totals, options.pdfText, options.percentages));
+  // With totals every line has its numbers; a line without a total of its own has nothing to compare.
+  if (!isNumber(line.netAmount) || !isNumber(line.quantity) || !isNumber(line.unitPrice)) return findings;
+  if (lineAgrees(line.quantity, line.unitPrice, discount?.amount ?? 0, totals.lineNet[i]!, slack)) return findings;
+  // In cents, as the XML has it: 1 x 1.005 is 1.01, not 1.005.
+  const expected = (lineBase(line.quantity, line.unitPrice) - (discount?.amount ?? 0)).toFixed(2);
+  const stated = totals.lineNet[i]!.toFixed(2);
+  if (!options.adjustedLines) {
+    findings.push(error(`lines.${i}.netAmount`, 'line-net', { discounted: Boolean(discount), expected, stated }));
+  } else if (!options.adjustedLines.includes(i)) {
+    findings.push(warning(`lines.${i}.netAmount`, 'line-net.xml', { discounted: Boolean(discount), expected, stated }));
+  }
+  return findings;
+}
 
-  const ok = !findings.some((f) => f.severity === 'error');
-  return { findings, totals, invoice: ok ? (d as Invoice) : undefined };
+/** The totals as printed against the calculated ones, to the cent. */
+function checkPrintedTotals(draft: Prepared, totals: Totals): Finding[] {
+  const findings: Finding[] = [];
+  for (const key of ['net', 'vat', 'gross', 'due'] as const) {
+    const printed = draft.totals?.[key];
+    if (printed === undefined) continue;
+    if (!isNumber(printed)) findings.push(error(`totals.${key}`, 'format.number'));
+    else if (cents(printed) !== cents(totals[key])) {
+      findings.push(
+        error(`totals.${key}`, 'totals-mismatch', {
+          printed: printed.toFixed(2),
+          calculated: totals[key].toFixed(2),
+          adjusted: totals.adjustments.length > 0,
+        }),
+      );
+    }
+  }
+  return findings;
 }
 
 /** A cash discount as XRechnung wants it written into the payment terms, one to a line. */
@@ -310,187 +436,88 @@ const SKONTO = /^#SKONTO#TAGE=\d+#PROZENT=\d+\.\d{2}(#BASISBETRAG=-?\d+\.\d{2})?
  * for it: an error where the rule says "must" and the validator rejects the file, a warning where it says "should".
  * What the rules ask of the XML alone (payment instructions, a VAT rate in every breakdown) is the job of `toUbl`.
  */
-function xrechnungFindings(d: Bag): Finding[] {
+function xrechnungFindings(draft: Prepared): Finding[] {
   const findings: Finding[] = [];
-  const add = (severity: Finding['severity'], path: string, code: string, message: string) =>
-    findings.push({ path, severity, code: `xrechnung-${code}`, message });
-  const need = (path: string, code: string, message: string) => {
-    if (path.split('.').reduce((o, k) => o?.[k], d as any) === undefined) add('error', path, code, message);
+  const need = <K extends MessageKey>(path: string, key: K, ...params: MessageParams<K>) => {
+    if (valueAt(draft, path) === undefined) findings.push(error(path, key, ...params));
   };
 
   // BR-DE-15
-  need(
-    'buyerReference',
-    'buyer-reference',
-    'XRechnung needs the buyer reference: for a German public body its Leitweg-ID, which the buyer names, usually with the order.',
-  );
+  need('buyerReference', 'xrechnung-buyer-reference');
   // BR-DE-2, BR-DE-5
-  need('seller.contactName', 'seller-contact', 'XRechnung needs a contact at the seller: the person or department the buyer can ask about the invoice.');
+  need('seller.contactName', 'xrechnung-seller-contact');
   // BR-DE-6
-  need('seller.phone', 'seller-phone', 'XRechnung needs the phone number of the contact at the seller.');
+  need('seller.phone', 'xrechnung-seller-phone');
   // BR-DE-7 for the contact, PEPPOL-EN16931-R020 for the electronic address: both are this one e-mail address.
-  need(
-    'seller.email',
-    'seller-email',
-    'XRechnung needs the e-mail address of the seller. It is written as the address of the contact and as the electronic address of the seller.',
-  );
+  need('seller.email', 'xrechnung-seller-email');
   // PEPPOL-EN16931-R010
-  need(
-    'buyer.email',
-    'buyer-email',
-    'XRechnung needs an electronic address of the buyer, and this tool writes the e-mail address there. Ask the buyer where invoices are to be sent.',
-  );
+  need('buyer.email', 'xrechnung-buyer-email');
   // BR-DE-3, BR-DE-4, BR-DE-8, BR-DE-9
   for (const who of ['seller', 'buyer']) {
-    need(`${who}.city`, 'address', `XRechnung needs the city of the ${who}.`);
-    need(`${who}.postalCode`, 'address', `XRechnung needs the postal code of the ${who}.`);
+    need(`${who}.city`, 'xrechnung-address.city', { who });
+    need(`${who}.postalCode`, 'xrechnung-address.postal-code', { who });
   }
 
   // BR-DE-18. The validator also wants a line break right after the last "#...#" of the text; `toUbl` ends the text with one.
-  if (typeof d.paymentTerms === 'string') {
-    const marked = d.paymentTerms.split(/\r?\n/).filter((line: string) => line.trim().startsWith('#'));
-    if (marked.some((line: string) => !SKONTO.test(line.trim())) || (marked.length > 0 && !/^\s*\n/.test(`${d.paymentTerms}\n`.split(/#.+#/).at(-1)!))) {
-      add(
-        'error',
-        'paymentTerms',
-        'payment-terms',
-        'XRechnung reads a line of the payment terms that starts with # as a cash discount, which has to be written exactly like #SKONTO#TAGE=14#PROZENT=2.00# on a line of its own (days, then percent with two decimals). Write the line that way, or do not start it with #.',
-      );
+  if (typeof draft.paymentTerms === 'string') {
+    const marked = draft.paymentTerms.split(/\r?\n/).filter((line: string) => line.trim().startsWith('#'));
+    if (
+      marked.some((line: string) => !SKONTO.test(line.trim())) ||
+      (marked.length > 0 && !/^\s*\n/.test(`${draft.paymentTerms}\n`.split(/#.+#/).at(-1)!))
+    ) {
+      findings.push(error('paymentTerms', 'xrechnung-payment-terms'));
     }
   }
 
   // A place of delivery needs its city and postal code in an XRechnung (BR-DE-10, BR-DE-11), which the data cannot hold.
   // A country alone would be left out of the XML without a word, so it is refused.
-  if (d.deliveryCountry !== undefined) {
-    add(
-      'error',
-      'deliveryCountry',
-      'delivery-address',
-      'XRechnung takes a place of delivery with its city and postal code only, which this tool cannot state yet. Leave the country of delivery empty.',
-    );
+  if (draft.deliveryCountry !== undefined) {
+    findings.push(error('deliveryCountry', 'xrechnung-delivery-address'));
   }
 
   // BR-IC-12 asks for the country of delivery of an intra-community supply, and BR-DE-10 and BR-DE-11 then for its city and postal code.
   // Known limit: the data model has no delivery address, so such an invoice is refused instead of naming the buyer's address as the place of delivery.
-  const intraCommunity = [
-    ...d.lines.map((line: Bag, i: number) => [`lines.${i}`, line] as const),
-    ...(['discounts', 'charges'] as const).flatMap((list) => (Array.isArray(d[list]) ? d[list] : []).map((e: Bag, i: number) => [`${list}.${i}`, e] as const)),
-  ].find(([, item]) => item?.vatCategory === 'K');
+  const intraCommunity = taxedOf(draft).find(([, item]) => item?.vatCategory === 'K');
   if (intraCommunity) {
-    add(
-      'error',
-      `${intraCommunity[0]}.vatCategory`,
-      'delivery-address',
-      'An intra-community supply cannot be written as XRechnung yet: XRechnung then asks for the city and postal code of the place of delivery, and the invoice data has no field for them.',
-    );
+    findings.push(error(`${intraCommunity[0]}.vatCategory`, 'xrechnung-delivery-address.intra-community'));
   }
 
   // BR-DE-17: of the types this tool knows, the prepayment invoice is the one XRechnung does not list.
-  if (d.typeCode === '386') {
-    add(
-      'warning',
-      'typeCode',
-      'type-code',
-      'XRechnung does not list the prepayment invoice (type 386) among its invoice types. A recipient may not accept it.',
-    );
+  if (draft.typeCode === '386') {
+    findings.push(warning('typeCode', 'xrechnung-type-code'));
   }
   // BR-DE-27
-  if (typeof d.seller.phone === 'string' && (d.seller.phone.match(/\d/g) ?? []).length < 3) {
-    add('warning', 'seller.phone', 'phone', 'XRechnung expects a phone number here, with three digits at least.');
+  if (typeof draft.seller.phone === 'string' && (draft.seller.phone.match(/\d/g) ?? []).length < 3) {
+    findings.push(warning('seller.phone', 'xrechnung-phone'));
   }
   // BR-DE-28
-  if (typeof d.seller.email === 'string' && !/^[^@\s]+@([^@.\s]+\.)+[^@.\s]+$/.test(d.seller.email)) {
-    add('warning', 'seller.email', 'email', 'XRechnung expects an e-mail address of the form name@example.org here.');
+  if (typeof draft.seller.email === 'string' && !/^[^@\s]+@([^@.\s]+\.)+[^@.\s]+$/.test(draft.seller.email)) {
+    findings.push(warning('seller.email', 'xrechnung-email'));
   }
   return findings;
-}
-
-/** The names of the months, as German and English invoices print them, in lower case. */
-export const MONTHS = [
-  ['januar', 'january', 'jan'],
-  ['februar', 'february', 'feb'],
-  ['märz', 'march', 'mar', 'mär'],
-  ['april', 'apr'],
-  ['mai', 'may'],
-  ['juni', 'june', 'jun'],
-  ['juli', 'july', 'jul'],
-  ['august', 'aug'],
-  ['september', 'sep'],
-  ['oktober', 'october', 'oct', 'okt'],
-  ['november', 'nov'],
-  ['dezember', 'december', 'dec', 'dez'],
-];
-
-/** The ways a date is commonly printed, without whitespace, lower case. */
-export function dateSpellings(iso: string): string[] {
-  const [y, m, d] = iso.split('-') as [string, string, string];
-  const day = String(Number(d));
-  const month = String(Number(m));
-  const yy = y.slice(2);
-  const numeric = [
-    iso,
-    `${d}.${m}.${y}`,
-    `${day}.${month}.${y}`,
-    `${d}.${m}.${yy}`,
-    `${day}.${month}.${yy}`,
-    `${d}/${m}/${y}`,
-    `${m}/${d}/${y}`,
-    `${d}/${m}/${yy}`,
-    `${m}/${d}/${yy}`,
-    `${d}-${m}-${y}`,
-  ];
-  // A month that does not exist has no name: such a date is only looked for in digits.
-  const named = (MONTHS[Number(m) - 1] ?? []).flatMap((name) => [
-    `${day}.${name}${y}`,
-    `${d}.${name}${y}`,
-    `${day}${name}${y}`,
-    `${name}${day},${y}`,
-    `${name}${day}${y}`,
-  ]);
-  return [...numeric, ...named];
-}
-
-/** The ways an amount is commonly printed, without whitespace. */
-export function amountSpellings(n: number): string[] {
-  // A price may be finer than a cent ("0,4995 €"): it keeps its decimals, two at least.
-  const decimals = Math.min(Math.max(2, String(n).split('.')[1]?.length ?? 0), 6);
-  const [int, frac] = Math.abs(n).toFixed(decimals).split('.') as [string, string];
-  const grouped = (sep: string) => int.replace(/\B(?=(\d{3})+(?!\d))/g, sep);
-  const spellings = [`${int},${frac}`, `${int}.${frac}`, `${grouped('.')},${frac}`, `${grouped(',')}.${frac}`, `${grouped("'")}.${frac}`];
-  // Known limit: a whole number matches any occurrence of its digits ("100" in "1000"); tighten with word boundaries if that hides real mismatches.
-  return frac === '00' ? [...spellings, int, grouped('.'), grouped(',')] : spellings;
-}
-
-/** The ways a percentage is commonly printed, without whitespace: "10%", "10,0%", "10.00%", "12,345%". */
-export function percentSpellings(p: number): string[] {
-  const own = String(p).split('.')[1]?.length ?? 0;
-  const forms = [own, 1, 2].filter((decimals) => decimals >= own).map((decimals) => p.toFixed(decimals));
-  return [...new Set(forms.flatMap((form) => [`${form}%`, `${form.replace('.', ',')}%`]))];
 }
 
 /**
  * Reports values that the text of the PDF does not contain. Known limit: it tells whether a value stands in the text,
  * not where. An address entered for the wrong party passes, because each of its words stands somewhere on the page.
  */
-function compareWithPdf(d: Bag, totals: Totals | undefined, pdfText: string, percentages: Record<string, number> = {}): Finding[] {
+function compareWithPdf(
+  draft: Prepared,
+  totals: Totals | undefined,
+  pdfText: string,
+  percentages: Record<string, number> = {},
+): Finding[] {
   const haystack = pdfText.replace(/\s+/g, '').toLowerCase();
   if (!haystack) {
-    return [
-      {
-        path: '',
-        severity: 'warning',
-        code: 'no-pdf-text',
-        message: 'The PDF contains no text (it may be a scan), so the data could not be compared with it. Check every value by eye.',
-      },
-    ];
+    return [warning('', 'no-pdf-text')];
   }
   const findings: Finding[] = [];
   const expect = (path: string, spellings: string[], shown: unknown) => {
     if (!spellings.some((s) => haystack.includes(s.replace(/\s+/g, '').toLowerCase()))) {
-      findings.push({ path, severity: 'warning', code: 'not-in-pdf', message: `"${shown}" does not appear in the PDF. Please check it.` });
+      findings.push(warning(path, 'not-in-pdf', { value: String(shown) }));
     }
   };
-  const get = (path: string) => path.split('.').reduce((o, k) => o?.[k], d as any);
+  const get = (path: string) => valueAt(draft, path);
 
   for (const path of ['number', 'seller.vatId', 'seller.taxNumber', 'buyer.vatId', 'iban']) {
     const value = get(path);
@@ -498,7 +525,8 @@ function compareWithPdf(d: Bag, totals: Totals | undefined, pdfText: string, per
   }
   // A name may wrap, and in a table its rows mix with other columns: every word has to be there, in any order.
   const expectWords = (path: string, value: unknown) => {
-    if (typeof value === 'string' && !value.split(/\s+/).every((word) => haystack.includes(word.toLowerCase()))) expect(path, [value], value);
+    if (typeof value === 'string' && !value.split(/\s+/).every((word) => haystack.includes(word.toLowerCase())))
+      expect(path, [value], value);
   };
   for (const who of ['seller', 'buyer']) {
     for (const part of ['name', 'street', 'postalCode', 'city']) expectWords(`${who}.${part}`, get(`${who}.${part}`));
@@ -507,21 +535,21 @@ function compareWithPdf(d: Bag, totals: Totals | undefined, pdfText: string, per
     const value = get(path);
     if (isDate(value)) expect(path, dateSpellings(value), value);
   }
-  d.lines.forEach((line: Bag, i: number) => {
+  draft.lines.forEach((line, i) => {
     expectWords(`lines.${i}.name`, line.name);
     if (isNumber(line.unitPrice)) expect(`lines.${i}.unitPrice`, amountSpellings(line.unitPrice), line.unitPrice);
     // What a page prints of a discount: its percentage, from which the amount follows, or else its amount.
     const discount = line.discount;
-    if (isNumber(discount?.percent)) expect(`lines.${i}.discount.percent`, percentSpellings(discount.percent), `${discount.percent} %`);
-    else if (isNumber(discount?.amount)) expect(`lines.${i}.discount.amount`, amountSpellings(discount.amount), discount.amount);
+    if (isNumber(discount?.percent))
+      expect(`lines.${i}.discount.percent`, percentSpellings(discount.percent), `${discount.percent} %`);
+    else if (isNumber(discount?.amount))
+      expect(`lines.${i}.discount.amount`, amountSpellings(discount.amount), discount.amount);
   });
   // Of a discount or charge on the whole invoice, too: never what is derived from it, such as its amount in each VAT group.
-  for (const list of ['discounts', 'charges']) {
-    (Array.isArray(d[list]) ? d[list] : []).forEach((e: Bag, i: number) => {
-      const percent = isNumber(e?.percent) ? e.percent : percentages[`${list}.${i}`];
-      if (percent !== undefined) expect(`${list}.${i}.percent`, percentSpellings(percent), `${percent} %`);
-      else if (isNumber(e?.amount)) expect(`${list}.${i}.amount`, amountSpellings(e.amount), e.amount);
-    });
+  for (const [path, entry] of adjustmentsOf(draft)) {
+    const percent = isNumber(entry?.percent) ? entry.percent : percentages[path];
+    if (percent !== undefined) expect(`${path}.percent`, percentSpellings(percent), `${percent} %`);
+    else if (isNumber(entry?.amount)) expect(`${path}.amount`, amountSpellings(entry.amount), entry.amount);
   }
   if (totals) {
     for (const key of ['net', 'vat', 'gross'] as const) {

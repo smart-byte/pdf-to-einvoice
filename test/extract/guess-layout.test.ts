@@ -62,7 +62,13 @@ describe('guessFromText on the layout of a German invoice', () => {
   });
 
   it('takes the country of the buyer from the seller when VAT is charged and the address names none', () => {
-    expect(guessFromText(hours).buyer).toEqual({ name: 'Beispiel AG', street: 'Hauptstraße 5', postalCode: '54321', city: 'Beispielstadt', country: 'DE' });
+    expect(guessFromText(hours).buyer).toEqual({
+      name: 'Beispiel AG',
+      street: 'Hauptstraße 5',
+      postalCode: '54321',
+      city: 'Beispielstadt',
+      country: 'DE',
+    });
   });
 
   it('reads a slashed date after a German label as day first', () => {
@@ -75,7 +81,14 @@ describe('guessFromText on the layout of a German invoice', () => {
 
   it('reads a table row without quantity and price as one unit at the row total, joined with the row it wraps into', () => {
     expect(guessFromText(royalties).lines).toEqual([
-      { name: 'Lizenzgebühren gemäß Report für das 2. Quartal 2026 Beispielspiel', quantity: 1, unit: 'C62', unitPrice: 351.41, vatCategory: 'S', vatRate: 7 },
+      {
+        name: 'Lizenzgebühren gemäß Report für das 2. Quartal 2026 Beispielspiel',
+        quantity: 1,
+        unit: 'C62',
+        unitPrice: 351.41,
+        vatCategory: 'S',
+        vatRate: 7,
+      },
     ]);
   });
 
@@ -84,6 +97,23 @@ describe('guessFromText on the layout of a German invoice', () => {
       { name: 'Beratung E-Rechnung', quantity: 10, unit: 'HUR', unitPrice: 100, vatCategory: 'S', vatRate: 19 },
       { name: 'Softwarelizenz (Jahr)', quantity: 2, unit: 'C62', unitPrice: 249.5, vatCategory: 'S', vatRate: 19 },
     ]);
+  });
+
+  it('finds quantity and price whose product lies on half a cent, as the total rounds it', () => {
+    // 7 x 0.145 is 1.015, which binary floating point holds as 1.0149999999999999.
+    const cable = hours
+      .replace('2   Softwarelizenz (Jahr)   2 Stk.   249,50 €   499,00 €', '2   Kabel   7 m   0,145 €   1,02 €')
+      .replace('1.499,00 €', '1.001,02 €')
+      .replace('284,81 €', '190,19 €')
+      .replace('1.783,81 €', '1.191,21 €');
+    expect(guessFromText(cable).lines?.[1]).toEqual({
+      name: 'Kabel',
+      quantity: 7,
+      unit: 'MTR',
+      unitPrice: 0.145,
+      vatCategory: 'S',
+      vatRate: 19,
+    });
   });
 
   it('reads no lines when the rows do not add up to the printed net total', () => {
@@ -107,7 +137,10 @@ describe('guessFromText on the layout of a German invoice', () => {
   });
 
   it('reads a row that holds nothing but a month as the service period', () => {
-    expect(guessFromText('Beispiel AG\nDecember 2024\nInvoice 2410')).toMatchObject({ periodStart: '2024-12-01', periodEnd: '2024-12-31' });
+    expect(guessFromText('Beispiel AG\nDecember 2024\nInvoice 2410')).toMatchObject({
+      periodStart: '2024-12-01',
+      periodEnd: '2024-12-31',
+    });
   });
 
   it('does not take a month inside a sentence, or one that does not exist, for a service period', () => {
@@ -121,7 +154,9 @@ describe('languageOf', () => {
   });
 
   it('recognises an English invoice', () => {
-    expect(languageOf('Invoice No: INV-7\nInvoice date: November 3, 2026\nSubtotal $1,499.00\nTotal amount due $1,499.00')).toBe('en');
+    expect(
+      languageOf('Invoice No: INV-7\nInvoice date: November 3, 2026\nSubtotal $1,499.00\nTotal amount due $1,499.00'),
+    ).toBe('en');
   });
 
   it('falls back to English when the text gives no clue', () => {

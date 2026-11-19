@@ -11,17 +11,18 @@ import { createEInvoice, createXRechnung, type CreateOptions, type XRechnungOpti
 import { validateEInvoice, type ValidationResult } from '../inspect/validate.js';
 import { inspectPdf } from '../pdf/file.js';
 import { extractLayout, extractText } from '../pdf/text.js';
-export const reason = (e: unknown) => (e instanceof Error ? e.message : String(e));
+import { messageOf } from '../util/errors.js';
 export const readPdf = async (path: string) => new Uint8Array(await readFile(path));
 
-export const packageVersion = (): string => JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')).version;
+export const packageVersion = (): string =>
+  JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')).version;
 
 export async function readJson(path: string): Promise<InvoiceDraft> {
   const text = await readFile(path, 'utf8');
   try {
     return JSON.parse(text);
   } catch (e) {
-    throw new Error(`${path} is not valid JSON: ${reason(e)}`, { cause: e });
+    throw new Error(`${path} is not valid JSON: ${messageOf(e)}`, { cause: e });
   }
 }
 
@@ -57,12 +58,15 @@ export function sameFile(a: string, b: string): boolean {
 export async function createFile(
   pdfPath: string,
   invoice: InvoiceDraft,
-  outputPath = defaultOutput(pdfPath),
-  overwrite = false,
-  profile?: CreateOptions['profile'],
+  {
+    outputPath = defaultOutput(pdfPath),
+    overwrite = false,
+    profile,
+  }: { outputPath?: string; overwrite?: boolean; profile?: CreateOptions['profile'] } = {},
 ): Promise<{ outputPath: string; findings: Finding[]; totals: Totals }> {
   const output = resolve(outputPath);
-  if (sameFile(output, pdfPath)) throw new Error('The output path is the input PDF. Choose another output path; the input is never overwritten.');
+  if (sameFile(output, pdfPath))
+    throw new Error('The output path is the input PDF. Choose another output path; the input is never overwritten.');
   if (!overwrite && existsSync(output)) throw Object.assign(new Error(`${output} already exists.`), { code: 'EEXIST' });
 
   const result = await createEInvoice({ pdf: await readPdf(pdfPath), invoice, profile });
@@ -71,16 +75,21 @@ export async function createFile(
 }
 
 /**
- * Writes the invoice as an XRechnung XML file, over an existing file only when `overwrite` is set (the error then
- * carries the code `EEXIST`).
+ * Writes the invoice as an XRechnung XML file. Never writes over `dataPath`, the file the data was read from, and over
+ * another existing file only when `overwrite` is set (the error then carries the code `EEXIST`).
  */
 export async function createXRechnungFile(
   invoice: InvoiceDraft,
   outputPath: string,
-  syntax?: XRechnungOptions['syntax'],
-  overwrite = false,
+  {
+    dataPath,
+    overwrite = false,
+    syntax,
+  }: { dataPath?: string; overwrite?: boolean; syntax?: XRechnungOptions['syntax'] } = {},
 ): Promise<{ outputPath: string; findings: Finding[]; totals: Totals }> {
   const output = resolve(outputPath);
+  if (dataPath !== undefined && sameFile(output, dataPath))
+    throw new Error('The output path is the data file. Choose another output path; the input is never overwritten.');
   if (!overwrite && existsSync(output)) throw Object.assign(new Error(`${output} already exists.`), { code: 'EEXIST' });
   const result = await createXRechnung({ invoice, syntax });
   await writeFile(output, result.xml, { flag: overwrite ? 'w' : 'wx' });

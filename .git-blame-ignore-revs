@@ -1,0 +1,6 @@
+# Commits that only changed formatting. GitHub leaves them out of its blame view; locally run once
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+# so that `git blame` looks past them as well. A commit whose hash changes (a rebase) has to be entered again.
+
+# style: wrap at 120 characters instead of 160
+9a973658e9978f49475868a59272bce75b81357a

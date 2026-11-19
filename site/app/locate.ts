@@ -1,4 +1,4 @@
-import { amountSpellings, dateSpellings } from '../src/domain/check.js';
+import { amountSpellings, dateSpellings } from '../../src/domain/spellings.js';
 
 /** A rectangle on the page. `y` is its upper edge; the unit is up to the caller, as long as all pieces share it. */
 export interface Rect {
@@ -98,7 +98,8 @@ function hitsIn(row: Row, needle: string, kind: Kind, widthOf: (text: string) =>
     let [left, top, right, low] = [Infinity, Infinity, -Infinity, -Infinity];
     for (const piece of new Set(covered.map((char) => char.piece))) {
       const own = covered.filter((char) => char.piece === piece);
-      const edge = (at: number) => piece.x + (piece.width * widthOf(piece.text.slice(0, at))) / (widthOf(piece.text) || 1);
+      const edge = (at: number) =>
+        piece.x + (piece.width * widthOf(piece.text.slice(0, at))) / (widthOf(piece.text) || 1);
       left = Math.min(left, edge(own[0]!.at));
       right = Math.max(right, edge(own.at(-1)!.at + 1));
       top = Math.min(top, piece.y);
@@ -110,7 +111,8 @@ function hitsIn(row: Row, needle: string, kind: Kind, widthOf: (text: string) =>
 }
 
 /** A part of a wrapped text continues the one above: a row further down, in the same column. */
-const follows = (above: Rect, below: Rect) => below.y > above.y + above.height / 2 && below.y < above.y + 2.5 * above.height && overlap(above, below);
+const follows = (above: Rect, below: Rect) =>
+  below.y > above.y + above.height / 2 && below.y < above.y + 2.5 * above.height && overlap(above, below);
 
 /**
  * The places of a text that wraps over rows: the longest run of its first words, then the rest below it, and so on.
@@ -150,12 +152,19 @@ export function locate(pieces: Piece[], value: unknown, options: LocateOptions =
   else [kind, spellings] = ['text', [value]];
   const needles = [...new Set(spellings.map(fold))].filter(Boolean);
 
-  const rows = rowsOf(pieces).filter((row) => !beside || beside.some((rect) => rect.y + rect.height / 2 > row.top && rect.y + rect.height / 2 < row.bottom));
+  const rows = rowsOf(pieces).filter(
+    (row) =>
+      !beside || beside.some((rect) => rect.y + rect.height / 2 > row.top && rect.y + rect.height / 2 < row.bottom),
+  );
   const hits = rows.flatMap((row) => {
     const found = needles.flatMap((needle) => hitsIn(row, needle, kind, widthOf)).sort((a, b) => a.x - b.x);
     if (!beside) return found;
-    const others = found.filter((hit) => !beside.some((rect) => bottom(rect) > row.top && rect.y < row.bottom && overlap(rect, hit)));
-    const right = others.filter((hit) => beside.some((rect) => bottom(rect) > row.top && rect.y < row.bottom && hit.x >= rect.x + rect.width));
+    const others = found.filter(
+      (hit) => !beside.some((rect) => bottom(rect) > row.top && rect.y < row.bottom && overlap(rect, hit)),
+    );
+    const right = others.filter((hit) =>
+      beside.some((rect) => bottom(rect) > row.top && rect.y < row.bottom && hit.x >= rect.x + rect.width),
+    );
     return right.length ? right : others;
   });
   if (hits.length || kind !== 'text') return hits;

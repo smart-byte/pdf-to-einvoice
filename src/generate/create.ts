@@ -1,10 +1,12 @@
 import { InvoiceService } from '@e-invoice-eu/core';
 import type { Totals } from '../domain/calculate.js';
 import { check } from '../domain/check.js';
-import type { Finding } from '../domain/finding.js';
+import { warning, type Finding } from '../domain/finding.js';
+import { message } from '../domain/messages.js';
 import type { Invoice, InvoiceDraft } from '../domain/model.js';
 import { inspectPdf, readEmbeddedXml, repairForPdfA, type PdfInfo } from '../pdf/file.js';
 import { extractText } from '../pdf/text.js';
+import { messageOf } from '../util/errors.js';
 import { toUbl } from './ubl.js';
 
 export interface CreateOptions {
@@ -57,28 +59,37 @@ export class InvoiceError extends Error {
   override name = 'InvoiceError';
   constructor(
     readonly code: InvoiceErrorCode,
-    message: string,
+    text: string,
     readonly findings: Finding[] = [],
   ) {
-    super(message);
+    super(text);
   }
 }
-
-const reason = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 /** The data, cleaned and with its totals; throws what is wrong with it. */
 function checked(draft: InvoiceDraft, rules?: 'xrechnung', pdfText?: string) {
   const { findings, invoice, totals } = check(draft, { rules, pdfText });
   if (!invoice || !totals) {
     const errors = findings.filter((f) => f.severity === 'error');
-    throw new InvoiceError('invalid-invoice', `The invoice data has ${errors.length} error(s): ${errors.map((f) => f.message).join(' ')}`, findings);
+    throw new InvoiceError(
+      'invalid-invoice',
+      message('invalid-invoice', { errors: errors.map((f) => f.message) }),
+      findings,
+    );
   }
   return { findings, invoice, totals };
 }
 
 /** Has @e-invoice-eu/core write the invoice in one of its formats. What the library warns about joins the findings. */
-async function write(format: string, invoice: Invoice, totals: Totals, findings: Finding[], lang = 'en', pdf?: Uint8Array): Promise<string | Uint8Array> {
-  const note = (message: unknown) => findings.push({ path: '', severity: 'warning', code: 'generator', message: String(message) });
+async function write(
+  format: string,
+  invoice: Invoice,
+  totals: Totals,
+  findings: Finding[],
+  lang = 'en',
+  pdf?: Uint8Array,
+): Promise<string | Uint8Array> {
+  const note = (text: unknown) => findings.push(warning('', 'generator.library', { text: String(text) }));
   try {
     const service = new InvoiceService({ log: () => {}, warn: note, error: note });
     return await service.generate(toUbl(invoice, totals, /xrechnung/i.test(format)), {
@@ -90,7 +101,10 @@ async function write(format: string, invoice: Invoice, totals: Totals, findings:
       postProcessor: async (xml: any) => {
         // @e-invoice-eu/core 3.4 writes the purchase order number (BT-13) for the EXTENDED profile only, although
         // EN 16931 has it. It is the last element of the trade agreement in everything this function writes.
-        const agreement = xml?.['rsm:CrossIndustryInvoice']?.['rsm:SupplyChainTradeTransaction']?.['ram:ApplicableHeaderTradeAgreement'];
+        const agreement =
+          xml?.['rsm:CrossIndustryInvoice']?.['rsm:SupplyChainTradeTransaction']?.[
+            'ram:ApplicableHeaderTradeAgreement'
+          ];
         if (invoice.orderReference && agreement && !agreement['ram:BuyerOrderReferencedDocument']) {
           agreement['ram:BuyerOrderReferencedDocument'] = { 'ram:IssuerAssignedID': invoice.orderReference };
         }
@@ -104,27 +118,34 @@ async function write(format: string, invoice: Invoice, totals: Totals, findings:
       },
     });
   } catch (e) {
-    throw new InvoiceError('generator', `The e-invoice could not be written: ${reason(e)}`, findings);
+    throw new InvoiceError('generator', message('generator', { reason: messageOf(e) }), findings);
   }
 }
 
 /** The XML is the binding part: a value that was given but did not make it there must not go unnoticed. */
 function reportNotWritten(invoice: Invoice, xml: string, findings: Finding[]): void {
   const escaped = (value: string) => value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  const { lines, seller, buyer, discounts = [], charges = [], totals: _printed, typeCode: _type, currency: _currency, ...head } = invoice;
+  const {
+    lines,
+    seller,
+    buyer,
+    discounts = [],
+    charges = [],
+    totals: _printed,
+    typeCode: _type,
+    currency: _currency,
+    ...head
+  } = invoice;
   const given = [
-    ...[head, seller, buyer, ...lines.map(({ name, description }) => ({ name, description }))].flatMap((part) => Object.entries(part)),
+    ...[head, seller, buyer, ...lines.map(({ name, description }) => ({ name, description }))].flatMap((part) =>
+      Object.entries(part),
+    ),
     ...discounts.map((entry, i) => [`discounts.${i}.reason`, entry.reason] as const),
     ...charges.map((entry, i) => [`charges.${i}.reason`, entry.reason] as const),
   ];
   for (const [field, value] of given) {
     if (typeof value === 'string' && !/^\d{4}-\d{2}-\d{2}$/.test(value) && !xml.includes(escaped(value))) {
-      findings.push({
-        path: field,
-        severity: 'warning',
-        code: 'not-written',
-        message: `"${value}" could not be written into the XML. Do not send this file; please report it at https://github.com/smart-byte/pdf-to-einvoice/issues.`,
-      });
+      findings.push(warning(field, 'not-written', { value }));
     }
   }
 }
@@ -141,33 +162,30 @@ export async function createEInvoice(options: CreateOptions): Promise<CreateResu
   try {
     info = await inspectPdf(options.pdf);
   } catch (e) {
-    throw new InvoiceError('invalid-pdf', `The file could not be read as a PDF: ${reason(e)}`);
+    throw new InvoiceError('invalid-pdf', message('invalid-pdf', { reason: messageOf(e) }));
   }
-  if (info.embeddedXml !== null) throw new InvoiceError('already-einvoice', 'This PDF already carries an e-invoice.');
+  if (info.embeddedXml !== null) throw new InvoiceError('already-einvoice', message('already-einvoice'));
   // A PDF whose text cannot be read is compared with no text: that is reported, and the file is written all the same.
   const pdfText = options.pdfText ?? (await extractText(options.pdf).catch(() => ''));
   const { findings, invoice, totals } = checked(options.invoice, xrechnung ? 'xrechnung' : undefined, pdfText);
   if (info.unembeddedFonts.length) {
-    findings.push({
-      path: '',
-      severity: 'warning',
-      code: 'pdf-fonts',
-      message: `The PDF does not embed these fonts: ${info.unembeddedFonts.join(', ')}. The XML is not affected, but the file is not a strict PDF/A-3. Export the PDF again with fonts embedded (or as PDF/A) to fix this.`,
-    });
+    findings.push(warning('', 'pdf-fonts.create', { fonts: info.unembeddedFonts.join(', ') }));
   }
 
   if (info.forbiddenActions.length) {
-    findings.push({
-      path: '',
-      severity: 'warning',
-      code: 'pdf-actions',
-      message: `The PDF carried what PDF/A forbids a file to run: ${info.forbiddenActions.join(', ')}. It was left out of the e-invoice; the pages are unchanged.`,
-    });
+    findings.push(warning('', 'pdf-actions.create', { actions: info.forbiddenActions.join(', ') }));
   }
 
-  const pdf = (await write(xrechnung ? 'Factur-X-XRechnung' : 'Factur-X-EN16931', invoice, totals, findings, options.lang, options.pdf)) as Uint8Array;
+  const pdf = (await write(
+    xrechnung ? 'Factur-X-XRechnung' : 'Factur-X-EN16931',
+    invoice,
+    totals,
+    findings,
+    options.lang,
+    options.pdf,
+  )) as Uint8Array;
   const xml = await readEmbeddedXml(pdf);
-  if (xml === null) throw new InvoiceError('generator', 'The e-invoice was written without its XML.', findings);
+  if (xml === null) throw new InvoiceError('generator', message('generator.no-xml'), findings);
   reportNotWritten(invoice, xml, findings);
   return { pdf, xml, findings, totals };
 }
@@ -179,7 +197,13 @@ export async function createEInvoice(options: CreateOptions): Promise<CreateResu
  */
 export async function createXRechnung(options: XRechnungOptions): Promise<XRechnungResult> {
   const { findings, invoice, totals } = checked(options.invoice, 'xrechnung');
-  const xml = (await write(options.syntax === 'cii' ? 'XRECHNUNG-CII' : 'XRECHNUNG-UBL', invoice, totals, findings, options.lang)) as string;
+  const xml = (await write(
+    options.syntax === 'cii' ? 'XRECHNUNG-CII' : 'XRECHNUNG-UBL',
+    invoice,
+    totals,
+    findings,
+    options.lang,
+  )) as string;
   reportNotWritten(invoice, xml, findings);
   return { xml, findings, totals };
 }

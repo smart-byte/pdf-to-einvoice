@@ -85,8 +85,22 @@ const wrapped = [
   'Muster Software GmbH · Beispielweg 1 · DE-12345 Musterstadt · USt-IdNr. DE123456789 · muster-software.example',
 ].join('\n');
 
-const SELLER = { name: 'Muster Software GmbH', street: 'Beispielweg 1', postalCode: '12345', city: 'Musterstadt', country: 'DE', vatId: 'DE123456789' };
-const US_BUYER = { name: 'Example Inc.', contactName: 'Jane Doe', street: '8 Sample Road', postalCode: '19901', city: 'Dover', country: 'US' };
+const SELLER = {
+  name: 'Muster Software GmbH',
+  street: 'Beispielweg 1',
+  postalCode: '12345',
+  city: 'Musterstadt',
+  country: 'DE',
+  vatId: 'DE123456789',
+};
+const US_BUYER = {
+  name: 'Example Inc.',
+  contactName: 'Jane Doe',
+  street: '8 Sample Road',
+  postalCode: '19901',
+  city: 'Dover',
+  country: 'US',
+};
 
 describe('guessFromText on a letterhead layout', () => {
   const guess = guessFromText(letterhead);
@@ -116,8 +130,22 @@ describe('guessFromText on a letterhead layout', () => {
 
   it('reads the VAT rate from a totals row that starts with it', () => {
     expect(guess.lines).toEqual([
-      { name: 'Erläuterungen zum Markt für Apps (iOS, Android) inkl. Rechte', quantity: 1, unit: 'C62', unitPrice: 6000, vatCategory: 'S', vatRate: 19 },
-      { name: 'Besprechungen der Feststellungen', quantity: 1, unit: 'C62', unitPrice: 5000, vatCategory: 'S', vatRate: 19 },
+      {
+        name: 'Erläuterungen zum Markt für Apps (iOS, Android) inkl. Rechte',
+        quantity: 1,
+        unit: 'C62',
+        unitPrice: 6000,
+        vatCategory: 'S',
+        vatRate: 19,
+      },
+      {
+        name: 'Besprechungen der Feststellungen',
+        quantity: 1,
+        unit: 'C62',
+        unitPrice: 5000,
+        vatCategory: 'S',
+        vatRate: 19,
+      },
     ]);
   });
 
@@ -144,7 +172,13 @@ describe('guessFromText on invoices to a customer abroad', () => {
       periodEnd: '2024-12-31',
       currency: 'USD',
       totals: { gross: 12000 },
-      lines: [{ name: 'Based on the project planning, the design and component implementations will proceed.', quantity: 1, unitPrice: 12000 }],
+      lines: [
+        {
+          name: 'Based on the project planning, the design and component implementations will proceed.',
+          quantity: 1,
+          unitPrice: 12000,
+        },
+      ],
     });
   });
 
@@ -152,7 +186,13 @@ describe('guessFromText on invoices to a customer abroad', () => {
     expect(guessFromText(wrapped)).toMatchObject({
       number: '2616',
       issueDate: '2026-09-25',
-      lines: [{ name: 'Based on the project planning and designs, the design and component implementations will proceed.', quantity: 1, unitPrice: 12000 }],
+      lines: [
+        {
+          name: 'Based on the project planning and designs, the design and component implementations will proceed.',
+          quantity: 1,
+          unitPrice: 12000,
+        },
+      ],
     });
   });
 

@@ -1,10 +1,18 @@
-import { readFile } from 'node:fs/promises';
 import { isAbsolute } from 'node:path';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ErrorCode, ListToolsRequestSchema, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { check } from '../domain/check.js';
-import { CHOICES, createFile, createXRechnungFile, describePdf, packageVersion, validateFile } from './files.js';
+import { messageOf } from '../util/errors.js';
+import {
+  CHOICES,
+  createFile,
+  createXRechnungFile,
+  describePdf,
+  packageVersion,
+  readPdf,
+  validateFile,
+} from './files.js';
 import { InvoiceError } from '../generate/create.js';
 import { invoiceJsonSchema, type InvoiceDraft } from '../domain/model.js';
 import { readEmbeddedXml } from '../pdf/file.js';
@@ -32,7 +40,7 @@ Rules:
 
 const { $schema: _dialect, ...INVOICE_SCHEMA } = invoiceJsonSchema;
 /** The same schema for a draft: nothing is required, so an incomplete invoice can be sent to learn what it lacks. */
-const optional = (schema: any): any =>
+const optional = (schema: unknown): unknown =>
   Array.isArray(schema)
     ? schema.map(optional)
     : schema && typeof schema === 'object'
@@ -48,7 +56,11 @@ const READS = { readOnlyHint: true, openWorldHint: false };
 // A tool that creates writes one new file and replaces nothing unless `overwrite` is set.
 const WRITES = { readOnlyHint: false, destructiveHint: false, openWorldHint: false };
 const pathSchema = (description: string) => ({ type: 'string', description: `${description} Absolute path.` });
-const choiceSchema = (key: keyof typeof CHOICES, description: string) => ({ type: 'string', enum: CHOICES[key], description });
+const choiceSchema = (key: keyof typeof CHOICES, description: string) => ({
+  type: 'string',
+  enum: CHOICES[key],
+  description,
+});
 
 const TOOLS = [
   {
@@ -104,7 +116,10 @@ const TOOLS = [
       properties: {
         invoice: INVOICE_SCHEMA,
         output_path: pathSchema('Where to write the XML file.'),
-        syntax: choiceSchema('syntax', 'The XML syntax: ubl (default) or cii, UN/CEFACT Cross Industry Invoice. XRechnung allows both.'),
+        syntax: choiceSchema(
+          'syntax',
+          'The XML syntax: ubl (default) or cii, UN/CEFACT Cross Industry Invoice. XRechnung allows both.',
+        ),
         overwrite: { type: 'boolean', description: 'Replace output_path if it exists. Default false.' },
       },
       required: ['invoice', 'output_path'],
@@ -137,18 +152,18 @@ function pathArg(args: Args, key: string): string {
 
 function invoiceArg(args: Args): InvoiceDraft {
   const value = args.invoice;
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) throw new Error('invoice must be an object holding the invoice data.');
+  if (typeof value !== 'object' || value === null || Array.isArray(value))
+    throw new Error('invoice must be an object holding the invoice data.');
   return value as InvoiceDraft;
 }
 
 /** An optional argument that takes one of a few words. */
 function choiceArg<K extends keyof typeof CHOICES>(args: Args, key: K): (typeof CHOICES)[K][number] | undefined {
   const value = args[key];
-  if (value !== undefined && !(CHOICES[key] as readonly unknown[]).includes(value)) throw new Error(`${key} must be ${CHOICES[key].join(' or ')}.`);
+  if (value !== undefined && !(CHOICES[key] as readonly unknown[]).includes(value))
+    throw new Error(`${key} must be ${CHOICES[key].join(' or ')}.`);
   return value as (typeof CHOICES)[K][number] | undefined;
 }
-
-const readPdf = async (path: string) => new Uint8Array(await readFile(path));
 
 /** Each handler returns the result (an object, or text to pass on as it is) or throws what went wrong. */
 const HANDLERS: Record<string, (args: Args) => Promise<object | string>> = {
@@ -156,19 +171,27 @@ const HANDLERS: Record<string, (args: Args) => Promise<object | string>> = {
 
   async check_invoice(args) {
     const rules = choiceArg(args, 'rules');
-    const pdfText = args.pdf_path === undefined ? undefined : await extractText(await readPdf(pathArg(args, 'pdf_path')));
+    const pdfText =
+      args.pdf_path === undefined ? undefined : await extractText(await readPdf(pathArg(args, 'pdf_path')));
     const { findings, totals, invoice } = check(invoiceArg(args), { pdfText, rules });
     return { ok: invoice !== undefined, findings, totals };
   },
 
   async create_einvoice(args) {
     const output = args.output_path === undefined ? undefined : pathArg(args, 'output_path');
-    const result = await createFile(pathArg(args, 'pdf_path'), invoiceArg(args), output, args.overwrite === true, choiceArg(args, 'profile'));
+    const result = await createFile(pathArg(args, 'pdf_path'), invoiceArg(args), {
+      outputPath: output,
+      overwrite: args.overwrite === true,
+      profile: choiceArg(args, 'profile'),
+    });
     return { output_path: result.outputPath, findings: result.findings, totals: result.totals };
   },
 
   async create_xrechnung(args) {
-    const result = await createXRechnungFile(invoiceArg(args), pathArg(args, 'output_path'), choiceArg(args, 'syntax'), args.overwrite === true);
+    const result = await createXRechnungFile(invoiceArg(args), pathArg(args, 'output_path'), {
+      overwrite: args.overwrite === true,
+      syntax: choiceArg(args, 'syntax'),
+    });
     return { output_path: result.outputPath, findings: result.findings, totals: result.totals };
   },
 
@@ -184,8 +207,9 @@ const HANDLERS: Record<string, (args: Args) => Promise<object | string>> = {
 /** What the model gets to read when a tool fails: enough to fix the call. */
 function describeError(e: unknown): object {
   if (e instanceof InvoiceError) return { error: e.code, message: e.message, findings: e.findings };
-  const message = e instanceof Error ? e.message : String(e);
-  if ((e as NodeJS.ErrnoException).code === 'EEXIST') return { error: `${message} Pass "overwrite": true to replace it, or choose another output_path.` };
+  const message = messageOf(e);
+  if ((e as NodeJS.ErrnoException).code === 'EEXIST')
+    return { error: `${message} Pass "overwrite": true to replace it, or choose another output_path.` };
   return { error: message };
 }
 
@@ -195,12 +219,16 @@ const asText = (result: object | string) => ({
 
 /** The MCP server, not yet connected to a transport. */
 export function createServer(): Server {
-  const server = new Server({ name: 'pdf-to-einvoice', version: packageVersion() }, { capabilities: { tools: {} }, instructions: INSTRUCTIONS });
+  const server = new Server(
+    { name: 'pdf-to-einvoice', version: packageVersion() },
+    { capabilities: { tools: {} }, instructions: INSTRUCTIONS },
+  );
 
   server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS }));
 
   server.setRequestHandler(CallToolRequestSchema, async ({ params }) => {
-    if (!Object.hasOwn(HANDLERS, params.name)) throw new McpError(ErrorCode.InvalidParams, `Unknown tool: ${params.name}`);
+    if (!Object.hasOwn(HANDLERS, params.name))
+      throw new McpError(ErrorCode.InvalidParams, `Unknown tool: ${params.name}`);
     try {
       return asText(await HANDLERS[params.name]!(params.arguments ?? {}));
     } catch (e) {

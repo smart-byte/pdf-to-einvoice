@@ -15,6 +15,9 @@ export const VAT_CATEGORIES = {
   O: 'Not subject to VAT',
 } as const;
 export type VatCategory = keyof typeof VAT_CATEGORIES;
+/** Whether a value is one of the codes above, not merely a key every object inherits ("toString"). */
+export const isVatCategory = (v: unknown): v is VatCategory =>
+  typeof v === 'string' && Object.hasOwn(VAT_CATEGORIES, v);
 
 /** Invoice type codes (UNTDID 1001 subset). */
 export const INVOICE_TYPES = {
@@ -26,6 +29,8 @@ export const INVOICE_TYPES = {
   '386': 'Prepayment invoice',
 } as const;
 export type InvoiceType = keyof typeof INVOICE_TYPES;
+/** Whether a value is one of the codes above, not merely a key every object inherits. */
+export const isInvoiceType = (v: unknown): v is InvoiceType => typeof v === 'string' && Object.hasOwn(INVOICE_TYPES, v);
 
 export interface Party {
   /** Full legal name (seller BT-27, buyer BT-44). */
@@ -136,6 +141,20 @@ export interface Invoice {
 
 type Draft<T> = T extends (infer U)[] ? Draft<U>[] : T extends object ? { [K in keyof T]?: Draft<T[K]> | null } : T;
 
+/**
+ * Data as it came in, before `check` looked at it: the fields of `T`, an invoice unless a party, a line or a discount
+ * is named. Only their names are promised, so that a misspelt one does not compile. Any of them may be missing or of
+ * any type: a value is `unknown` until a guard says what it is, and a list until `Array.isArray` says it is one. A
+ * field that holds an object is read as one, since reading a field of anything but `null` or `undefined` is safe.
+ */
+export type Unchecked<T = Invoice> = {
+  [K in keyof T]?: NonNullable<T[K]> extends unknown[]
+    ? unknown
+    : NonNullable<T[K]> extends object
+      ? Unchecked<NonNullable<T[K]>>
+      : unknown;
+};
+
 /** Invoice data that may still be incomplete, e.g. straight from an extraction. */
 export type InvoiceDraft = Draft<Invoice>;
 
@@ -193,7 +212,8 @@ const party = (who: string, extra: Record<string, unknown> = {}) => ({
 export const invoiceJsonSchema = {
   $schema: 'https://json-schema.org/draft/2020-12/schema',
   title: 'Invoice',
-  description: 'Invoice data as printed on the PDF. Copy values exactly; leave out anything the document does not state.',
+  description:
+    'Invoice data as printed on the PDF. Copy values exactly; leave out anything the document does not state.',
   type: 'object',
   additionalProperties: false,
   required: ['number', 'issueDate', 'seller', 'buyer', 'lines'],
@@ -203,7 +223,8 @@ export const invoiceJsonSchema = {
     typeCode: {
       type: 'string',
       enum: Object.keys(INVOICE_TYPES),
-      description: '380 invoice (default), 381 credit note, 384 corrected invoice, 389 self-billed invoice, 326 partial invoice, 386 prepayment invoice.',
+      description:
+        '380 invoice (default), 381 credit note, 384 corrected invoice, 389 self-billed invoice, 326 partial invoice, 386 prepayment invoice.',
     },
     currency: {
       type: 'string',
@@ -245,7 +266,9 @@ export const invoiceJsonSchema = {
           name: text('Item or service name.'),
           description: text('Further description.'),
           quantity: amount('Quantity.'),
-          unit: text('UN/ECE Rec. 20 unit code: C62 piece (default), HUR hour, DAY day, MON month, KGM kilogram, MTR metre, LTR litre, LS lump sum.'),
+          unit: text(
+            'UN/ECE Rec. 20 unit code: C62 piece (default), HUR hour, DAY day, MON month, KGM kilogram, MTR metre, LTR litre, LS lump sum.',
+          ),
           unitPrice: amount('Net price per unit, without VAT.'),
           netAmount: amount('Net line total as printed.'),
           discount: {

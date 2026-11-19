@@ -1,6 +1,6 @@
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
-import { forBuild } from './counter.js';
+import { forBuild } from './shared/counter.js';
 
 const page = (name: string) => fileURLToPath(new URL(name, import.meta.url));
 
@@ -44,7 +44,9 @@ export default defineConfig({
     {
       name: 'content-security-policy',
       apply: 'build',
-      transformIndexHtml: () => [{ tag: 'meta', attrs: { 'http-equiv': 'Content-Security-Policy', content: POLICY }, injectTo: 'head-prepend' }],
+      transformIndexHtml: () => [
+        { tag: 'meta', attrs: { 'http-equiv': 'Content-Security-Policy', content: POLICY }, injectTo: 'head-prepend' },
+      ],
     },
   ],
   root: page('.'),

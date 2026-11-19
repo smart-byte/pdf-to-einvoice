@@ -70,7 +70,14 @@ const { pdf, xml, findings } = await createEInvoice({
     deliveryDate: '2026-10-31',
     dueDate: '2026-11-17',
     iban: 'DE02120300000000202051',
-    seller: { name: 'Muster Software GmbH', street: 'Beispielweg 1', postalCode: '12345', city: 'Musterstadt', country: 'DE', vatId: 'DE123456789' },
+    seller: {
+      name: 'Muster Software GmbH',
+      street: 'Beispielweg 1',
+      postalCode: '12345',
+      city: 'Musterstadt',
+      country: 'DE',
+      vatId: 'DE123456789',
+    },
     buyer: { name: 'Beispiel AG', street: 'Hauptstraße 5', postalCode: '54321', city: 'Beispielstadt', country: 'DE' },
     lines: [{ name: 'Consulting', quantity: 10, unit: 'HUR', unitPrice: 100, vatRate: 19 }],
   },
@@ -80,7 +87,7 @@ await writeFile('invoice.einvoice.pdf', pdf);
 ```
 
 It works the same in a browser: `pdf` is a `Uint8Array` in and out. A bundler needs two things set up, as
-[`site/vite.config.ts`](site/vite.config.ts) and [`site/main.ts`](site/main.ts) do: an alias that points
+[`site/vite.config.ts`](site/vite.config.ts) and [`site/app/page.ts`](site/app/page.ts) do: an alias that points
 `@e-invoice-eu/core` to its browser bundle, and the worker of pdf.js.
 
 | function                                     | what it does                                                                                                       |
@@ -261,7 +268,8 @@ npm run site             # the web app on http://localhost:4350
 ```
 
 The rest is in [CONTRIBUTING.md](CONTRIBUTING.md): the checks, the reference validation and how the reader is
-measured.
+measured. How the code is laid out and how an invoice moves through it is in
+[docs/architecture.md](docs/architecture.md).
 
 ## Licence
 

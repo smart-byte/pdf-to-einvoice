@@ -60,7 +60,8 @@ function cellsOf(row: Raw[]): Cell[] {
     const gap = before ? piece.x - (before.piece.x + before.piece.width) : Infinity;
     const cell = cells.at(-1);
     // A value set apart behind its colon ("Nummer    : 77") stays in the cell of its label.
-    if (!before || !cell || (gap > COLUMN_GAP && !piece.text.startsWith(':'))) cells.push({ x: piece.x, y: piece.y, height: piece.height, text: piece.text });
+    if (!before || !cell || (gap > COLUMN_GAP && !piece.text.startsWith(':')))
+      cells.push({ x: piece.x, y: piece.y, height: piece.height, text: piece.text });
     else {
       const spaced = gap > WORD_GAP * before.piece.height || /\s$/.test(before.str) || /^\s/.test(raw.str);
       cell.text += (spaced ? ' ' : '') + piece.text;
@@ -78,7 +79,11 @@ function blocksOf(cells: Cell[]): string[][] {
     const block = blocks.find((candidate) => {
       const last = candidate.at(-1)!;
       const below = last.y - cell.y;
-      return Math.abs(last.x - cell.x) <= EDGE_TOLERANCE && below > 0 && below <= LINE_GAP * Math.max(last.height, cell.height);
+      return (
+        Math.abs(last.x - cell.x) <= EDGE_TOLERANCE &&
+        below > 0 &&
+        below <= LINE_GAP * Math.max(last.height, cell.height)
+      );
     });
     if (block) block.push(cell);
     else blocks.push([cell]);
@@ -108,7 +113,14 @@ export async function extractLayout(pdf: Uint8Array): Promise<Layout> {
         if (!('str' in item) || !item.str.trim()) continue;
         // Typesetting writes a negative amount with the minus sign (U+2212); everything that reads amounts expects a hyphen.
         const text = item.str.trim().replace(/−/g, '-');
-        const piece = { page: n, x: item.transform[4], y: item.transform[5], width: item.width, height: item.height, text };
+        const piece = {
+          page: n,
+          x: item.transform[4],
+          y: item.transform[5],
+          width: item.width,
+          height: item.height,
+          text,
+        };
         pieces.push({ piece, str: item.str });
         layout.pieces.push(piece);
       }

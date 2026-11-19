@@ -30,8 +30,21 @@ const withoutVat = (category: string, reason: string, change: (draft: any) => vo
     change(d);
   });
 
-const US_BUYER = { name: 'Example Inc.', street: '1 Market Street', postalCode: '94105', city: 'San Francisco', country: 'US' };
-const AT_BUYER = { name: 'Beispiel GmbH', street: 'Ringstraße 1', postalCode: '1010', city: 'Wien', country: 'AT', vatId: 'ATU12345678' };
+const US_BUYER = {
+  name: 'Example Inc.',
+  street: '1 Market Street',
+  postalCode: '94105',
+  city: 'San Francisco',
+  country: 'US',
+};
+const AT_BUYER = {
+  name: 'Beispiel GmbH',
+  street: 'Ringstraße 1',
+  postalCode: '1010',
+  city: 'Wien',
+  country: 'AT',
+  vatId: 'ATU12345678',
+};
 
 const CASES: Record<string, InvoiceDraft> = {
   'domestic invoice with VAT': sample(),
@@ -51,17 +64,29 @@ const CASES: Record<string, InvoiceDraft> = {
     d.prepaidAmount = 500;
     delete d.totals;
   }),
-  'reverse charge to a business in another EU country': withoutVat('AE', 'Reverse charge: VAT is owed by the recipient.', (d) => (d.buyer = AT_BUYER)),
+  'reverse charge to a business in another EU country': withoutVat(
+    'AE',
+    'Reverse charge: VAT is owed by the recipient.',
+    (d) => (d.buyer = AT_BUYER),
+  ),
   'intra-community supply of goods': withoutVat('K', 'Tax-free intra-community supply.', (d) => (d.buyer = AT_BUYER)),
   'export of goods to the USA': withoutVat('G', 'Tax-free export.', (d) => (d.buyer = US_BUYER)),
-  'service for a business in the USA, not subject to VAT, in US dollars': withoutVat('O', 'Not taxable in Germany (§ 3a (2) UStG).', (d) => {
-    d.buyer = US_BUYER;
-    d.currency = 'USD';
-  }),
-  'not subject to VAT, with a charge in the same category': withoutVat('O', 'Not taxable in Germany (§ 3a (2) UStG).', (d) => {
-    d.buyer = US_BUYER;
-    d.charges = [{ amount: 5, reason: 'Porto' }];
-  }),
+  'service for a business in the USA, not subject to VAT, in US dollars': withoutVat(
+    'O',
+    'Not taxable in Germany (§ 3a (2) UStG).',
+    (d) => {
+      d.buyer = US_BUYER;
+      d.currency = 'USD';
+    },
+  ),
+  'not subject to VAT, with a charge in the same category': withoutVat(
+    'O',
+    'Not taxable in Germany (§ 3a (2) UStG).',
+    (d) => {
+      d.buyer = US_BUYER;
+      d.charges = [{ amount: 5, reason: 'Porto' }];
+    },
+  ),
   'small business without VAT (§ 19 UStG)': withoutVat('E', 'No VAT charged: small business under § 19 UStG.', (d) => {
     delete d.seller.vatId;
     d.seller.taxNumber = '123/456/78901';
@@ -73,9 +98,19 @@ const CASES: Record<string, InvoiceDraft> = {
     Object.assign(d.lines[1], { description: 'Twelve months', unitPrice: 249.505 });
     delete d.totals;
   }),
-  'credit note': sample((d) => Object.assign(d, { typeCode: '381', precedingInvoiceNumber: 'RE-2026-0041', precedingInvoiceDate: '2026-10-20' })),
+  'credit note': sample((d) =>
+    Object.assign(d, { typeCode: '381', precedingInvoiceNumber: 'RE-2026-0041', precedingInvoiceDate: '2026-10-20' }),
+  ),
   'line discounts: a percentage with a cent fraction, an amount with a reason': sample((d) => {
-    d.lines.push({ name: 'Schulungsunterlagen', quantity: 3, unit: 'C62', unitPrice: 33.33, vatCategory: 'S', vatRate: 19, discount: { percent: 10 } });
+    d.lines.push({
+      name: 'Schulungsunterlagen',
+      quantity: 3,
+      unit: 'C62',
+      unitPrice: 33.33,
+      vatCategory: 'S',
+      vatRate: 19,
+      discount: { percent: 10 },
+    });
     d.lines[1].discount = { amount: 50, reason: 'Treuerabatt' };
     delete d.totals;
   }),
@@ -104,7 +139,12 @@ const CASES: Record<string, InvoiceDraft> = {
     delete d.totals;
   }),
   'corrected invoice replacing an earlier plain PDF': sample((d) =>
-    Object.assign(d, { typeCode: '384', precedingInvoiceNumber: 'RE-2026-0042', precedingInvoiceDate: '2026-11-03', number: 'RE-2026-0042-K' }),
+    Object.assign(d, {
+      typeCode: '384',
+      precedingInvoiceNumber: 'RE-2026-0042',
+      precedingInvoiceDate: '2026-11-03',
+      number: 'RE-2026-0042-K',
+    }),
   ),
 };
 
@@ -125,7 +165,9 @@ const XRECHNUNG_CASES: Record<string, InvoiceDraft> = Object.fromEntries(
       delete d.iban;
       delete d.bic;
     }),
-    'cash discount in the payment terms': sample((d) => (d.paymentTerms = 'Zahlbar innerhalb von 30 Tagen.\n#SKONTO#TAGE=14#PROZENT=2.00#')),
+    'cash discount in the payment terms': sample(
+      (d) => (d.paymentTerms = 'Zahlbar innerhalb von 30 Tagen.\n#SKONTO#TAGE=14#PROZENT=2.00#'),
+    ),
     'credit note with negative amounts and neither due date nor bank account': sample((d) => {
       for (const line of d.lines) line.quantity = -line.quantity;
       for (const field of ['dueDate', 'paymentTerms', 'iban', 'bic', 'totals']) delete d[field];
@@ -149,7 +191,8 @@ const XRECHNUNG_CASES: Record<string, InvoiceDraft> = Object.fromEntries(
 );
 const XRECHNUNG_3_0 = 'urn:cen.eu:en16931:2017#compliant#urn:xeinkauf.de:kosit:xrechnung_3.0';
 
-const status = (report: string, part: 'pdf' | 'xml') => new RegExp(`<${part}>[\\s\\S]*?<summary status="(\\w+)"`).exec(report)?.[1];
+const status = (report: string, part: 'pdf' | 'xml') =>
+  new RegExp(`<${part}>[\\s\\S]*?<summary status="(\\w+)"`).exec(report)?.[1];
 const problems = (report: string) => [...report.matchAll(/<(?:error|warning)[^>]*>([^<]+)/g)].map((m) => m[1]!.trim());
 
 describe.skipIf(!jar)('reference validation with Mustang', () => {
@@ -159,29 +202,42 @@ describe.skipIf(!jar)('reference validation with Mustang', () => {
   const validate = async (name: string, content: Uint8Array | string) => {
     const path = join(dir, name.replace(/[^\w.]+/g, '-'));
     writeFileSync(path, content);
-    const { stdout } = await promisify(execFile)('java', ['-jar', jar!, '--no-notices', '--action', 'validate', '--source', path], {
-      maxBuffer: 64 * 1024 * 1024,
-    }).catch((e) => e as { stdout: string });
+    const { stdout } = await promisify(execFile)(
+      'java',
+      ['-jar', jar!, '--no-notices', '--action', 'validate', '--source', path],
+      {
+        maxBuffer: 64 * 1024 * 1024,
+      },
+    ).catch((e) => e as { stdout: string });
     return { pdf: status(stdout, 'pdf'), xml: status(stdout, 'xml'), problems: problems(stdout), report: stdout };
   };
 
   // Without a delivery date and a country of delivery there is nothing to say about the delivery, and nothing is made
   // up: the element the syntax demands stays empty, as in official samples of the standard. The validator accepts the
   // file and remarks on the empty element.
-  const REMARKS: Record<string, unknown[]> = { 'service period instead of a delivery date': [expect.stringContaining('PEPPOL-EN16931-R008')] };
+  const REMARKS: Record<string, unknown[]> = {
+    'service period instead of a delivery date': [expect.stringContaining('PEPPOL-EN16931-R008')],
+  };
 
   it.concurrent.each(Object.entries(CASES))(
     '%s',
     async (name, invoice) => {
       const { pdf } = await createEInvoice({ pdf: samplePdf(), invoice });
-      expect(await validate(`${name}.pdf`, pdf)).toMatchObject({ pdf: 'valid', xml: 'valid', problems: REMARKS[name] ?? [] });
+      expect(await validate(`${name}.pdf`, pdf)).toMatchObject({
+        pdf: 'valid',
+        xml: 'valid',
+        problems: REMARKS[name] ?? [],
+      });
     },
     120_000,
   );
 
   it('a PDF that came with a script is a valid PDF/A-3 once the script is removed', async () => {
     const doc = await PDFDocument.load(samplePdf(), { updateMetadata: false });
-    doc.catalog.set(PDFName.of('OpenAction'), doc.context.obj({ Type: 'Action', S: 'JavaScript', JS: PDFString.of("app.alert('x')") }));
+    doc.catalog.set(
+      PDFName.of('OpenAction'),
+      doc.context.obj({ Type: 'Action', S: 'JavaScript', JS: PDFString.of("app.alert('x')") }),
+    );
     const { pdf, findings } = await createEInvoice({ pdf: await doc.save(), invoice: sample() });
     expect(findings.map((finding) => finding.code)).toEqual(['pdf-actions']);
     expect(await validate('with-script.pdf', pdf)).toMatchObject({ pdf: 'valid', xml: 'valid', problems: [] });

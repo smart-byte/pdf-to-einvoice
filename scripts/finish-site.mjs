@@ -42,7 +42,8 @@ for (const [name, from] of queue) {
     licence: info.license,
     text: files.map((file) => readFileSync(join(dir, file), 'utf8').trim()).join('\n\n'),
   });
-  for (const dependency of Object.keys({ ...info.dependencies, ...info.optionalDependencies })) queue.push([dependency, dir]);
+  for (const dependency of Object.keys({ ...info.dependencies, ...info.optionalDependencies }))
+    queue.push([dependency, dir]);
 }
 
 // Many packages carry the same text: it is printed once, under the names of all of them.
@@ -56,7 +57,8 @@ for (const { id, licence, text } of [...packages.values()].sort((a, b) => a.id.l
 
 const rule = '-'.repeat(80);
 const sections = [...byText].map(([text, ids]) => `${ids.join('\n')}\n\n${text}`);
-if (withoutText.length) sections.push(`These packages name their licence without shipping its text:\n\n${withoutText.join('\n')}`);
+if (withoutText.length)
+  sections.push(`These packages name their licence without shipping its text:\n\n${withoutText.join('\n')}`);
 writeFileSync(
   join(out, 'third-party-licenses.txt'),
   [readFileSync(join(root, 'THIRD_PARTY_NOTICES.md'), 'utf8').trim(), ...sections].join(`\n\n${rule}\n\n`) + '\n',
@@ -77,7 +79,8 @@ const START_PAGES = {
       'og:description':
         'Ihr Layout bleibt, die Rechnungsdaten kommen als XML nach EN 16931 dazu (ZUGFeRD / Factur-X). Kostenlos, quelloffen, und nichts wird hochgeladen.',
       'og:image': `${SITE}og-de.png`,
-      'og:image:alt': 'pdf-to-einvoice: eine Rechnung mit gelb markierten Werten, dahinter die Fassung für Maschinen, das XML der E-Rechnung.',
+      'og:image:alt':
+        'pdf-to-einvoice: eine Rechnung mit gelb markierten Werten, dahinter die Fassung für Maschinen, das XML der E-Rechnung.',
       'twitter:title': GERMAN_TITLE,
       'twitter:image': `${SITE}og-de.png`,
     },

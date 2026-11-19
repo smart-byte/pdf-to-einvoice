@@ -43,7 +43,8 @@ export function visitOf(visit: Visit, name?: string, data?: Record<string, strin
     hostname,
     url: plain(visit.href, visit.href),
     // A page of the site itself is named by its path.
-    referrer: referrer === origin || referrer.startsWith(`${origin}/`) ? referrer.slice(origin.length) || '/' : referrer,
+    referrer:
+      referrer === origin || referrer.startsWith(`${origin}/`) ? referrer.slice(origin.length) || '/' : referrer,
     title: visit.title,
     language: visit.language,
     screen: visit.screen,

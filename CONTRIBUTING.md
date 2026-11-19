@@ -4,7 +4,8 @@ Thanks for helping out. The project stays small on purpose: established librarie
 PDF, text extraction), and this repository adds the data model, the checks and the front ends.
 
 The commands, a map of the code and the rules are in [AGENTS.md](AGENTS.md); they hold for people as for coding
-agents. Everyone who takes part is expected to follow the [code of conduct](CODE_OF_CONDUCT.md).
+agents. How an invoice moves through the code, the layers and the conventions are in
+[docs/architecture.md](docs/architecture.md). Everyone who takes part is expected to follow the [code of conduct](CODE_OF_CONDUCT.md).
 
 ## Pull requests
 
@@ -14,6 +15,16 @@ agents. Everyone who takes part is expected to follow the [code of conduct](CODE
 - Third-party code that ends up in `dist/` or in the site is listed in `THIRD_PARTY_NOTICES.md`.
 - Run `npm run type-check && npm run lint && npm run format:check && npm test && npm run build` before pushing; CI
   runs the same.
+
+## Formatting
+
+Prettier formats everything (`npm run format`), at 120 characters. A commit that only changes formatting goes into
+`.git-blame-ignore-revs`, so that blame shows who wrote a line rather than who reformatted it. GitHub reads that file by
+itself; for `git blame` on your machine, run once:
+
+```bash
+git config blame.ignoreRevsFile .git-blame-ignore-revs
+```
 
 ## Reference validation
 
@@ -46,7 +57,7 @@ The last line also reads with a language model, as the web app does: in Chrome w
 invoice. Its second table compares the rules alone, the model alone, and the rules with the model for what they left
 empty.
 
-A change to `src/extract/guess.ts`, `src/pdf/text.ts`, `src/extract/ground.ts`, the prompt or the models in `site/llm.ts` comes with the
+A change to `src/extract/guess.ts` or `src/extract/guess/`, `src/pdf/text.ts`, `src/extract/ground.ts`, the prompt or the models in `site/app/model/llm.ts` comes with the
 table before and after. Keep the corpus out of this repository, and write no rule for a single vendor's sample: most
 of its files come from very few generators.
 
