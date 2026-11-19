@@ -11,11 +11,20 @@ import { state } from './state.js';
 
 pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
-/** The text of every page with the place of each piece, in percent of its page. A page that is not read yet, or a scan, has none. */
-let pagePieces: Piece[][] = [];
-/** The page the preview shows, counted from 0, and the one it was last asked for: drawing a page takes a moment. */
-let shown = 0;
-let wanted = 0;
+/** The PDF that is open, as pdf.js holds it, and what the preview knows of it. Another PDF replaces all of it. */
+interface Opened {
+  task: pdfjs.PDFDocumentLoadingTask;
+  doc: pdfjs.PDFDocumentProxy;
+  /** The text of every page with the place of each piece, in percent of its page. A page not read yet, or a scan, has none. */
+  pieces: Piece[][];
+  /** The page the preview shows, counted from 0, and the one it was last asked for: drawing a page takes a moment. */
+  shown: number;
+  wanted: number;
+}
+let opened: Opened | undefined;
+/** The page that is being drawn. */
+let drawing: Promise<void> = Promise.resolve();
+
 const marks = $('#marks');
 export const focusedPath = () => (document.activeElement as HTMLElement | null)?.dataset.path;
 /** The total the pointer rests on: it stays the marked one while its page is being turned to. */
@@ -73,7 +82,7 @@ export function renderMarks(): void {
       placed.push({ mark, rect });
     }
   };
-  const on = pagePieces[shown] ?? [];
+  const on = opened?.pieces[opened.shown] ?? [];
   // Dropdowns hold codes, which are not printed; everything else is looked for.
   for (const input of $('#form').querySelectorAll<HTMLElement>('[data-path]:not(select)')) {
     const path = input.dataset.path!;
@@ -95,8 +104,9 @@ export function renderMarks(): void {
 
 /** Turns the preview to the page a value stands on, unless the page that is shown has it too. */
 export function turnTo(path: string): void {
-  const page = pageToShow(pagePieces, shown, (on) => placesOf(path, on).length > 0);
-  if (page === undefined || page === shown) return;
+  if (!opened) return;
+  const page = pageToShow(opened.pieces, opened.shown, (on) => placesOf(path, on).length > 0);
+  if (page === undefined || page === opened.shown) return;
   void showPage(page).then(
     () => ($('#page-live').textContent = t('page.turned', { n: page + 1, f: fieldLabel(path) })),
   );
@@ -126,9 +136,6 @@ export function scan(mode: 'on' | 'once' | 'off'): void {
 }
 $('#scan').addEventListener('animationend', () => scan('off'));
 
-/** The PDF that is open, as pdf.js holds it: its pages are drawn when they are turned to. */
-let opened: { task: pdfjs.PDFDocumentLoadingTask; doc: pdfjs.PDFDocumentProxy } | undefined;
-
 /** The text of a page with the place of every piece, in percent of the page. */
 async function piecesOf(page: pdfjs.PDFPageProxy): Promise<Piece[]> {
   // Measured here and not taken from extractLayout: the marks lie on the drawing of the page, so they use its view of the page.
@@ -155,6 +162,7 @@ async function piecesOf(page: pdfjs.PDFPageProxy): Promise<Piece[]> {
 /** Says which page is shown, and lets the pages be turned where there is more than one. */
 function renderPager(): void {
   const count = opened?.doc.numPages ?? 1;
+  const shown = opened?.shown ?? 0;
   $('#pager').hidden = count < 2;
   $('#page-now').textContent = t('page.now', { n: shown + 1, m: count });
   $<HTMLButtonElement>('#page-prev').disabled = shown === 0;
@@ -169,7 +177,7 @@ function renderPager(): void {
 async function drawPage(index: number): Promise<void> {
   const pdf = opened;
   if (!pdf || index < 0 || index >= pdf.doc.numPages) return;
-  wanted = index;
+  pdf.wanted = index;
   const page = await pdf.doc.getPage(index + 1);
   const canvas = $<HTMLCanvasElement>('#preview');
   const viewport = page.getViewport({
@@ -180,33 +188,32 @@ async function drawPage(index: number): Promise<void> {
   // Drawn beside the stage and put on it when done: turning on while a page is still being drawn leaves no half page behind.
   const sheet = el('canvas', { width: viewport.width, height: viewport.height });
   await page.render({ canvas: sheet, viewport }).promise;
-  pagePieces[index] ??= await piecesOf(page);
+  pdf.pieces[index] ??= await piecesOf(page);
   // Another page was turned to, or another PDF opened, while this one was drawn.
-  if (opened !== pdf || wanted !== index) return;
-  shown = index;
+  if (opened !== pdf || pdf.wanted !== index) return;
+  pdf.shown = index;
   Object.assign(canvas, { width: sheet.width, height: sheet.height });
   canvas.getContext('2d')!.drawImage(sheet, 0, 0);
   renderMarks();
 }
-/** The page that is being drawn, for whoever needs the finished preview. */
-export let drawing: Promise<void> = Promise.resolve();
 const showPage = (index: number): Promise<void> => (drawing = drawPage(index));
-$('#page-prev').onclick = () => showPage(wanted - 1);
-$('#page-next').onclick = () => showPage(wanted + 1);
+/** The page that is being drawn, for whoever needs the finished preview. */
+export const pageDrawn = (): Promise<void> => drawing;
+$('#page-prev').onclick = () => showPage((opened?.wanted ?? 0) - 1);
+$('#page-next').onclick = () => showPage((opened?.wanted ?? 0) + 1);
 
 export async function preview(pdf: Uint8Array): Promise<void> {
   const before = opened;
   opened = undefined;
   await before?.task.destroy();
   const task = pdfjs.getDocument({ data: pdf.slice(), verbosity: 0 });
-  const mine = (opened = { task, doc: await task.promise });
-  pagePieces = [];
-  shown = 0;
+  const mine: Opened = { task, doc: await task.promise, pieces: [], shown: 0, wanted: 0 };
+  opened = mine;
   await showPage(0);
   // The other pages are read in the background, so that a value that stands on one of them can be turned to.
   void (async () => {
     for (let index = 1; index < mine.doc.numPages && opened === mine; index++)
-      pagePieces[index] ??= await piecesOf(await mine.doc.getPage(index + 1));
+      mine.pieces[index] ??= await piecesOf(await mine.doc.getPage(index + 1));
   })().catch(() => {
     // The PDF was closed while its pages were read: nothing is left to read.
   });
@@ -219,5 +226,5 @@ export function point(path?: string): void {
 
 /** Forgets the pieces of the pages read so far, when a file is opened that is not shown page by page. */
 export function forgetPages(): void {
-  pagePieces = [];
+  if (opened) opened.pieces = [];
 }

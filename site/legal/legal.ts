@@ -40,5 +40,5 @@ function apply(next: Lang): void {
 }
 for (const button of document.querySelectorAll<HTMLButtonElement>('[data-lang]'))
   button.onclick = () => apply(button.dataset.lang as Lang);
-apply(lang);
+apply(lang());
 countVisit();

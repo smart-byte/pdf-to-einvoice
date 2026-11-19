@@ -707,19 +707,22 @@ const stored = () => {
 /** The start page of one language: /de or /en. Its language wins over a choice made before. */
 const routeLang = () => /^\/(de|en)\b/.exec(location.pathname)?.[1];
 
-export let lang: Lang = (() => {
+let current: Lang = (() => {
   const wanted = new URLSearchParams(location.search).get('lang') ?? routeLang() ?? stored() ?? navigator.language;
   return wanted.toLowerCase().startsWith('de') ? 'de' : 'en';
 })();
 
+/** The language the page is shown in; `setLang` changes it. */
+export const lang = (): Lang => current;
+
 export function t(key: string, values: Record<string, string | number> = {}): string {
-  const text = STRINGS[key]?.[lang] || STRINGS[key]?.en || key;
+  const text = STRINGS[key]?.[current] || STRINGS[key]?.en || key;
   return text.replace(/\{(\w+)\}/g, (_, name: string) => String(values[name] ?? ''));
 }
 
 /** Translates every element that carries `data-i18n`, and remembers the choice. */
 export function setLang(next: Lang): void {
-  lang = next;
+  current = next;
   try {
     localStorage.setItem('lang', next);
   } catch {

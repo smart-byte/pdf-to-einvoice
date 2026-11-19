@@ -13,7 +13,7 @@ const modelSelect = $<HTMLSelectElement>('#ai-model');
 function showModel(): void {
   const model = MODELS.find((candidate) => candidate.id === modelSelect.value);
   $('#ai-model-note').textContent = model
-    ? t('ai.download', { size: new Intl.NumberFormat(lang).format(model.gigabytes) })
+    ? t('ai.download', { size: new Intl.NumberFormat(lang()).format(model.gigabytes) })
     : t('ai.endpoint.note');
   $('#ai-endpoint').hidden = model !== undefined;
 }
@@ -25,7 +25,7 @@ export function renderModels(): void {
       el(
         'option',
         { value: model.id, selected: model.id === chosen },
-        `${model.id.replace(/-q4f16_1-MLC$/, '')} (${model.note[lang]})`,
+        `${model.id.replace(/-q4f16_1-MLC$/, '')} (${model.note[lang()]})`,
       ),
     ),
     el('option', { value: 'endpoint', selected: chosen === 'endpoint' }, t('ai.endpoint')),

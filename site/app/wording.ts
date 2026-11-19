@@ -16,7 +16,7 @@ export function describe(finding: Pick<Finding, 'code' | 'message' | 'params'> &
   const candidates = [`e.${finding.code}.${path.split('.').at(-1)}`, `e.${finding.code}`];
   if (state.mode === 'validate') candidates.unshift(`e.${finding.code}.xml`);
   const key = candidates.find((candidate) => candidate in STRINGS);
-  if (!key || (lang !== 'de' && !STRINGS[key]?.en)) return finding.message;
+  if (!key || (lang() !== 'de' && !STRINGS[key]?.en)) return finding.message;
   const { expected, stated, value } = finding.params ?? {};
   const money = (amount: unknown) => (amount === undefined ? '' : formatMoney(Number(amount)));
   return t(key, {
@@ -34,7 +34,7 @@ export const reasonOf = (error: unknown) =>
       ? error.message
       : String(error);
 export const formatMoney = (n: number) =>
-  new Intl.NumberFormat(lang, {
+  new Intl.NumberFormat(lang(), {
     style: 'currency',
     currency: isCurrencyCode(state.draft.currency) ? state.draft.currency : 'EUR',
   }).format(n);

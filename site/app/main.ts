@@ -27,5 +27,5 @@ function applyLang(next: 'de' | 'en'): void {
 }
 for (const button of document.querySelectorAll<HTMLButtonElement>('[data-lang]'))
   button.onclick = () => applyLang(button.dataset.lang as 'de' | 'en');
-applyLang(lang);
+applyLang(lang());
 countVisit();
