@@ -16,26 +16,33 @@ import { after, CUSTOMER, SEPARATOR } from './values.js';
 // identifies it. A single contact with no such indication may belong to somebody else.
 
 const EMAIL = /[\p{L}\d._%+-]+@[\p{L}\d-]+(?:\.[\p{L}\d-]+)+/gu;
+/** "E-Mail", "E-Mail-Adresse", "courriel". */
+const EMAIL_WORD = '(?:e-?mail(?:[- ]?(?:adresse|address))?|courriel)';
 /** "E-Mail:" right before an address, and what its cell says before that. */
-const EMAIL_LABEL = /^(.*?)(?:e-?mail(?:[- ]?(?:adresse|address))?|courriel)\s*:?\s*$/i;
+const EMAIL_LABEL = new RegExp(`^(.*?)${EMAIL_WORD}\\s*:?\\s*$`, 'i');
 /** A customer can also be named after the kind of address: "E-Mail des Kunden". */
-const CUSTOMER_EMAIL_SUFFIX =
-  /(?:e-?mail(?:[- ]?(?:adresse|address))?|courriel)\s+(?:(?:des|der|du|de|of(?:\s+the)?)\s+)?(?:kunden?|käufers?|buyers?|customers?|clients?)\s*:?\s*$/i;
+const OF_THE = '(?:(?:des|der|du|de|of(?:\\s+the)?)\\s+)?';
+const CUSTOMER_WORD = '(?:kunden?|käufers?|buyers?|customers?|clients?)';
+const CUSTOMER_EMAIL_SUFFIX = new RegExp(`${EMAIL_WORD}\\s+${OF_THE}${CUSTOMER_WORD}\\s*:?\\s*$`, 'i');
 /** "Tel.", "Telefon-Nr.", "Phone", "Mobil"; not a fax, which "Telefax" and "Tel./Fax" name. */
-const PHONE_LABEL =
-  /(?<![a-zäöü])(?:tele(?:fon|phone)|tel|phone|fon|mobil(?:e|telefon)?|handy)(?:\.?[-\s]?(?:nr|nummer|number|no))?(?![a-zäöü])\.?/;
+const PHONE_WORD = '(?:tele(?:fon|phone)|tel|phone|fon|mobil(?:e|telefon)?|handy)';
+/** "-Nr.", "Nummer", "number", "No" after the word. */
+const NUMBER_WORD = '(?:\\.?[-\\s]?(?:nr|nummer|number|no))?';
+const PHONE_LABEL = new RegExp(`(?<![a-zäöü])${PHONE_WORD}${NUMBER_WORD}(?![a-zäöü])\\.?`);
 /** Digits in groups, one space apart at most: three spaces start the next column. */
 const PHONE = new RegExp(`${SEPARATOR}(\\+{0,2}[\\d(](?:[\\d()/.-]| (?=[\\d(/-]))*\\d)`);
 const CONTACT_LABEL =
   /(?:ihre?\s+)?ansprechpartner(?:in)?|(?:sach)?bearbeiter(?:in)?|kontaktperson|contact\s+person|your\s+contact/;
 /** A name of two to four words that start with a capital, with its titles. One word may be anything. */
-const PERSON = new RegExp(
-  `${SEPARATOR}((?:(?:Herrn?|Frau|Mrs?\\.?|Ms\\.?|Dr\\.?|Prof\\.?)\\s)*\\p{Lu}[\\p{L}.'’-]*(?:\\s\\p{Lu}[\\p{L}.'’-]*){1,3})(?=\\s{2}|\\s*$|,)`,
-  'u',
-);
+const TITLES = '(?:(?:Herrn?|Frau|Mrs?\\.?|Ms\\.?|Dr\\.?|Prof\\.?)\\s)*';
+const NAME_WORD = "\\p{Lu}[\\p{L}.'’-]*";
+const PERSON = new RegExp(`${SEPARATOR}(${TITLES}${NAME_WORD}(?:\\s${NAME_WORD}){1,3})(?=\\s{2}|\\s*$|,)`, 'u');
 /** The heading of an address that is neither party's, such as "Lieferadresse:" or "Ship to". */
-const OTHER_ADDRESS =
-  /^(?!.*(?:mail|web|internet|bank)).*(?:adresse|address|anschrift|empfänger|(?:ship(?:ped)?|deliver(?:ed)?)\s+to)\s*:?$/i;
+const NOT_A_CONTACT = '(?!.*(?:mail|web|internet|bank))';
+const OTHER_ADDRESS = new RegExp(
+  `^${NOT_A_CONTACT}.*(?:adresse|address|anschrift|empfänger|(?:ship(?:ped)?|deliver(?:ed)?)\\s+to)\\s*:?$`,
+  'i',
+);
 
 /** A value where it stands on the page, with whose it is as far as that place tells. */
 interface Mention {

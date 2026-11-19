@@ -1,7 +1,7 @@
 import type { Line, VatCategory } from '../../domain/model.js';
 import { cells, KEY_VALUE, senderOf } from './parties.js';
 import { rateOf, type Totals, TOTALS_CELL, TOTALS_ROW } from './totals.js';
-import { cents, CURRENCY, lastIndex, MONEY, toNumber } from './values.js';
+import { anyOf, cents, CURRENCY, lastIndex, MONEY, toNumber } from './values.js';
 
 // Items: the rows of the table that add up to the totals, with quantity, unit, price and VAT rate, and the note that
 // says why no VAT is charged.
@@ -298,7 +298,15 @@ function itemsThatAddUp(
 /** What the printed reason for charging no VAT says the sale is. The exemptions of § 4 UStG other than 1a and 1b are E. */
 export const NOTE_CATEGORIES: [RegExp, VatCategory][] = [
   [
-    /innergemeinschaftlich\w*\s+(?:waren)?lieferung|intra-?community\s+(?:supply|delivery)|livraison\s+intracommunautaire|§\s?4\s?nr\.?\s?1\s?b\b/i,
+    new RegExp(
+      anyOf(
+        /innergemeinschaftlich\w*\s+(?:waren)?lieferung/,
+        /intra-?community\s+(?:supply|delivery)/,
+        /livraison\s+intracommunautaire/,
+        /§\s?4\s?nr\.?\s?1\s?b\b/,
+      ),
+      'i',
+    ),
     'K',
   ],
   [/ausfuhr\w*|\bexport(?:s|ed)?\b|exportation|§\s?4\s?nr\.?\s?1\s?a\b/i, 'G'],
@@ -307,16 +315,26 @@ export const NOTE_CATEGORIES: [RegExp, VatCategory][] = [
   [/nicht\s+steuerbar|not\s+(?:taxable|subject\s+to)|non\s+soumis/i, 'O'],
 ];
 
+/** A row that speaks of VAT: a word for it, or a paragraph of the UStG. */
+const VAT_NOTE = new RegExp(
+  `\\b(${[
+    'vat',
+    'umsatzsteuer',
+    'mehrwertsteuer',
+    'steuerschuld\\w*',
+    'reverse[- ]charge',
+    'steuerfrei\\w*',
+    'steuerbefreit\\w*',
+    'nicht steuerbar',
+  ].join('|')})\\b|§\\s?\\d+\\w*\\s.*ustg`,
+  'i',
+);
+
 /** The printed sentence that says why no VAT is charged, joined over the rows it wraps into. */
 export function readVatNote(rows: string[]): string | undefined {
   const start = rows.findIndex(
     (row) =>
-      /\b(vat|umsatzsteuer|mehrwertsteuer|steuerschuld\w*|reverse[- ]charge|steuerfrei\w*|steuerbefreit\w*|nicht steuerbar)\b|§\s?\d+\w*\s.*ustg/i.test(
-        row,
-      ) &&
-      !TOTALS_ROW.test(row) &&
-      !cells(row).some(senderOf) &&
-      !/\b[A-Z]{2} ?\d[\d ]{7,}/.test(row),
+      VAT_NOTE.test(row) && !TOTALS_ROW.test(row) && !cells(row).some(senderOf) && !/\b[A-Z]{2} ?\d[\d ]{7,}/.test(row),
   );
   if (start < 0) return undefined;
   const note = [rows[start]!.replace(/^\s*(note|hinweis|anmerkung)\s*:\s*/i, '')];

@@ -8,15 +8,30 @@ export const SEPARATOR = '^\\s*[:#.]?\\s*';
 
 /** ISO, 3.11.2026, 3.11.26, 3 November 2026, November 3, 2026, and 08/10/2026 where it can be read in one way only. */
 export const DATE = new RegExp(
-  `${SEPARATOR}(?:(\\d{4})-(\\d{2})-(\\d{2})|(\\d{1,2})\\.\\s?(\\d{1,2})\\.\\s?(\\d{4}|\\d{2})(?!\\d)|(\\d{1,2})\\.?\\s+${MONTH}\\s+(\\d{4})|${MONTH}\\s+(\\d{1,2}),?\\s+(\\d{4})|(\\d{1,2})/(\\d{1,2})/(\\d{4}|\\d{2})(?!\\d))`,
+  `${SEPARATOR}(?:${[
+    '(\\d{4})-(\\d{2})-(\\d{2})', // 2026-11-03
+    '(\\d{1,2})\\.\\s?(\\d{1,2})\\.\\s?(\\d{4}|\\d{2})(?!\\d)', // 3.11.2026, 3.11.26
+    `(\\d{1,2})\\.?\\s+${MONTH}\\s+(\\d{4})`, // 3 November 2026
+    `${MONTH}\\s+(\\d{1,2}),?\\s+(\\d{4})`, // November 3, 2026
+    '(\\d{1,2})/(\\d{1,2})/(\\d{4}|\\d{2})(?!\\d)', // 08/10/2026
+  ].join('|')})`,
   'i',
 );
 export const MONEY = "(-?\\d{1,3}(?:[.,' ]\\d{3})*[.,]\\d{2}|-?\\d+[.,]\\d{2})";
 export const CURRENCY = '(?:€|EUR|US\\$|\\$|USD|£|GBP|CHF)';
 // A label may go on with a word in brackets: "Zwischensumme (netto)". A code such as the category in "USt (S)" is no word.
+const WORD_IN_BRACKETS = '(?:\\([A-Za-zÄÖÜäöüß]{3,}[^)\\d]*\\)\\s*)?';
+/** A rate before the amount: "19 % 190,00". */
+const RATE_BEFORE = '(?:\\d{1,2}(?:[.,]\\d+)?\\s*%\\s*)?';
 export const AMOUNT = new RegExp(
-  `${SEPARATOR}(?:\\([A-Za-zÄÖÜäöüß]{3,}[^)\\d]*\\)\\s*)?(?:\\d{1,2}(?:[.,]\\d+)?\\s*%\\s*)?(?:in\\s+)?${CURRENCY}?\\s*${MONEY}(?![.,]?\\d)`,
+  `${SEPARATOR}${WORD_IN_BRACKETS}${RATE_BEFORE}(?:in\\s+)?${CURRENCY}?\\s*${MONEY}(?![.,]?\\d)`,
 );
+
+/**
+ * One pattern from several: any of them matches. Each is a regular expression of its own, so that a long list of
+ * alternatives stands one to a line; only their text is used, the flags belong to the pattern they go into.
+ */
+export const anyOf = (...alternatives: RegExp[]): string => alternatives.map((pattern) => pattern.source).join('|');
 
 export const pad = (n: string | number) => String(n).padStart(2, '0');
 const century = (year: string) => (year.length === 2 ? `20${year}` : year);
@@ -90,8 +105,15 @@ export function findIban(text: string): string | undefined {
   return undefined;
 }
 
-export const VAT_ID_LABEL =
-  /ust\.?-?\s?id\.?-?\s?(?:nr\.?)?|umsatzsteuer-?\s?id(?:entifikationsnummer)?|uid(?:-nr\.?)?|vat[\s-]*(?:id|reg(?:istration)?\.?)?\s*(?:no\.?|number)?|(?:n°\s*)?tva(?:\s+intracom\w*)?(?:\s+client)?/;
+export const VAT_ID_LABEL = new RegExp(
+  anyOf(
+    /ust\.?-?\s?id\.?-?\s?(?:nr\.?)?/,
+    /umsatzsteuer-?\s?id(?:entifikationsnummer)?/,
+    /uid(?:-nr\.?)?/,
+    /vat[\s-]*(?:id|reg(?:istration)?\.?)?\s*(?:no\.?|number)?/,
+    /(?:n°\s*)?tva(?:\s+intracom\w*)?(?:\s+client)?/,
+  ),
+);
 /** A line that starts with the label of a VAT ID, with or without a colon: "USt-IdNr. ATU12345678". */
 export const VAT_ID_LINE = new RegExp(`^(?:${VAT_ID_LABEL.source})\\s*:?\\s*[A-Z]{2}`, 'i');
 /** A German VAT ID has a shape of its own, DE and nine digits. An IBAN goes on with digits, a SEPA creditor ID with letters. */

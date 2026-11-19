@@ -1,21 +1,64 @@
-import { after, AMOUNT, cents, MONEY, SEPARATOR, toNumber } from './values.js';
+import { after, AMOUNT, anyOf, cents, MONEY, SEPARATOR, toNumber } from './values.js';
 
 // Totals: three printed amounts with net + VAT = gross, picked by their labels where several fit.
 
 const VAT_WORD = '(?:ust|mwst|umsatzsteuer|mehrwertsteuer|vat|tax|tva|taxes)\\.?';
 const NET_LABEL = new RegExp(
-  `nettobetrag|nettosumme|summe\\s+netto|zwischensumme|netto|subtotal|net\\s+(?:amount|total)|total\\s+(?:net|ht)|montant\\s+ht|(?:ohne|exkl\\.?|excl(?:\\.|uding)?|hors)\\s+${VAT_WORD}`,
+  [
+    'nettobetrag',
+    'nettosumme',
+    'summe\\s+netto',
+    'zwischensumme',
+    'netto',
+    'subtotal',
+    'net\\s+(?:amount|total)',
+    'total\\s+(?:net|ht)',
+    'montant\\s+ht',
+    // "ohne USt.", "excl. VAT", "hors taxes"
+    `(?:ohne|exkl\\.?|excl(?:\\.|uding)?|hors)\\s+${VAT_WORD}`,
+  ].join('|'),
 );
 // "ohne USt." and "inkl. MwSt." say what another amount is, not how much VAT there is.
+const NOT_AFTER = '(?<!(?:ohne|inkl\\.?|incl\\.?|zzgl\\.?|exkl\\.?|excl\\.?|plus|including|excluding|hors)\\s+)';
 const VAT_LABEL = new RegExp(
-  `(?<!(?:ohne|inkl\\.?|incl\\.?|zzgl\\.?|exkl\\.?|excl\\.?|plus|including|excluding|hors)\\s+)(?:(?:vat|tax)\\s+total|total\\s+(?:vat|tax(?:es)?|tva)|montant\\s+tva|steuerbetrag|umsatzsteuer|mehrwertsteuer|mwst\\.?|ust\\.?|\\bvat\\b|sales\\s+tax|\\btva\\b)`,
+  `${NOT_AFTER}(?:${[
+    '(?:vat|tax)\\s+total',
+    'total\\s+(?:vat|tax(?:es)?|tva)',
+    'montant\\s+tva',
+    'steuerbetrag',
+    'umsatzsteuer',
+    'mehrwertsteuer',
+    'mwst\\.?',
+    'ust\\.?',
+    '\\bvat\\b',
+    'sales\\s+tax',
+    '\\btva\\b',
+  ].join('|')})`,
 );
 const GROSS_LABEL = new RegExp(
-  `gesamt(?:betrag|summe)?|rechnungsbetrag|brutto(?:betrag|summe)?|endbetrag|grand\\s+total|amount\\s+due|(?:total|montant)\\s+ttc|total(?:\\s+amount)?(?:\\s+due)?|(?:inkl\\.?|incl(?:\\.|uding)?)\\s+${VAT_WORD}`,
+  [
+    'gesamt(?:betrag|summe)?',
+    'rechnungsbetrag',
+    'brutto(?:betrag|summe)?',
+    'endbetrag',
+    'grand\\s+total',
+    'amount\\s+due',
+    '(?:total|montant)\\s+ttc',
+    'total(?:\\s+amount)?(?:\\s+due)?',
+    // "inkl. MwSt.", "including VAT"
+    `(?:inkl\\.?|incl(?:\\.|uding)?)\\s+${VAT_WORD}`,
+  ].join('|'),
 );
 /** A row that sums up: it starts with a word for a total ("Taxi" and "Nettopreis" are none), or a cell of it is one ("Positionssumme", "Zahlbetrag", "Total HT"). */
-export const TOTALS_ROW =
-  /^(?:\d{1,2}(?:[.,]\d+)?\s?%\s*)?(?:(?:netto|brutto|gesamt)(?:betrag|summe)?|zwischensumme|summe|mwst|ust|umsatzsteuer|mehrwertsteuer|rechnungsbetrag|endbetrag|zzgl|total|subtotal|net\s+(?:amount|total)|vat|tax(?:es)?|tva|übertrag)\b/i;
+export const TOTALS_ROW = new RegExp(
+  `^(?:\\d{1,2}(?:[.,]\\d+)?\\s?%\\s*)?(?:${anyOf(
+    /(?:netto|brutto|gesamt)(?:betrag|summe)?|zwischensumme|summe/,
+    /mwst|ust|umsatzsteuer|mehrwertsteuer/,
+    /rechnungsbetrag|endbetrag|zzgl/,
+    /total|subtotal|net\s+(?:amount|total)|vat|tax(?:es)?|tva|übertrag/,
+  )})\\b`,
+  'i',
+);
 export const TOTALS_CELL = /(?:summe|betrag)(?![\p{L}])|\btotal\b/iu;
 /** An amount that stands on its own: not part of a date, a longer number or a percentage. */
 const PRINTED_AMOUNT = new RegExp(`(?<![\\d.,])${MONEY}(?![.,]?\\d)(?!\\s?%)`, 'g');

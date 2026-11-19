@@ -1,6 +1,6 @@
 import type { InvoiceType, Party } from '../../domain/model.js';
 import { COUNTRY_NAMES } from '../ground.js';
-import { lastIndex, VAT_ID_LABEL, VAT_ID_LINE } from './values.js';
+import { anyOf, lastIndex, VAT_ID_LABEL, VAT_ID_LINE } from './values.js';
 
 // Parties. extractLayout() writes three spaces between columns, so a row splits into cells; its blocks are the
 // columns themselves. Without blocks, the first cells of the rows stand in for the one column that matters most.
@@ -12,8 +12,11 @@ const SENDER_SEPARATOR = /\s[·|•●–—-]\s/;
 /** "12345 Musterstadt", "DE-12345 Musterstadt", "D-12345 Musterstadt", "DE 12345 Musterstadt", and the Dutch "1234 AB Voorbeeldstad". */
 const POSTAL = /^(?:([A-Z]{1,2})[- ])?(\d{4} [A-Z]{2}(?= )|\d{4,5})\s+(\p{L}.*)$/u;
 /** "Dover, DE 19901", with the country in front ("USA – Dover, DE 19901") or behind ("Dover, DE 19901, USA"). */
-const US_PLACE =
-  /^(?:(?:USA|United States(?: of America)?)\s[–—-]\s)?([\p{L} .'-]+),\s[A-Z]{2}\s(\d{5}(?:-\d{4})?)(?:,\s(?:USA|United States(?: of America)?))?$/u;
+const USA = '(?:USA|United States(?: of America)?)';
+const US_PLACE = new RegExp(
+  `^(?:${USA}\\s[–—-]\\s)?([\\p{L} .'-]+),\\s[A-Z]{2}\\s(\\d{5}(?:-\\d{4})?)(?:,\\s${USA})?$`,
+  'u',
+);
 export const EU = new Set(
   'AT BE BG CY CZ DE DK EE ES FI FR GR HR HU IE IT LT LU LV MT NL PL PT RO SE SI SK'.split(' '),
 );
@@ -52,10 +55,39 @@ export function senderOf(cell: string): Partial<Party> | undefined {
 }
 
 export type Role = 'seller' | 'buyer' | 'other';
-const BUYER =
-  'bill(?:ed)?\\s+to|invoice\\s+to|sold\\s+to|rechnung\\s+an|rechnungsempfänger|rechnungsadresse|rechnungsanschrift|kunde|customer|client|buyer|käufer|leistungsempfänger|empfänger|destinataire|acheteur|adresse\\s+de\\s+facturation|billing\\s+address';
-const SELLER =
-  'verkäufer|lieferant|leistungserbringer|rechnungssteller|absender|seller|supplier|vendor|vendeur|fournisseur|from';
+const BUYER = [
+  'bill(?:ed)?\\s+to',
+  'invoice\\s+to',
+  'sold\\s+to',
+  'rechnung\\s+an',
+  'rechnungsempfänger',
+  'rechnungsadresse',
+  'rechnungsanschrift',
+  'kunde',
+  'customer',
+  'client',
+  'buyer',
+  'käufer',
+  'leistungsempfänger',
+  'empfänger',
+  'destinataire',
+  'acheteur',
+  'adresse\\s+de\\s+facturation',
+  'billing\\s+address',
+].join('|');
+const SELLER = [
+  'verkäufer',
+  'lieferant',
+  'leistungserbringer',
+  'rechnungssteller',
+  'absender',
+  'seller',
+  'supplier',
+  'vendor',
+  'vendeur',
+  'fournisseur',
+  'from',
+].join('|');
 /** A label on a line of its own, such as "Käufer:", "Käufer/Leistungsempfänger:" or "BILL TO". */
 const heading = (labels: string) => new RegExp(`^(?:${labels})(?:\\s*[/&]\\s*[\\p{L}-]+)*\\s*:?$`, 'iu');
 export const [BUYER_HEADING, SELLER_HEADING] = [heading(BUYER), heading(SELLER)];
@@ -68,8 +100,16 @@ export const KEY_VALUE = /\S\s*:\s*\S|^\p{L}[\p{L}.-]*\s+\d[\d ]{7,}$/u;
 export const DATE_OR_AMOUNT = /\d{1,2}[./]\d{1,2}[./]\d{2,4}|\d{4}-\d{2}-\d{2}|\d[.,]\d{2}(?!\d)/;
 /** The title of the document, alone or at the end of a cell ("Ihre Rechnung"), and with its number ("Rechnung 2301"). */
 /** The words that title an invoice, also as the end of a longer one ("Teilrechnung"). */
-const TITLE_WORD =
-  '\\p{L}*rechnung|rechnungskorrektur|gutschrift|(?:partial|prepayment|advance|corrected)\\s+invoice|invoice|facture|avoir|credit\\s+note';
+const TITLE_WORD = [
+  '\\p{L}*rechnung',
+  'rechnungskorrektur',
+  'gutschrift',
+  '(?:partial|prepayment|advance|corrected)\\s+invoice',
+  'invoice',
+  'facture',
+  'avoir',
+  'credit\\s+note',
+].join('|');
 export const TITLE = new RegExp(`(?:^|\\s)(?:${TITLE_WORD})$`, 'iu');
 export const NAMED = new RegExp(`^(${TITLE_WORD})[ \\t]+([A-Z]{0,3}[-/]?\\d{2,}[\\w/-]*)$`, 'iu');
 /** The kinds of invoice a title names. A "Gutschrift" may be a credit note or an invoice the buyer issued, and stays open. */
@@ -80,11 +120,28 @@ export const TYPES: [RegExp, InvoiceType][] = [
   [/^(?:credit\s+note|avoir)$/i, '381'],
 ];
 const SALUTATION = /^(?:herrn?|frau|mr\.?|mrs\.?|ms\.?|monsieur|madame|mme\.?)$/i;
-const LEGAL_FORM =
-  /(?:^|\s)(?:gmbh|mbh|ag|kg|ohg|gbr|e\.\s?[vk]\.|a\.\s?g\.|ltd\.?|inc\.?|llc|plc|sarl|sas|s\.a\.|b\.v\.)(?=\s|$)|&\s*co\b/i;
+const LEGAL_FORMS = anyOf(
+  /gmbh|mbh|ag|kg|ohg|gbr|e\.\s?[vk]\.|a\.\s?g\./, // German
+  /ltd\.?|inc\.?|llc|plc/, // English
+  /sarl|sas|s\.a\.|b\.v\./, // French, Dutch
+);
+const LEGAL_FORM = new RegExp(`(?:^|\\s)(?:${LEGAL_FORMS})(?=\\s|$)|&\\s*co\\b`, 'i');
 /** What only the issuer prints about itself: its tax number and its entry in the commercial register. */
-const ISSUER_SIGNS =
-  /steuer-?(?:nr|nummer)|\bst\.?-?nr|tax\s+(?:number|no\b)|\bhr[ab]\b|amtsgericht|registergericht|handelsregister|siret/i;
+const ISSUER_SIGNS = new RegExp(
+  anyOf(
+    // The tax number
+    /steuer-?(?:nr|nummer)/,
+    /\bst\.?-?nr/,
+    /tax\s+(?:number|no\b)/,
+    // The entry in the commercial register
+    /\bhr[ab]\b/,
+    /amtsgericht/,
+    /registergericht/,
+    /handelsregister/,
+    /siret/,
+  ),
+  'i',
+);
 /** What only the issuer prints beside its VAT ID: its numbers and its bank account. */
 export const ISSUER_OR_BANK = new RegExp(`${ISSUER_SIGNS.source}|\\b(?:iban|bic)\\b`, 'i');
 /** What a footer lists beside the issuer's name: its numbers, its VAT ID and its bank account. */

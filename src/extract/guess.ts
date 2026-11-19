@@ -4,7 +4,7 @@ import { readBuyerReference, readNumber, readPaymentTerms, readPeriod, readType 
 import { NOTE_CATEGORIES, readItems, readVatNote } from './guess/items.js';
 import { believed, cells, countryOfVatId, EU, type Found, ISSUER_OR_BANK, readParties } from './guess/parties.js';
 import { findCurrency, readTotals } from './guess/totals.js';
-import { after, cents, DATE, findIban, SEPARATOR, toIsoDate, vatIdsIn } from './guess/values.js';
+import { after, anyOf, cents, DATE, findIban, SEPARATOR, toIsoDate, vatIdsIn } from './guess/values.js';
 
 // Known limit: patterns for German, English and French invoices, no model. A value is believed for what it fits to, not
 // for where it stands: the totals are three printed amounts with net + VAT = gross, the items are rows that add up to
@@ -13,9 +13,50 @@ import { after, cents, DATE, findIban, SEPARATOR, toIsoDate, vatIdsIn } from './
 // stays unread: less, never something invented. Ceiling: labels are still words, and a name is believed as printed;
 // add words here before reaching for anything smarter.
 
-const GERMAN_WORDS =
-  /\b(rechnung\w*|mwst|ust|umsatzsteuer|mehrwertsteuer|netto|brutto|gesamt\w*|betrag|datum|menge|zahlbar|leistung\w*|lieferung)\b/gi;
+const GERMAN_WORDS = new RegExp(
+  `\\b(${[
+    'rechnung\\w*',
+    'mwst',
+    'ust',
+    'umsatzsteuer',
+    'mehrwertsteuer',
+    'netto',
+    'brutto',
+    'gesamt\\w*',
+    'betrag',
+    'datum',
+    'menge',
+    'zahlbar',
+    'leistung\\w*',
+    'lieferung',
+  ].join('|')})\\b`,
+  'gi',
+);
 const ENGLISH_WORDS = /\b(invoice|vat|tax|subtotal|total|amount|date|quantity|payable|payment|due|delivery)\b/gi;
+
+const ISSUE_DATE_LABEL = new RegExp(
+  anyOf(
+    /rechnungs-?datum/,
+    /belegdatum/,
+    /invoice\s+date/,
+    /date\s+of\s+issue/,
+    /issue\s+date/,
+    /date\s+de\s+(?:la\s+)?facture/,
+    /date\s+d['’]émission/,
+  ),
+);
+const DELIVERY_DATE_LABEL = new RegExp(
+  anyOf(/leistungsdatum/, /lieferdatum/, /date\s+of\s+(?:supply|delivery)/, /delivery\s+date/, /service\s+date/),
+);
+const DUE_DATE_LABEL = new RegExp(
+  anyOf(
+    /fällig(?:keit(?:s(?:datum|tag|termin))?|\s+am|\s+bis)?/,
+    /zahlbar\s+bis/,
+    /due(?:\s+date|\s+by|\s+on)?/,
+    /payable\s+by/,
+    /date\s+d['’]échéance/,
+  ),
+);
 
 /** The language an invoice is written in, judged by the words invoices use. English when nothing tells. */
 export function languageOf(text: string): 'de' | 'en' {
@@ -101,18 +142,10 @@ export function guessFromText(text: string, options: GuessOptions = {}): Invoice
     number,
     typeCode: readType(rows),
     buyerReference: readBuyerReference(searched),
-    issueDate:
-      date(
-        /rechnungs-?datum|belegdatum|invoice\s+date|date\s+of\s+issue|issue\s+date|date\s+de\s+(?:la\s+)?facture|date\s+d['’]émission/,
-      ) ??
-      dated ??
-      date(/(?<![a-zäöü-])datum|(?<![a-z] ?)date/) ??
-      beside,
-    deliveryDate: date(/leistungsdatum|lieferdatum|date\s+of\s+(?:supply|delivery)|delivery\s+date|service\s+date/),
+    issueDate: date(ISSUE_DATE_LABEL) ?? dated ?? date(/(?<![a-zäöü-])datum|(?<![a-z] ?)date/) ?? beside,
+    deliveryDate: date(DELIVERY_DATE_LABEL),
     ...readPeriod(searched, rows),
-    dueDate: date(
-      /fällig(?:keit(?:s(?:datum|tag|termin))?|\s+am|\s+bis)?|zahlbar\s+bis|due(?:\s+date|\s+by|\s+on)?|payable\s+by|date\s+d['’]échéance/,
-    ),
+    dueDate: date(DUE_DATE_LABEL),
     paymentTerms: readPaymentTerms(rows),
     currency: findCurrency(text),
     iban,

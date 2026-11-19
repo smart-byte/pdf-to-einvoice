@@ -1,26 +1,69 @@
 import type { InvoiceType } from '../../domain/model.js';
 import { MAX_WRAPPED } from './items.js';
 import { cells, KEY_VALUE, NAMED, TITLE, TYPES } from './parties.js';
-import { after, DATE, escape, MONTH, monthNumber, pad, SEPARATOR, toIsoDate } from './values.js';
+import { after, anyOf, DATE, escape, MONTH, monthNumber, pad, SEPARATOR, toIsoDate } from './values.js';
 
 // The head of the invoice: its number and type, its dates, the service period, the payment terms and the reference
 // of the buyer.
 
-const PERIOD_LABEL =
-  /(?:leistungs|abrechnungs|liefer)?zeitraum|leistungsmonat|leistungsdatum|lieferdatum|(?:service|billing|delivery)\s+(?:period|month)|period/;
+const PERIOD_LABEL = new RegExp(
+  anyOf(
+    /(?:leistungs|abrechnungs|liefer)?zeitraum/,
+    /leistungsmonat/,
+    /leistungsdatum/,
+    /lieferdatum/,
+    /(?:service|billing|delivery)\s+(?:period|month)/,
+    /period/,
+  ),
+);
 const DOTTED = '(\\d{1,2})\\.(\\d{1,2})\\.(\\d{4})';
 const PERIOD = new RegExp(
-  `${SEPARATOR}(?:Q([1-4])[ /]?(\\d{4})|([1-4])\\.\\s?Quartal\\s+(\\d{4})|${DOTTED}\\s*(?:-|–|bis|to)\\s*${DOTTED}|${MONTH}\\s+(\\d{4})|(\\d{1,2})[./-](\\d{4})(?!\\d)|(\\d{4})-(\\d{2})(?![-\\d]))`,
+  `${SEPARATOR}(?:${[
+    // A quarter: "Q3 2026", "3. Quartal 2026".
+    'Q([1-4])[ /]?(\\d{4})',
+    '([1-4])\\.\\s?Quartal\\s+(\\d{4})',
+    // Two dates: "01.10.2026 - 31.10.2026".
+    `${DOTTED}\\s*(?:-|–|bis|to)\\s*${DOTTED}`,
+    // A month: "Oktober 2026", "10/2026", "2026-10".
+    `${MONTH}\\s+(\\d{4})`,
+    '(\\d{1,2})[./-](\\d{4})(?!\\d)',
+    '(\\d{4})-(\\d{2})(?![-\\d])',
+  ].join('|')})`,
   'i',
 );
-const MONTH_RANGE = new RegExp(`${SEPARATOR}${MONTH}\\s+(\\d{4})\\s*(?:-|–|bis|to|until)\\s*${MONTH}\\s+(\\d{4})`, 'i');
+const UNTIL = '(?:-|–|bis|to|until)';
+const MONTH_RANGE = new RegExp(`${SEPARATOR}${MONTH}\\s+(\\d{4})\\s*${UNTIL}\\s*${MONTH}\\s+(\\d{4})`, 'i');
 const MONTH_ROW = new RegExp(`^${MONTH}\\s+(\\d{4})$`, 'i');
 /** The label of payment terms: what follows it is the terms, whatever words they use. */
-const TERMS_LABEL =
-  /^(?:zahlungs(?:bedingung(?:en)?|ziel|frist|konditionen)|payment\s+terms?|terms\s+of\s+payment|conditions\s+de\s+(?:paiement|règlement))\s*:?\s*/i;
+const TERMS_LABEL = new RegExp(
+  `^(?:${anyOf(
+    /zahlungs(?:bedingung(?:en)?|ziel|frist|konditionen)/,
+    /payment\s+terms?/,
+    /terms\s+of\s+payment/,
+    /conditions\s+de\s+(?:paiement|règlement)/,
+  )})\\s*:?\\s*`,
+  'i',
+);
 /** How a sentence starts that says when to pay. "Zahlbetrag" and "Zahlungsart" say something else. */
-const TERMS_START =
-  /^(?:zahlbar\b|(?:die\s+)?zahlung\s+(?:ist\s+)?(?:innerhalb|bis|sofort|ohne|erfolgt|fällig|\d)|bitte\s+(?:überweisen|zahlen|begleichen)|der\s+(?:rechnungs|gesamt)betrag\s+ist|sofort\s+(?:fällig|zahlbar)|payable\b|payment\s+(?:is\s+)?(?:due|within|upon)|please\s+(?:pay|remit|transfer)|net\s+\d+|due\s+(?:on|upon)\s+receipt|paiement\s+(?:à|sous|dans|comptant))/i;
+const TERMS_START = new RegExp(
+  `^(?:${anyOf(
+    // German
+    /zahlbar\b/,
+    /(?:die\s+)?zahlung\s+(?:ist\s+)?(?:innerhalb|bis|sofort|ohne|erfolgt|fällig|\d)/,
+    /bitte\s+(?:überweisen|zahlen|begleichen)/,
+    /der\s+(?:rechnungs|gesamt)betrag\s+ist/,
+    /sofort\s+(?:fällig|zahlbar)/,
+    // English
+    /payable\b/,
+    /payment\s+(?:is\s+)?(?:due|within|upon)/,
+    /please\s+(?:pay|remit|transfer)/,
+    /net\s+\d+/,
+    /due\s+(?:on|upon)\s+receipt/,
+    // French
+    /paiement\s+(?:à|sous|dans|comptant)/,
+  )})`,
+  'i',
+);
 
 /**
  * The payment terms as printed: what stands after their label, or the sentence that says when to pay, joined over
@@ -105,7 +148,9 @@ const NUMBER_LABEL = new RegExp(
     '(?<=^|\\n|\\s{3})(?:nr|no)\\.?\\s*:',
     // "Rechnungskorrektur Nr. …", "Gutschrift (…) Nr. …": the title of the document, then its number. A title that
     // goes on to name another document ("Rechnung zu Bestellung Nr. …") would give that one's number.
-    '(?<=^|\\n)[a-zäöüß]*(?:rechnung|gutschrift|invoice|facture|avoir)(?:(?!bestell|auftrag|order|liefer|angebot|vertrag|kunde|customer)[^\\n\\d])*?\\s(?:nr\\.?|no\\.?|n°|#|nummer|number)(?=[\\s:])',
+    '(?<=^|\\n)[a-zäöüß]*(?:rechnung|gutschrift|invoice|facture|avoir)' +
+      '(?:(?!bestell|auftrag|order|liefer|angebot|vertrag|kunde|customer)[^\\n\\d])*?' +
+      '\\s(?:nr\\.?|no\\.?|n°|#|nummer|number)(?=[\\s:])',
   ].join('|'),
 );
 
