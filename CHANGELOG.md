@@ -11,6 +11,18 @@ All notable changes to this project are documented here. The format follows
 - A finding carries the values its message was filled with as `params`, such as `{ expected: '0.99', stated: '0.50' }`.
   The web app words its German texts from them instead of reading them out of the English message.
 
+### Changed
+
+- A line with a negative VAT rate is told that a rate is never negative, as a discount or a charge is, instead of what
+  its category asks for.
+- The comparison of a language model's answer with the PDF drops an e-mail address that `check` would reject, such as
+  one that took the full stop of its sentence along.
+
+### Fixed
+
+- The comparison of a language model's answer with the PDF keeps a service period printed as "März 2026" or
+  "Mär. 2026"; month names with an umlaut were never found.
+
 ## [0.3.2] - 2026-11-19
 
 ### Fixed
