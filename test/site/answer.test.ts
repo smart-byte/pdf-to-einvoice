@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { extractionSchema, progressOf } from '../site/answer.js';
+import { extractionSchema, progressOf } from '../../site/answer.js';
 
 /** An answer as the grammar makes a model write it: every key of the schema, in its order, here with two line items. */
 function answerOf(schema: any = extractionSchema()): unknown {

@@ -1,11 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { check } from '../src/domain/check.js';
-import { createEInvoice } from '../src/generate/create.js';
-import type { InvoiceDraft } from '../src/domain/model.js';
-import { readInvoiceXml } from '../src/inspect/read-xml.js';
+import { check } from '../../src/domain/check.js';
+import { createEInvoice } from '../../src/generate/create.js';
+import type { InvoiceDraft } from '../../src/domain/model.js';
+import { readInvoiceXml } from '../../src/inspect/read-xml.js';
 
-const file = (name: string) => readFileSync(new URL(`../examples/${name}`, import.meta.url));
+const file = (name: string) => readFileSync(new URL(`../../examples/${name}`, import.meta.url));
 const samplePdf = () => new Uint8Array(file('sample-invoice.pdf'));
 const printedTotals = () => JSON.parse(file('sample-invoice.json').toString()).totals;
 /** The sample data without its printed totals, with one change applied. */

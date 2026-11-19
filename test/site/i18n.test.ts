@@ -1,9 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
-import { check } from '../src/domain/check.js';
-import type { InvoiceDraft } from '../src/domain/model.js';
+import { check } from '../../src/domain/check.js';
+import type { InvoiceDraft } from '../../src/domain/model.js';
 
-const source = (file: string) => readFileSync(new URL(`../src/${file}`, import.meta.url), 'utf8');
+const source = (file: string) => readFileSync(new URL(`../../src/${file}`, import.meta.url), 'utf8');
 
 /**
  * Every code the library can put on a finding or an `InvoiceError`, read from its source: the argument right before
@@ -27,7 +27,7 @@ function libraryCodes(): Set<string> {
   ]);
 }
 
-const sample = (): InvoiceDraft => JSON.parse(readFileSync(new URL('../examples/sample-invoice.json', import.meta.url), 'utf8'));
+const sample = (): InvoiceDraft => JSON.parse(readFileSync(new URL('../../examples/sample-invoice.json', import.meta.url), 'utf8'));
 
 describe('German texts', () => {
   it('reads the codes the library produces from its source', () => {
@@ -56,7 +56,7 @@ describe('German texts', () => {
   it('has a German text for every code', async () => {
     // The page's module reads the language from the address it is served at.
     vi.stubGlobal('location', new URL('https://pdf-to-einvoice.app/'));
-    const { STRINGS } = await import('../site/i18n.js');
+    const { STRINGS } = await import('../../site/i18n.js');
     expect([...libraryCodes()].filter((code) => !STRINGS[`e.${code}`]?.de)).toEqual([]);
     vi.unstubAllGlobals();
   });
@@ -65,7 +65,7 @@ describe('German texts', () => {
 describe('Footer', () => {
   it('is the same on every page and leaves the site only for the source', () => {
     const [home, ...others] = ['index.html', 'privacy.html', 'legal-notice.html'].map((page) => {
-      const html = readFileSync(new URL(`../site/${page}`, import.meta.url), 'utf8');
+      const html = readFileSync(new URL(`../../site/${page}`, import.meta.url), 'utf8');
       return [...html.slice(html.indexOf('<footer')).matchAll(/<a href="([^"]+)"/g)].map((match) => match[1]!);
     });
     for (const links of others) expect(links).toEqual(home);

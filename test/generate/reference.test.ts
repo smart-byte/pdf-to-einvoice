@@ -11,11 +11,11 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { PDFDocument, PDFName, PDFString } from '@cantoo/pdf-lib';
 import { describe, expect, it } from 'vitest';
-import { createEInvoice, createXRechnung } from '../src/generate/create.js';
-import type { InvoiceDraft } from '../src/domain/model.js';
+import { createEInvoice, createXRechnung } from '../../src/generate/create.js';
+import type { InvoiceDraft } from '../../src/domain/model.js';
 
 const jar = process.env.MUSTANG_JAR;
-const file = (name: string) => readFileSync(new URL(`../examples/${name}`, import.meta.url));
+const file = (name: string) => readFileSync(new URL(`../../examples/${name}`, import.meta.url));
 const sample = (change: (draft: any) => void = () => {}): InvoiceDraft => {
   const draft = JSON.parse(file('sample-invoice.json').toString());
   change(draft);

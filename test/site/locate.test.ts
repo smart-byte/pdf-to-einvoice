@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { locate, pageToShow, type Piece } from '../site/locate.js';
+import { locate, pageToShow, type Piece } from '../../site/locate.js';
 
 /** A piece of text: 10 high and, unless told otherwise, 10 wide per character. `y` is its upper edge. */
 const piece = (text: string, x: number, y: number, width = text.length * 10): Piece => ({ text, x, y, width, height: 10 });

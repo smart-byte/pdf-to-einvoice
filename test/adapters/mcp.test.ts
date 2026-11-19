@@ -6,11 +6,11 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { Ajv } from 'ajv';
 import { describe, expect, it } from 'vitest';
-import type { Adjustment, Allowance, DocumentAllowance, Invoice } from '../src/index.js';
-import { createServer } from '../src/adapters/mcp.js';
-import { readEmbeddedXml } from '../src/pdf/file.js';
+import type { Adjustment, Allowance, DocumentAllowance, Invoice } from '../../src/index.js';
+import { createServer } from '../../src/adapters/mcp.js';
+import { readEmbeddedXml } from '../../src/pdf/file.js';
 
-const example = (name: string) => fileURLToPath(new URL(`../examples/${name}`, import.meta.url));
+const example = (name: string) => fileURLToPath(new URL(`../../examples/${name}`, import.meta.url));
 const SAMPLE_PDF = example('sample-invoice.pdf');
 const sample = (change: (draft: any) => void = () => {}) => {
   const draft = JSON.parse(readFileSync(example('sample-invoice.json'), 'utf8'));
@@ -102,7 +102,7 @@ describe('MCP server', () => {
   });
 
   it('is described for the MCP Registry under the name and version of the package', () => {
-    const read = (name: string) => JSON.parse(readFileSync(new URL(`../${name}`, import.meta.url), 'utf8'));
+    const read = (name: string) => JSON.parse(readFileSync(new URL(`../../${name}`, import.meta.url), 'utf8'));
     const [manifest, entry] = [read('package.json'), read('server.json')];
     expect(entry.name).toBe(manifest.mcpName);
     expect(entry.version).toBe(manifest.version);

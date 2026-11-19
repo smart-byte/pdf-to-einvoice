@@ -26,7 +26,8 @@ A change is done when `npm test`, `npm run type-check`, `npm run lint` and `npm 
 ## Where things are
 
 `src/` is split into layers, one folder each. A layer imports only the layers listed beside it;
-`test/architecture.test.ts` enforces this, and that there is no cycle between files.
+`test/architecture.test.ts` enforces this, and that there is no cycle between files. `test/` has the same folders, and
+`test/site/` for the web app.
 
 | path                 | what it holds                                                                                      | imports          |
 | -------------------- | -------------------------------------------------------------------------------------------------- | ---------------- |
@@ -41,7 +42,7 @@ A change is done when `npm test`, `npm run type-check`, `npm run lint` and `npm 
 |                      | (`files.ts`); `server.json` describes the server for registries                                    |                  |
 | `src/index.ts`       | the public API of the package                                                                      | all but adapters |
 | `site/`              | the web app; it imports `src/` directly, never `src/adapters/`                                     |                  |
-| `test/`, `examples/` | tests and the invented sample invoice                                                              |                  |
+| `test/`, `examples/` | tests, by layer, and the invented sample invoice                                                   |                  |
 
 ## Rules
 
@@ -52,7 +53,7 @@ A change is done when `npm test`, `npm run type-check`, `npm run lint` and `npm 
 - The reader must not be fitted to single layouts. A change to `src/extract/guess.ts` or `src/pdf/text.ts` comes with the table
   of `npm run eval:reader` before and after. A wrong value is worse than a missing one.
 - A change to how files are written comes with `npm run test:reference`.
-- A change to the website comes with `npm run test:browser`; a new flow gets a test in `test/browser.test.ts`.
+- A change to the website comes with `npm run test:browser`; a new flow gets a test in `test/site/browser.test.ts`.
 - Money is calculated in whole cents (`src/domain/calculate.ts`), never in floating point euros.
 - The website makes no request to a third party except the model download the user asks for. No scripts, styles or
   fonts from another origin, in any build. One further request exists, to the page counter of the project

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { guessFromText } from '../src/extract/guess.js';
+import { guessFromText } from '../../src/extract/guess.js';
 
 // Invented invoices in two layouts that once misled the reader: a letterhead with the address of a customer abroad,
 // and two address columns with the seller on the right. A wrong value is worse than a missing one.

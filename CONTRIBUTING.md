@@ -27,7 +27,7 @@ MUSTANG_JAR=$PWD/Mustang-CLI-2.26.0.jar npm run test:reference
 ```
 
 CI runs this on every push. A new kind of invoice (a VAT category, a document type, a field that changes the XML)
-gets a case in `test/reference.test.ts`.
+gets a case in `test/generate/reference.test.ts`.
 
 ## Measuring the reader
 

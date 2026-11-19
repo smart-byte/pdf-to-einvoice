@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { guessFromText } from '../src/extract/guess.js';
+import { guessFromText } from '../../src/extract/guess.js';
 
 // Layouts that do not put things where the reader used to look for them, rebuilt with made-up data. Each is read
 // by what has to fit together: amounts that add up, the party that shows its tax details, a label and its value.

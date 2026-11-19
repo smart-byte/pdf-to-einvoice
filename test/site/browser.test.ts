@@ -6,15 +6,15 @@ import { PDFDocument, PDFName, PDFString, StandardFonts } from '@cantoo/pdf-lib'
 import { chromium, type Browser, type Download, type Page } from 'playwright-core';
 import { preview, type PreviewServer } from 'vite';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
-import { extractionSchema } from '../site/answer.js';
-import { createEInvoice } from '../src/generate/create.js';
-import type { InvoiceDraft } from '../src/domain/model.js';
-import { validateEInvoice } from '../src/inspect/validate.js';
+import { extractionSchema } from '../../site/answer.js';
+import { createEInvoice } from '../../src/generate/create.js';
+import type { InvoiceDraft } from '../../src/domain/model.js';
+import { validateEInvoice } from '../../src/inspect/validate.js';
 
 // npm names the script it runs: only `npm run test:browser` runs these tests.
 const asked = process.env.npm_lifecycle_event === 'test:browser';
 
-const file = (name: string) => readFileSync(new URL(`../examples/${name}`, import.meta.url));
+const file = (name: string) => readFileSync(new URL(`../../examples/${name}`, import.meta.url));
 const samplePdf = () => new Uint8Array(file('sample-invoice.pdf'));
 const sampleData = (): InvoiceDraft => JSON.parse(file('sample-invoice.json').toString());
 const upload = (name: string, bytes: Uint8Array) => ({ name, mimeType: 'application/pdf', buffer: Buffer.from(bytes) });
@@ -29,7 +29,7 @@ describe.skipIf(!asked)('the web app in a browser', () => {
 
   beforeAll(async () => {
     server = await preview({
-      configFile: fileURLToPath(new URL('../site/vite.config.ts', import.meta.url)),
+      configFile: fileURLToPath(new URL('../../site/vite.config.ts', import.meta.url)),
       logLevel: 'silent',
       preview: { host: '127.0.0.1' },
     });

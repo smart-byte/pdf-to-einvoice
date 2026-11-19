@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { COUNTER_ORIGIN, forBuild, visitOf } from '../site/counter.js';
+import { COUNTER_ORIGIN, forBuild, visitOf } from '../../site/counter.js';
 
 describe('the page counter of the project website', () => {
   const page = {

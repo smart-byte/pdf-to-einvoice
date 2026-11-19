@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { PDFDocument, StandardFonts } from '@cantoo/pdf-lib';
 import { describe, expect, it } from 'vitest';
-import { extractLayout, extractText } from '../src/pdf/text.js';
+import { extractLayout, extractText } from '../../src/pdf/text.js';
 
 type Drawn = [text: string, x: number, y: number, size?: number];
 
@@ -23,7 +23,7 @@ describe('extractLayout', () => {
   });
 
   it('returns the rows that extractText returns', async () => {
-    const pdf = new Uint8Array(readFileSync(new URL('../examples/sample-invoice.pdf', import.meta.url)));
+    const pdf = new Uint8Array(readFileSync(new URL('../../examples/sample-invoice.pdf', import.meta.url)));
     expect((await extractLayout(pdf)).text).toBe(await extractText(pdf));
   });
 

@@ -3,10 +3,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { run } from '../src/adapters/cli.js';
-import { readEmbeddedXml } from '../src/pdf/file.js';
+import { run } from '../../src/adapters/cli.js';
+import { readEmbeddedXml } from '../../src/pdf/file.js';
 
-const example = (name: string) => fileURLToPath(new URL(`../examples/${name}`, import.meta.url));
+const example = (name: string) => fileURLToPath(new URL(`../../examples/${name}`, import.meta.url));
 const SAMPLE_PDF = example('sample-invoice.pdf');
 const SAMPLE_JSON = example('sample-invoice.json');
 const tmp = () => mkdtempSync(join(tmpdir(), 'pdf-to-einvoice-cli-'));
@@ -246,7 +246,7 @@ describe('usage', () => {
   });
 
   it('prints the package version for --version', async () => {
-    const { version } = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+    const { version } = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8'));
     expect((await cli('--version')).stdout).toBe(`${version}\n`);
   });
 

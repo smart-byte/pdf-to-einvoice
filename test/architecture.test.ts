@@ -94,3 +94,14 @@ describe('the layers of src/', () => {
     expect(wrong).toEqual([]);
   });
 });
+
+describe('the tests', () => {
+  // Like src/test/java beside src/main/java: the tests of a layer are found in the folder of the same name.
+  it('stand in the folder of the layer they test, or of the web app', () => {
+    const folders = new Set([...Object.keys(LAYERS), 'site']);
+    const stray = sources('test')
+      .map((file) => relative(join(root, 'test'), file))
+      .filter((path) => path !== 'architecture.test.ts' && !folders.has(path.split('/')[0] ?? ''));
+    expect(stray).toEqual([]);
+  });
+});
