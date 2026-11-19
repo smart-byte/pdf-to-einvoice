@@ -1,4 +1,5 @@
-import type { Finding } from './finding.js';
+import { error, warning, type Finding } from './finding.js';
+import type { MessageKey, MessageParams } from './messages.js';
 import { VAT_CATEGORIES, type Invoice, type Line, type VatCategory } from './model.js';
 
 export interface VatGroup {
@@ -131,7 +132,6 @@ interface Placed {
 const LISTS = ['discounts', 'charges'] as const;
 const WHAT = { discounts: 'discount', charges: 'charge' } as const;
 
-const problem = (severity: Finding['severity'], path: string, code: string, message: string): Finding => ({ path, severity, code, message });
 const pathOf = (list: List, index: number, field?: string) => (field ? `${list}.${index}.${field}` : `${list}.${index}`);
 
 /** The lines summed by VAT category and rate, in the order the groups first appear. */
@@ -157,29 +157,28 @@ function checkEntry(raw: unknown, list: List, index: number): { checked?: Checke
   const e: Record<string, any> = raw && typeof raw === 'object' ? raw : {};
   const problems: Finding[] = [];
   let usable = true;
-  const refuse = (path: string, code: string, message: string) => {
-    problems.push(problem('error', path, code, message));
+  const refuse = <K extends MessageKey>(path: string, key: K, ...params: MessageParams<K>) => {
+    problems.push(error(path, key, ...params));
     usable = false;
   };
 
   for (const field of ['percent', 'amount', 'vatRate']) {
-    if (e[field] !== undefined && !isNumber(e[field])) refuse(at(field), 'format', 'Not a number.');
+    if (e[field] !== undefined && !isNumber(e[field])) refuse(at(field), 'format.number');
   }
-  if (e.percent === undefined && e.amount === undefined) refuse(at(), 'adjustment', `A ${what} needs a percentage or an amount.`);
-  if (isNumber(e.percent) && e.percent < 0) refuse(at('percent'), 'adjustment', 'A percentage is never negative; the sign comes from the lines.');
+  if (e.percent === undefined && e.amount === undefined) refuse(at(), 'adjustment', { what });
+  if (isNumber(e.percent) && e.percent < 0) refuse(at('percent'), 'adjustment.negative');
   if (list === 'charges' && e.reason === undefined) {
-    problems.push(problem('error', at('reason'), 'charge-reason', 'A charge needs its reason as printed, e.g. freight.'));
+    problems.push(error(at('reason'), 'charge-reason'));
   }
 
   let category: VatCategory | undefined = e.vatCategory;
   if (category !== undefined && !(category in VAT_CATEGORIES)) {
-    refuse(at('vatCategory'), 'format', `Unknown VAT category. Use one of ${Object.keys(VAT_CATEGORIES).join(', ')}.`);
+    refuse(at('vatCategory'), 'format.category');
   } else if (isNumber(e.vatRate)) {
     if (category === undefined && e.vatRate > 0) category = 'S';
-    if (e.vatRate < 0) refuse(at('vatRate'), 'vat-rate', 'A VAT rate is never negative.');
-    else if (category === 'S' && e.vatRate === 0) refuse(at('vatRate'), 'vat-rate', 'With VAT charged (category S), the rate must be above 0.');
-    else if (category !== undefined && category !== 'S' && e.vatRate !== 0)
-      refuse(at('vatRate'), 'vat-rate', `Category ${category} carries no VAT: the rate must be 0.`);
+    if (e.vatRate < 0) refuse(at('vatRate'), 'vat-rate.negative');
+    else if (category === 'S' && e.vatRate === 0) refuse(at('vatRate'), 'vat-rate.standard');
+    else if (category !== undefined && category !== 'S' && e.vatRate !== 0) refuse(at('vatRate'), 'vat-rate.zero', { category });
   }
   if (!usable) return { problems };
 
@@ -199,14 +198,7 @@ function placePercent(entry: Checked & { percent: number }, matching: Group[], n
   if (!matching.length) {
     return {
       entries: [],
-      problems: [
-        problem(
-          'error',
-          at(entry.vatRate !== undefined ? 'vatRate' : 'vatCategory'),
-          'adjustment-group',
-          `No line is in the VAT group ${named}, so the percentage has nothing to be taken of. Correct the VAT category or rate, or leave both out to take it of all lines.`,
-        ),
-      ],
+      problems: [error(at(entry.vatRate !== undefined ? 'vatRate' : 'vatCategory'), 'adjustment-group.percent', { group: named })],
       placed: false,
     };
   }
@@ -219,12 +211,7 @@ function placePercent(entry: Checked & { percent: number }, matching: Group[], n
       const part = parts[0]!;
       if (!percentAgrees(fromCents(part.g.cents), percent, fromCents(stated), slack)) {
         problems.push(
-          problem(
-            'error',
-            at('amount'),
-            'adjustment-mismatch',
-            `${percent} % of ${money(part.g.cents)} is ${money(part.cents)}, but the ${what} states ${money(stated)}. Correct the percentage or the amount.`,
-          ),
+          error(at('amount'), 'adjustment-mismatch', { percent, base: money(part.g.cents), expected: money(part.cents), what, stated: money(stated) }),
         );
       }
       // The stated amount is the one written, as on a line.
@@ -233,12 +220,13 @@ function placePercent(entry: Checked & { percent: number }, matching: Group[], n
       const sum = parts.reduce((a, p) => a + p.cents, 0n);
       if (sum !== stated) {
         problems.push(
-          problem(
-            'error',
-            at('amount'),
-            'adjustment-mismatch',
-            `${percent} % of the lines comes to ${parts.map((p) => money(p.cents)).join(' + ')} = ${money(sum)} by VAT rate, but the ${what} states ${money(stated)}. Correct the percentage or the amount; an amount is not split between VAT rates.`,
-          ),
+          error(at('amount'), 'adjustment-mismatch.split', {
+            percent,
+            parts: parts.map((p) => money(p.cents)).join(' + '),
+            sum: money(sum),
+            what,
+            stated: money(stated),
+          }),
         );
       }
     }
@@ -258,14 +246,7 @@ function placeAmount(entry: Checked & { amount: number }, matching: Group[], nam
   if (matching.length > 1) {
     return {
       entries: [],
-      problems: [
-        problem(
-          'error',
-          where,
-          'adjustment-group',
-          `The lines are in several VAT groups (${matching.map((g) => `${g.category} ${g.rate} %`).join(', ')}). State the VAT category and rate this ${what} belongs to; an amount is not split between them.`,
-        ),
-      ],
+      problems: [error(where, 'adjustment-group.several', { groups: matching.map((g) => `${g.category} ${g.rate} %`).join(', '), what })],
       placed: false,
     };
   }
@@ -273,14 +254,7 @@ function placeAmount(entry: Checked & { amount: number }, matching: Group[], nam
   if (!group) {
     return {
       entries: [],
-      problems: [
-        problem(
-          'error',
-          where,
-          'adjustment-group',
-          `No line is in the VAT group ${named || 'it names'}. State the VAT category and rate this ${what} belongs to.`,
-        ),
-      ],
+      problems: [error(where, 'adjustment-group.none', { group: named || 'it names', what })],
       placed: false,
     };
   }
@@ -288,14 +262,7 @@ function placeAmount(entry: Checked & { amount: number }, matching: Group[], nam
   const problems: Finding[] = [];
   const stated = toCents(entry.amount);
   if (group.cents !== 0n && stated !== 0n && group.cents < 0n !== stated < 0n) {
-    problems.push(
-      problem(
-        'warning',
-        pathOf(list, index, 'amount'),
-        'adjustment-sign',
-        `The ${what} and its lines have different signs. Where the lines add up to a negative amount, the ${what} is negative too: -10 for 10.`,
-      ),
-    );
+    problems.push(warning(pathOf(list, index, 'amount'), 'adjustment-sign', { what }));
   }
   return { entries: [{ list, index, category: group.category, rate: group.rate, cents: stated, reason: entry.reason }], problems, placed: true };
 }
@@ -325,7 +292,7 @@ function resolve(invoice: Adjustable, lineCents?: bigint[]) {
     const given: unknown = invoice[list];
     if (given === undefined) continue;
     if (!Array.isArray(given)) {
-      problems.push(problem('error', list, 'format', `Not a list of ${WHAT[list]}s.`));
+      problems.push(error(list, 'format.list', { what: WHAT[list] }));
       resolved = false;
       continue;
     }

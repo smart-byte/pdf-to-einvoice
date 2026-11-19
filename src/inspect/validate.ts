@@ -1,6 +1,7 @@
 import type { Totals } from '../domain/calculate.js';
 import { check } from '../domain/check.js';
-import type { Finding } from '../domain/finding.js';
+import { error, warning, type Finding } from '../domain/finding.js';
+import { message } from '../domain/messages.js';
 import type { InvoiceDraft } from '../domain/model.js';
 import { inspectPdf, type PdfInfo } from '../pdf/file.js';
 import { readInvoiceXml } from './read-xml.js';
@@ -28,9 +29,6 @@ export interface ValidationResult {
 /** EN 16931 itself and everything built on it: Factur-X BASIC and EXTENDED, XRECHNUNG. MINIMUM and BASIC WL carry other identifiers. */
 const EN16931 = 'urn:cen.eu:en16931:2017';
 
-/** A finding about the file as a whole, not about one field. */
-const aboutTheFile = (severity: Finding['severity'], code: string, message: string): Finding => ({ path: '', severity, code, message });
-
 /**
  * Checks an existing e-invoice PDF (ZUGFeRD / Factur-X): does it carry invoice XML in an EN 16931 profile, is the
  * data in that XML complete, does it add up, does the file declare PDF/A-3 with its fonts embedded and, when
@@ -47,13 +45,7 @@ export async function validateEInvoice(pdf: Uint8Array, options: { pdfText?: str
   if (xml === null) {
     return {
       isEInvoice: false,
-      findings: [
-        aboutTheFile(
-          'error',
-          'no-xml',
-          'This PDF carries no invoice XML (factur-x.xml, zugferd-invoice.xml or xrechnung.xml): it is a plain PDF, not an e-invoice. Ask the issuer for an e-invoice, or create one if the invoice is yours.',
-        ),
-      ],
+      findings: [error('', 'no-xml')],
     };
   }
 
@@ -77,26 +69,14 @@ function readXml(xml: string): { read?: ReturnType<typeof readInvoiceXml>; isEIn
   } catch (e) {
     return {
       isEInvoice: false,
-      findings: [
-        aboutTheFile(
-          'error',
-          'xml-syntax',
-          `${e instanceof Error ? e.message : String(e)} The invoice data cannot be read: ask the issuer for a ZUGFeRD 2 / Factur-X e-invoice.`,
-        ),
-      ],
+      findings: [error('', 'xml-syntax', { reason: e instanceof Error ? e.message : String(e) })],
     };
   }
   if (read.profile?.startsWith(EN16931)) return { read, isEInvoice: true, findings: [] };
   return {
     read,
     isEInvoice: false,
-    findings: [
-      aboutTheFile(
-        'error',
-        'profile',
-        `The XML declares ${read.profile ? `the profile "${read.profile}"` : 'no profile'}, not one built on EN 16931 (${EN16931}...). MINIMUM and BASIC WL files do not count as e-invoices under EN 16931 and German VAT law. Ask the issuer for the profile EN 16931 (COMFORT), EXTENDED or XRECHNUNG.`,
-      ),
-    ],
+    findings: [error('', 'profile', { declared: read.profile ? `the profile "${read.profile}"` : 'no profile', expected: EN16931 })],
   };
 }
 
@@ -105,51 +85,29 @@ function pdfFindings(info: PdfInfo): Finding[] {
   const findings: Finding[] = [];
   if (info.pdfaPart !== '3') {
     const declared = info.pdfaPart === null ? 'does not declare PDF/A' : `declares PDF/A-${info.pdfaPart}`;
-    findings.push(
-      aboutTheFile(
-        'warning',
-        'pdf-a',
-        `The metadata of the PDF ${declared}; ZUGFeRD / Factur-X asks for PDF/A-3. The XML can be read all the same, but a strict recipient may reject the file. Have it exported again as PDF/A-3.`,
-      ),
-    );
+    findings.push(warning('', 'pdf-a', { declared }));
   }
   if (info.unembeddedFonts.length) {
-    findings.push(
-      aboutTheFile(
-        'warning',
-        'pdf-fonts',
-        `The PDF does not embed these fonts: ${info.unembeddedFonts.join(', ')}. The XML is not affected, but the file is not a strict PDF/A-3. Have the PDF exported again with fonts embedded (or as PDF/A) and the e-invoice created from that.`,
-      ),
-    );
+    findings.push(warning('', 'pdf-fonts', { fonts: info.unembeddedFonts.join(', ') }));
   }
   if (info.forbiddenActions.length) {
-    findings.push(
-      aboutTheFile(
-        'warning',
-        'pdf-actions',
-        `The file carries what PDF/A forbids a file to run: ${info.forbiddenActions.join(', ')}. It is not a strict PDF/A-3, and software may refuse it or warn about it.`,
-      ),
-    );
+    findings.push(warning('', 'pdf-actions', { actions: info.forbiddenActions.join(', ') }));
   }
   return findings;
 }
 
 /** The data holds one value of such a discount or charge, so `check` cannot see the contradiction: it is reported here. */
 function contradictionFindings(paths: string[]): Finding[] {
-  // The codes stay written out: test/site/i18n.test.ts reads them from here to find their German texts.
-  const disagree = (what: string) =>
-    `The XML states a percentage, a base and an amount for this ${what} that do not agree. Ask the issuer for a corrected e-invoice.`;
-  return paths.map((path): Finding =>
-    path.startsWith('charges.')
-      ? { path, severity: 'error', code: 'xml-charge', message: disagree('charge') }
-      : { path, severity: 'error', code: 'xml-discount', message: disagree('discount') },
-  );
+  return paths.map((path) => (path.startsWith('charges.') ? error(path, 'xml-charge') : error(path, 'xml-discount')));
 }
 
 /** check() words a totals mismatch for data typed in from a PDF; here both sides of the contradiction are in the XML. */
 function reworded(finding: Finding, invoice: InvoiceDraft, totals: Totals | undefined): Finding {
   const key = finding.path.replace('totals.', '') as 'net' | 'vat' | 'gross' | 'due';
-  const what = totals?.adjustments.length ? 'its lines, discounts and charges' : 'its lines';
-  const message = `The XML states a total of ${invoice.totals?.[key]?.toFixed(2)}, but ${what} add up to ${totals?.[key].toFixed(2)}. The XML contradicts itself: ask the issuer for a corrected e-invoice.`;
-  return { ...finding, message };
+  const text = message('totals-mismatch.xml', {
+    stated: `${invoice.totals?.[key]?.toFixed(2)}`,
+    calculated: `${totals?.[key].toFixed(2)}`,
+    adjusted: Boolean(totals?.adjustments.length),
+  });
+  return { ...finding, message: text };
 }

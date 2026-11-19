@@ -1,5 +1,6 @@
 import { calculate, lineBase, micro, percentAgrees, percentOf, resolveAdjustments, slackOf, type Totals } from './calculate.js';
-import type { Finding } from './finding.js';
+import { error, warning, type Finding } from './finding.js';
+import type { MessageKey, MessageParams } from './messages.js';
 import { INVOICE_TYPES, VAT_CATEGORIES, type Invoice, type InvoiceDraft, type VatCategory } from './model.js';
 
 export interface CheckResult {
@@ -87,8 +88,6 @@ const isNumber = (v: unknown): v is number => typeof v === 'number' && Number.is
 const NEEDS_REASON: VatCategory[] = ['E', 'AE', 'K', 'G', 'O'];
 const DATE_FIELDS = ['issueDate', 'dueDate', 'deliveryDate', 'periodStart', 'periodEnd', 'precedingInvoiceDate'];
 
-const error = (path: string, code: string, message: string): Finding => ({ path, severity: 'error', code, message });
-const warning = (path: string, code: string, message: string): Finding => ({ path, severity: 'warning', code, message });
 const valueAt = (d: Bag, path: string) => path.split('.').reduce((o, k) => o?.[k], d as any);
 
 /**
@@ -122,7 +121,7 @@ export function check(draft: InvoiceDraft, options: CheckOptions = {}): CheckRes
 function checkHeader(d: Bag): Finding[] {
   const findings: Finding[] = [];
   const require = (path: string, label: string) => {
-    if (valueAt(d, path) === undefined) findings.push(error(path, 'required', `${label} is missing.`));
+    if (valueAt(d, path) === undefined) findings.push(error(path, 'required', { what: label }));
   };
 
   require('number', 'The invoice number');
@@ -134,20 +133,20 @@ function checkHeader(d: Bag): Finding[] {
   }
 
   for (const field of DATE_FIELDS) {
-    if (d[field] !== undefined && !isDate(d[field])) findings.push(error(field, 'format', 'Not a valid date. Use YYYY-MM-DD.'));
+    if (d[field] !== undefined && !isDate(d[field])) findings.push(error(field, 'format.date'));
   }
   if (isDate(d.periodStart) && isDate(d.periodEnd) && d.periodEnd < d.periodStart) {
-    findings.push(error('periodEnd', 'period-reversed', 'The service period ends before it starts.'));
+    findings.push(error('periodEnd', 'period-reversed'));
   }
   if (!(d.typeCode in INVOICE_TYPES)) {
-    findings.push(error('typeCode', 'format', `Unknown invoice type. Use one of ${Object.keys(INVOICE_TYPES).join(', ')}.`));
+    findings.push(error('typeCode', 'format.type'));
   }
-  if (!/^[A-Z]{3}$/.test(d.currency)) findings.push(error('currency', 'format', 'Use the three-letter currency code, e.g. EUR.'));
-  if (d.iban !== undefined && !isIban(d.iban)) findings.push(error('iban', 'format', 'The IBAN is not valid (check digits do not match).'));
-  if (d.prepaidAmount !== undefined && !isNumber(d.prepaidAmount)) findings.push(error('prepaidAmount', 'format', 'Not a number.'));
+  if (!/^[A-Z]{3}$/.test(d.currency)) findings.push(error('currency', 'format.currency'));
+  if (d.iban !== undefined && !isIban(d.iban)) findings.push(error('iban', 'format.iban'));
+  if (d.prepaidAmount !== undefined && !isNumber(d.prepaidAmount)) findings.push(error('prepaidAmount', 'format.number'));
 
   if (d.seller.vatId === undefined && d.seller.taxNumber === undefined) {
-    findings.push(error('seller.vatId', 'seller-tax-id', 'The seller needs a VAT ID or a tax number.'));
+    findings.push(error('seller.vatId', 'seller-tax-id'));
   }
   return findings;
 }
@@ -156,7 +155,7 @@ function checkHeader(d: Bag): Finding[] {
 function checkAddress(party: Bag, who: 'seller' | 'buyer'): Finding[] {
   const findings: Finding[] = [];
   if (party.country !== undefined && !/^[A-Z]{2}$/.test(party.country)) {
-    findings.push(error(`${who}.country`, 'format', 'Use the two-letter country code, e.g. DE.'));
+    findings.push(error(`${who}.country`, 'format.country'));
   }
   for (const [field, name] of [
     ['street', 'street'],
@@ -164,7 +163,7 @@ function checkAddress(party: Bag, who: 'seller' | 'buyer'): Finding[] {
     ['city', 'city'],
   ] as const) {
     if (party[field] === undefined) {
-      findings.push(warning(`${who}.${field}`, 'address', `The ${name} of the ${who} is missing. German VAT law (§ 14 UStG) asks for the full address.`));
+      findings.push(warning(`${who}.${field}`, 'address', { part: name, who }));
     }
   }
   return findings;
@@ -176,7 +175,7 @@ function checkAddress(party: Bag, who: 'seller' | 'buyer'): Finding[] {
  */
 function checkLines(d: Bag): { findings: Finding[]; calculable: boolean } {
   const findings: Finding[] = [];
-  if (d.lines.length === 0) findings.push(error('lines', 'required', 'The invoice needs at least one line.'));
+  if (d.lines.length === 0) findings.push(error('lines', 'required.lines'));
   let calculable = d.lines.length > 0 && (d.prepaidAmount === undefined || isNumber(d.prepaidAmount));
   for (const [i, line] of (d.lines as Bag[]).entries()) {
     const checked = checkLine(line, i);
@@ -191,42 +190,42 @@ function checkLine(line: Bag, i: number): { findings: Finding[]; calculable: boo
   const at = (field: string) => `lines.${i}.${field}`;
   const NAMES: Record<string, string> = { quantity: 'quantity', unitPrice: 'unit price', vatRate: 'VAT rate' };
 
-  if (line.name === undefined) findings.push(error(at('name'), 'required', 'The line needs a description.'));
+  if (line.name === undefined) findings.push(error(at('name'), 'required.line-name'));
   for (const field of ['quantity', 'unitPrice', 'vatRate']) {
-    if (line[field] === undefined) findings.push(error(at(field), 'required', `The line needs a ${NAMES[field]}.`));
-    else if (!isNumber(line[field])) findings.push(error(at(field), 'format', 'Not a number.'));
+    if (line[field] === undefined) findings.push(error(at(field), 'required.line-value', { what: NAMES[field]! }));
+    else if (!isNumber(line[field])) findings.push(error(at(field), 'format.number'));
   }
   let calculable = ['quantity', 'unitPrice', 'vatRate'].every((field) => isNumber(line[field]));
   if (line.netAmount !== undefined && !isNumber(line.netAmount)) {
-    findings.push(error(at('netAmount'), 'format', 'Not a number.'));
+    findings.push(error(at('netAmount'), 'format.number'));
     calculable = false;
   }
   const discount = line.discount;
   if (discount !== undefined) {
     if (discount.percent === undefined && discount.amount === undefined) {
-      findings.push(error(at('discount'), 'discount', 'A discount needs a percentage or an amount.'));
+      findings.push(error(at('discount'), 'discount'));
     }
     for (const field of ['percent', 'amount']) {
       if (discount[field] !== undefined && !isNumber(discount[field])) {
-        findings.push(error(at(`discount.${field}`), 'format', 'Not a number.'));
+        findings.push(error(at(`discount.${field}`), 'format.number'));
         calculable = false;
       }
     }
     if (isNumber(discount.percent) && discount.percent < 0) {
-      findings.push(error(at('discount.percent'), 'discount', 'A percentage is never negative; the sign comes from the line.'));
+      findings.push(error(at('discount.percent'), 'discount.negative'));
     }
   }
   if (isNumber(line.unitPrice) && line.unitPrice < 0) {
-    findings.push(error(at('unitPrice'), 'negative-price', 'The unit price must not be negative. Use a negative quantity for credits.'));
+    findings.push(error(at('unitPrice'), 'negative-price'));
   }
   if (!(line.vatCategory in VAT_CATEGORIES)) {
-    findings.push(error(at('vatCategory'), 'format', `Unknown VAT category. Use one of ${Object.keys(VAT_CATEGORIES).join(', ')}.`));
+    findings.push(error(at('vatCategory'), 'format.category'));
   } else if (isNumber(line.vatRate)) {
     if (line.vatCategory === 'S' && line.vatRate <= 0) {
-      findings.push(error(at('vatRate'), 'vat-rate', 'With VAT charged (category S), the rate must be above 0.'));
+      findings.push(error(at('vatRate'), 'vat-rate.standard'));
     }
     if (line.vatCategory !== 'S' && line.vatRate !== 0) {
-      findings.push(error(at('vatRate'), 'vat-rate', `Category ${line.vatCategory} carries no VAT: the rate must be 0.`));
+      findings.push(error(at('vatRate'), 'vat-rate.zero', { category: line.vatCategory }));
     }
   }
   return { findings, calculable };
@@ -250,35 +249,23 @@ function checkVatTreatment(d: Bag, options: CheckOptions): Finding[] {
   // BR-O-11: what is not subject to VAT stands alone on its invoice.
   const odd = taxed.find((item) => (item.category === 'O') !== (taxed[0]?.category === 'O'));
   if (categories.has('O') && odd) {
-    findings.push(
-      error(
-        odd.path,
-        'category-o',
-        'An invoice with something not subject to VAT (category O) cannot also have anything in another VAT category. Issue a separate invoice for one of them, or correct the category.',
-      ),
-    );
+    findings.push(error(odd.path, 'category-o'));
   }
   if (NEEDS_REASON.some((c) => categories.has(c)) && d.vatExemptionReason === undefined) {
-    findings.push(error('vatExemptionReason', 'exemption-reason', 'State why no VAT is charged, as printed on the invoice.'));
+    findings.push(error('vatExemptionReason', 'exemption-reason'));
   }
   if ((categories.has('AE') || categories.has('K')) && d.buyer.vatId === undefined) {
-    findings.push(error('buyer.vatId', 'buyer-vat-id', 'Reverse charge and intra-community supplies need the VAT ID of the buyer.'));
+    findings.push(error('buyer.vatId', 'buyer-vat-id'));
   }
   if (d.deliveryCountry !== undefined && !/^[A-Z]{2}$/.test(d.deliveryCountry)) {
-    findings.push(error('deliveryCountry', 'format', 'Use the two-letter country code, e.g. DE.'));
+    findings.push(error('deliveryCountry', 'format.country'));
   }
   // BR-IC-12 wants the country an intra-community supply went to. As an XRechnung it is refused anyway.
   if (categories.has('K') && d.deliveryCountry === undefined && d.buyer.country !== undefined && options.rules !== 'xrechnung') {
-    findings.push(
-      warning(
-        'deliveryCountry',
-        'delivery-country',
-        `An intra-community supply names the country the goods went to. The country of the buyer (${d.buyer.country}) is written; state the country of delivery if they went elsewhere.`,
-      ),
-    );
+    findings.push(warning('deliveryCountry', 'delivery-country', { country: d.buyer.country }));
   }
   if ((categories.has('K') || categories.has('G')) && d.seller.vatId === undefined && d.seller.taxNumber !== undefined) {
-    findings.push(error('seller.vatId', 'seller-tax-id', 'Intra-community supplies and exports need the VAT ID of the seller.'));
+    findings.push(error('seller.vatId', 'seller-tax-id.export'));
   }
   return findings;
 }
@@ -287,12 +274,10 @@ function checkVatTreatment(d: Bag, options: CheckOptions): Finding[] {
 function checkSupply(d: Bag): Finding[] {
   const findings: Finding[] = [];
   if (d.deliveryDate === undefined && d.periodStart === undefined && d.periodEnd === undefined) {
-    findings.push(
-      warning('deliveryDate', 'delivery-date', 'The date of supply is missing. German invoices must state it, even if it equals the invoice date.'),
-    );
+    findings.push(warning('deliveryDate', 'delivery-date'));
   }
   if (['381', '384'].includes(d.typeCode) && d.precedingInvoiceNumber === undefined) {
-    findings.push(warning('precedingInvoiceNumber', 'preceding-invoice', 'A correction or credit note should name the invoice it refers to.'));
+    findings.push(warning('precedingInvoiceNumber', 'preceding-invoice'));
   }
   return findings;
 }
@@ -301,7 +286,7 @@ function checkSupply(d: Bag): Finding[] {
 function checkTotals(d: Bag, totals: Totals, options: CheckOptions): Finding[] {
   const findings: Finding[] = [];
   if (totals.due > 0 && d.dueDate === undefined && d.paymentTerms === undefined) {
-    findings.push(error('dueDate', 'payment-terms', 'An invoice with an amount due needs a due date or payment terms.'));
+    findings.push(error('dueDate', 'payment-terms'));
   }
   for (const [i, line] of (d.lines as Bag[]).entries()) findings.push(...checkLineTotal(line, i, d.currency, totals, options));
   findings.push(...checkPrintedTotals(d, totals));
@@ -322,20 +307,15 @@ function checkLineTotal(line: Bag, i: number, currency: string, totals: Totals, 
     const { amount } = discount;
     if (percent !== undefined && !percentAgrees(discount.base, percent, amount, slack)) {
       findings.push(
-        error(
-          `lines.${i}.discount.amount`,
-          'discount-mismatch',
-          `${percent} % of ${discount.base.toFixed(2)} is ${percentOf(discount.base, percent).toFixed(2)}, but the discount states ${amount.toFixed(2)}. Correct the percentage or the amount.`,
-        ),
+        error(`lines.${i}.discount.amount`, 'discount-mismatch', {
+          percent,
+          base: discount.base.toFixed(2),
+          expected: percentOf(discount.base, percent).toFixed(2),
+          stated: amount.toFixed(2),
+        }),
       );
     } else if (percent === undefined && discount.base !== 0 && amount !== 0 && Math.sign(discount.base) !== Math.sign(amount)) {
-      findings.push(
-        warning(
-          `lines.${i}.discount.amount`,
-          'discount-sign',
-          'The discount and its line have different signs. On a line with a negative amount the discount is negative too: -10 for 10 off.',
-        ),
-      );
+      findings.push(warning(`lines.${i}.discount.amount`, 'discount-sign'));
     }
   }
 
@@ -346,21 +326,9 @@ function checkLineTotal(line: Bag, i: number, currency: string, totals: Totals, 
   const expected = (lineBase(line.quantity, line.unitPrice) - (discount?.amount ?? 0)).toFixed(2);
   const stated = totals.lineNet[i]!.toFixed(2);
   if (!options.adjustedLines) {
-    findings.push(
-      error(
-        `lines.${i}.netAmount`,
-        'line-net',
-        `Quantity times unit price${discount ? ' less the discount' : ''} is ${expected}, but the line states ${stated}. Correct the quantity, the price or the discount.`,
-      ),
-    );
+    findings.push(error(`lines.${i}.netAmount`, 'line-net', { discounted: Boolean(discount), expected, stated }));
   } else if (!options.adjustedLines.includes(i)) {
-    findings.push(
-      warning(
-        `lines.${i}.netAmount`,
-        'line-net',
-        `The XML states ${stated} as the total of this line, but its quantity times its price${discount ? ' less its discount' : ''} is ${expected}, and it names nothing else on the line that explains the difference.`,
-      ),
-    );
+    findings.push(warning(`lines.${i}.netAmount`, 'line-net.xml', { discounted: Boolean(discount), expected, stated }));
   }
   return findings;
 }
@@ -371,14 +339,14 @@ function checkPrintedTotals(d: Bag, totals: Totals): Finding[] {
   for (const key of ['net', 'vat', 'gross', 'due'] as const) {
     const printed = d.totals?.[key];
     if (printed === undefined) continue;
-    if (!isNumber(printed)) findings.push(error(`totals.${key}`, 'format', 'Not a number.'));
+    if (!isNumber(printed)) findings.push(error(`totals.${key}`, 'format.number'));
     else if (Math.round(printed * 100) !== Math.round(totals[key] * 100)) {
       findings.push(
-        error(
-          `totals.${key}`,
-          'totals-mismatch',
-          `The PDF says ${printed.toFixed(2)}, the lines${totals.adjustments.length ? ' with the discounts and charges' : ''} add up to ${totals[key].toFixed(2)}. The e-invoice must not contradict the PDF: check quantities and prices, and enter any discounts or charges on the whole invoice the PDF states.`,
-        ),
+        error(`totals.${key}`, 'totals-mismatch', {
+          printed: printed.toFixed(2),
+          calculated: totals[key].toFixed(2),
+          adjusted: totals.adjustments.length > 0,
+        }),
       );
     }
   }
@@ -396,62 +364,38 @@ const SKONTO = /^#SKONTO#TAGE=\d+#PROZENT=\d+\.\d{2}(#BASISBETRAG=-?\d+\.\d{2})?
  */
 function xrechnungFindings(d: Bag): Finding[] {
   const findings: Finding[] = [];
-  const add = (severity: Finding['severity'], path: string, code: string, message: string) =>
-    findings.push({ path, severity, code: `xrechnung-${code}`, message });
-  const need = (path: string, code: string, message: string) => {
-    if (valueAt(d, path) === undefined) add('error', path, code, message);
+  const need = <K extends MessageKey>(path: string, key: K, ...params: MessageParams<K>) => {
+    if (valueAt(d, path) === undefined) findings.push(error(path, key, ...params));
   };
 
   // BR-DE-15
-  need(
-    'buyerReference',
-    'buyer-reference',
-    'XRechnung needs the buyer reference: for a German public body its Leitweg-ID, which the buyer names, usually with the order.',
-  );
+  need('buyerReference', 'xrechnung-buyer-reference');
   // BR-DE-2, BR-DE-5
-  need('seller.contactName', 'seller-contact', 'XRechnung needs a contact at the seller: the person or department the buyer can ask about the invoice.');
+  need('seller.contactName', 'xrechnung-seller-contact');
   // BR-DE-6
-  need('seller.phone', 'seller-phone', 'XRechnung needs the phone number of the contact at the seller.');
+  need('seller.phone', 'xrechnung-seller-phone');
   // BR-DE-7 for the contact, PEPPOL-EN16931-R020 for the electronic address: both are this one e-mail address.
-  need(
-    'seller.email',
-    'seller-email',
-    'XRechnung needs the e-mail address of the seller. It is written as the address of the contact and as the electronic address of the seller.',
-  );
+  need('seller.email', 'xrechnung-seller-email');
   // PEPPOL-EN16931-R010
-  need(
-    'buyer.email',
-    'buyer-email',
-    'XRechnung needs an electronic address of the buyer, and this tool writes the e-mail address there. Ask the buyer where invoices are to be sent.',
-  );
+  need('buyer.email', 'xrechnung-buyer-email');
   // BR-DE-3, BR-DE-4, BR-DE-8, BR-DE-9
   for (const who of ['seller', 'buyer']) {
-    need(`${who}.city`, 'address', `XRechnung needs the city of the ${who}.`);
-    need(`${who}.postalCode`, 'address', `XRechnung needs the postal code of the ${who}.`);
+    need(`${who}.city`, 'xrechnung-address.city', { who });
+    need(`${who}.postalCode`, 'xrechnung-address.postal-code', { who });
   }
 
   // BR-DE-18. The validator also wants a line break right after the last "#...#" of the text; `toUbl` ends the text with one.
   if (typeof d.paymentTerms === 'string') {
     const marked = d.paymentTerms.split(/\r?\n/).filter((line: string) => line.trim().startsWith('#'));
     if (marked.some((line: string) => !SKONTO.test(line.trim())) || (marked.length > 0 && !/^\s*\n/.test(`${d.paymentTerms}\n`.split(/#.+#/).at(-1)!))) {
-      add(
-        'error',
-        'paymentTerms',
-        'payment-terms',
-        'XRechnung reads a line of the payment terms that starts with # as a cash discount, which has to be written exactly like #SKONTO#TAGE=14#PROZENT=2.00# on a line of its own (days, then percent with two decimals). Write the line that way, or do not start it with #.',
-      );
+      findings.push(error('paymentTerms', 'xrechnung-payment-terms'));
     }
   }
 
   // A place of delivery needs its city and postal code in an XRechnung (BR-DE-10, BR-DE-11), which the data cannot hold.
   // A country alone would be left out of the XML without a word, so it is refused.
   if (d.deliveryCountry !== undefined) {
-    add(
-      'error',
-      'deliveryCountry',
-      'delivery-address',
-      'XRechnung takes a place of delivery with its city and postal code only, which this tool cannot state yet. Leave the country of delivery empty.',
-    );
+    findings.push(error('deliveryCountry', 'xrechnung-delivery-address'));
   }
 
   // BR-IC-12 asks for the country of delivery of an intra-community supply, and BR-DE-10 and BR-DE-11 then for its city and postal code.
@@ -461,30 +405,20 @@ function xrechnungFindings(d: Bag): Finding[] {
     ...(['discounts', 'charges'] as const).flatMap((list) => (Array.isArray(d[list]) ? d[list] : []).map((e: Bag, i: number) => [`${list}.${i}`, e] as const)),
   ].find(([, item]) => item?.vatCategory === 'K');
   if (intraCommunity) {
-    add(
-      'error',
-      `${intraCommunity[0]}.vatCategory`,
-      'delivery-address',
-      'An intra-community supply cannot be written as XRechnung yet: XRechnung then asks for the city and postal code of the place of delivery, and the invoice data has no field for them.',
-    );
+    findings.push(error(`${intraCommunity[0]}.vatCategory`, 'xrechnung-delivery-address.intra-community'));
   }
 
   // BR-DE-17: of the types this tool knows, the prepayment invoice is the one XRechnung does not list.
   if (d.typeCode === '386') {
-    add(
-      'warning',
-      'typeCode',
-      'type-code',
-      'XRechnung does not list the prepayment invoice (type 386) among its invoice types. A recipient may not accept it.',
-    );
+    findings.push(warning('typeCode', 'xrechnung-type-code'));
   }
   // BR-DE-27
   if (typeof d.seller.phone === 'string' && (d.seller.phone.match(/\d/g) ?? []).length < 3) {
-    add('warning', 'seller.phone', 'phone', 'XRechnung expects a phone number here, with three digits at least.');
+    findings.push(warning('seller.phone', 'xrechnung-phone'));
   }
   // BR-DE-28
   if (typeof d.seller.email === 'string' && !/^[^@\s]+@([^@.\s]+\.)+[^@.\s]+$/.test(d.seller.email)) {
-    add('warning', 'seller.email', 'email', 'XRechnung expects an e-mail address of the form name@example.org here.');
+    findings.push(warning('seller.email', 'xrechnung-email'));
   }
   return findings;
 }
@@ -559,19 +493,12 @@ export function percentSpellings(p: number): string[] {
 function compareWithPdf(d: Bag, totals: Totals | undefined, pdfText: string, percentages: Record<string, number> = {}): Finding[] {
   const haystack = pdfText.replace(/\s+/g, '').toLowerCase();
   if (!haystack) {
-    return [
-      {
-        path: '',
-        severity: 'warning',
-        code: 'no-pdf-text',
-        message: 'The PDF contains no text (it may be a scan), so the data could not be compared with it. Check every value by eye.',
-      },
-    ];
+    return [warning('', 'no-pdf-text')];
   }
   const findings: Finding[] = [];
   const expect = (path: string, spellings: string[], shown: unknown) => {
     if (!spellings.some((s) => haystack.includes(s.replace(/\s+/g, '').toLowerCase()))) {
-      findings.push({ path, severity: 'warning', code: 'not-in-pdf', message: `"${shown}" does not appear in the PDF. Please check it.` });
+      findings.push(warning(path, 'not-in-pdf', { value: String(shown) }));
     }
   };
   const get = (path: string) => valueAt(d, path);

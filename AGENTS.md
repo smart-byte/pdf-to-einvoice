@@ -32,7 +32,8 @@ A change is done when `npm test`, `npm run type-check`, `npm run lint` and `npm 
 | path                 | what it holds                                                                                      | imports          |
 | -------------------- | -------------------------------------------------------------------------------------------------- | ---------------- |
 | `src/domain/`        | the data model and its JSON Schema (`model.ts`), totals in exact cents (`calculate.ts`), the rules | nothing else     |
-|                      | the data has to meet (`check.ts`), and `Finding`, what all of them report (`finding.ts`)           |                  |
+|                      | the data has to meet (`check.ts`), `Finding`, what all of them report (`finding.ts`), and the      |                  |
+|                      | English text of every finding (`messages.ts`)                                                      |                  |
 | `src/pdf/`           | text and layout of a PDF (`text.ts`), its structure, embedded XML and PDF/A repair (`file.ts`)     | nothing else     |
 | `src/extract/`       | reading an invoice from the text without a model (`guess.ts`, parts in `guess/`), dropping         | domain           |
 |                      | what a language model returned but the PDF does not show (`ground.ts`)                             |                  |
@@ -57,6 +58,9 @@ A change is done when `npm test`, `npm run type-check`, `npm run lint` and `npm 
   missing one.
 - A change to how files are written comes with `npm run test:reference`.
 - A change to the website comes with `npm run test:browser`; a new flow gets a test in `test/site/browser.test.ts`.
+- A finding gets its code and its English text from `src/domain/messages.ts`, through `error()` and `warning()` of
+  `src/domain/finding.ts`. A new code needs a German text in `site/shared/i18n.ts`; `test/site/i18n.test.ts` says
+  which.
 - Money is calculated in whole cents (`src/domain/calculate.ts`), never in floating point euros.
 - The website makes no request to a third party except the model download the user asks for. No scripts, styles or
   fonts from another origin, in any build. One further request exists, to the page counter of the project
