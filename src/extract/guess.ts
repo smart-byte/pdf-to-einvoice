@@ -16,71 +16,84 @@ import { after, anyOf, DATE, findIban, SEPARATOR, toIsoDate, vatIdsIn } from './
 // stays unread: less, never something invented. Ceiling: labels are still words, and a name is believed as printed;
 // add words here before reaching for anything smarter.
 
-const GERMAN_WORDS = new RegExp(
-  `\\b(${[
-    'rechnung\\w*',
-    'mwst',
-    'ust',
-    'umsatzsteuer',
-    'mehrwertsteuer',
-    'netto',
-    'brutto',
-    'gesamt\\w*',
-    'betrag',
-    'datum',
-    'menge',
-    'zahlbar',
-    'leistung\\w*',
-    'lieferung',
-  ].join('|')})\\b`,
-  'gi',
-);
-const ENGLISH_WORDS = /\b(invoice|vat|tax|subtotal|total|amount|date|quantity|payable|payment|due|delivery)\b/gi;
-
-const ISSUE_DATE_LABEL = new RegExp(
-  anyOf(
-    /rechnungs-?datum/,
-    /belegdatum/,
-    /invoice\s+date/,
-    /date\s+of\s+issue/,
-    /issue\s+date/,
-    /date\s+de\s+(?:la\s+)?facture/,
-    /date\s+d['’]émission/,
-  ),
-);
-const DELIVERY_DATE_LABEL = new RegExp(
-  anyOf(/leistungsdatum/, /lieferdatum/, /date\s+of\s+(?:supply|delivery)/, /delivery\s+date/, /service\s+date/),
-);
-const DUE_DATE_LABEL = new RegExp(
-  anyOf(
-    /fällig(?:keit(?:s(?:datum|tag|termin))?|\s+am|\s+bis)?/,
-    /zahlbar\s+bis/,
-    /due(?:\s+date|\s+by|\s+on)?/,
-    /payable\s+by/,
-    /date\s+d['’]échéance/,
-  ),
-);
-
-/** The language an invoice is written in, judged by the words invoices use. English when nothing tells. */
-export function languageOf(text: string): 'de' | 'en' {
-  return (text.match(GERMAN_WORDS)?.length ?? 0) > (text.match(ENGLISH_WORDS)?.length ?? 0) ? 'de' : 'en';
-}
-
-/** Removes undefined values and objects that end up empty. */
-function prune<T extends object>(object: T): T {
-  if (Array.isArray(object)) return object.map((item) => prune(item)) as T;
-  const entries = Object.entries(object)
-    .map(([k, v]) => [k, v && typeof v === 'object' ? prune(v) : v] as const)
-    .filter(
-      ([, v]) =>
-        v !== undefined && !(typeof v === 'object' && !Array.isArray(v) && Object.keys(v as object).length === 0),
-    );
-  return Object.fromEntries(entries) as T;
-}
-
 export interface GuessOptions {
   /** The blocks of the page as extractLayout() returns them. With them, an address is read even where rows mix it with the column beside it. */
   blocks?: string[][];
+}
+
+/**
+ * Reads an invoice from its text without any model: values that fit together, wherever the layout puts them. A
+ * starting point for review, not a result: check every value.
+ */
+export function guessFromText(text: string, options: GuessOptions = {}): InvoiceDraft {
+  const rows = text.split('\n');
+  // Labels are looked up in the rows first, then in the blocks, where a value stands below its label.
+  const searched = [text, ...(options.blocks ?? []).map((block) => block.join('\n'))].join('\n\n');
+
+  const found = readParties(rows, options.blocks ?? [rows.map((row) => cells(row)[0]!)]);
+  const totals = readTotals(searched, text);
+  const lines = readItems(rows, totals, options.blocks);
+  const { seller, buyer } = partiesOf({ rows, searched, blocks: options.blocks }, found, lines);
+
+  // An invoice that shows no VAT at all charges none.
+  const { vatCategory, reason } = lines
+    ? withoutVat(rows, totals, lines, { seller: seller.country, buyer: buyer.country })
+    : {};
+  if (lines && vatCategory) for (const line of lines) Object.assign(line, { vatCategory, vatRate: 0 });
+
+  const { number, dated, beside } = readNumber(searched, rows);
+  const iban = findIban(text);
+  const contact = readContact(searched, options.blocks !== undefined, found);
+  return prune({
+    number,
+    typeCode: readType(rows),
+    buyerReference: readBuyerReference(searched),
+    issueDate: dateAfter(searched, ISSUE_DATE_LABEL) ?? dated ?? dateAfter(searched, ANY_DATE_LABEL) ?? beside,
+    deliveryDate: dateAfter(searched, DELIVERY_DATE_LABEL),
+    ...readPeriod(searched, rows),
+    dueDate: dateAfter(searched, DUE_DATE_LABEL),
+    paymentTerms: readPaymentTerms(rows),
+    currency: findCurrency(text),
+    iban,
+    // A BIC belongs to an IBAN; with another kind of account it has no place in the invoice data.
+    bic: iban ? firstAfter(searched, BIC_LABEL, BIC_VALUE) : undefined,
+    vatExemptionReason: reason,
+    seller: {
+      ...seller,
+      taxNumber: firstAfter(searched, TAX_NUMBER_LABEL, TAX_NUMBER),
+      ...contact.seller,
+      // A contact named by its label counts before the person an address names in its second line.
+      contactName: contact.seller.contactName ?? seller.contactName,
+    },
+    buyer: { ...buyer, ...contact.buyer },
+    lines,
+    totals,
+  });
+}
+
+/** The text of the page: its rows, what labels are looked up in, and its blocks where the layout gives them. */
+interface Page {
+  rows: string[];
+  searched: string;
+  blocks?: string[][];
+}
+
+/** Seller and buyer as their addresses give them, with their VAT IDs, and their countries where those tell them. */
+function partiesOf(
+  { rows, searched, blocks }: Page,
+  found: { seller?: Found; buyer?: Found },
+  lines: Partial<Line>[] | undefined,
+): { seller: Partial<Party>; buyer: Partial<Party> } {
+  const units = [...rows, ...(blocks ?? []).map((block) => block.join('   '))];
+  const vatIds = vatIdsOf(searched, units, found);
+  const buyer: Partial<Party> = { ...believed(found.buyer), vatId: vatIds.buyer };
+  const seller: Partial<Party> = { ...believed(found.seller), vatId: vatIds.seller };
+  seller.country ??= countryOfVatId(seller.vatId);
+  // An address without a country is at home when VAT is charged: that is the ordinary domestic invoice.
+  buyer.country ??=
+    countryOfVatId(buyer.vatId) ??
+    (buyer.postalCode && lines?.some((line) => (line.vatRate ?? 0) > 0) ? seller.country : undefined);
+  return { seller, buyer };
 }
 
 /**
@@ -127,69 +140,88 @@ function categoryByCountry(seller: string | undefined, buyer: string | undefined
   return buyer === seller ? 'E' : 'AE';
 }
 
-/**
- * Reads an invoice from its text without any model: values that fit together, wherever the layout puts them. A
- * starting point for review, not a result: check every value.
- */
-export function guessFromText(text: string, options: GuessOptions = {}): InvoiceDraft {
-  const rows = text.split('\n');
-  // Labels are looked up in the rows first, then in the blocks, where a value stands below its label.
-  const searched = [text, ...(options.blocks ?? []).map((block) => block.join('\n'))].join('\n\n');
-  const date = (label: RegExp) =>
-    after(searched, label, DATE)
-      .map(({ hit, label: found }) => toIsoDate(hit, /datum|fällig|zahlbar|facture|échéance/i.test(found)))
-      .find(Boolean);
-  const first = (label: RegExp, value: RegExp) => after(searched, label, value)[0]?.hit[1];
-
-  const found = readParties(rows, options.blocks ?? [rows.map((row) => cells(row)[0]!)]);
-  const totals = readTotals(searched, text);
-  const lines = readItems(rows, totals, options.blocks);
-
-  const units = [...rows, ...(options.blocks ?? []).map((block) => block.join('   '))];
-  const vatIds = vatIdsOf(searched, units, found);
-  const buyer: Partial<Party> = { ...believed(found.buyer), vatId: vatIds.buyer };
-  const seller: Partial<Party> = { ...believed(found.seller), vatId: vatIds.seller };
-  seller.country ??= countryOfVatId(seller.vatId);
-  // An address without a country is at home when VAT is charged: that is the ordinary domestic invoice.
-  buyer.country ??=
-    countryOfVatId(buyer.vatId) ??
-    (buyer.postalCode && lines?.some((line) => (line.vatRate ?? 0) > 0) ? seller.country : undefined);
-
-  // An invoice that shows no VAT at all charges none.
-  const { vatCategory, reason } = lines
-    ? withoutVat(rows, totals, lines, { seller: seller.country, buyer: buyer.country })
-    : {};
-  if (lines && vatCategory) for (const line of lines) Object.assign(line, { vatCategory, vatRate: 0 });
-
-  const { number, dated, beside } = readNumber(searched, rows);
-  const iban = findIban(text);
-  const contact = readContact(searched, options.blocks !== undefined, found);
-  return prune({
-    number,
-    typeCode: readType(rows),
-    buyerReference: readBuyerReference(searched),
-    issueDate: date(ISSUE_DATE_LABEL) ?? dated ?? date(/(?<![a-zäöü-])datum|(?<![a-z] ?)date/) ?? beside,
-    deliveryDate: date(DELIVERY_DATE_LABEL),
-    ...readPeriod(searched, rows),
-    dueDate: date(DUE_DATE_LABEL),
-    paymentTerms: readPaymentTerms(rows),
-    currency: findCurrency(text),
-    iban,
-    // A BIC belongs to an IBAN; with another kind of account it has no place in the invoice data.
-    bic: iban ? first(/\b(?:bic|swift)(?:[-/ ]?code)?/, new RegExp(`${SEPARATOR}(${BIC.source})\\b`)) : undefined,
-    vatExemptionReason: reason,
-    seller: {
-      ...seller,
-      taxNumber: first(
-        /steuernummer|steuer-?nr\.?|st\.?-?nr\.?|tax\s+(?:number|no\.?)/,
-        new RegExp(`${SEPARATOR}(\\d{2,3}/\\d{3,4}/\\d{4,5}|\\d{10,13})`),
-      ),
-      ...contact.seller,
-      // A contact named by its label counts before the person an address names in its second line.
-      contactName: contact.seller.contactName ?? seller.contactName,
-    },
-    buyer: { ...buyer, ...contact.buyer },
-    lines,
-    totals,
-  });
+/** The first date after a label. A German or French label says the day comes first in "08/10/2026". */
+function dateAfter(searched: string, label: RegExp): string | undefined {
+  return after(searched, label, DATE)
+    .map(({ hit, label: found }) => toIsoDate(hit, DAY_FIRST.test(found)))
+    .find(Boolean);
 }
+
+/** What the first match of `value` after a label captures. */
+function firstAfter(searched: string, label: RegExp, value: RegExp): string | undefined {
+  return after(searched, label, value)[0]?.hit[1];
+}
+
+/** Removes undefined values and objects that end up empty. */
+function prune<T extends object>(object: T): T {
+  if (Array.isArray(object)) return object.map((item) => prune(item)) as T;
+  const entries = Object.entries(object)
+    .map(([k, v]) => [k, v && typeof v === 'object' ? prune(v) : v] as const)
+    .filter(
+      ([, v]) =>
+        v !== undefined && !(typeof v === 'object' && !Array.isArray(v) && Object.keys(v as object).length === 0),
+    );
+  return Object.fromEntries(entries) as T;
+}
+
+/** The language an invoice is written in, judged by the words invoices use. English when nothing tells. */
+export function languageOf(text: string): 'de' | 'en' {
+  return (text.match(GERMAN_WORDS)?.length ?? 0) > (text.match(ENGLISH_WORDS)?.length ?? 0) ? 'de' : 'en';
+}
+
+// What the page is searched for. The functions above use these patterns only when a page is read, so they may stand
+// below them.
+
+const ISSUE_DATE_LABEL = new RegExp(
+  anyOf(
+    /rechnungs-?datum/,
+    /belegdatum/,
+    /invoice\s+date/,
+    /date\s+of\s+issue/,
+    /issue\s+date/,
+    /date\s+de\s+(?:la\s+)?facture/,
+    /date\s+d['’]émission/,
+  ),
+);
+/** Any other date: "Datum", "Date", but not "Lieferdatum", "Due date" or "Update". */
+const ANY_DATE_LABEL = /(?<![a-zäöü-])datum|(?<![a-z] ?)date/;
+const DELIVERY_DATE_LABEL = new RegExp(
+  anyOf(/leistungsdatum/, /lieferdatum/, /date\s+of\s+(?:supply|delivery)/, /delivery\s+date/, /service\s+date/),
+);
+const DUE_DATE_LABEL = new RegExp(
+  anyOf(
+    /fällig(?:keit(?:s(?:datum|tag|termin))?|\s+am|\s+bis)?/,
+    /zahlbar\s+bis/,
+    /due(?:\s+date|\s+by|\s+on)?/,
+    /payable\s+by/,
+    /date\s+d['’]échéance/,
+  ),
+);
+/** Labels written where the day comes first. */
+const DAY_FIRST = /datum|fällig|zahlbar|facture|échéance/i;
+
+const BIC_LABEL = /\b(?:bic|swift)(?:[-/ ]?code)?/;
+const BIC_VALUE = new RegExp(`${SEPARATOR}(${BIC.source})\\b`);
+const TAX_NUMBER_LABEL = /steuernummer|steuer-?nr\.?|st\.?-?nr\.?|tax\s+(?:number|no\.?)/;
+const TAX_NUMBER = new RegExp(`${SEPARATOR}(\\d{2,3}/\\d{3,4}/\\d{4,5}|\\d{10,13})`);
+
+const GERMAN_WORDS = new RegExp(
+  `\\b(${[
+    'rechnung\\w*',
+    'mwst',
+    'ust',
+    'umsatzsteuer',
+    'mehrwertsteuer',
+    'netto',
+    'brutto',
+    'gesamt\\w*',
+    'betrag',
+    'datum',
+    'menge',
+    'zahlbar',
+    'leistung\\w*',
+    'lieferung',
+  ].join('|')})\\b`,
+  'gi',
+);
+const ENGLISH_WORDS = /\b(invoice|vat|tax|subtotal|total|amount|date|quantity|payable|payment|due|delivery)\b/gi;
