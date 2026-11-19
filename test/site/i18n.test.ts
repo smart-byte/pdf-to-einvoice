@@ -60,6 +60,17 @@ describe('German texts', () => {
     expect([...libraryCodes()].filter((code) => !STRINGS[`e.${code}`]?.de)).toEqual([]);
     vi.unstubAllGlobals();
   });
+
+  it('still reads every code it has a German text for', async () => {
+    // A code whose message is no longer written right behind it, but in a variable, escapes `libraryCodes`: its German
+    // text would then go unchecked without a word.
+    vi.stubGlobal('location', new URL('https://pdf-to-einvoice.app/'));
+    const { STRINGS } = await import('../../site/i18n.js');
+    // A text may have variants, `e.format.country` beside `e.format`: the code is what stands before them.
+    const translated = new Set(Object.keys(STRINGS).flatMap((key) => (key.startsWith('e.') ? [key.split('.')[1]!] : [])));
+    expect([...translated].filter((code) => !libraryCodes().has(code))).toEqual([]);
+    vi.unstubAllGlobals();
+  });
 });
 
 describe('Footer', () => {

@@ -211,6 +211,22 @@ describe('discounts and charges on the whole invoice', () => {
     expect(() => calculate(invoice(mixed, { discounts: [{ amount: 10 }] }))).toThrow(/several VAT/);
   });
 
+  it('refuses a negative VAT rate, and reports every fault of an entry in the order of its fields', () => {
+    expect(problems([line()], { discounts: [{ amount: 5, vatRate: -19 }] })).toEqual([{ path: 'discounts.0.vatRate', code: 'vat-rate', severity: 'error' }]);
+    expect(problems([line()], { charges: [{ percent: -5, vatRate: 'x' as unknown as number }] })).toEqual([
+      { path: 'charges.0.vatRate', code: 'format', severity: 'error' },
+      { path: 'charges.0.percent', code: 'adjustment', severity: 'error' },
+      { path: 'charges.0.reason', code: 'charge-reason', severity: 'error' },
+    ]);
+  });
+
+  it('without the lines checks each entry by itself and places none', () => {
+    const t = resolveAdjustments(invoice(mixed, { discounts: [{ amount: 10 }, { percent: -1 }] }), false);
+    expect(t).toMatchObject({ adjustments: [], resolved: false });
+    expect(t.problems.map(({ path, code }) => `${path} ${code}`)).toEqual(['discounts.1.percent adjustment']);
+    expect(resolveAdjustments(invoice(mixed), false)).toEqual({ adjustments: [], problems: [], resolved: false });
+  });
+
   it('warns about an amount against the sign of its lines, but not in a group of its own', () => {
     const t = resolveAdjustments(invoice([line()], { discounts: [{ amount: -10 }] }));
     expect(t.problems).toMatchObject([{ path: 'discounts.0.amount', code: 'adjustment-sign', severity: 'warning' }]);

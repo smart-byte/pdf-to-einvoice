@@ -96,147 +96,251 @@ function linesInCents(lines: Line[]) {
 
 type Entry = Omit<Adjustment, 'amount' | 'base'> & { cents: bigint; base?: bigint };
 type Adjustable = Pick<Invoice, 'lines' | 'discounts' | 'charges' | 'currency'>;
+type List = Adjustment['list'];
+
+/** The lines of one VAT category and rate, summed. */
+interface Group {
+  category: VatCategory;
+  rate: number;
+  cents: bigint;
+}
+
+/**
+ * A discount or charge whose fields are all usable. It states a percentage, an amount, or both: a percentage alone, an
+ * amount alone, or a percentage with the amount it comes to.
+ */
+type Checked = ({ percent: number; amount?: number } | { percent?: undefined; amount: number }) & {
+  list: List;
+  index: number;
+  /** The category it states; a rate above 0 alone means S. */
+  category?: VatCategory;
+  /** The rate of the group it goes into: 0 for every category but S, otherwise the rate it states. */
+  rate?: number;
+  /** The rate as given, which tells where a problem is reported. */
+  vatRate?: number;
+  reason?: string;
+};
+
+/** What placing one entry into the VAT groups gave: its parts, and whether it found a group at all. */
+interface Placed {
+  entries: Entry[];
+  problems: Finding[];
+  placed: boolean;
+}
+
+const LISTS = ['discounts', 'charges'] as const;
+const WHAT = { discounts: 'discount', charges: 'charge' } as const;
+
+const problem = (severity: Finding['severity'], path: string, code: string, message: string): Finding => ({ path, severity, code, message });
+const pathOf = (list: List, index: number, field?: string) => (field ? `${list}.${index}.${field}` : `${list}.${index}`);
+
+/** The lines summed by VAT category and rate, in the order the groups first appear. */
+function groupLines(lines: Line[], lineCents: bigint[]): Group[] {
+  const groups = new Map<string, Group>();
+  lines.forEach((l, i) => {
+    const key = `${l.vatCategory}|${l.vatRate}`;
+    const group = groups.get(key) ?? { category: l.vatCategory, rate: l.vatRate, cents: 0n };
+    group.cents += lineCents[i]!;
+    groups.set(key, group);
+  });
+  return [...groups.values()];
+}
+
+/**
+ * What one entry needs by itself, without the lines: numbers that are numbers, a percentage or an amount, a VAT
+ * category and rate that fit together. `checked` is missing where a field cannot be used. A charge without its reason
+ * is reported, but can still be placed.
+ */
+function checkEntry(raw: unknown, list: List, index: number): { checked?: Checked; problems: Finding[] } {
+  const what = WHAT[list];
+  const at = (field?: string) => pathOf(list, index, field);
+  const e: Record<string, any> = raw && typeof raw === 'object' ? raw : {};
+  const problems: Finding[] = [];
+  let usable = true;
+  const refuse = (path: string, code: string, message: string) => {
+    problems.push(problem('error', path, code, message));
+    usable = false;
+  };
+
+  for (const field of ['percent', 'amount', 'vatRate']) {
+    if (e[field] !== undefined && !isNumber(e[field])) refuse(at(field), 'format', 'Not a number.');
+  }
+  if (e.percent === undefined && e.amount === undefined) refuse(at(), 'adjustment', `A ${what} needs a percentage or an amount.`);
+  if (isNumber(e.percent) && e.percent < 0) refuse(at('percent'), 'adjustment', 'A percentage is never negative; the sign comes from the lines.');
+  if (list === 'charges' && e.reason === undefined) {
+    problems.push(problem('error', at('reason'), 'charge-reason', 'A charge needs its reason as printed, e.g. freight.'));
+  }
+
+  let category: VatCategory | undefined = e.vatCategory;
+  if (category !== undefined && !(category in VAT_CATEGORIES)) {
+    refuse(at('vatCategory'), 'format', `Unknown VAT category. Use one of ${Object.keys(VAT_CATEGORIES).join(', ')}.`);
+  } else if (isNumber(e.vatRate)) {
+    if (category === undefined && e.vatRate > 0) category = 'S';
+    if (e.vatRate < 0) refuse(at('vatRate'), 'vat-rate', 'A VAT rate is never negative.');
+    else if (category === 'S' && e.vatRate === 0) refuse(at('vatRate'), 'vat-rate', 'With VAT charged (category S), the rate must be above 0.');
+    else if (category !== undefined && category !== 'S' && e.vatRate !== 0)
+      refuse(at('vatRate'), 'vat-rate', `Category ${category} carries no VAT: the rate must be 0.`);
+  }
+  if (!usable) return { problems };
+
+  const rate: number | undefined = category !== undefined && category !== 'S' ? 0 : e.vatRate;
+  const checked = { list, index, category, rate, vatRate: e.vatRate, percent: e.percent, amount: e.amount, reason: e.reason } as Checked;
+  return { checked, problems };
+}
+
+/**
+ * A percentage, taken of every group that matches, each rounded to the cent. An amount beside it counts on one group
+ * if it is within R040, and has to be the sum of the rounded group amounts on several.
+ */
+function placePercent(entry: Checked & { percent: number }, matching: Group[], named: string, slack: number): Placed {
+  const { list, index, percent } = entry;
+  const what = WHAT[list];
+  const at = (field?: string) => pathOf(list, index, field);
+  if (!matching.length) {
+    return {
+      entries: [],
+      problems: [
+        problem(
+          'error',
+          at(entry.vatRate !== undefined ? 'vatRate' : 'vatCategory'),
+          'adjustment-group',
+          `No line is in the VAT group ${named}, so the percentage has nothing to be taken of. Correct the VAT category or rate, or leave both out to take it of all lines.`,
+        ),
+      ],
+      placed: false,
+    };
+  }
+
+  const problems: Finding[] = [];
+  const parts = matching.map((g) => ({ g, cents: percentCents(g.cents, percent) }));
+  if (entry.amount !== undefined) {
+    const stated = toCents(entry.amount);
+    if (parts.length === 1) {
+      const part = parts[0]!;
+      if (!percentAgrees(fromCents(part.g.cents), percent, fromCents(stated), slack)) {
+        problems.push(
+          problem(
+            'error',
+            at('amount'),
+            'adjustment-mismatch',
+            `${percent} % of ${money(part.g.cents)} is ${money(part.cents)}, but the ${what} states ${money(stated)}. Correct the percentage or the amount.`,
+          ),
+        );
+      }
+      // The stated amount is the one written, as on a line.
+      part.cents = stated;
+    } else {
+      const sum = parts.reduce((a, p) => a + p.cents, 0n);
+      if (sum !== stated) {
+        problems.push(
+          problem(
+            'error',
+            at('amount'),
+            'adjustment-mismatch',
+            `${percent} % of the lines comes to ${parts.map((p) => money(p.cents)).join(' + ')} = ${money(sum)} by VAT rate, but the ${what} states ${money(stated)}. Correct the percentage or the amount; an amount is not split between VAT rates.`,
+          ),
+        );
+      }
+    }
+  }
+  const entries = parts.map((p) => ({ list, index, category: p.g.category, rate: p.g.rate, cents: p.cents, base: p.g.cents, percent, reason: entry.reason }));
+  return { entries, problems, placed: true };
+}
+
+/**
+ * An amount, into the one group that matches. With none it makes a group of its own if its category and rate are
+ * known; with several it is an error, since an amount is never split between VAT rates.
+ */
+function placeAmount(entry: Checked & { amount: number }, matching: Group[], named: string): Placed {
+  const { list, index, category, rate } = entry;
+  const what = WHAT[list];
+  const where = pathOf(list, index, entry.vatRate === undefined ? 'vatRate' : 'vatCategory');
+  if (matching.length > 1) {
+    return {
+      entries: [],
+      problems: [
+        problem(
+          'error',
+          where,
+          'adjustment-group',
+          `The lines are in several VAT groups (${matching.map((g) => `${g.category} ${g.rate} %`).join(', ')}). State the VAT category and rate this ${what} belongs to; an amount is not split between them.`,
+        ),
+      ],
+      placed: false,
+    };
+  }
+  const group = matching[0] ?? (category !== undefined && rate !== undefined ? { category, rate, cents: 0n } : undefined);
+  if (!group) {
+    return {
+      entries: [],
+      problems: [
+        problem(
+          'error',
+          where,
+          'adjustment-group',
+          `No line is in the VAT group ${named || 'it names'}. State the VAT category and rate this ${what} belongs to.`,
+        ),
+      ],
+      placed: false,
+    };
+  }
+
+  const problems: Finding[] = [];
+  const stated = toCents(entry.amount);
+  if (group.cents !== 0n && stated !== 0n && group.cents < 0n !== stated < 0n) {
+    problems.push(
+      problem(
+        'warning',
+        pathOf(list, index, 'amount'),
+        'adjustment-sign',
+        `The ${what} and its lines have different signs. Where the lines add up to a negative amount, the ${what} is negative too: -10 for 10.`,
+      ),
+    );
+  }
+  return { entries: [{ list, index, category: group.category, rate: group.rate, cents: stated, reason: entry.reason }], problems, placed: true };
+}
+
+/** One checked entry into the VAT groups its category and rate match: by percentage or by amount. */
+function place(entry: Checked, groups: Group[], slack: number): Placed {
+  const { category, rate } = entry;
+  const matching = groups.filter((g) => (category === undefined || g.category === category) && (rate === undefined || g.rate === rate));
+  const named = [category, rate !== undefined ? `${rate} %` : undefined].filter(Boolean).join(' ');
+  return entry.percent !== undefined ? placePercent(entry, matching, named, slack) : placeAmount(entry, matching, named);
+}
 
 /**
  * Puts each discount and charge on the whole invoice into the VAT groups of the lines (category and rate). What an
- * entry states of these filters the groups; a rate above 0 alone means category S. A percentage is taken of every
- * group that matches, each rounded to the cent, and always of the lines alone, so the order of the entries does not
- * matter. An amount goes into the one group that matches; with none it makes a group of its own if its category and
- * rate are known, and with several it is an error: an amount is never split between VAT rates. Beside a percentage an
- * amount counts on one group if it is within R040, and has to be the sum of the rounded group amounts on several.
- * Without `lineCents` only what an entry needs by itself is checked.
+ * entry states of these filters the groups; a rate above 0 alone means category S. A percentage is always taken of
+ * the lines alone, so the order of the entries does not matter. Without `lineCents` only what an entry needs by
+ * itself is checked, and nothing is placed.
  */
 function resolve(invoice: Adjustable, lineCents?: bigint[]) {
-  const problems: Finding[] = [];
-  const add = (severity: Finding['severity'], path: string, code: string, message: string) => problems.push({ path, severity, code, message });
-  const error = (path: string, code: string, message: string) => add('error', path, code, message);
-  const groups = new Map<string, { category: VatCategory; rate: number; cents: bigint }>();
-  if (lineCents) {
-    invoice.lines.forEach((l, i) => {
-      const key = `${l.vatCategory}|${l.vatRate}`;
-      const group = groups.get(key) ?? { category: l.vatCategory, rate: l.vatRate, cents: 0n };
-      group.cents += lineCents[i]!;
-      groups.set(key, group);
-    });
-  }
-  const lineGroups = [...groups.values()];
-  const entries: Entry[] = [];
-  let resolved = lineCents !== undefined;
+  const groups = lineCents ? groupLines(invoice.lines, lineCents) : [];
   const slack = slackOf(invoice.currency);
+  const entries: Entry[] = [];
+  const problems: Finding[] = [];
+  let resolved = lineCents !== undefined;
 
-  for (const [list, what] of [
-    ['discounts', 'discount'],
-    ['charges', 'charge'],
-  ] as const) {
+  for (const list of LISTS) {
     const given: unknown = invoice[list];
     if (given === undefined) continue;
     if (!Array.isArray(given)) {
-      error(list, 'format', `Not a list of ${what}s.`);
+      problems.push(problem('error', list, 'format', `Not a list of ${WHAT[list]}s.`));
       resolved = false;
       continue;
     }
-    given.forEach((raw: unknown, index) => {
-      const at = (field?: string) => (field ? `${list}.${index}.${field}` : `${list}.${index}`);
-      const e: Record<string, any> = raw && typeof raw === 'object' ? raw : {};
-      let ok = true;
-      const refuse = (path: string, code: string, message: string) => {
-        error(path, code, message);
-        ok = false;
-      };
-      for (const field of ['percent', 'amount', 'vatRate']) {
-        if (e[field] !== undefined && !isNumber(e[field])) refuse(at(field), 'format', 'Not a number.');
-      }
-      if (e.percent === undefined && e.amount === undefined) refuse(at(), 'adjustment', `A ${what} needs a percentage or an amount.`);
-      if (isNumber(e.percent) && e.percent < 0) refuse(at('percent'), 'adjustment', 'A percentage is never negative; the sign comes from the lines.');
-      if (list === 'charges' && e.reason === undefined) error(at('reason'), 'charge-reason', 'A charge needs its reason as printed, e.g. freight.');
-      let category: VatCategory | undefined = e.vatCategory;
-      if (category !== undefined && !(category in VAT_CATEGORIES)) {
-        refuse(at('vatCategory'), 'format', `Unknown VAT category. Use one of ${Object.keys(VAT_CATEGORIES).join(', ')}.`);
-      } else if (isNumber(e.vatRate)) {
-        if (category === undefined && e.vatRate > 0) category = 'S';
-        if (e.vatRate < 0) refuse(at('vatRate'), 'vat-rate', 'A VAT rate is never negative.');
-        else if (category === 'S' && e.vatRate === 0) refuse(at('vatRate'), 'vat-rate', 'With VAT charged (category S), the rate must be above 0.');
-        else if (category !== undefined && category !== 'S' && e.vatRate !== 0)
-          refuse(at('vatRate'), 'vat-rate', `Category ${category} carries no VAT: the rate must be 0.`);
-      }
-      if (!ok || !lineCents) {
+    for (const [index, raw] of given.entries()) {
+      const { checked, problems: own } = checkEntry(raw, list, index);
+      problems.push(...own);
+      if (!checked || !lineCents) {
         resolved = false;
-        return;
+        continue;
       }
-
-      const rate: number | undefined = category !== undefined && category !== 'S' ? 0 : e.vatRate;
-      const matching = lineGroups.filter((g) => (category === undefined || g.category === category) && (rate === undefined || g.rate === rate));
-      const named = [category, rate !== undefined ? `${rate} %` : undefined].filter(Boolean).join(' ');
-      const unplaced = (path: string, code: string, message: string) => {
-        error(path, code, message);
-        resolved = false;
-      };
-
-      if (e.percent !== undefined) {
-        if (!matching.length) {
-          unplaced(
-            at(e.vatRate !== undefined ? 'vatRate' : 'vatCategory'),
-            'adjustment-group',
-            `No line is in the VAT group ${named}, so the percentage has nothing to be taken of. Correct the VAT category or rate, or leave both out to take it of all lines.`,
-          );
-          return;
-        }
-        const parts = matching.map((g) => ({ g, cents: percentCents(g.cents, e.percent) }));
-        if (e.amount !== undefined) {
-          const stated = toCents(e.amount);
-          if (parts.length === 1) {
-            const part = parts[0]!;
-            if (!percentAgrees(fromCents(part.g.cents), e.percent, fromCents(stated), slack)) {
-              error(
-                at('amount'),
-                'adjustment-mismatch',
-                `${e.percent} % of ${money(part.g.cents)} is ${money(part.cents)}, but the ${what} states ${money(stated)}. Correct the percentage or the amount.`,
-              );
-            }
-            // The stated amount is the one written, as on a line.
-            part.cents = stated;
-          } else {
-            const sum = parts.reduce((a, p) => a + p.cents, 0n);
-            if (sum !== stated) {
-              error(
-                at('amount'),
-                'adjustment-mismatch',
-                `${e.percent} % of the lines comes to ${parts.map((p) => money(p.cents)).join(' + ')} = ${money(sum)} by VAT rate, but the ${what} states ${money(stated)}. Correct the percentage or the amount; an amount is not split between VAT rates.`,
-              );
-            }
-          }
-        }
-        entries.push(
-          ...parts.map((p) => ({ list, index, category: p.g.category, rate: p.g.rate, cents: p.cents, base: p.g.cents, percent: e.percent, reason: e.reason })),
-        );
-        return;
-      }
-
-      const where = e.vatRate === undefined ? 'vatRate' : 'vatCategory';
-      if (matching.length > 1) {
-        unplaced(
-          at(where),
-          'adjustment-group',
-          `The lines are in several VAT groups (${matching.map((g) => `${g.category} ${g.rate} %`).join(', ')}). State the VAT category and rate this ${what} belongs to; an amount is not split between them.`,
-        );
-        return;
-      }
-      const group = matching[0] ?? (category !== undefined && rate !== undefined ? { category, rate, cents: 0n } : undefined);
-      if (!group) {
-        unplaced(at(where), 'adjustment-group', `No line is in the VAT group ${named || 'it names'}. State the VAT category and rate this ${what} belongs to.`);
-        return;
-      }
-      const stated = toCents(e.amount);
-      if (group.cents !== 0n && stated !== 0n && group.cents < 0n !== stated < 0n) {
-        add(
-          'warning',
-          at('amount'),
-          'adjustment-sign',
-          `The ${what} and its lines have different signs. Where the lines add up to a negative amount, the ${what} is negative too: -10 for 10.`,
-        );
-      }
-      entries.push({ list, index, category: group.category, rate: group.rate, cents: stated, reason: e.reason });
-    });
+      const placed = place(checked, groups, slack);
+      entries.push(...placed.entries);
+      problems.push(...placed.problems);
+      resolved &&= placed.placed;
+    }
   }
   return { entries, problems, resolved };
 }
