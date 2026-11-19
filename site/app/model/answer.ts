@@ -1,5 +1,5 @@
 // What a language model is asked for and how far its answer has come. Nothing here touches the browser.
-import { invoiceJsonSchema } from '../src/domain/model.js';
+import { invoiceJsonSchema } from '../../../src/domain/model.js';
 
 const NOT_ASKED = new Set([
   'typeCode',

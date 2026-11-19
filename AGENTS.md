@@ -41,14 +41,15 @@ A change is done when `npm test`, `npm run type-check`, `npm run lint` and `npm 
 | `src/adapters/`      | command line (`cli.ts`), MCP server (`mcp.ts`), and the work with files on disk both share         | all of the above |
 |                      | (`files.ts`); `server.json` describes the server for registries                                    |                  |
 | `src/index.ts`       | the public API of the package                                                                      | all but adapters |
-| `site/`              | the web app; `main.ts` loads one module per section of the page, without cycles between them       |                  |
-|                      | it imports `src/` directly, never `src/adapters/`                                                  |                  |
+| `site/`              | the web app: `app/` the start page (`main.ts` loads one module per section), `legal/` the          |                  |
+|                      | legal pages, `shared/` what both use. A part uses `shared/` and `src/`, never another part or      |                  |
+|                      | `src/adapters/`, and there is no cycle between its files                                           |                  |
 | `test/`, `examples/` | tests, by layer, and the invented sample invoice                                                   |                  |
 
 ## Rules
 
 - Code, comments and documentation are in English. Every text on the website exists in English and German
-  (`site/i18n.ts`).
+  (`site/shared/i18n.ts`).
 - No real invoice and no data from one enters the repository, not in fixtures, tests, screenshots or issues.
   `examples/` is invented; `npm run sample` rebuilds it.
 - The reader must not be fitted to single layouts. A change to `src/extract/guess.ts` or `src/pdf/text.ts` comes with the table
@@ -58,7 +59,7 @@ A change is done when `npm test`, `npm run type-check`, `npm run lint` and `npm 
 - Money is calculated in whole cents (`src/domain/calculate.ts`), never in floating point euros.
 - The website makes no request to a third party except the model download the user asks for. No scripts, styles or
   fonts from another origin, in any build. One further request exists, to the page counter of the project
-  (`site/counter.ts`, `site/count.ts`): only a build that is given `ANALYTICS_WEBSITE_ID` counts, with the code in
+  (`site/shared/counter.ts`, `site/shared/count.ts`): only a build that is given `ANALYTICS_WEBSITE_ID` counts, with the code in
   this repository, and its privacy policy describes it. Nothing of an invoice is ever passed to it.
 - New dependencies only where they clearly beat a few lines of own code, and no release younger than 14 days
   (`npm install --before=<date>`; Dependabot waits as long).

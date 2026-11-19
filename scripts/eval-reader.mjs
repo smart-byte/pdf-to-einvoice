@@ -6,7 +6,7 @@
 //   npm run build && node scripts/eval-reader.mjs /tmp/corpus/ZUGFeRDv2/correct
 //
 // With `--model <id>` the same invoices are also read by a language model, where the web app runs it: in Chrome
-// with WebGPU, through site/llm.ts. That takes about a minute per invoice, so `--sample 4` takes the first four
+// with WebGPU, through site/app/model/llm.ts. That takes about a minute per invoice, so `--sample 4` takes the first four
 // usable files of each folder. Chrome has to be installed; the model is downloaded once into `--profile <folder>`.
 //
 // "wrong" is worse than "missing": a missing value is asked for, a wrong one may go unnoticed.
@@ -92,7 +92,7 @@ async function openModel() {
   const page = await context.newPage();
   await page.goto(server.resolvedUrls.local[0]);
   // The function runs in the page: it gets the text and the model as arguments, since it sees nothing of this script.
-  const inPage = async ([words, modelId]) => (await import('/llm.ts')).readWithBrowserModel(words, modelId, () => {});
+  const inPage = async ([words, modelId]) => (await import('/app/model/llm.ts')).readWithBrowserModel(words, modelId, () => {});
   const read = (pageText) => page.evaluate(inPage, [pageText, model]);
   return { read, close: () => context.close().then(() => server.close()) };
 }

@@ -1,7 +1,7 @@
 // The web app: it loads its parts, each of which wires up its own section of the page, and then sets the language.
 // The parts are loaded in the order their sections stand on the page; each registers its listeners when it loads.
-import './styles.css';
-import './theme-switch.js';
+import '../shared/styles.css';
+import '../shared/theme-switch.js';
 import './form.js';
 import './findings.js';
 import './page.js';
@@ -10,10 +10,10 @@ import './reading.js';
 import './xml.js';
 import './creating.js';
 import './tabs.js';
-import { countVisit } from './count.js';
+import { countVisit } from '../shared/count.js';
 import { renderNotes } from './creating.js';
 import { renderForm } from './form.js';
-import { lang, setLang } from './i18n.js';
+import { lang, setLang } from '../shared/i18n.js';
 import { renderModels } from './reading.js';
 import { state } from './state.js';
 

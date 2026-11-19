@@ -1,4 +1,4 @@
-import type { InvoiceDraft } from '../src/domain/model.js';
+import type { InvoiceDraft } from '../../../src/domain/model.js';
 import { extractionSchema, progressOf } from './answer.js';
 
 /**

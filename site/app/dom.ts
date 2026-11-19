@@ -1,5 +1,5 @@
 // Small helpers for the page: finding and creating elements, switching the view, setting a translated text.
-import { t } from './i18n.js';
+import { t } from '../shared/i18n.js';
 
 export const $ = <T extends HTMLElement>(selector: string) => document.querySelector<T>(selector)!;
 /** Creates an element. `props` are assigned as properties; `dataset` entries become data attributes. */

@@ -115,3 +115,39 @@ describe('the tests', () => {
     expect(stray).toEqual([]);
   });
 });
+
+// The web app has parts of its own: the start page, the legal pages, and what both use. A page is free to use `src/`
+// (except the adapters, see above), but not another page's code.
+const SITE_PARTS: Record<string, string[]> = {
+  /** The start page: reading a PDF, the form, the check, creating the e-invoice. */
+  app: ['app', 'shared'],
+  /** The script of the legal notice and the privacy policy. */
+  legal: ['legal', 'shared'],
+  /** What every page uses: texts in two languages, the theme, the page counter, the style sheet. */
+  shared: ['shared'],
+};
+/** Files of the web app that stand in no part: the configuration of the build, which may use what the pages share. */
+const SITE_CONFIG: Record<string, string[]> = { 'vite.config.ts': ['shared'] };
+
+describe('the parts of site/', () => {
+  const site = join(root, 'site');
+  const files = sources('site');
+  const partOf = (file: string) => relative(site, file).split('/')[0]!;
+
+  it('puts every script into a part', () => {
+    const stray = files.map((file) => relative(site, file)).filter((path) => !(path in SITE_CONFIG) && !((path.split('/')[0] ?? '') in SITE_PARTS));
+    expect(stray).toEqual([]);
+  });
+
+  it('imports only from the parts each part may use', () => {
+    const wrong = files.flatMap((file) => {
+      const path = relative(site, file);
+      const allowed = SITE_CONFIG[path] ?? SITE_PARTS[partOf(file)] ?? [];
+      return importsOf(file)
+        .filter((target) => !relative(site, target).startsWith('..'))
+        .filter((target) => !allowed.includes(partOf(target)))
+        .map((target) => `${path} -> ${relative(site, target)}`);
+    });
+    expect(wrong).toEqual([]);
+  });
+});

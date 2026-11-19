@@ -1,8 +1,8 @@
 // The legal notice and the privacy policy share the language switch and the footer texts with the main page.
-import { NOT_COUNTED, countVisit } from './count.js';
-import { lang, setLang, t, type Lang } from './i18n.js';
-import './styles.css';
-import './theme-switch.js';
+import { NOT_COUNTED, countVisit } from '../shared/count.js';
+import { lang, setLang, t, type Lang } from '../shared/i18n.js';
+import '../shared/styles.css';
+import '../shared/theme-switch.js';
 
 /** Says whether visits are counted in this browser and offers to change it. A build without the counter has no such box. */
 function showCounting(): void {

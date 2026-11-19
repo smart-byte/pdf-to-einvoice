@@ -6,7 +6,7 @@ import { PDFDocument, PDFName, PDFString, StandardFonts } from '@cantoo/pdf-lib'
 import { chromium, type Browser, type Download, type Page } from 'playwright-core';
 import { preview, type PreviewServer } from 'vite';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
-import { extractionSchema } from '../../site/answer.js';
+import { extractionSchema } from '../../site/app/model/answer.js';
 import { createEInvoice } from '../../src/generate/create.js';
 import type { InvoiceDraft } from '../../src/domain/model.js';
 import { validateEInvoice } from '../../src/inspect/validate.js';

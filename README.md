@@ -80,7 +80,7 @@ await writeFile('invoice.einvoice.pdf', pdf);
 ```
 
 It works the same in a browser: `pdf` is a `Uint8Array` in and out. A bundler needs two things set up, as
-[`site/vite.config.ts`](site/vite.config.ts) and [`site/main.ts`](site/main.ts) do: an alias that points
+[`site/vite.config.ts`](site/vite.config.ts) and [`site/app/page.ts`](site/app/page.ts) do: an alias that points
 `@e-invoice-eu/core` to its browser bundle, and the worker of pdf.js.
 
 | function                                     | what it does                                                                                                       |

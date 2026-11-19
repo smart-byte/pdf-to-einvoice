@@ -1,7 +1,7 @@
 // What the page knows about the invoice it works on. One object, changed by the modules that own each part.
-import type { CheckResult } from '../src/domain/check.js';
-import type { Finding } from '../src/domain/finding.js';
-import type { InvoiceDraft } from '../src/domain/model.js';
+import type { CheckResult } from '../../src/domain/check.js';
+import type { Finding } from '../../src/domain/finding.js';
+import type { InvoiceDraft } from '../../src/domain/model.js';
 
 interface State {
   pdf?: Uint8Array;

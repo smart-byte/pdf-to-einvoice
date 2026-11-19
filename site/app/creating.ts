@@ -1,10 +1,10 @@
 // Creating the e-invoice and offering it for download.
-import type { Finding } from '../src/domain/finding.js';
-import { countVisit } from './count.js';
+import type { Finding } from '../../src/domain/finding.js';
+import { countVisit } from '../shared/count.js';
 import { $, el, setText, show } from './dom.js';
 import { validate } from './findings.js';
 import { describe, fieldLabel, reasonOf } from './wording.js';
-import { t } from './i18n.js';
+import { t } from '../shared/i18n.js';
 import { drawing } from './page.js';
 import { state } from './state.js';
 
@@ -34,7 +34,7 @@ $('#create').onclick = async () => {
   const xr = state.format === 'xrechnung';
   try {
     // Loaded on demand: the XML writer is the heaviest part of the page.
-    const { createEInvoice, createXRechnung } = await import('../src/generate/create.js');
+    const { createEInvoice, createXRechnung } = await import('../../src/generate/create.js');
     // No language is passed on. The library that writes the XML asks the server for a catalogue of translations in
     // whatever language it is given, and ships none: for English, its default here, the site answers with an empty
     // one (public/assets/locale).

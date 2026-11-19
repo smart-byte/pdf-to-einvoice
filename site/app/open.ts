@@ -1,12 +1,12 @@
 // Opening a PDF: reading its text and layout, guessing the invoice, or showing an existing e-invoice.
-import sampleUrl from '../examples/sample-invoice.pdf?url';
-import { guessFromText, languageOf } from '../src/extract/guess.js';
-import { inspectPdf } from '../src/pdf/file.js';
-import { extractLayout } from '../src/pdf/text.js';
+import sampleUrl from '../../examples/sample-invoice.pdf?url';
+import { guessFromText, languageOf } from '../../src/extract/guess.js';
+import { inspectPdf } from '../../src/pdf/file.js';
+import { extractLayout } from '../../src/pdf/text.js';
 import { $, setText, show } from './dom.js';
 import { isEmpty, merge } from './draft.js';
 import { renderForm } from './form.js';
-import { t } from './i18n.js';
+import { t } from '../shared/i18n.js';
 import { forgetPages, preview, scan } from './page.js';
 import { state } from './state.js';
 import { closeXml } from './xml.js';
@@ -44,7 +44,7 @@ async function open(pdf: Uint8Array, fileName: string): Promise<void> {
     });
     if (state.mode === 'validate') {
       // The PDF already is an e-invoice: show what its XML says, next to the page it belongs to.
-      const { validateEInvoice } = await import('../src/inspect/validate.js');
+      const { validateEInvoice } = await import('../../src/inspect/validate.js');
       const result = await validateEInvoice(pdf, { pdfText: text });
       state.draft = result.invoice ?? {};
       state.adjustedLines = result.adjustedLines ?? [];

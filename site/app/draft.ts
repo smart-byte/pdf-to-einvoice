@@ -1,5 +1,5 @@
 // Paths into the draft, e.g. "seller.name" or "lines.0.unitPrice", and merging what was read into it.
-import type { InvoiceDraft } from '../src/domain/model.js';
+import type { InvoiceDraft } from '../../src/domain/model.js';
 import { state } from './state.js';
 
 export const getPath = (object: any, path: string) => path.split('.').reduce((o, key) => o?.[key], object);

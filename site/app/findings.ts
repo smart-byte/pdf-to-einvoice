@@ -1,8 +1,8 @@
 // Findings and totals: what the check says, at each field, in the totals and in the summary.
-import { check, type CheckResult } from '../src/domain/check.js';
-import type { Finding } from '../src/domain/finding.js';
+import { check, type CheckResult } from '../../src/domain/check.js';
+import type { Finding } from '../../src/domain/finding.js';
 import { $, el } from './dom.js';
-import { t } from './i18n.js';
+import { t } from '../shared/i18n.js';
 import { focusedPath, highlight, point, renderMarks, turnTo } from './page.js';
 import { shownFormat, state } from './state.js';
 import { refreshXml } from './xml.js';

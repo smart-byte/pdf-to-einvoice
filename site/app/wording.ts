@@ -1,6 +1,6 @@
 // How the page words what the library says: findings in the language of the page, errors, amounts, field names.
-import { lineBase, percentOf } from '../src/domain/calculate.js';
-import { lang, STRINGS, t } from './i18n.js';
+import { lineBase, percentOf } from '../../src/domain/calculate.js';
+import { lang, STRINGS, t } from '../shared/i18n.js';
 import { state } from './state.js';
 
 /**

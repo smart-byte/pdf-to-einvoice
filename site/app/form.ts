@@ -1,9 +1,9 @@
 // The form: its fields, the line items, the discounts and charges, and the choice of what "Create" makes.
-import { INVOICE_TYPES, VAT_CATEGORIES } from '../src/domain/model.js';
+import { INVOICE_TYPES, VAT_CATEGORIES } from '../../src/domain/model.js';
 import { $, el, setText } from './dom.js';
 import { getPath, isEmpty, setPath } from './draft.js';
 import { validate } from './findings.js';
-import { t } from './i18n.js';
+import { t } from '../shared/i18n.js';
 import { focusedPath } from './page.js';
 import { type Format, shownFormat, state } from './state.js';
 

@@ -1,4 +1,4 @@
-import { amountSpellings, dateSpellings } from '../src/domain/check.js';
+import { amountSpellings, dateSpellings } from '../../src/domain/check.js';
 
 /** A rectangle on the page. `y` is its upper edge; the unit is up to the caller, as long as all pieces share it. */
 export interface Rect {

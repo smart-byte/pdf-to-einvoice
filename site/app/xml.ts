@@ -1,7 +1,7 @@
 // The XML that goes into the file, shown as it would be written.
 import { $, el, setText } from './dom.js';
 import { money, reasonOf } from './wording.js';
-import { lang, t } from './i18n.js';
+import { lang, t } from '../shared/i18n.js';
 import { shownFormat, state } from './state.js';
 
 const xmlSection = $<HTMLDetailsElement>('#xml');
@@ -31,7 +31,7 @@ async function renderXml(): Promise<void> {
   if (pair.hidden) status.textContent = t('xml.busy');
   try {
     const invoice = structuredClone(state.draft);
-    const { createEInvoice, createXRechnung } = await import('../src/generate/create.js');
+    const { createEInvoice, createXRechnung } = await import('../../src/generate/create.js');
     const { xml, totals } = shownFormat() === 'xrechnung' ? await createXRechnung({ invoice }) : await createEInvoice({ pdf: state.pdf, invoice });
     // The data has changed again in the meantime: the newer run shows its XML.
     if (run !== xmlRun) return;

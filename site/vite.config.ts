@@ -1,6 +1,6 @@
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
-import { forBuild } from './counter.js';
+import { forBuild } from './shared/counter.js';
 
 const page = (name: string) => fileURLToPath(new URL(name, import.meta.url));
 

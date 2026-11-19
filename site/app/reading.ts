@@ -1,10 +1,10 @@
 // Reading the invoice with a language model, in the browser or at an endpoint the user names.
-import { keepWhatThePdfShows } from '../src/extract/ground.js';
+import { keepWhatThePdfShows } from '../../src/extract/ground.js';
 import { $, el } from './dom.js';
 import { merge, normaliseDraft } from './draft.js';
 import { renderForm } from './form.js';
-import { lang, t } from './i18n.js';
-import { DEFAULT_MODEL, hasWebGpu, MODELS, readWithBrowserModel, readWithEndpoint } from './llm.js';
+import { lang, t } from '../shared/i18n.js';
+import { DEFAULT_MODEL, hasWebGpu, MODELS, readWithBrowserModel, readWithEndpoint } from './model/llm.js';
 import { scan } from './page.js';
 import { state } from './state.js';
 

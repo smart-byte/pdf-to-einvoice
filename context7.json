@@ -14,7 +14,7 @@
     "Every VAT category except S has vatRate 0; all of those except Z need vatExemptionReason. AE and K need buyer.vatId.",
     "For a German public body write an XRechnung: createXRechnung({ invoice, syntax }) for plain XML (UBL or CII), or createEInvoice with profile: 'xrechnung' for a PDF that carries it. Check with check(draft, { rules: 'xrechnung' }) first: XRechnung needs buyerReference (the Leitweg-ID, which the buyer names; never make one up), seller.contactName, seller.phone, seller.email and buyer.email.",
     "Discounts and charges on the whole invoice go into `discounts` and `charges` (`percent` and/or `amount`, a `reason` required for a charge). An amount is never split between VAT rates: where the lines have several, give its `vatRate`.",
-    "Node 22.13 or newer. In a browser the bundler needs an alias from @e-invoice-eu/core to its browser bundle and the pdf.js worker; see site/vite.config.ts and site/main.ts.",
+    "Node 22.13 or newer. In a browser the bundler needs an alias from @e-invoice-eu/core to its browser bundle and the pdf.js worker; see site/vite.config.ts and site/app/page.ts.",
     "validateEInvoice is a plausibility check, not a full EN 16931 validation."
   ]
 }
