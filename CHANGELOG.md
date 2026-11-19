@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-11-19
+
+### Fixed
+
+- The web app reads "1.000" in the answer of a language model as 1000, as the reader of the page does, not as 1.
+
 ### Security
 
 - fast-xml-parser 5.12.0, which reads an unterminated tag without quadratic CPU time (GHSA-474x-hrwr-fgx4).
