@@ -41,7 +41,8 @@ A change is done when `npm test`, `npm run type-check`, `npm run lint` and `npm 
 | `src/adapters/`      | command line (`cli.ts`), MCP server (`mcp.ts`), and the work with files on disk both share         | all of the above |
 |                      | (`files.ts`); `server.json` describes the server for registries                                    |                  |
 | `src/index.ts`       | the public API of the package                                                                      | all but adapters |
-| `site/`              | the web app; it imports `src/` directly, never `src/adapters/`                                     |                  |
+| `site/`              | the web app; `main.ts` loads one module per section of the page, without cycles between them       |                  |
+|                      | it imports `src/` directly, never `src/adapters/`                                                  |                  |
 | `test/`, `examples/` | tests, by layer, and the invented sample invoice                                                   |                  |
 
 ## Rules

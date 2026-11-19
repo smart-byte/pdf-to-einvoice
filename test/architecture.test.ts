@@ -26,7 +26,8 @@ const ENTRY_POINTS = ['adapters/cli.ts'];
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const src = join(root, 'src');
-const IMPORT = /(?:\bfrom\s*|\bimport\s*\(\s*)'(\.{1,2}\/[^']+)'/g;
+/** `from '...'`, `import('...')`, and an import for its side effects alone, `import '...'`. */
+const IMPORT = /(?:\bfrom\s*|\bimport\s*\(\s*|^import\s+)'(\.{1,2}\/[^']+)'/gm;
 
 const sources = (dir: string) =>
   (readdirSync(join(root, dir), { recursive: true }) as string[]).filter((file) => file.endsWith('.ts')).map((file) => join(root, dir, file));
@@ -37,6 +38,25 @@ const importsOf = (file: string) => [...readFileSync(file, 'utf8').matchAll(IMPO
 const inSrc = (file: string) => relative(src, file).split('/');
 /** The folder under `src/` a file is in; `index.ts` for the public API. */
 const layerOf = (file: string) => inSrc(file)[0]!;
+
+/** Every cycle of imports among `files`, each as the chain of paths that closes it. */
+function cyclesIn(files: string[]): string[] {
+  const graph = new Map(files.map((file) => [file, importsOf(file).filter((target) => files.includes(target))]));
+  const cycles: string[] = [];
+  const done = new Set<string>();
+  const visit = (file: string, path: string[]) => {
+    const seen = path.indexOf(file);
+    if (seen >= 0) {
+      cycles.push([...path.slice(seen), file].map((f) => relative(root, f)).join(' -> '));
+      return;
+    }
+    if (done.has(file)) return;
+    for (const target of graph.get(file) ?? []) visit(target, [...path, file]);
+    done.add(file);
+  };
+  for (const file of files) visit(file, []);
+  return cycles;
+}
 
 describe('the layers of src/', () => {
   const files = sources('src');
@@ -68,21 +88,11 @@ describe('the layers of src/', () => {
   });
 
   it('has no cycle between files, not even through a type', () => {
-    const graph = new Map(files.map((file) => [file, importsOf(file).filter((target) => files.includes(target))]));
-    const cycles: string[] = [];
-    const done = new Set<string>();
-    const visit = (file: string, path: string[]) => {
-      const seen = path.indexOf(file);
-      if (seen >= 0) {
-        cycles.push([...path.slice(seen), file].map((f) => relative(src, f)).join(' -> '));
-        return;
-      }
-      if (done.has(file)) return;
-      for (const target of graph.get(file) ?? []) visit(target, [...path, file]);
-      done.add(file);
-    };
-    for (const file of files) visit(file, []);
-    expect(cycles).toEqual([]);
+    expect(cyclesIn(files)).toEqual([]);
+  });
+
+  it('has no cycle between the files of the web app either', () => {
+    expect(cyclesIn(sources('site'))).toEqual([]);
   });
 
   it('keeps the adapters, which need Node, out of the web app', () => {
