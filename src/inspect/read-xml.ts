@@ -1,5 +1,5 @@
 import { XMLParser } from 'fast-xml-parser';
-import { exactSum, lineBase, percentAgrees, slackOf } from '../domain/calculate.js';
+import { exactSum, lineBase, percentAgrees, slackOf } from '../domain/money.js';
 import { isVatId } from '../domain/formats.js';
 import type { Allowance, DocumentAllowance, InvoiceDraft, InvoiceType, VatCategory } from '../domain/model.js';
 import { messageOf } from '../util/errors.js';

@@ -1,14 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import {
-  calculate,
-  cents,
-  exactSum,
-  lineAgrees,
-  percentAgrees,
-  checkAdjustments,
-  slackOf,
-  tryCalculate,
-} from '../../src/domain/calculate.js';
+import { checkAdjustments } from '../../src/domain/adjustments.js';
+import { calculate, tryCalculate } from '../../src/domain/calculate.js';
+import { cents, exactSum, lineAgrees, percentAgrees, slackOf } from '../../src/domain/money.js';
 import type { DocumentAllowance, Invoice, Line } from '../../src/domain/model.js';
 
 const line = (over: Partial<Line> = {}): Line => ({

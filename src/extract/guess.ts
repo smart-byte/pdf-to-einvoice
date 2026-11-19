@@ -1,4 +1,4 @@
-import { cents } from '../domain/calculate.js';
+import { cents } from '../domain/money.js';
 import { BIC } from '../domain/formats.js';
 import type { InvoiceDraft, Line, Party, VatCategory } from '../domain/model.js';
 import { readContact } from './guess/contact.js';

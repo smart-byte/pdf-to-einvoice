@@ -32,7 +32,8 @@ through them). A layer imports only the layers listed beside it;
 
 | path                 | what it holds                                                                                      | imports          |
 | -------------------- | -------------------------------------------------------------------------------------------------- | ---------------- |
-| `src/domain/`        | the data model and its JSON Schema (`model.ts`), totals in exact cents (`calculate.ts`), the rules | nothing else     |
+| `src/domain/`        | the data model and its JSON Schema (`model.ts`), money in exact cents (`money.ts`), the totals     | nothing else     |
+|                      | (`calculate.ts`) with the discounts and charges on the whole invoice (`adjustments.ts`), the rules |                  |
 |                      | the data has to meet (`check.ts`), the one rule for a VAT rate both use (`vat.ts`), the shape of a |                  |
 |                      | date, an IBAN, an ID or an e-mail address (`formats.ts`), how a date or an amount is printed       |                  |
 |                      | (`spellings.ts`), `Finding`, what all of them report (`finding.ts`), and the English text of every |                  |
@@ -66,7 +67,7 @@ through them). A layer imports only the layers listed beside it;
 - A finding gets its code and its English text from `src/domain/messages.ts`, through `error()` and `warning()` of
   `src/domain/finding.ts`. A new code needs a German text in `site/shared/i18n.ts`; `test/site/i18n.test.ts` says
   which.
-- Money is calculated in whole cents (`src/domain/calculate.ts`), never in floating point euros.
+- Money is calculated in whole cents (`src/domain/money.ts`), never in floating point euros.
 - The website makes no request to a third party except the model download the user asks for. No scripts, styles or
   fonts from another origin, in any build. One further request exists, to the page counter of the project
   (`site/shared/counter.ts`, `site/shared/count.ts`): only a build that is given `ANALYTICS_WEBSITE_ID` counts, with the code in

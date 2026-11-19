@@ -1,4 +1,4 @@
-import { cents, lineBase, netOfGross, percentOf, perUnit } from '../../domain/calculate.js';
+import { cents, lineBase, netOfGross, percentOf, perUnit } from '../../domain/money.js';
 import type { Line, VatCategory } from '../../domain/model.js';
 import { senderOf } from './parties.js';
 import { cells, KEY_VALUE, MAX_WRAPPED } from './rows.js';
