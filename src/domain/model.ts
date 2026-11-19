@@ -136,6 +136,12 @@ export interface Invoice {
 
 type Draft<T> = T extends (infer U)[] ? Draft<U>[] : T extends object ? { [K in keyof T]?: Draft<T[K]> | null } : T;
 
+/**
+ * Data as it came in, before `check` looked at it: any field may be missing or of any type, so code that reads it
+ * guards every value it uses. An object with the fields of an invoice, a party or a line, but no promise about them.
+ */
+export type Unchecked = Record<string, any>;
+
 /** Invoice data that may still be incomplete, e.g. straight from an extraction. */
 export type InvoiceDraft = Draft<Invoice>;
 

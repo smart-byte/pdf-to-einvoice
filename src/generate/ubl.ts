@@ -2,7 +2,8 @@ import type { Invoice as EInvoiceEuInvoice } from '@e-invoice-eu/core';
 import type { Adjustment, Totals } from '../domain/calculate.js';
 import type { Invoice, Line, Party, VatCategory } from '../domain/model.js';
 
-type Bag = Record<string, unknown>;
+/** A part of the UBL document as @e-invoice-eu/core takes it: element names as keys, `name@attribute` for attributes. */
+type UblElement = Record<string, unknown>;
 
 const amount = (n: number) => n.toFixed(2);
 /** Quantities and prices keep their precision; no exponent, no trailing zeros. */
@@ -12,11 +13,11 @@ const price = (n: number) => n.toFixed(6).replace(/0{1,4}$/, '');
 const VAT = { 'cbc:ID': 'VAT' };
 
 /** Removes keys whose value is undefined, so optional elements simply do not appear. */
-function compact<T extends Bag>(object: T): T {
+function compact<T extends UblElement>(object: T): T {
   return Object.fromEntries(Object.entries(object).filter(([, v]) => v !== undefined)) as T;
 }
 
-function address(p: Party): Bag {
+function address(p: Party): UblElement {
   return compact({
     'cbc:StreetName': p.street,
     'cbc:CityName': p.city,
@@ -25,7 +26,7 @@ function address(p: Party): Bag {
   });
 }
 
-function contact(p: Party): Bag | undefined {
+function contact(p: Party): UblElement | undefined {
   if (!p.contactName && !p.phone && !p.email) return undefined;
   return compact({ 'cbc:Name': p.contactName, 'cbc:Telephone': p.phone, 'cbc:ElectronicMail': p.email });
 }
@@ -101,7 +102,7 @@ export function toUbl(invoice: Invoice, totals: Totals, xrechnung = false): EInv
   return { 'ubl:Invoice': document } as unknown as EInvoiceEuInvoice;
 }
 
-function taxCategory(ctx: Context, category: string, rate: number, breakdown: boolean): Bag {
+function taxCategory(ctx: Context, category: string, rate: number, breakdown: boolean): UblElement {
   return compact({
     'cbc:ID': category,
     // BR-O-05: no rate at all where VAT does not apply. XRechnung wants one in every VAT breakdown all the same (BR-DE-14).
@@ -112,7 +113,7 @@ function taxCategory(ctx: Context, category: string, rate: number, breakdown: bo
   });
 }
 
-function supplierParty({ invoice: { seller }, vatIdsAllowed }: Context): Bag {
+function supplierParty({ invoice: { seller }, vatIdsAllowed }: Context): UblElement {
   const taxSchemes = [
     vatIdsAllowed && seller.vatId ? { 'cbc:CompanyID': seller.vatId, 'cac:TaxScheme': VAT } : undefined,
     seller.taxNumber ? { 'cbc:CompanyID': seller.taxNumber, 'cac:TaxScheme': { 'cbc:ID': 'FC' } } : undefined,
@@ -131,7 +132,7 @@ function supplierParty({ invoice: { seller }, vatIdsAllowed }: Context): Bag {
   });
 }
 
-function customerParty({ invoice: { buyer }, vatIdsAllowed }: Context): Bag {
+function customerParty({ invoice: { buyer }, vatIdsAllowed }: Context): UblElement {
   return compact({
     'cbc:EndpointID': buyer.email,
     'cbc:EndpointID@schemeID': buyer.email ? 'EM' : undefined,
@@ -151,7 +152,7 @@ function customerParty({ invoice: { buyer }, vatIdsAllowed }: Context): Bag {
  * Not so in an XRechnung: a place of delivery there needs its city and postal code (BR-DE-10, BR-DE-11), which the
  * data does not have. `check` refuses an intra-community supply for that reason.
  */
-function deliveryOf({ invoice, xrechnung, categories }: Context): Bag {
+function deliveryOf({ invoice, xrechnung, categories }: Context): UblElement {
   const stateCountry = !xrechnung && (categories.has('K') || invoice.deliveryCountry !== undefined);
   return compact({
     'cbc:ActualDeliveryDate': invoice.deliveryDate,
@@ -165,7 +166,7 @@ function deliveryOf({ invoice, xrechnung, categories }: Context): Bag {
   });
 }
 
-function paymentMeans({ invoice, xrechnung }: Context): Bag[] | undefined {
+function paymentMeans({ invoice, xrechnung }: Context): UblElement[] | undefined {
   if (invoice.iban) {
     return [
       {
@@ -182,13 +183,13 @@ function paymentMeans({ invoice, xrechnung }: Context): Bag[] | undefined {
 }
 
 /** XRechnung reads a line that starts with # as a cash discount and wants a line break after it (BR-DE-18). */
-function paymentTerms({ invoice: { paymentTerms: terms }, xrechnung }: Context): Bag | undefined {
+function paymentTerms({ invoice: { paymentTerms: terms }, xrechnung }: Context): UblElement | undefined {
   if (!terms) return undefined;
   return { 'cbc:Note': xrechnung && /^\s*#/m.test(terms) ? `${terms}\n` : terms };
 }
 
 /** One for each VAT group a discount or charge on the whole invoice goes into. A reason in words stands alone, as on a line. */
-function documentAllowance(ctx: Context, a: Adjustment): Bag {
+function documentAllowance(ctx: Context, a: Adjustment): UblElement {
   return compact({
     'cbc:ChargeIndicator': String(a.list === 'charges'),
     'cbc:AllowanceChargeReasonCode': a.reason || a.list === 'charges' ? undefined : '95',
@@ -200,7 +201,7 @@ function documentAllowance(ctx: Context, a: Adjustment): Bag {
   });
 }
 
-function taxTotal(ctx: Context): Bag {
+function taxTotal(ctx: Context): UblElement {
   return {
     ...amountElement(ctx, 'cbc:TaxAmount', ctx.totals.vat),
     'cac:TaxSubtotal': ctx.totals.vatBreakdown.map((group) => ({
@@ -211,7 +212,7 @@ function taxTotal(ctx: Context): Bag {
   };
 }
 
-function monetaryTotal(ctx: Context): Bag {
+function monetaryTotal(ctx: Context): UblElement {
   const { totals } = ctx;
   return compact({
     ...amountElement(ctx, 'cbc:LineExtensionAmount', totals.lineTotal),
@@ -229,7 +230,7 @@ function monetaryTotal(ctx: Context): Bag {
   });
 }
 
-function invoiceLine(ctx: Context, line: Line, i: number): Bag {
+function invoiceLine(ctx: Context, line: Line, i: number): UblElement {
   return {
     'cbc:ID': String(i + 1),
     'cbc:InvoicedQuantity': decimal(line.quantity),
@@ -245,7 +246,7 @@ function invoiceLine(ctx: Context, line: Line, i: number): Bag {
   };
 }
 
-function lineDiscount(ctx: Context, discount: NonNullable<Line['discount']>, i: number): Bag {
+function lineDiscount(ctx: Context, discount: NonNullable<Line['discount']>, i: number): UblElement {
   const calculated = ctx.totals.lineDiscounts[i]!;
   return compact({
     'cbc:ChargeIndicator': 'false',

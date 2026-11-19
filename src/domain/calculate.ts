@@ -1,7 +1,7 @@
 import { isNumber } from '../util/numbers.js';
 import { error, warning, type Finding } from './finding.js';
 import type { MessageKey, MessageParams } from './messages.js';
-import { VAT_CATEGORIES, type Invoice, type Line, type VatCategory } from './model.js';
+import { VAT_CATEGORIES, type Invoice, type Line, type Unchecked, type VatCategory } from './model.js';
 
 export interface VatGroup {
   category: VatCategory;
@@ -85,14 +85,17 @@ const formatCents = (cents: bigint) => fromCents(cents).toFixed(2);
 
 /** Each line in cents, and its discount with the base it was taken from. Expects the numbers of every line. */
 function linesInCents(lines: Line[]) {
-  const discounts = lines.map((l) => {
-    if (!l.discount) return undefined;
-    const base = baseCents(l.quantity, l.unitPrice);
-    const amount = l.discount.amount != null ? toCents(l.discount.amount) : percentCents(base, l.discount.percent ?? 0);
+  const discounts = lines.map((line) => {
+    if (!line.discount) return undefined;
+    const base = baseCents(line.quantity, line.unitPrice);
+    const amount =
+      line.discount.amount != null ? toCents(line.discount.amount) : percentCents(base, line.discount.percent ?? 0);
     return { base, amount };
   });
-  const lineCents = lines.map((l, i) =>
-    l.netAmount != null ? toCents(l.netAmount) : baseCents(l.quantity, l.unitPrice) - (discounts[i]?.amount ?? 0n),
+  const lineCents = lines.map((line, i) =>
+    line.netAmount != null
+      ? toCents(line.netAmount)
+      : baseCents(line.quantity, line.unitPrice) - (discounts[i]?.amount ?? 0n),
   );
   return { discounts, lineCents };
 }
@@ -140,9 +143,9 @@ const pathOf = (list: List, index: number, field?: string) =>
 /** The lines summed by VAT category and rate, in the order the groups first appear. */
 function groupLines(lines: Line[], lineCents: bigint[]): Group[] {
   const groups = new Map<string, Group>();
-  lines.forEach((l, i) => {
-    const key = `${l.vatCategory}|${l.vatRate}`;
-    const group = groups.get(key) ?? { category: l.vatCategory, rate: l.vatRate, cents: 0n };
+  lines.forEach((line, i) => {
+    const key = `${line.vatCategory}|${line.vatRate}`;
+    const group = groups.get(key) ?? { category: line.vatCategory, rate: line.vatRate, cents: 0n };
     group.cents += lineCents[i]!;
     groups.set(key, group);
   });
@@ -157,7 +160,7 @@ function groupLines(lines: Line[], lineCents: bigint[]): Group[] {
 function checkEntry(raw: unknown, list: List, index: number): { checked?: Checked; problems: Finding[] } {
   const what = WHAT[list];
   const at = (field?: string) => pathOf(list, index, field);
-  const e: Record<string, any> = raw && typeof raw === 'object' ? raw : {};
+  const entry: Unchecked = raw && typeof raw === 'object' ? raw : {};
   const problems: Finding[] = [];
   let usable = true;
   const refuse = <K extends MessageKey>(path: string, key: K, ...params: MessageParams<K>) => {
@@ -166,36 +169,36 @@ function checkEntry(raw: unknown, list: List, index: number): { checked?: Checke
   };
 
   for (const field of ['percent', 'amount', 'vatRate']) {
-    if (e[field] !== undefined && !isNumber(e[field])) refuse(at(field), 'format.number');
+    if (entry[field] !== undefined && !isNumber(entry[field])) refuse(at(field), 'format.number');
   }
-  if (e.percent === undefined && e.amount === undefined) refuse(at(), 'adjustment', { what });
-  if (isNumber(e.percent) && e.percent < 0) refuse(at('percent'), 'adjustment.negative');
-  if (list === 'charges' && e.reason === undefined) {
+  if (entry.percent === undefined && entry.amount === undefined) refuse(at(), 'adjustment', { what });
+  if (isNumber(entry.percent) && entry.percent < 0) refuse(at('percent'), 'adjustment.negative');
+  if (list === 'charges' && entry.reason === undefined) {
     problems.push(error(at('reason'), 'charge-reason'));
   }
 
-  let category: VatCategory | undefined = e.vatCategory;
+  let category: VatCategory | undefined = entry.vatCategory;
   if (category !== undefined && !(category in VAT_CATEGORIES)) {
     refuse(at('vatCategory'), 'format.category');
-  } else if (isNumber(e.vatRate)) {
-    if (category === undefined && e.vatRate > 0) category = 'S';
-    if (e.vatRate < 0) refuse(at('vatRate'), 'vat-rate.negative');
-    else if (category === 'S' && e.vatRate === 0) refuse(at('vatRate'), 'vat-rate.standard');
-    else if (category !== undefined && category !== 'S' && e.vatRate !== 0)
+  } else if (isNumber(entry.vatRate)) {
+    if (category === undefined && entry.vatRate > 0) category = 'S';
+    if (entry.vatRate < 0) refuse(at('vatRate'), 'vat-rate.negative');
+    else if (category === 'S' && entry.vatRate === 0) refuse(at('vatRate'), 'vat-rate.standard');
+    else if (category !== undefined && category !== 'S' && entry.vatRate !== 0)
       refuse(at('vatRate'), 'vat-rate.zero', { category });
   }
   if (!usable) return { problems };
 
-  const rate: number | undefined = category !== undefined && category !== 'S' ? 0 : e.vatRate;
+  const rate: number | undefined = category !== undefined && category !== 'S' ? 0 : entry.vatRate;
   const checked = {
     list,
     index,
     category,
     rate,
-    vatRate: e.vatRate,
-    percent: e.percent,
-    amount: e.amount,
-    reason: e.reason,
+    vatRate: entry.vatRate,
+    percent: entry.percent,
+    amount: entry.amount,
+    reason: entry.reason,
   } as Checked;
   return { checked, problems };
 }
@@ -395,8 +398,8 @@ export function calculate(invoice: Invoice): Totals {
     group.taxable += cents;
     groups.set(key, group);
   };
-  invoice.lines.forEach((l, i) => add(l.vatCategory, l.vatRate, lineCents[i]!));
-  for (const e of entries) add(e.category, e.rate, e.list === 'charges' ? e.cents : -e.cents);
+  invoice.lines.forEach((line, i) => add(line.vatCategory, line.vatRate, lineCents[i]!));
+  for (const entry of entries) add(entry.category, entry.rate, entry.list === 'charges' ? entry.cents : -entry.cents);
 
   const breakdown = [...groups.values()].map((g) => ({
     ...g,
@@ -405,15 +408,17 @@ export function calculate(invoice: Invoice): Totals {
 
   const sum = (cents: bigint[]) => cents.reduce((a, b) => a + b, 0n);
   const lineTotal = sum(lineCents);
-  const allowances = sum(entries.filter((e) => e.list === 'discounts').map((e) => e.cents));
-  const charges = sum(entries.filter((e) => e.list === 'charges').map((e) => e.cents));
+  const allowances = sum(entries.filter((entry) => entry.list === 'discounts').map((entry) => entry.cents));
+  const charges = sum(entries.filter((entry) => entry.list === 'charges').map((entry) => entry.cents));
   const net = lineTotal - allowances + charges;
   const vat = breakdown.reduce((a, g) => a + g.tax, 0n);
   const prepaid = toCents(invoice.prepaidAmount ?? 0);
 
   return {
     lineNet: lineCents.map(fromCents),
-    lineDiscounts: discounts.map((d) => d && { base: fromCents(d.base), amount: fromCents(d.amount) }),
+    lineDiscounts: discounts.map(
+      (discount) => discount && { base: fromCents(discount.base), amount: fromCents(discount.amount) },
+    ),
     lineTotal: fromCents(lineTotal),
     allowances: fromCents(allowances),
     charges: fromCents(charges),
