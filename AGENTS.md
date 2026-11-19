@@ -25,7 +25,8 @@ A change is done when `npm test`, `npm run type-check`, `npm run lint` and `npm 
 
 ## Where things are
 
-`src/` is split into layers, one folder each. A layer imports only the layers listed beside it;
+`src/` is split into layers, one folder each ([docs/architecture.md](docs/architecture.md) shows how an invoice moves
+through them). A layer imports only the layers listed beside it;
 `test/architecture.test.ts` enforces this, and that there is no cycle between files. `test/` has the same folders, and
 `test/site/` for the web app.
 

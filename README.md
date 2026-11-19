@@ -268,7 +268,8 @@ npm run site             # the web app on http://localhost:4350
 ```
 
 The rest is in [CONTRIBUTING.md](CONTRIBUTING.md): the checks, the reference validation and how the reader is
-measured.
+measured. How the code is laid out and how an invoice moves through it is in
+[docs/architecture.md](docs/architecture.md).
 
 ## Licence
 

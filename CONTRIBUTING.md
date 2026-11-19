@@ -4,7 +4,8 @@ Thanks for helping out. The project stays small on purpose: established librarie
 PDF, text extraction), and this repository adds the data model, the checks and the front ends.
 
 The commands, a map of the code and the rules are in [AGENTS.md](AGENTS.md); they hold for people as for coding
-agents. Everyone who takes part is expected to follow the [code of conduct](CODE_OF_CONDUCT.md).
+agents. How an invoice moves through the code, the layers and the conventions are in
+[docs/architecture.md](docs/architecture.md). Everyone who takes part is expected to follow the [code of conduct](CODE_OF_CONDUCT.md).
 
 ## Pull requests
 
