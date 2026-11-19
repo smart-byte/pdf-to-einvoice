@@ -148,7 +148,8 @@ function summarise(findings: Finding[], unchecked: Finding[]): { errors: Finding
 function renderSummary(errors: Finding[], warnings: Finding[]): void {
   const summary = $('#summary');
   summary.replaceChildren();
-  summary.className = `summary summary--${errors.length ? 'error' : warnings.length ? 'warning' : 'ok'}`;
+  const tone = warnings.length ? 'warning' : 'ok';
+  summary.className = `summary summary--${errors.length ? 'error' : tone}`;
   const count = (key: string, n: number) => (n ? t(n === 1 ? `${key}.one` : key, { n }) : '');
   const headline = [
     count(state.mode === 'validate' ? 'valid.errors' : 'sum.errors', errors.length),

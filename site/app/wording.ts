@@ -27,12 +27,10 @@ export function describe(finding: Pick<Finding, 'code' | 'message' | 'params'> &
   });
 }
 /** Why creating failed. An error of the library carries a code, and the page has a sentence for each. */
-export const reasonOf = (error: unknown) =>
-  error instanceof Error && error.name === 'InvoiceError'
-    ? describe(error as Error & { code: string })
-    : error instanceof Error
-      ? error.message
-      : String(error);
+export function reasonOf(error: unknown): string {
+  if (!(error instanceof Error)) return String(error);
+  return error.name === 'InvoiceError' ? describe(error as Error & { code: string }) : error.message;
+}
 export const formatMoney = (n: number) =>
   new Intl.NumberFormat(lang(), {
     style: 'currency',
@@ -49,5 +47,6 @@ export function fieldLabel(path: string): string {
   // Seller and buyer have fields of the same name: the party is named first.
   const who = /^(seller|buyer)\./.exec(path)?.[1];
   if (label) return who ? `${t(who === 'seller' ? 'xml.seller' : 's.buyer')}, ${label}` : label;
-  return path.startsWith('totals.') ? t(`t.${path.slice(7)}`) : path === 'lines' ? t('s.lines') : '';
+  if (path.startsWith('totals.')) return t(`t.${path.slice(7)}`);
+  return path === 'lines' ? t('s.lines') : '';
 }

@@ -21,7 +21,8 @@ function showCounting(): void {
       toggle.hidden = true;
       continue;
     }
-    state.textContent = t(doNotTrack ? 'optout.dnt' : off ? 'optout.off' : 'optout.on');
+    const counted = off ? 'optout.off' : 'optout.on';
+    state.textContent = t(doNotTrack ? 'optout.dnt' : counted);
     toggle.hidden = doNotTrack;
     toggle.textContent = t(off ? 'optout.start' : 'optout.stop');
     toggle.onclick = () => {

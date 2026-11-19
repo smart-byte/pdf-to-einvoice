@@ -183,6 +183,6 @@ export function findCurrency(text: string): string | undefined {
         .join('\n'),
     ),
   ];
-  const one = onPage.length === 1 ? onPage : inTotals.length === 1 ? inTotals : [];
+  const one = [onPage, inTotals].find((codes) => codes.length === 1) ?? [];
   return after(text, /währung|currency|devise/, new RegExp(`${SEPARATOR}([A-Z]{3})\\b`))[0]?.hit[1] ?? one[0];
 }

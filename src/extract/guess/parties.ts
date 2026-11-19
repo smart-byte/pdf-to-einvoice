@@ -123,14 +123,11 @@ export const ISSUER_OR_BANK = new RegExp(`${ISSUER_SIGNS.source}|\\b(?:iban|bic)
 /** What a footer lists beside the issuer's name: its numbers, its VAT ID and its bank account. */
 const IDENTIFIERS = new RegExp(`${ISSUER_OR_BANK.source}|\\b(?:${VAT_ID_LABEL.source})`, 'i');
 
+/** Whose address a heading announces: the buyer's, the seller's, or another one, such as a delivery address. */
 export function roleOf(line: string): Role | undefined {
-  return BUYER_HEADING.test(line)
-    ? 'buyer'
-    : SELLER_HEADING.test(line)
-      ? 'seller'
-      : OTHER_HEADING.test(line)
-        ? 'other'
-        : undefined;
+  if (BUYER_HEADING.test(line)) return 'buyer';
+  if (SELLER_HEADING.test(line)) return 'seller';
+  return OTHER_HEADING.test(line) ? 'other' : undefined;
 }
 
 /** An address as found on the page, with what tells whose it is. */

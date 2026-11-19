@@ -52,11 +52,9 @@ function placesOf(path: string, on: Piece[]): Rect[] {
   const line = /^(lines\.\d+)\.(\w+)$/.exec(path);
   // The numbers of a line item are looked for next to its name: a "2" elsewhere on the page is not its quantity.
   // Known limit: the rate is looked for as "19 %" anywhere, since most invoices print it with the totals only; "7,5 %" is not found.
-  return !line || line[2] === 'name'
-    ? find(value)
-    : line[2] === 'vatRate'
-      ? find(`${value} %`)
-      : find(value, find(valueAt(state.draft, `${line[1]}.name`)));
+  if (!line || line[2] === 'name') return find(value);
+  if (line[2] === 'vatRate') return find(`${value} %`);
+  return find(value, find(valueAt(state.draft, `${line[1]}.name`)));
 }
 
 /** Marks on the page that is shown, where the values of the form are printed there. A value that stands on another page gets its mark when that page is shown. */

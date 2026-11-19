@@ -128,39 +128,53 @@ const MONTH_NAMED = new RegExp(`\\b(?:im|für|for|in)\\s+${monthAs('month')}\\s+
  * September 2026"). German VAT law accepts the calendar month as the date of supply (§ 31 (4) UStDV); the XML needs
  * its first and last day.
  */
-export function readPeriod(text: string, rows: string[]): { periodStart?: string; periodEnd?: string } {
-  const months = (year: string, from: number, to: number) => {
-    if (from < 1 || to > 12) return undefined;
-    return {
-      periodStart: `${year}-${pad(from)}-01`,
-      periodEnd: `${year}-${pad(to)}-${new Date(Date.UTC(Number(year), to, 0)).getUTCDate()}`,
-    };
+type Period = { periodStart: string; periodEnd: string };
+
+/** From the first day of the month `from` to the last day of the month `to` of one year; none for a month that is no month. */
+function months(year: string, from: number, to: number): Period | undefined {
+  if (from < 1 || to > 12) return undefined;
+  return {
+    periodStart: `${year}-${pad(from)}-01`,
+    periodEnd: `${year}-${pad(to)}-${new Date(Date.UTC(Number(year), to, 0)).getUTCDate()}`,
   };
+}
+
+/** The months a match of `MONTH_RANGE` names: from the first day of the one to the last day of the other. */
+function monthRangeOf(g: Record<string, string | undefined>): Period | undefined {
+  if (!g.fromYear || !g.fromMonth || !g.toYear || !g.toMonth) return undefined;
+  const from = months(g.fromYear, monthNumber(g.fromMonth), monthNumber(g.fromMonth));
+  const to = months(g.toYear, monthNumber(g.toMonth), monthNumber(g.toMonth));
+  return from && to && from.periodStart < to.periodEnd
+    ? { periodStart: from.periodStart, periodEnd: to.periodEnd }
+    : undefined;
+}
+
+/** The period one alternative of `PERIOD` matched: a quarter, two dates, a month by its name or by its number. */
+function periodOf(g: Record<string, string | undefined>): Period | undefined {
+  const quarter = Number(g.quarter ?? g.quartal);
+  const quarterYear = g.quarterYear ?? g.quartalYear;
+  if (quarter && quarterYear) return months(quarterYear, quarter * 3 - 2, quarter * 3);
+  if (g.fromDay && g.fromMonth && g.toDay && g.toMonth) {
+    return {
+      periodStart: `${g.fromYear}-${pad(g.fromMonth)}-${pad(g.fromDay)}`,
+      periodEnd: `${g.toYear}-${pad(g.toMonth)}-${pad(g.toDay)}`,
+    };
+  }
+  if (g.month && g.monthYear) return months(g.monthYear, monthNumber(g.month), monthNumber(g.month));
+  if (g.numberedMonth && g.numberedYear) {
+    return months(g.numberedYear, Number(g.numberedMonth), Number(g.numberedMonth));
+  }
+  return g.isoYear ? months(g.isoYear, Number(g.isoMonth), Number(g.isoMonth)) : undefined;
+}
+
+export function readPeriod(text: string, rows: string[]): { periodStart?: string; periodEnd?: string } {
   // "September 2026 bis Januar 2027": from the first day of the one month to the last day of the other.
   for (const { hit } of after(text, PERIOD_LABEL, MONTH_RANGE)) {
-    const g = hit.groups ?? {};
-    const [from, to] = [
-      months(g.fromYear!, monthNumber(g.fromMonth!), monthNumber(g.fromMonth!)),
-      months(g.toYear!, monthNumber(g.toMonth!), monthNumber(g.toMonth!)),
-    ];
-    if (from && to && from.periodStart < to.periodEnd)
-      return { periodStart: from.periodStart, periodEnd: to.periodEnd };
+    const period = monthRangeOf(hit.groups ?? {});
+    if (period) return period;
   }
   for (const { hit } of after(text, PERIOD_LABEL, PERIOD)) {
-    const g = hit.groups ?? {};
-    const quarter = Number(g.quarter ?? g.quartal);
-    const period = quarter
-      ? months(g.quarterYear ?? g.quartalYear!, quarter * 3 - 2, quarter * 3)
-      : g.fromDay
-        ? {
-            periodStart: `${g.fromYear}-${pad(g.fromMonth!)}-${pad(g.fromDay)}`,
-            periodEnd: `${g.toYear}-${pad(g.toMonth!)}-${pad(g.toDay!)}`,
-          }
-        : g.month
-          ? months(g.monthYear!, monthNumber(g.month), monthNumber(g.month))
-          : g.numberedMonth
-            ? months(g.numberedYear!, Number(g.numberedMonth), Number(g.numberedMonth))
-            : months(g.isoYear!, Number(g.isoMonth), Number(g.isoMonth));
+    const period = periodOf(hit.groups ?? {});
     if (period) return period;
   }
   const titled = rows.findIndex((row) => cells(row).some((cell) => TITLE.test(cell)));

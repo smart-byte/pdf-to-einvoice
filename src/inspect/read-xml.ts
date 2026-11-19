@@ -31,7 +31,8 @@ function percentageOf(entry: Node): { percent?: number; signed: boolean } {
 /** Every occurrence of a child element; the parser gives one as a value and several as an array. */
 function all(node: Node, name: string): Node[] {
   const value = typeof node === 'object' ? node[name] : undefined;
-  return value === undefined ? [] : Array.isArray(value) ? value : [value];
+  if (value === undefined) return [];
+  return Array.isArray(value) ? value : [value];
 }
 
 /** Follows element names down from a node; where an element repeats, the first one counts. */

@@ -41,16 +41,15 @@ Rules:
 
 const { $schema: _dialect, ...INVOICE_SCHEMA } = invoiceJsonSchema;
 /** The same schema for a draft: nothing is required, so an incomplete invoice can be sent to learn what it lacks. */
-const optional = (schema: unknown): unknown =>
-  Array.isArray(schema)
-    ? schema.map(optional)
-    : schema && typeof schema === 'object'
-      ? Object.fromEntries(
-          Object.entries(schema)
-            .filter(([key]) => key !== 'required' && key !== 'minItems')
-            .map(([key, value]) => [key, optional(value)]),
-        )
-      : schema;
+function optional(schema: unknown): unknown {
+  if (Array.isArray(schema)) return schema.map(optional);
+  if (!schema || typeof schema !== 'object') return schema;
+  return Object.fromEntries(
+    Object.entries(schema)
+      .filter(([key]) => key !== 'required' && key !== 'minItems')
+      .map(([key, value]) => [key, optional(value)]),
+  );
+}
 const DRAFT_SCHEMA = optional(INVOICE_SCHEMA);
 // No tool reaches beyond this machine: files are read and written locally, nothing is sent anywhere.
 const READS = { readOnlyHint: true, openWorldHint: false };

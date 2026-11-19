@@ -1,6 +1,6 @@
 import type { Party } from '../../domain/model.js';
 import { TITLE } from './head.js';
-import { BUYER_HEADING, DATE_OR_AMOUNT, type Found, type Role, roleOf, SELLER_HEADING, senderOf } from './parties.js';
+import { DATE_OR_AMOUNT, type Found, type Role, roleOf, senderOf } from './parties.js';
 import { cells } from './rows.js';
 import { after, CUSTOMER, SEPARATOR } from './values.js';
 
@@ -53,9 +53,8 @@ function headedBy(lines: string[], i: number): Mention['role'] {
   for (let j = i - 1; j >= 0 && j >= i - 10; j--) {
     const line = lines[j]!;
     if (!line || DATE_OR_AMOUNT.test(line) || TITLE.test(line)) return undefined;
-    const roles = cells(line).map((cell) =>
-      BUYER_HEADING.test(cell) ? 'buyer' : SELLER_HEADING.test(cell) ? 'seller' : undefined,
-    );
+    // Another address, such as one for delivery, heads no contact of either party.
+    const roles = cells(line).map((cell) => (roleOf(cell) === 'other' ? undefined : roleOf(cell)));
     if (roles.some(Boolean)) return roles.length === 1 ? roles[0] : 'unclear';
     if (roles.length === 1 && OTHER_ADDRESS.test(line)) return 'other';
   }
@@ -103,7 +102,8 @@ export function readContact(
   const partyIn = (cell: string): 'seller' | 'buyer' | 'unclear' | undefined => {
     const name = (senderOf(cell)?.name ?? cell).trim().toLowerCase();
     const matches = (['seller', 'buyer'] as const).filter((who) => parties[who]?.party.name?.toLowerCase() === name);
-    return matches.length === 1 ? matches[0] : matches.length > 1 ? 'unclear' : undefined;
+    if (matches.length > 1) return 'unclear';
+    return matches[0];
   };
   const role = (at: number, customers: boolean): Mention['role'] => {
     if (customers) return 'buyer';
