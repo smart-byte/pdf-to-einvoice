@@ -1,7 +1,8 @@
 // The form: its fields, the line items, the discounts and charges, and the choice of what "Create" makes.
 import { INVOICE_TYPES, VAT_CATEGORIES } from '../../src/domain/model.js';
 import { $, el, setText } from './dom.js';
-import { getPath, isEmpty, setPath } from './draft.js';
+import { valueAt } from '../../src/util/objects.js';
+import { isEmpty, setPath } from './draft.js';
 import { validate } from './findings.js';
 import { t } from '../shared/i18n.js';
 import { focusedPath } from './page.js';
@@ -131,7 +132,7 @@ const SELECT_DEFAULTS: Record<string, string> = { typeCode: '380', unit: 'C62', 
 
 function control(field: Field, path: string): HTMLElement {
   // An empty choice shows what will be used, not whichever option happens to come first.
-  const value = getPath(state.draft, path) ?? (field.blank ? '' : SELECT_DEFAULTS[field.path]) ?? '';
+  const value = valueAt(state.draft, path) ?? (field.blank ? '' : SELECT_DEFAULTS[field.path]) ?? '';
   const id = `in-${path.replace(/\./g, '-')}`;
   let input: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
   if (field.type === 'select') {
@@ -258,7 +259,7 @@ export function renderForm(): void {
   // group of further fields is open while one of them does.
   const asked = (field: Field) => (field.only ?? format) === format;
   const paths = new Set(SECTIONS.flatMap(({ fields }) => fields.filter(asked).map((field) => field.path)));
-  const filled = (field: Field) => !isEmpty(getPath(state.draft, field.path));
+  const filled = (field: Field) => !isEmpty(valueAt(state.draft, field.path));
   const [invoice, seller, buyer, payment, more] = SECTIONS.map(({ title, fields, collapsed }) => {
     const shown = fields.filter((field) => asked(field) || (filled(field) && !paths.has(field.path)));
     return section(

@@ -3,7 +3,11 @@ import { lineBase, micro, percentAgrees, slackOf } from '../domain/calculate.js'
 import type { Allowance, DocumentAllowance, InvoiceDraft, InvoiceType, VatCategory } from '../domain/model.js';
 import { messageOf } from '../util/errors.js';
 
-type Node = Record<string, any> | string | undefined;
+/**
+ * An element as the parser gives it: its text, or its children, attributes (`@_name`) and text (`#text`) by name,
+ * where a child that repeats is a list.
+ */
+type Node = string | { [name: string]: Node | Node[] } | undefined;
 
 // Every value stays a string, so "0042" or a postal code is not turned into a number; amounts are converted where
 // they are read. Character references such as &#228; are decoded only with htmlEntities.
@@ -24,13 +28,13 @@ function percentageOf(entry: Node): { percent?: number; signed: boolean } {
 }
 
 /** Every occurrence of a child element; the parser gives one as a value and several as an array. */
-function all(node: Node, name: string): any[] {
+function all(node: Node, name: string): Node[] {
   const value = typeof node === 'object' ? node[name] : undefined;
   return value === undefined ? [] : Array.isArray(value) ? value : [value];
 }
 
 /** Follows element names down from a node; where an element repeats, the first one counts. */
-const at = (node: Node, ...path: string[]): any => path.reduce((n, name) => all(n, name)[0], node);
+const at = (node: Node, ...path: string[]): Node => path.reduce<Node>((n, name) => all(n, name)[0], node);
 
 /** The text of an element, whether or not it carries attributes. Empty counts as absent. */
 function text(node: Node, ...path: string[]): string | undefined {
@@ -48,8 +52,10 @@ function number(node: Node, ...path: string[]): number | undefined {
 const date = (node: Node, ...path: string[]) =>
   text(node, ...path, 'DateTimeString')?.replace(/^(\d{4})(\d{2})(\d{2})$/, '$1-$2-$3');
 
-const attribute = (node: Node, name: string): string | undefined =>
-  typeof node === 'object' ? node[`@_${name}`] : undefined;
+function attribute(node: Node, name: string): string | undefined {
+  const value = typeof node === 'object' ? node[`@_${name}`] : undefined;
+  return typeof value === 'string' ? value : undefined;
+}
 
 function party(node: Node, who: 'seller' | 'buyer') {
   const address = at(node, 'PostalTradeAddress');

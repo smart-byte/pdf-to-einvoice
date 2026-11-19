@@ -1,10 +1,11 @@
+import { cents } from '../domain/calculate.js';
 import type { InvoiceDraft, Party } from '../domain/model.js';
 import { readContact } from './guess/contact.js';
 import { readBuyerReference, readNumber, readPaymentTerms, readPeriod, readType } from './guess/head.js';
 import { NOTE_CATEGORIES, readItems, readVatNote } from './guess/items.js';
 import { believed, cells, countryOfVatId, EU, type Found, ISSUER_OR_BANK, readParties } from './guess/parties.js';
 import { findCurrency, readTotals } from './guess/totals.js';
-import { after, anyOf, cents, DATE, findIban, SEPARATOR, toIsoDate, vatIdsIn } from './guess/values.js';
+import { after, anyOf, DATE, findIban, SEPARATOR, toIsoDate, vatIdsIn } from './guess/values.js';
 
 // Known limit: patterns for German, English and French invoices, no model. A value is believed for what it fits to, not
 // for where it stands: the totals are three printed amounts with net + VAT = gross, the items are rows that add up to

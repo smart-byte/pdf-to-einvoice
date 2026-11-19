@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { calculate, percentAgrees, resolveAdjustments, slackOf } from '../../src/domain/calculate.js';
+import {
+  calculate,
+  cents,
+  lineAgrees,
+  percentAgrees,
+  resolveAdjustments,
+  slackOf,
+  tryCalculate,
+} from '../../src/domain/calculate.js';
 import type { DocumentAllowance, Invoice, Line } from '../../src/domain/model.js';
 
 const line = (over: Partial<Line> = {}): Line => ({
@@ -106,6 +114,23 @@ describe('calculate', () => {
     expect(percentAgrees(499, 10, 49.92, 0.02)).toBe(true);
     expect(percentAgrees(499, 10, 49.93, 0.02)).toBe(false);
     expect(percentAgrees(4990, 10, 499.5, slackOf('HUF'))).toBe(true);
+  });
+
+  it('rounds to the cent half away from zero, also where binary floating point falls short of the half', () => {
+    // 1.005 * 100 is 100.49999999999999 in floating point, and 7 * 0.145 is 1.0149999999999999.
+    expect(cents(1.005)).toBe(101);
+    expect(cents(-1.005)).toBe(-101);
+    expect(cents(7 * 0.145)).toBe(102);
+    expect(cents(10.004)).toBe(1000);
+  });
+
+  it('compares a line total with quantity times price less the discount before rounding', () => {
+    expect(lineAgrees(10, 49.9, 0, 499.02, 0.02)).toBe(true);
+    expect(lineAgrees(10, 49.9, 0, 499.03, 0.02)).toBe(false);
+    expect(lineAgrees(1, 1.005, 0.02, 0.985, 0)).toBe(true);
+    expect(lineAgrees(-2, 50, -10, -90, 0.02)).toBe(true);
+    expect(lineAgrees(1, 500, 0, 499.5, slackOf('HUF'))).toBe(true);
+    expect(lineAgrees(1, 500, 0, 499.49, slackOf('HUF'))).toBe(false);
   });
 
   it('prefers the printed line total to the discount, and leaves lines without one alone', () => {
@@ -266,6 +291,16 @@ describe('discounts and charges on the whole invoice', () => {
     expect(t).toMatchObject({ adjustments: [], resolved: false });
     expect(t.problems.map(({ path, code }) => `${path} ${code}`)).toEqual(['discounts.1.percent adjustment']);
     expect(resolveAdjustments(invoice(mixed), false)).toEqual({ adjustments: [], problems: [], resolved: false });
+  });
+
+  it('gives the totals with the problems of the entries, and none while one cannot be placed, without throwing', () => {
+    const placed = tryCalculate(invoice([line()], { discounts: [{ amount: -10 }] }));
+    expect(placed.totals?.net).toBe(110);
+    expect(placed.problems).toMatchObject([{ path: 'discounts.0.amount', code: 'adjustment-sign' }]);
+    const stuck = tryCalculate(invoice(mixed, { discounts: [{ amount: 10 }] }));
+    expect(stuck.totals).toBeUndefined();
+    expect(stuck.problems).toMatchObject([{ path: 'discounts.0.vatRate', severity: 'error' }]);
+    expect(tryCalculate(invoice(mixed), false)).toEqual({ problems: [] });
   });
 
   it('warns about an amount against the sign of its lines, but not in a group of its own', () => {

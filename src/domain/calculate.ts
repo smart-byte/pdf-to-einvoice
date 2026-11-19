@@ -1,7 +1,14 @@
 import { isNumber } from '../util/numbers.js';
 import { error, warning, type Finding } from './finding.js';
 import type { MessageKey, MessageParams } from './messages.js';
-import { VAT_CATEGORIES, type Invoice, type Line, type Unchecked, type VatCategory } from './model.js';
+import {
+  isVatCategory,
+  type DocumentAllowance,
+  type Invoice,
+  type Line,
+  type Unchecked,
+  type VatCategory,
+} from './model.js';
 
 export interface VatGroup {
   category: VatCategory;
@@ -47,14 +54,16 @@ export interface Totals {
   due: number;
 }
 
-// Amounts are summed as whole cents in BigInt: binary floating point cannot
-// represent 1.005 and would round it down.
+// Amounts are taken in millionths and summed as whole cents in BigInt: binary floating point cannot represent 1.005
+// and would round it down.
 export const micro = (n: number) => BigInt(Math.round(n * 1e6));
+
+const abs = (n: bigint) => (n < 0n ? -n : n);
 
 /** Integer division, rounding half away from zero (commercial rounding). */
 function divRound(n: bigint, d: bigint): bigint {
-  const abs = n < 0n ? -n : n;
-  const q = (abs + d / 2n) / d;
+  if (d < 0n) return divRound(-n, -d);
+  const q = (abs(n) + d / 2n) / d;
   return n < 0n ? -q : q;
 }
 
@@ -63,11 +72,25 @@ const fromCents = (c: bigint) => Number(c) / 100;
 const baseCents = (quantity: number, unitPrice: number) => divRound(micro(quantity) * micro(unitPrice), 10n ** 10n);
 const percentCents = (base: bigint, percent: number) => divRound(base * micro(percent), 10n ** 8n);
 
+/**
+ * An amount in whole cents, rounded half away from zero: 1.005 is 101, where `Math.round(1.005 * 100)` gives 100. NaN
+ * for what cannot be calculated with: NaN, infinity, or a number too large for its millionths.
+ */
+export const cents = (n: number) => (Number.isFinite(n * 1e6) ? Number(toCents(n)) : NaN);
+
 /** Quantity times unit price, rounded to the cent: the base of a line and of its discount. */
 export const lineBase = (quantity: number, unitPrice: number) => fromCents(baseCents(quantity, unitPrice));
 
 /** The percentage of a base, rounded to the cent. */
 export const percentOf = (base: number, percent: number) => fromCents(percentCents(toCents(base), percent));
+
+/** The net amount a gross amount holds at a VAT rate, rounded to the cent: 119 at 19 % holds 100. */
+export const netOfGross = (gross: number, rate: number) =>
+  fromCents(divRound(toCents(gross) * 10n ** 8n, 10n ** 8n + micro(rate)));
+
+/** The price of one unit of an amount, rounded to the cent. */
+export const perUnit = (amount: number, quantity: number) =>
+  fromCents(divRound(toCents(amount) * 10n ** 6n, micro(quantity)));
 
 /**
  * Whether an amount is the percentage of its base, `slack` apart at most (Peppol R040). The product is not rounded
@@ -75,13 +98,22 @@ export const percentOf = (base: number, percent: number) => fromCents(percentCen
  */
 export function percentAgrees(base: number, percent: number, amount: number, slack: number): boolean {
   const apart = micro(amount) * 100n * 10n ** 6n - micro(base) * micro(percent);
-  return (apart < 0n ? -apart : apart) <= micro(slack) * 100n * 10n ** 6n;
+  return abs(apart) <= micro(slack) * 100n * 10n ** 6n;
+}
+
+/**
+ * Whether a stated line total is quantity times price less `less` (its discount), `slack` apart at most. The product is
+ * not rounded first, as with `percentAgrees`.
+ */
+export function lineAgrees(quantity: number, unitPrice: number, less: number, net: number, slack: number): boolean {
+  const apart = micro(quantity) * micro(unitPrice) - (micro(less) + micro(net)) * 10n ** 6n;
+  return abs(apart) <= micro(slack) * 10n ** 6n;
 }
 
 /** How far a stated amount may be from the calculated one: two cents, half a forint where there are no cents (PEPPOL-EN16931-R120). */
 export const slackOf = (currency?: string) => (currency === 'HUF' ? 0.5 : 0.02);
 
-const formatCents = (cents: bigint) => fromCents(cents).toFixed(2);
+const formatCents = (amount: bigint) => fromCents(amount).toFixed(2);
 
 /** Each line in cents, and its discount with the base it was taken from. Expects the numbers of every line. */
 function linesInCents(lines: Line[]) {
@@ -140,17 +172,21 @@ const WHAT = { discounts: 'discount', charges: 'charge' } as const;
 const pathOf = (list: List, index: number, field?: string) =>
   field ? `${list}.${index}.${field}` : `${list}.${index}`;
 
-/** The lines summed by VAT category and rate, in the order the groups first appear. */
-function groupLines(lines: Line[], lineCents: bigint[]): Group[] {
+/** Amounts summed by VAT category and rate, in the order the groups first appear. */
+function sumByGroup(parts: Group[]): Group[] {
   const groups = new Map<string, Group>();
-  lines.forEach((line, i) => {
-    const key = `${line.vatCategory}|${line.vatRate}`;
-    const group = groups.get(key) ?? { category: line.vatCategory, rate: line.vatRate, cents: 0n };
-    group.cents += lineCents[i]!;
+  for (const part of parts) {
+    const key = `${part.category}|${part.rate}`;
+    const group = groups.get(key) ?? { category: part.category, rate: part.rate, cents: 0n };
+    group.cents += part.cents;
     groups.set(key, group);
-  });
+  }
   return [...groups.values()];
 }
+
+/** Each line as a part of its VAT group. */
+const lineParts = (lines: Line[], lineCents: bigint[]): Group[] =>
+  lines.map((line, i) => ({ category: line.vatCategory, rate: line.vatRate, cents: lineCents[i]! }));
 
 /**
  * What one entry needs by itself, without the lines: numbers that are numbers, a percentage or an amount, a VAT
@@ -160,7 +196,7 @@ function groupLines(lines: Line[], lineCents: bigint[]): Group[] {
 function checkEntry(raw: unknown, list: List, index: number): { checked?: Checked; problems: Finding[] } {
   const what = WHAT[list];
   const at = (field?: string) => pathOf(list, index, field);
-  const entry: Unchecked = raw && typeof raw === 'object' ? raw : {};
+  const entry: Unchecked<DocumentAllowance> = raw && typeof raw === 'object' ? raw : {};
   const problems: Finding[] = [];
   let usable = true;
   const refuse = <K extends MessageKey>(path: string, key: K, ...params: MessageParams<K>) => {
@@ -168,7 +204,7 @@ function checkEntry(raw: unknown, list: List, index: number): { checked?: Checke
     usable = false;
   };
 
-  for (const field of ['percent', 'amount', 'vatRate']) {
+  for (const field of ['percent', 'amount', 'vatRate'] as const) {
     if (entry[field] !== undefined && !isNumber(entry[field])) refuse(at(field), 'format.number');
   }
   if (entry.percent === undefined && entry.amount === undefined) refuse(at(), 'adjustment', { what });
@@ -177,8 +213,8 @@ function checkEntry(raw: unknown, list: List, index: number): { checked?: Checke
     problems.push(error(at('reason'), 'charge-reason'));
   }
 
-  let category: VatCategory | undefined = entry.vatCategory;
-  if (category !== undefined && !(category in VAT_CATEGORIES)) {
+  let category = isVatCategory(entry.vatCategory) ? entry.vatCategory : undefined;
+  if (entry.vatCategory !== undefined && category === undefined) {
     refuse(at('vatCategory'), 'format.category');
   } else if (isNumber(entry.vatRate)) {
     if (category === undefined && entry.vatRate > 0) category = 'S';
@@ -189,13 +225,14 @@ function checkEntry(raw: unknown, list: List, index: number): { checked?: Checke
   }
   if (!usable) return { problems };
 
-  const rate: number | undefined = category !== undefined && category !== 'S' ? 0 : entry.vatRate;
+  const vatRate = isNumber(entry.vatRate) ? entry.vatRate : undefined;
+  const rate = category !== undefined && category !== 'S' ? 0 : vatRate;
   const checked = {
     list,
     index,
     category,
     rate,
-    vatRate: entry.vatRate,
+    vatRate,
     percent: entry.percent,
     amount: entry.amount,
     reason: entry.reason,
@@ -331,7 +368,7 @@ function place(entry: Checked, groups: Group[], slack: number): Placed {
  * itself is checked, and nothing is placed.
  */
 function resolve(invoice: Adjustable, lineCents?: bigint[]) {
-  const groups = lineCents ? groupLines(invoice.lines, lineCents) : [];
+  const groups = lineCents ? sumByGroup(lineParts(invoice.lines, lineCents)) : [];
   const slack = slackOf(invoice.currency);
   const entries: Entry[] = [];
   const problems: Finding[] = [];
@@ -361,9 +398,9 @@ function resolve(invoice: Adjustable, lineCents?: bigint[]) {
   return { entries, problems, resolved };
 }
 
-const adjustmentOf = ({ cents, base, percent, reason, ...entry }: Entry): Adjustment => ({
+const adjustmentOf = ({ cents: amount, base, percent, reason, ...entry }: Entry): Adjustment => ({
   ...entry,
-  amount: fromCents(cents),
+  amount: fromCents(amount),
   ...(base !== undefined ? { base: fromCents(base), percent } : {}),
   ...(reason !== undefined ? { reason } : {}),
 });
@@ -382,31 +419,42 @@ export function resolveAdjustments(
 }
 
 /**
+ * `calculate` for data that may not allow it: the totals, where every discount and charge on the whole invoice could
+ * be placed in a VAT group, and what is wrong with these entries. Never throws. With `lines` false (their numbers are
+ * not all there yet) only what each entry needs by itself is checked, and there are no totals.
+ */
+export function tryCalculate(invoice: Invoice, lines = true): { totals?: Totals; problems: Finding[] } {
+  const inCents = lines ? linesInCents(invoice.lines) : undefined;
+  const { entries, problems, resolved } = resolve(invoice, inCents?.lineCents);
+  return resolved && inCents ? { totals: totalsOf(invoice, inCents, entries), problems } : { problems };
+}
+
+/**
  * Derives every total from the lines and the discounts and charges on the whole invoice, following the EN 16931
  * calculation rules: VAT is calculated per category and rate on the summed base (BR-CO-17), not per line. Throws if a
  * discount or charge on the whole invoice cannot be placed in a VAT group (see `resolveAdjustments`).
  */
 export function calculate(invoice: Invoice): Totals {
-  const { discounts, lineCents } = linesInCents(invoice.lines);
-  const { entries, problems, resolved } = resolve(invoice, lineCents);
-  if (!resolved) throw new Error(problems.flatMap((p) => (p.severity === 'error' ? [p.message] : [])).join(' '));
+  const { totals, problems } = tryCalculate(invoice);
+  if (!totals) throw new Error(problems.flatMap((p) => (p.severity === 'error' ? [p.message] : [])).join(' '));
+  return totals;
+}
 
-  const groups = new Map<string, { category: VatCategory; rate: number; taxable: bigint }>();
-  const add = (category: VatCategory, rate: number, cents: bigint) => {
-    const key = `${category}|${rate}`;
-    const group = groups.get(key) ?? { category, rate, taxable: 0n };
-    group.taxable += cents;
-    groups.set(key, group);
-  };
-  invoice.lines.forEach((line, i) => add(line.vatCategory, line.vatRate, lineCents[i]!));
-  for (const entry of entries) add(entry.category, entry.rate, entry.list === 'charges' ? entry.cents : -entry.cents);
+function totalsOf(
+  invoice: Invoice,
+  { discounts, lineCents }: ReturnType<typeof linesInCents>,
+  entries: Entry[],
+): Totals {
+  const breakdown = sumByGroup([
+    ...lineParts(invoice.lines, lineCents),
+    ...entries.map((entry) => ({
+      category: entry.category,
+      rate: entry.rate,
+      cents: entry.list === 'charges' ? entry.cents : -entry.cents,
+    })),
+  ]).map((g) => ({ ...g, tax: divRound(g.cents * micro(g.rate), 10n ** 8n) }));
 
-  const breakdown = [...groups.values()].map((g) => ({
-    ...g,
-    tax: divRound(g.taxable * micro(g.rate), 10n ** 8n),
-  }));
-
-  const sum = (cents: bigint[]) => cents.reduce((a, b) => a + b, 0n);
+  const sum = (amounts: bigint[]) => amounts.reduce((a, b) => a + b, 0n);
   const lineTotal = sum(lineCents);
   const allowances = sum(entries.filter((entry) => entry.list === 'discounts').map((entry) => entry.cents));
   const charges = sum(entries.filter((entry) => entry.list === 'charges').map((entry) => entry.cents));
@@ -426,7 +474,7 @@ export function calculate(invoice: Invoice): Totals {
     vatBreakdown: breakdown.map((g) => ({
       category: g.category,
       rate: g.rate,
-      taxable: fromCents(g.taxable),
+      taxable: fromCents(g.cents),
       tax: fromCents(g.tax),
     })),
     net: fromCents(net),

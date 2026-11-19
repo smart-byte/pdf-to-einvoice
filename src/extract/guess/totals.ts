@@ -1,4 +1,5 @@
-import { after, AMOUNT, anyOf, cents, MONEY, SEPARATOR, toNumber } from './values.js';
+import { cents } from '../../domain/calculate.js';
+import { after, AMOUNT, anyOf, MONEY, SEPARATOR, toNumber } from './values.js';
 
 // Totals: three printed amounts with net + VAT = gross, picked by their labels where several fit.
 
@@ -85,7 +86,10 @@ export type Totals = { net?: number; vat?: number; gross?: number };
  * three amounts fit, as on an invoice without VAT.
  */
 export function readTotals(searched: string, text: string): Totals {
-  const labelled = (label: RegExp) => after(searched, label, AMOUNT).map(({ hit }) => cents(toNumber(hit[1]!)));
+  // An amount too large to calculate with is none.
+  const amounts = (printed: string[]) =>
+    printed.map((amount) => cents(toNumber(amount))).filter((c) => !Number.isNaN(c));
+  const labelled = (label: RegExp) => amounts(after(searched, label, AMOUNT).map(({ hit }) => hit[1]!));
   const hits = { net: labelled(NET_LABEL), vat: labelled(VAT_LABEL), gross: labelled(GROSS_LABEL) };
   const [net, vat, gross] = [hits.net[0], hits.vat[0], hits.gross[0]];
   const first = {
@@ -97,7 +101,7 @@ export function readTotals(searched: string, text: string): Totals {
   // The same amount as net and as gross, and no VAT: an invoice without VAT, whatever else adds up on the page.
   if (net !== undefined && net === gross && vat === undefined) return { net: first.net, gross: first.gross };
 
-  const printed = new Set([...text.matchAll(PRINTED_AMOUNT)].map((match) => cents(toNumber(match[1]!))));
+  const printed = new Set(amounts([...text.matchAll(PRINTED_AMOUNT)].map((match) => match[1]!)));
   const sums: { net: number; vat: number; gross: number; score: number }[] = [];
   for (const n of printed) {
     for (const v of printed) {

@@ -99,6 +99,23 @@ describe('guessFromText on the layout of a German invoice', () => {
     ]);
   });
 
+  it('finds quantity and price whose product lies on half a cent, as the total rounds it', () => {
+    // 7 x 0.145 is 1.015, which binary floating point holds as 1.0149999999999999.
+    const cable = hours
+      .replace('2   Softwarelizenz (Jahr)   2 Stk.   249,50 €   499,00 €', '2   Kabel   7 m   0,145 €   1,02 €')
+      .replace('1.499,00 €', '1.001,02 €')
+      .replace('284,81 €', '190,19 €')
+      .replace('1.783,81 €', '1.191,21 €');
+    expect(guessFromText(cable).lines?.[1]).toEqual({
+      name: 'Kabel',
+      quantity: 7,
+      unit: 'MTR',
+      unitPrice: 0.145,
+      vatCategory: 'S',
+      vatRate: 19,
+    });
+  });
+
   it('reads no lines when the rows do not add up to the printed net total', () => {
     expect(guessFromText(hours.replace('499,00 €', '500,00 €')).lines).toBeUndefined();
   });

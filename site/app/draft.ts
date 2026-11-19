@@ -1,12 +1,19 @@
 // Paths into the draft, e.g. "seller.name" or "lines.0.unitPrice", and merging what was read into it.
 import type { InvoiceDraft } from '../../src/domain/model.js';
+import { valueAt } from '../../src/util/objects.js';
 import { state } from './state.js';
 
-export const getPath = (object: any, path: string) => path.split('.').reduce((o, key) => o?.[key], object);
-export function setPath(object: any, path: string, value: unknown): void {
+/** An object or a list of the draft, by key or index. */
+type Tree = Record<string, unknown>;
+
+/** Writes a value at a path, making the objects and lists on the way; an empty value removes the field. */
+export function setPath(object: object, path: string, value: unknown): void {
   const keys = path.split('.');
   const last = keys.pop()!;
-  const parent = keys.reduce((o, key, i) => (o[key] ??= /^\d+$/.test(keys[i + 1] ?? last) ? [] : {}), object);
+  const parent = keys.reduce<Tree>(
+    (o, key, i) => (o[key] ??= /^\d+$/.test(keys[i + 1] ?? last) ? [] : {}) as Tree,
+    object as Tree,
+  );
   if (value === undefined || value === '') delete parent[last];
   else parent[last] = value;
 }
@@ -20,7 +27,7 @@ const hasContent = (lines: unknown) =>
  * that are already there stay as well: what the patterns found is not replaced by what a model read. Returns what
  * was filled in: the paths of the fields, and one path per line item ("lines.2") where the lines were taken over.
  */
-export function merge(extra: any, onlyEmpty = false, prefix = '', filled: string[] = []): string[] {
+export function merge(extra: object, onlyEmpty = false, prefix = '', filled: string[] = []): string[] {
   for (const [key, value] of Object.entries(extra ?? {})) {
     const path = prefix ? `${prefix}.${key}` : key;
     if (isEmpty(value)) continue;
@@ -31,7 +38,7 @@ export function merge(extra: any, onlyEmpty = false, prefix = '', filled: string
         filled.push(...value.map((_, i) => `lines.${i}`));
       }
     } else if (typeof value === 'object') merge(value, onlyEmpty, path, filled);
-    else if (!state.touched.has(path) && !(onlyEmpty && !isEmpty(getPath(state.draft, path)))) {
+    else if (!state.touched.has(path) && !(onlyEmpty && !isEmpty(valueAt(state.draft, path)))) {
       setPath(state.draft, path, NUMERIC.test(path) ? toNumber(value) : value);
       filled.push(path);
     }
@@ -50,7 +57,7 @@ function toNumber(value: unknown): unknown {
   );
   return Number.isFinite(number) && digits ? number : value;
 }
-const normalise = (line: any) =>
+const normalise = (line: unknown) =>
   Object.fromEntries(Object.entries(line ?? {}).map(([k, v]) => [k, NUMERIC.test(k) ? toNumber(v) : v]));
 /** Turns the number-like strings of a model answer into numbers, everywhere in the draft. */
 export const normaliseDraft = (draft: any): InvoiceDraft => ({

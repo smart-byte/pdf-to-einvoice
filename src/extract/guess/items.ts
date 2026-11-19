@@ -1,7 +1,8 @@
+import { cents, lineBase, netOfGross, percentOf, perUnit } from '../../domain/calculate.js';
 import type { Line, VatCategory } from '../../domain/model.js';
 import { cells, KEY_VALUE, senderOf } from './parties.js';
 import { rateOf, type Totals, TOTALS_CELL, TOTALS_ROW } from './totals.js';
-import { anyOf, cents, CURRENCY, lastIndex, MONEY, toNumber } from './values.js';
+import { anyOf, CURRENCY, lastIndex, MONEY, toNumber } from './values.js';
 
 // Items: the rows of the table that add up to the totals, with quantity, unit, price and VAT rate, and the note that
 // says why no VAT is charged.
@@ -73,7 +74,9 @@ function itemOf(parts: string[], table: number): Item {
   const figures: Figure[] = before
     .filter((cell) => cell !== name && /^\(?[€$£]?\s*-?\d/.test(cell))
     .flatMap((cell) => [...cell.matchAll(NUMBER)])
-    .map(([, number, mark = '']) => ({ value: toNumber(number!), mark, money: /[.,]\d{2}$/.test(number!) }));
+    .map(([, number, mark = '']) => ({ value: toNumber(number!), mark, money: /[.,]\d{2}$/.test(number!) }))
+    // A number too large to calculate with is no quantity and no price.
+    .filter((figure) => !Number.isNaN(cents(figure.value)));
   const item: Item = { name, cell: name, total: toNumber(MONEY_CELL.exec(parts.at(-1)!)![1]!), table, below: [] };
 
   const rates = figures.filter((figure) => figure.mark === '%');
@@ -98,7 +101,7 @@ function itemOf(parts: string[], table: number): Item {
   const hasUnit = (figure: Figure) => figure.mark !== '' && !isPrice(figure);
   for (const [i, a] of others.entries()) {
     for (const b of others.slice(i + 1)) {
-      if (Math.round(a.value * b.value * 100) !== cents(item.total)) continue;
+      if (cents(lineBase(a.value, b.value)) !== cents(item.total)) continue;
       // Known limit: where neither a currency nor a unit nor a whole number tells, the quantity is taken to come first.
       const swap =
         isPrice(a) ||
@@ -184,17 +187,20 @@ export function readItems(rows: string[], totals: Totals, blocks: string[][] | u
   if (inclusive) {
     for (const line of lines) {
       if (line.vatRate === undefined || !line.quantity) return undefined;
-      line.net = Math.round((cents(line.total) * 100) / (100 + line.vatRate));
-      line.unitPrice = Math.round(line.net / line.quantity) / 100;
+      line.net = cents(netOfGross(line.total, line.vatRate));
+      line.unitPrice = perUnit(line.net / 100, line.quantity);
       // The printed net total has to come out to the cent, also line by line.
-      if (cents(line.quantity * line.unitPrice) !== line.net) return undefined;
+      if (cents(lineBase(line.quantity, line.unitPrice)) !== line.net) return undefined;
     }
     if (lines.reduce((sum, line) => sum + line.net, 0) !== cents(totals.net!)) return undefined;
   }
   // Rates are believed when they give the printed VAT: a percentage in a row may as well be a discount.
   const taxable = new Map<number | undefined, number>();
   for (const line of lines) taxable.set(line.vatRate, (taxable.get(line.vatRate) ?? 0) + line.net);
-  const tax = [...taxable].reduce((sum, [rate, base]) => sum + Math.round((base * (rate ?? NaN)) / 100), 0);
+  const tax = [...taxable].reduce(
+    (sum, [rate, base]) => sum + (rate === undefined ? NaN : cents(percentOf(base / 100, rate))),
+    0,
+  );
   const rated = totals.vat === undefined || Math.abs(tax - cents(totals.vat)) <= taxable.size;
   return lines.map((line) => ({
     name: line.name || undefined,

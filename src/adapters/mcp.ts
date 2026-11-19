@@ -1,11 +1,18 @@
-import { readFile } from 'node:fs/promises';
 import { isAbsolute } from 'node:path';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ErrorCode, ListToolsRequestSchema, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { check } from '../domain/check.js';
 import { messageOf } from '../util/errors.js';
-import { CHOICES, createFile, createXRechnungFile, describePdf, packageVersion, validateFile } from './files.js';
+import {
+  CHOICES,
+  createFile,
+  createXRechnungFile,
+  describePdf,
+  packageVersion,
+  readPdf,
+  validateFile,
+} from './files.js';
 import { InvoiceError } from '../generate/create.js';
 import { invoiceJsonSchema, type InvoiceDraft } from '../domain/model.js';
 import { readEmbeddedXml } from '../pdf/file.js';
@@ -33,7 +40,7 @@ Rules:
 
 const { $schema: _dialect, ...INVOICE_SCHEMA } = invoiceJsonSchema;
 /** The same schema for a draft: nothing is required, so an incomplete invoice can be sent to learn what it lacks. */
-const optional = (schema: any): any =>
+const optional = (schema: unknown): unknown =>
   Array.isArray(schema)
     ? schema.map(optional)
     : schema && typeof schema === 'object'
@@ -157,8 +164,6 @@ function choiceArg<K extends keyof typeof CHOICES>(args: Args, key: K): (typeof 
     throw new Error(`${key} must be ${CHOICES[key].join(' or ')}.`);
   return value as (typeof CHOICES)[K][number] | undefined;
 }
-
-const readPdf = async (path: string) => new Uint8Array(await readFile(path));
 
 /** Each handler returns the result (an object, or text to pass on as it is) or throws what went wrong. */
 const HANDLERS: Record<string, (args: Args) => Promise<object | string>> = {

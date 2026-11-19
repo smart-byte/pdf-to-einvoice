@@ -1,9 +1,9 @@
-import { isIban } from '../../domain/check.js';
+import { isIban, MONTHS } from '../../domain/check.js';
 
 // How values are recognised in the text: dates, amounts, currencies, IBANs, VAT IDs, and a value after its label.
 
-const MONTHS = ['jan', 'feb', 'm[aä]r', 'apr', 'ma[iy]', 'jun', 'jul', 'aug', 'sep', 'o[ck]t', 'nov', 'de[cz]'];
-export const MONTH = `(${MONTHS.join('|')})[a-zä]*\\.?`;
+/** A month by any of its names in `MONTHS`, and what an invoice adds to it: "Okt.", "Sept", "Mars". */
+export const MONTH = `(${MONTHS.flat().join('|')})[a-zä]*\\.?`;
 export const SEPARATOR = '^\\s*[:#.]?\\s*';
 
 /** ISO, 3.11.2026, 3.11.26, 3 November 2026, November 3, 2026, and 08/10/2026 where it can be read in one way only. */
@@ -35,8 +35,11 @@ export const anyOf = (...alternatives: RegExp[]): string => alternatives.map((pa
 
 export const pad = (n: string | number) => String(n).padStart(2, '0');
 const century = (year: string) => (year.length === 2 ? `20${year}` : year);
-export const monthNumber = (name: string) => MONTHS.findIndex((m) => new RegExp(`^${m}`, 'i').test(name)) + 1;
-export const cents = (n: number) => Math.round(n * 100);
+/** The number of a month whose name `MONTH` matched, 1 to 12. */
+export function monthNumber(name: string): number {
+  const lower = name.toLowerCase();
+  return MONTHS.findIndex((names) => names.some((known) => lower.startsWith(known))) + 1;
+}
 /** The index of the last item that passes the test, or -1. */
 export const lastIndex = <T>(items: T[], test: (item: T) => unknown) =>
   items.reduce((last, item, i) => (test(item) ? i : last), -1);

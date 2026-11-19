@@ -2,7 +2,8 @@
 import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.mjs';
 import pdfWorkerUrl from 'pdfjs-dist/legacy/build/pdf.worker.mjs?url';
 import { $, el } from './dom.js';
-import { getPath, isEmpty } from './draft.js';
+import { valueAt } from '../../src/util/objects.js';
+import { isEmpty } from './draft.js';
 import { fieldLabel } from './wording.js';
 import { t } from '../shared/i18n.js';
 import { locate, pageToShow, type Piece, type Rect } from './locate.js';
@@ -37,7 +38,7 @@ function placesOf(path: string, on: Piece[]): Rect[] {
   const find = (value: unknown, beside?: Rect[]) => locate(on, value, { beside, widthOf });
   const total = /^totals\.(net|vat|gross)$/.exec(path);
   if (total) return find(state.result?.totals?.[total[1] as 'net' | 'vat' | 'gross'] || undefined);
-  const value = getPath(state.draft, path);
+  const value = valueAt(state.draft, path);
   if (isEmpty(value)) return [];
   const line = /^(lines\.\d+)\.(\w+)$/.exec(path);
   // The numbers of a line item are looked for next to its name: a "2" elsewhere on the page is not its quantity.
@@ -46,7 +47,7 @@ function placesOf(path: string, on: Piece[]): Rect[] {
     ? find(value)
     : line[2] === 'vatRate'
       ? find(`${value} %`)
-      : find(value, find(getPath(state.draft, `${line[1]}.name`)));
+      : find(value, find(valueAt(state.draft, `${line[1]}.name`)));
 }
 
 /** Marks on the page that is shown, where the values of the form are printed there. A value that stands on another page gets its mark when that page is shown. */

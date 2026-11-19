@@ -99,6 +99,20 @@ describe('check', () => {
     expect(result.findings.find((f) => f.code === 'line-net')?.message).toContain('is 0.99,');
   });
 
+  it('compares a printed total with the calculated one in cents, rounded half away from zero', () => {
+    const printedNet = (net: number) =>
+      codesAt(
+        withChange((d) => {
+          d.lines = [{ name: 'Item', quantity: 1, unitPrice: 1.01, vatCategory: 'S', vatRate: 19 }];
+          d.totals = { net };
+        }),
+        'totals.net',
+      );
+    // 1.005 * 100 is 100.49999999999999 in floating point; in cents it is 1.01.
+    expect(printedNet(1.005)).toEqual([]);
+    expect(printedNet(1.004)).toEqual(['error:totals-mismatch']);
+  });
+
   it('checks a line total against quantity times price less the discount', () => {
     const at = (netAmount: number) =>
       codesAt(
@@ -370,6 +384,17 @@ describe('check', () => {
       expect(notInPdf(pdfText)).toEqual([]);
       expect(notInPdf('Fracht 9,90').map((f) => f.path)).toEqual(['discounts.0.percent', 'charges.1.amount']);
     });
+  });
+
+  it('knows only its own codes, not what every object inherits', () => {
+    const inherited = withChange((d) => {
+      d.typeCode = 'toString';
+      d.lines[0].vatCategory = 'constructor';
+      d.discounts = [{ amount: 1, vatCategory: 'hasOwnProperty' }];
+    });
+    expect(codesAt(inherited, 'typeCode')).toEqual(['error:format']);
+    expect(codesAt(inherited, 'lines.0.vatCategory')).toEqual(['error:format']);
+    expect(codesAt(inherited, 'discounts.0.vatCategory')).toEqual(['error:format']);
   });
 
   it('treats null and blank strings as missing', () => {

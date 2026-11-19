@@ -1,8 +1,10 @@
 import { amountSpellings, dateSpellings, isDate, isIban, MONTHS } from '../domain/check.js';
-import type { InvoiceDraft, Unchecked } from '../domain/model.js';
+import type { InvoiceDraft } from '../domain/model.js';
 import { escapeRegExp } from '../util/regexp.js';
 
-type Rule = (value: any, siblings: Unchecked) => boolean;
+/** The fields of one object of the draft: the invoice, a party, a line or the totals. */
+type Fields = Record<string, unknown>;
+type Rule = (value: unknown, siblings: Fields) => boolean;
 
 /** How a country is written on a page, in lower case. */
 export const COUNTRY_NAMES: Record<string, string[]> = {
@@ -132,25 +134,22 @@ export function keepWhatThePdfShows(input: unknown, pdfText: string): InvoiceDra
   };
   const totals: Record<string, Rule> = { net: amount, vat: amount, gross: amount, due: amount };
 
-  const keep = (object: unknown, rules: Record<string, Rule>): Unchecked => {
-    const bag = object && typeof object === 'object' ? (object as Unchecked) : {};
+  const fieldsOf = (object: unknown): Fields => (object && typeof object === 'object' ? (object as Fields) : {});
+  const keep = (object: unknown, rules: Record<string, Rule>): Fields => {
+    const bag = fieldsOf(object);
     return Object.fromEntries(Object.entries(bag).filter(([key, value]) => value != null && rules[key]?.(value, bag)));
   };
-  const draft = input as Unchecked;
-  const result: Unchecked = keep(draft, root);
-  for (const [key, rules] of [
-    ['seller', party],
-    ['buyer', party],
-    ['totals', totals],
-  ] as const) {
-    const kept = keep(draft[key], rules);
+  const draft = fieldsOf(input);
+  const result = keep(draft, root);
+  const [seller, buyer] = [keep(draft.seller, party), keep(draft.buyer, party)];
+  for (const [key, kept] of Object.entries({ seller, buyer, totals: keep(draft.totals, totals) })) {
     if (Object.keys(kept).length) result[key] = kept;
   }
-  if (Array.isArray(draft.lines) && draft.lines.length)
-    result.lines = draft.lines.map((given: unknown) => keep(given, line));
+  const lines = Array.isArray(draft.lines) && draft.lines.length ? draft.lines.map((given) => keep(given, line)) : [];
+  if (lines.length) result.lines = lines;
   // Two mix-ups no page can reveal: the seller repeated as the buyer, and a reason for charging no VAT although
   // every line charges it.
-  if (result.buyer?.name && result.buyer.name === result.seller?.name) delete result.buyer.name;
-  if (!result.lines?.some((kept: Unchecked) => kept.vatRate === 0)) delete result.vatExemptionReason;
+  if (buyer.name && buyer.name === seller.name) delete buyer.name;
+  if (!lines.some((kept) => kept.vatRate === 0)) delete result.vatExemptionReason;
   return result as InvoiceDraft;
 }

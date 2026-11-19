@@ -100,11 +100,12 @@ change them through a function of their owner.
 paths when it compiles, and Node needs the name of the file that exists at run time.
 
 **Data from outside is `Unchecked` until `check()` has seen it.** A draft from a PDF, a model, a JSON file or an MCP
-call may hold anything in any field. Code that reads it guards every value (`isNumber()` and the like); after `check()`
-it is an `Invoice` whose types hold.
+call may hold anything in any field. `Unchecked<T>` names the fields of `T` and holds every value as `unknown`, so a
+misspelt field does not compile and code that reads a value guards it first (`isNumber()`, `isVatCategory()` and the
+like); after `check()` it is an `Invoice` whose types hold.
 
 **Money is whole cents.** `domain/calculate.ts` sums amounts as integer cents in `BigInt` and rounds half away from
-zero; other code formats amounts, it does not calculate with them.
+zero; other code formats amounts and compares them in cents with `cents()`, it does not calculate with them.
 
 **A finding has a code and a text from the catalog.** `error(path, key, values)` and `warning(...)` in
 `domain/finding.ts` take both from `domain/messages.ts`. The code is stable: the web app shows a German text for it from

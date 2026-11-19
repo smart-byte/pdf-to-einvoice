@@ -322,3 +322,20 @@ describe('guessFromText with payment terms', () => {
     expect(guessFromText(`Rechnung 2026-21   6. Oktober 2026\n${terms}`).paymentTerms).toBe(terms);
   });
 });
+
+describe('guessFromText with numbers no invoice holds', () => {
+  it('reads no lines and no totals from amounts too large to calculate with, rather than failing', () => {
+    const huge = '9'.repeat(400);
+    const text = [
+      'Rechnung 2026-22   6. Oktober 2026',
+      `1   Gestaltung   ${huge} Std.   ${huge},00 €   ${huge},00 €`,
+      `Nettobetrag   ${huge},00 €`,
+      `Umsatzsteuer 19 %   ${huge},00 €`,
+      `Gesamtbetrag   ${huge},00 €`,
+    ].join('\n');
+    const guess = guessFromText(text);
+    expect(guess.number).toBe('2026-22');
+    expect(guess.lines).toBeUndefined();
+    expect(guess.totals).toBeUndefined();
+  });
+});
