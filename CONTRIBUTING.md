@@ -15,6 +15,16 @@ agents. Everyone who takes part is expected to follow the [code of conduct](CODE
 - Run `npm run type-check && npm run lint && npm run format:check && npm test && npm run build` before pushing; CI
   runs the same.
 
+## Formatting
+
+Prettier formats everything (`npm run format`), at 120 characters. A commit that only changes formatting goes into
+`.git-blame-ignore-revs`, so that blame shows who wrote a line rather than who reformatted it. GitHub reads that file by
+itself; for `git blame` on your machine, run once:
+
+```bash
+git config blame.ignoreRevsFile .git-blame-ignore-revs
+```
+
 ## Reference validation
 
 `npm test` checks this project's own logic. Whether a generated file conforms is checked by a reference validator,
