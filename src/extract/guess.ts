@@ -1,12 +1,12 @@
 import { cents } from '../domain/calculate.js';
 import { BIC } from '../domain/formats.js';
-import type { InvoiceDraft, Party } from '../domain/model.js';
+import type { InvoiceDraft, Line, Party, VatCategory } from '../domain/model.js';
 import { readContact } from './guess/contact.js';
 import { readBuyerReference, readNumber, readPaymentTerms, readPeriod, readType } from './guess/head.js';
 import { NOTE_CATEGORIES, readItems, readVatNote } from './guess/items.js';
 import { believed, countryOfVatId, EU, type Found, ISSUER_OR_BANK, readParties } from './guess/parties.js';
 import { cells } from './guess/rows.js';
-import { findCurrency, readTotals } from './guess/totals.js';
+import { findCurrency, readTotals, type Totals } from './guess/totals.js';
 import { after, anyOf, DATE, findIban, SEPARATOR, toIsoDate, vatIdsIn } from './guess/values.js';
 
 // Known limit: patterns for German, English and French invoices, no model. A value is believed for what it fits to, not
@@ -84,6 +84,50 @@ export interface GuessOptions {
 }
 
 /**
+ * The VAT IDs of seller and buyer. One that stands in the address of a party is that party's. Otherwise the customer's
+ * is labelled as such, and of the rest, one that stands beside the issuer's numbers or bank account, as in a footer,
+ * is the seller's.
+ */
+function vatIdsOf(searched: string, units: string[], found: { seller?: Found; buyer?: Found }) {
+  const vatIds = vatIdsIn(searched);
+  const inAddress = (party: Found | undefined) => (party ? vatIdsIn(party.tail)[0]?.id : undefined);
+  const buyer = inAddress(found.buyer) ?? vatIds.find(({ customer }) => customer)?.id;
+  const others = vatIds.filter(({ id, customer }) => !customer && id !== buyer);
+  const besideIssuer = others.find(({ id }) =>
+    units.some((unit) => unit.replace(/ /g, '').includes(id) && ISSUER_OR_BANK.test(unit)),
+  );
+  return { seller: inAddress(found.seller) ?? (besideIssuer ?? others[0])?.id, buyer };
+}
+
+/**
+ * The VAT category of an invoice that shows no VAT at all, and the reason printed for it. Why, the printed reason says,
+ * or else the country of the buyer: outside the EU the sale is not subject to VAT, elsewhere in the EU the buyer owes
+ * it, at home the seller is exempt. A person confirms this.
+ */
+function withoutVat(
+  rows: string[],
+  totals: Totals,
+  lines: Partial<Line>[],
+  countries: { seller?: string; buyer?: string },
+): { vatCategory?: VatCategory; reason?: string } {
+  const showsNoVat =
+    totals.vat === undefined &&
+    lines.every((line) => line.vatRate === undefined) &&
+    (totals.net === undefined || totals.gross === undefined || cents(totals.net) === cents(totals.gross));
+  if (!showsNoVat) return {};
+  const reason = readVatNote(rows);
+  const printed = NOTE_CATEGORIES.find(([pattern]) => pattern.test(reason ?? ''))?.[1];
+  const vatCategory = printed ?? categoryByCountry(countries.seller, countries.buyer);
+  return vatCategory ? { vatCategory, reason } : {};
+}
+
+function categoryByCountry(seller: string | undefined, buyer: string | undefined): VatCategory | undefined {
+  if (!buyer) return undefined;
+  if (!EU.has(buyer)) return 'O';
+  return buyer === seller ? 'E' : 'AE';
+}
+
+/**
  * Reads an invoice from its text without any model: values that fit together, wherever the layout puts them. A
  * starting point for review, not a result: check every value.
  */
@@ -101,23 +145,10 @@ export function guessFromText(text: string, options: GuessOptions = {}): Invoice
   const totals = readTotals(searched, text);
   const lines = readItems(rows, totals, options.blocks);
 
-  // A VAT ID belongs to the party in whose address it stands. Otherwise the customer's is labelled as such.
-  const vatIds = vatIdsIn(searched);
-  const inAddress = (party: Found | undefined) => (party ? vatIdsIn(party.tail)[0]?.id : undefined);
-  const buyer: Partial<Party> = {
-    ...believed(found.buyer),
-    vatId: inAddress(found.buyer) ?? vatIds.find(({ customer }) => customer)?.id,
-  };
-  // Of the rest, one that stands beside the issuer's numbers or bank account, as in a footer, is the seller's.
-  const others = vatIds.filter(({ id, customer }) => !customer && id !== buyer.vatId);
   const units = [...rows, ...(options.blocks ?? []).map((block) => block.join('   '))];
-  const besideIssuer = others.find(({ id }) =>
-    units.some((unit) => unit.replace(/ /g, '').includes(id) && ISSUER_OR_BANK.test(unit)),
-  );
-  const seller: Partial<Party> = {
-    ...believed(found.seller),
-    vatId: inAddress(found.seller) ?? (besideIssuer ?? others[0])?.id,
-  };
+  const vatIds = vatIdsOf(searched, units, found);
+  const buyer: Partial<Party> = { ...believed(found.buyer), vatId: vatIds.buyer };
+  const seller: Partial<Party> = { ...believed(found.seller), vatId: vatIds.seller };
   seller.country ??= countryOfVatId(seller.vatId);
   // An address without a country is at home when VAT is charged: that is the ordinary domestic invoice.
   buyer.country ??=
@@ -125,18 +156,10 @@ export function guessFromText(text: string, options: GuessOptions = {}): Invoice
     (buyer.postalCode && lines?.some((line) => (line.vatRate ?? 0) > 0) ? seller.country : undefined);
 
   // An invoice that shows no VAT at all charges none.
-  const showsNoVat =
-    totals.vat === undefined &&
-    lines?.every((line) => line.vatRate === undefined) &&
-    (totals.net === undefined || totals.gross === undefined || cents(totals.net) === cents(totals.gross));
-  // Why, the printed reason says, or else the country of the buyer: outside the EU the sale is not subject to VAT,
-  // elsewhere in the EU the buyer owes it, at home the seller is exempt. A person confirms this.
-  const note = lines && showsNoVat ? readVatNote(rows) : undefined;
-  const byCountry = buyer.country && (!EU.has(buyer.country) ? 'O' : buyer.country !== seller.country ? 'AE' : 'E');
-  const vatCategory =
-    lines && showsNoVat ? (NOTE_CATEGORIES.find(([pattern]) => pattern.test(note ?? ''))?.[1] ?? byCountry) : undefined;
+  const { vatCategory, reason } = lines
+    ? withoutVat(rows, totals, lines, { seller: seller.country, buyer: buyer.country })
+    : {};
   if (lines && vatCategory) for (const line of lines) Object.assign(line, { vatCategory, vatRate: 0 });
-  const vatExemptionReason = vatCategory ? note : undefined;
 
   const { number, dated, beside } = readNumber(searched, rows);
   const iban = findIban(text);
@@ -154,7 +177,7 @@ export function guessFromText(text: string, options: GuessOptions = {}): Invoice
     iban,
     // A BIC belongs to an IBAN; with another kind of account it has no place in the invoice data.
     bic: iban ? first(/\b(?:bic|swift)(?:[-/ ]?code)?/, new RegExp(`${SEPARATOR}(${BIC.source})\\b`)) : undefined,
-    vatExemptionReason,
+    vatExemptionReason: reason,
     seller: {
       ...seller,
       taxNumber: first(
