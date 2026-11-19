@@ -1,5 +1,5 @@
 import { XMLParser } from 'fast-xml-parser';
-import { lineBase, micro, percentAgrees, slackOf } from '../domain/calculate.js';
+import { exactSum, lineBase, percentAgrees, slackOf } from '../domain/calculate.js';
 import { isVatId } from '../domain/formats.js';
 import type { Allowance, DocumentAllowance, InvoiceDraft, InvoiceType, VatCategory } from '../domain/model.js';
 import { messageOf } from '../util/errors.js';
@@ -58,6 +58,42 @@ function attribute(node: Node, name: string): string | undefined {
   return typeof value === 'string' ? value : undefined;
 }
 
+/**
+ * A VAT category code as the XML states it. A code the standard does not know is passed on as it is, for `check` to
+ * report; it is not dropped as if the XML stated none.
+ */
+const category = (node: Node, ...path: string[]) => text(node, ...path) as VatCategory | undefined;
+
+/** The VAT rate of a discount or charge. Category O states none, so a category without a rate means 0. */
+const rateOf = (node: Node, vatCategory: VatCategory | undefined, ...path: string[]) =>
+  number(node, ...path) ?? (vatCategory !== undefined ? 0 : undefined);
+
+/**
+ * What a discount or charge states: its amount and its percentage of a base. `contradicts` is true where percentage,
+ * base and amount disagree in the XML itself (Peppol R040); a minus repeated before the percentage is forgiven.
+ * `allowance` keeps the percentage only where it gives the amount from `ownBase`, the base the data has, as well.
+ */
+function entryOf(entry: Node, slack: number) {
+  const amount = number(entry, 'ActualAmount');
+  const { percent, signed } = percentageOf(entry);
+  const base = number(entry, 'BasisAmount');
+  const agrees = (from: number | undefined, sign = 1) =>
+    from !== undefined &&
+    percent !== undefined &&
+    amount !== undefined &&
+    percentAgrees(from, sign * percent, amount, slack);
+  return {
+    percent,
+    agrees,
+    contradicts: percent !== undefined && base !== undefined && !agrees(base) && !(signed && agrees(base, -1)),
+    allowance: (ownBase: number | undefined): Allowance => ({
+      ...(agrees(ownBase) ? { percent } : {}),
+      ...(amount !== undefined ? { amount } : {}),
+      reason: text(entry, 'Reason') ?? text(entry, 'ReasonCode'),
+    }),
+  };
+}
+
 function party(node: Node, who: 'seller' | 'buyer') {
   const address = at(node, 'PostalTradeAddress');
   const contact = at(node, 'DefinedTradeContact');
@@ -94,7 +130,7 @@ function line(item: Node) {
     unit: attribute(quantity, 'unitCode'),
     unitPrice: number(item, 'SpecifiedLineTradeAgreement', 'NetPriceProductTradePrice', 'ChargeAmount'),
     netAmount: number(settlement, 'SpecifiedTradeSettlementLineMonetarySummation', 'LineTotalAmount'),
-    vatCategory: text(settlement, 'ApplicableTradeTax', 'CategoryCode') as VatCategory | undefined,
+    vatCategory: category(settlement, 'ApplicableTradeTax', 'CategoryCode'),
     // Category O states no rate at all.
     vatRate: number(settlement, 'ApplicableTradeTax', 'RateApplicablePercent') ?? 0,
   };
@@ -116,27 +152,10 @@ function lineOf(item: Node, currency: string | undefined) {
   if (entries.length !== 1 || text(entry, 'ChargeIndicator', 'Indicator') !== 'false' || !perUnit) {
     return { line: read, adjusted: entries.length > 0 || !perUnit, contradicts: false };
   }
-  const amount = number(entry, 'ActualAmount');
-  const { percent, signed } = percentageOf(entry);
-  const base = number(entry, 'BasisAmount');
-  const slack = slackOf(currency);
-  const agrees = (from: number | undefined, sign = 1) =>
-    from !== undefined &&
-    percent !== undefined &&
-    amount !== undefined &&
-    percentAgrees(from, sign * percent, amount, slack);
+  const stated = entryOf(entry, slackOf(currency));
   const ownBase =
     read.quantity !== undefined && read.unitPrice !== undefined ? lineBase(read.quantity, read.unitPrice) : undefined;
-  const discount: Allowance = {
-    ...(agrees(ownBase) ? { percent } : {}),
-    ...(amount !== undefined ? { amount } : {}),
-    reason: text(entry, 'Reason') ?? text(entry, 'ReasonCode'),
-  };
-  return {
-    line: { ...read, discount },
-    adjusted: false,
-    contradicts: percent !== undefined && base !== undefined && !agrees(base) && !(signed && agrees(base, -1)),
-  };
+  return { line: { ...read, discount: stated.allowance(ownBase) }, adjusted: false, contradicts: stated.contradicts };
 }
 
 /**
@@ -156,42 +175,24 @@ function adjustmentsOf(settlement: Node, lines: ReturnType<typeof line>[], curre
   for (const entry of all(settlement, 'SpecifiedTradeAllowanceCharge')) {
     const list = text(entry, 'ChargeIndicator', 'Indicator') === 'true' ? 'charges' : 'discounts';
     const path = `${list}.${read[list].length}`;
-    const amount = number(entry, 'ActualAmount');
-    const { percent, signed } = percentageOf(entry);
-    const base = number(entry, 'BasisAmount');
-    const vatCategory = text(entry, 'CategoryTradeTax', 'CategoryCode') as VatCategory | undefined;
-    // Category O states no rate at all. Without any category (BR-32) there is no rate either, and no VAT group is guessed.
-    const vatRate =
-      number(entry, 'CategoryTradeTax', 'RateApplicablePercent') ?? (vatCategory !== undefined ? 0 : undefined);
-    const agrees = (from: number | undefined, sign = 1) =>
-      from !== undefined &&
-      percent !== undefined &&
-      amount !== undefined &&
-      percentAgrees(from, sign * percent, amount, slack);
-    const group = lines.filter((l) => l.vatCategory === vatCategory && l.vatRate === vatRate);
-    // Summed in millionths, never in floating point euros.
-    const ownBase = group.every((l) => l.netAmount !== undefined)
-      ? Number(group.reduce((sum, l) => sum + micro(l.netAmount!), 0n)) / 1e6
-      : undefined;
-    if (percent !== undefined && base !== undefined && !agrees(base) && !(signed && agrees(base, -1)))
-      read.contradictions.push(`${path}.percent`);
-    else if (percent !== undefined && !agrees(ownBase)) read.percentages[path] = percent;
-    read[list].push({
-      ...(agrees(ownBase) ? { percent } : {}),
-      ...(amount !== undefined ? { amount } : {}),
-      reason: text(entry, 'Reason') ?? text(entry, 'ReasonCode'),
-      vatCategory,
-      vatRate,
-    });
+    const stated = entryOf(entry, slack);
+    const vatCategory = category(entry, 'CategoryTradeTax', 'CategoryCode');
+    // Without any category (BR-32) there is no rate either, and no VAT group is guessed.
+    const vatRate = rateOf(entry, vatCategory, 'CategoryTradeTax', 'RateApplicablePercent');
+    const amounts = lines.filter((l) => l.vatCategory === vatCategory && l.vatRate === vatRate).map((l) => l.netAmount);
+    const ownBase = amounts.every((amount) => amount !== undefined) ? exactSum(amounts) : undefined;
+    if (stated.contradicts) read.contradictions.push(`${path}.percent`);
+    else if (stated.percent !== undefined && !stated.agrees(ownBase)) read.percentages[path] = stated.percent;
+    read[list].push({ ...stated.allowance(ownBase), vatCategory, vatRate });
   }
   // The profile EXTENDED states freight apart, as a logistics service charge (BG-X-23): a charge on the whole invoice.
   for (const entry of all(settlement, 'SpecifiedLogisticsServiceCharge')) {
-    const vatCategory = text(entry, 'AppliedTradeTax', 'CategoryCode') as VatCategory | undefined;
+    const vatCategory = category(entry, 'AppliedTradeTax', 'CategoryCode');
     read.charges.push({
       amount: number(entry, 'AppliedAmount'),
       reason: text(entry, 'Description'),
       vatCategory,
-      vatRate: number(entry, 'AppliedTradeTax', 'RateApplicablePercent') ?? (vatCategory !== undefined ? 0 : undefined),
+      vatRate: rateOf(entry, vatCategory, 'AppliedTradeTax', 'RateApplicablePercent'),
     });
   }
   return read;

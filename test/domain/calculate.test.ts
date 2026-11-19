@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   calculate,
   cents,
+  exactSum,
   lineAgrees,
   percentAgrees,
   checkAdjustments,
@@ -122,6 +123,13 @@ describe('calculate', () => {
     expect(cents(-1.005)).toBe(-101);
     expect(cents(7 * 0.145)).toBe(102);
     expect(cents(10.004)).toBe(1000);
+  });
+
+  it('sums amounts without floating point error', () => {
+    expect(0.1 + 0.2).not.toBe(0.3);
+    expect(exactSum([0.1, 0.2])).toBe(0.3);
+    expect(exactSum([1000.1, -0.1, 0.005])).toBe(1000.005);
+    expect(exactSum([])).toBe(0);
   });
 
   it('compares a line total with quantity times price less the discount before rounding', () => {

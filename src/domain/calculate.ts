@@ -57,7 +57,7 @@ export interface Totals {
 
 // Amounts are taken in millionths and summed as whole cents in BigInt: binary floating point cannot represent 1.005
 // and would round it down.
-export const micro = (n: number) => BigInt(Math.round(n * 1e6));
+const micro = (n: number) => BigInt(Math.round(n * 1e6));
 
 const abs = (n: bigint) => (n < 0n ? -n : n);
 
@@ -78,6 +78,9 @@ const percentCents = (base: bigint, percent: number) => divRound(base * micro(pe
  * for what cannot be calculated with: NaN, infinity, or a number too large for its millionths.
  */
 export const cents = (n: number) => (Number.isFinite(n * 1e6) ? Number(toCents(n)) : NaN);
+
+/** The sum of amounts as given, not rounded: summed in millionths, where 0.1 + 0.2 is 0.3. */
+export const exactSum = (amounts: number[]) => Number(amounts.reduce((sum, n) => sum + micro(n), 0n)) / 1e6;
 
 /** Quantity times unit price, rounded to the cent: the base of a line and of its discount. */
 export const lineBase = (quantity: number, unitPrice: number) => fromCents(baseCents(quantity, unitPrice));
