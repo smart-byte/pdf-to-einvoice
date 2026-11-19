@@ -131,6 +131,20 @@ describe.skipIf(!asked)('the web app in a browser', () => {
     expect(await page.$eval('#done .stamp', (stamp) => (stamp as HTMLElement).hidden)).toBe(true);
   }, 120_000);
 
+  it('marks a total that no longer matches the page, beside what the page prints, and lets nothing be created', async () => {
+    const page = await open();
+    await read(page);
+    expect(await page.$$eval('#totals .total--off', (rows) => rows.length)).toBe(0);
+    await page.fill('[data-path="lines.0.quantity"]', '11');
+    const off = await page.$$eval('#totals .total--off', (rows) =>
+      rows.map((row) => [row.querySelector('dt')!.textContent, row.querySelector('.total__printed')?.textContent ?? '']),
+    );
+    // The sample prints net, VAT and gross, but no amount due of its own.
+    expect(off.map(([name]) => name)).toEqual(['Netto', 'Umsatzsteuer', 'Gesamt']);
+    for (const [, printed] of off) expect(printed).toMatch(/\d/);
+    expect(await page.$eval('#create', (button) => (button as HTMLButtonElement).disabled)).toBe(true);
+  }, 60_000);
+
   it('makes payment terms it suggests wait for a yes', async () => {
     // An invoice that states neither a due date nor payment terms.
     const doc = await PDFDocument.create();
