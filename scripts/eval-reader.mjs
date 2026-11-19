@@ -30,9 +30,11 @@ const sample = Number(option('--sample')) || Infinity;
 const walk = (dir) =>
   readdirSync(dir)
     .sort()
-    .flatMap((name) =>
-      statSync(join(dir, name)).isDirectory() ? walk(join(dir, name)) : /\.pdf$/i.test(name) ? [join(dir, name)] : [],
-    );
+    .flatMap((name) => {
+      const path = join(dir, name);
+      if (statSync(path).isDirectory()) return walk(path);
+      return /\.pdf$/i.test(name) ? [path] : [];
+    });
 const text = (v) => (typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().toLowerCase() : v);
 const id = (v) => (typeof v === 'string' ? v.replace(/\s+/g, '').toUpperCase() : v);
 const cents = (v) => (typeof v === 'number' ? Math.round(v * 100) : v);
@@ -64,7 +66,8 @@ const verdicts = (reading, truth) =>
     const expected = normalise(pick(truth));
     if (expected === undefined) return [];
     const got = normalise(pick(reading));
-    return [[field, got === undefined ? 'missing' : got === expected ? 'correct' : 'wrong']];
+    if (got === undefined) return [[field, 'missing']];
+    return [[field, got === expected ? 'correct' : 'wrong']];
   });
 const count = () => ({ correct: 0, missing: 0, wrong: 0 });
 

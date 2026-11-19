@@ -68,6 +68,9 @@ through them). A layer imports only the layers listed beside it;
   `src/domain/finding.ts`. A new code needs a German text in `site/shared/i18n.ts`; `test/site/i18n.test.ts` says
   which.
 - Money is calculated in whole cents (`src/domain/money.ts`), never in floating point euros.
+- oxlint caps how complex, how deeply nested and how long a function may be and how many parameters it takes, at the
+  highest value in the code when the caps were set (`.oxlintrc.json`). A change that splits the function holding a
+  cap up lowers it to the new highest value; no change raises it.
 - The website makes no request to a third party except the model download the user asks for. No scripts, styles or
   fonts from another origin, in any build. One further request exists, to the page counter of the project
   (`site/shared/counter.ts`, `site/shared/count.ts`): only a build that is given `ANALYTICS_WEBSITE_ID` counts, with the code in

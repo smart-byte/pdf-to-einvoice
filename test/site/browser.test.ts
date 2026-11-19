@@ -550,14 +550,14 @@ describe.skipIf(!asked)('the web app in a browser', () => {
 
   it('shows how far a language model has come with its answer', async () => {
     // What a model answers for the sample: every key of the schema in its order, with the one value the patterns do not read.
-    const filled = (schema: any, key = ''): unknown =>
-      schema.type === 'object'
-        ? Object.fromEntries(Object.entries(schema.properties).map(([name, value]) => [name, filled(value, name)]))
-        : schema.type === 'array'
-          ? [filled(schema.items), filled(schema.items)]
-          : key === 'email'
-            ? 'rechnung@muster-software.example'
-            : null;
+    const filled = (schema: any, key = ''): unknown => {
+      if (schema.type === 'object')
+        return Object.fromEntries(
+          Object.entries(schema.properties).map(([name, value]) => [name, filled(value, name)]),
+        );
+      if (schema.type === 'array') return [filled(schema.items), filled(schema.items)];
+      return key === 'email' ? 'rechnung@muster-software.example' : null;
+    };
     // Stands in for the library that runs the model: no model is loaded, and the answer comes piece by piece.
     const library = `
       const answer = ${JSON.stringify(JSON.stringify(filled(extractionSchema())))};
