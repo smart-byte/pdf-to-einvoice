@@ -319,8 +319,8 @@ export const STRINGS: Record<string, Entry> = {
   'done.xr.pdf': { de: 'PDF mit XRechnung herunterladen', en: 'Download PDF with XRechnung' },
 
   // One text per code of the library; in English its own message is shown. `e.<code>.<field>` words a code for one field,
-  // and {a}, {b}, {v} and {m} are filled in by the page (see `describe` in main.ts). test/i18n.test.ts checks that no
-  // code is missing.
+  // and {a}, {b} and {v} are filled in from the values of the finding, {m} with its English text (see `describe` in
+  // site/app/wording.ts). test/site/i18n.test.ts checks that no code is missing.
   'e.required': { de: 'Diese Angabe fehlt.', en: '' },
   'e.format': { de: 'Diese Angabe hat nicht das richtige Format. Bitte prüfen Sie die Schreibweise.', en: '' },
   'e.format.country': { de: 'Bitte geben Sie das Land als Kürzel mit zwei Buchstaben an, z.\u00a0B. DE.', en: '' },

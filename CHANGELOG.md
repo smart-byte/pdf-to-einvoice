@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- A finding carries the values its message was filled with as `params`, such as `{ expected: '0.99', stated: '0.50' }`.
+  The web app words its German texts from them instead of reading them out of the English message.
+
 ## [0.3.2] - 2026-11-19
 
 ### Fixed

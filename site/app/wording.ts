@@ -1,5 +1,5 @@
 // How the page words what the library says: findings in the language of the page, errors, amounts, field names.
-import { lineBase, percentOf } from '../../src/domain/calculate.js';
+import type { Finding } from '../../src/domain/finding.js';
 import { isCurrencyCode } from '../../src/domain/formats.js';
 import { lang, STRINGS, t } from '../shared/i18n.js';
 import { state } from './state.js';
@@ -7,33 +7,22 @@ import { state } from './state.js';
 /**
  * A finding, or an error of the library, in the language of the page: in German the text for its code, worded for its
  * field where there is one (`e.format.iban`), else the English message of the library. An existing e-invoice has words
- * of its own where a finding is about its XML (`e.totals-mismatch.xml`), in English as well. What a German text names,
- * it takes from the data rather than from the English sentence; only the value a message quotes and a message of the
- * library that writes the XML are passed on as they are.
+ * of its own where a finding is about its XML (`e.totals-mismatch.xml`), in English as well. A German text takes what
+ * it names from the values of the finding (`params`), the amounts as the check calculated them; only a message of the
+ * library that writes the XML is passed on as it is.
  */
-export function describe(finding: { code: string; message: string; path?: string }): string {
+export function describe(finding: Pick<Finding, 'code' | 'message' | 'params'> & { path?: string }): string {
   const path = finding.path ?? '';
   const candidates = [`e.${finding.code}.${path.split('.').at(-1)}`, `e.${finding.code}`];
   if (state.mode === 'validate') candidates.unshift(`e.${finding.code}.xml`);
   const key = candidates.find((candidate) => candidate in STRINGS);
   if (!key || (lang !== 'de' && !STRINGS[key]?.en)) return finding.message;
-  const line = state.draft.lines?.[Number(/^lines\.(\d+)\./.exec(path)?.[1])];
-  // What the line comes to: quantity times price, less its discount, in cents as the XML has it (1 x 1.005 less 0.02
-  // is 0.99, not 0.985). Nothing is calculated with a value that is not a number yet.
-  const [quantity, unitPrice, percent] = [
-    Number(line?.quantity),
-    Number(line?.unitPrice),
-    Number(line?.discount?.percent),
-  ];
-  const product = Number.isFinite(quantity) && Number.isFinite(unitPrice) ? lineBase(quantity, unitPrice) : NaN;
-  const discount =
-    line?.discount?.amount ?? (Number.isFinite(product) && Number.isFinite(percent) ? percentOf(product, percent) : 0);
+  const { expected, stated, value } = finding.params ?? {};
+  const money = (amount: unknown) => (amount === undefined ? '' : formatMoney(Number(amount)));
   return t(key, {
-    a: line ? formatMoney(product - Number(discount)) : '',
-    b: line ? formatMoney(Number(line.netAmount)) : '',
-    // Known limit: the value that could not be written is read from the quotes of the English message. Give the finding
-    // the value itself if that message is ever worded differently.
-    v: /"(.*)"/.exec(finding.message)?.[1] ?? '',
+    a: money(expected),
+    b: money(stated),
+    v: value === undefined ? '' : String(value),
     m: finding.message,
   });
 }

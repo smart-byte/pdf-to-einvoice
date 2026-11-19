@@ -8,14 +8,29 @@ export interface Finding {
   severity: 'error' | 'warning';
   code: string;
   message: string;
+  /**
+   * The values `message` was filled with, e.g. `{ expected: '0.99', stated: '0.50' }`, so that the text can be worded
+   * in another language without reading them out of the English one. Absent where the text has none.
+   */
+  params?: Readonly<Record<string, string | number | boolean>>;
+}
+
+function finding<K extends MessageKey>(
+  severity: Finding['severity'],
+  path: string,
+  key: K,
+  params: MessageParams<K>,
+): Finding {
+  const values = params[0] as Finding['params'];
+  return { path, severity, code: codeOf(key), message: message(key, ...params), ...(values ? { params: values } : {}) };
 }
 
 /** An error at `path`, with the code and the text of `key` (see `MESSAGES`). */
 export function error<K extends MessageKey>(path: string, key: K, ...params: MessageParams<K>): Finding {
-  return { path, severity: 'error', code: codeOf(key), message: message(key, ...params) };
+  return finding('error', path, key, params);
 }
 
 /** A warning at `path`, with the code and the text of `key` (see `MESSAGES`). */
 export function warning<K extends MessageKey>(path: string, key: K, ...params: MessageParams<K>): Finding {
-  return { path, severity: 'warning', code: codeOf(key), message: message(key, ...params) };
+  return finding('warning', path, key, params);
 }
