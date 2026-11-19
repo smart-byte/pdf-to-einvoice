@@ -75,15 +75,21 @@ export async function createFile(
 }
 
 /**
- * Writes the invoice as an XRechnung XML file, over an existing file only when `overwrite` is set (the error then
- * carries the code `EEXIST`).
+ * Writes the invoice as an XRechnung XML file. Never writes over `dataPath`, the file the data was read from, and over
+ * another existing file only when `overwrite` is set (the error then carries the code `EEXIST`).
  */
 export async function createXRechnungFile(
   invoice: InvoiceDraft,
   outputPath: string,
-  { overwrite = false, syntax }: { overwrite?: boolean; syntax?: XRechnungOptions['syntax'] } = {},
+  {
+    dataPath,
+    overwrite = false,
+    syntax,
+  }: { dataPath?: string; overwrite?: boolean; syntax?: XRechnungOptions['syntax'] } = {},
 ): Promise<{ outputPath: string; findings: Finding[]; totals: Totals }> {
   const output = resolve(outputPath);
+  if (dataPath !== undefined && sameFile(output, dataPath))
+    throw new Error('The output path is the data file. Choose another output path; the input is never overwritten.');
   if (!overwrite && existsSync(output)) throw Object.assign(new Error(`${output} already exists.`), { code: 'EEXIST' });
   const result = await createXRechnung({ invoice, syntax });
   await writeFile(output, result.xml, { flag: overwrite ? 'w' : 'wx' });

@@ -100,7 +100,7 @@ $('#ai-run').onclick = async () => {
     if (state.pdf !== pdf || run !== reads || abort.signal.aborted) return;
     // A small model translates names and makes up identifiers. Only what the PDF shows is taken over, and even of
     // that a good part is wrong: every value the model added is marked until the user has looked at it.
-    const added = merge(keepWhatThePdfShows(normaliseDraft(answer), state.pdfText), true);
+    const added = merge(state, keepWhatThePdfShows(normaliseDraft(answer), state.pdfText), { onlyEmpty: true });
     for (const path of added) state.toCheck.set(path, 'model');
     renderForm();
     // Counted as the verdict counts them: a value the form has no field for is not shown, so it is not counted.

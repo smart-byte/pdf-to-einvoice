@@ -1,7 +1,6 @@
 // Paths into the draft, e.g. "seller.name" or "lines.0.unitPrice", and merging what was read into it.
-import type { InvoiceDraft } from '../../src/domain/model.js';
+import { invoiceJsonSchema, type InvoiceDraft } from '../../src/domain/model.js';
 import { valueAt } from '../../src/util/objects.js';
-import { state } from './state.js';
 
 /** An object or a list of the draft, by key or index. */
 type Tree = Record<string, unknown>;
@@ -22,31 +21,56 @@ export const isEmpty = (value: unknown) => value === undefined || value === null
 const hasContent = (lines: unknown) =>
   Array.isArray(lines) && lines.some((line) => Object.values(line ?? {}).some((v) => !isEmpty(v)));
 
+/** What merging needs of the page: the draft, and the fields the user has typed into. */
+export interface Target {
+  draft: InvoiceDraft;
+  touched: Set<string>;
+}
+
 /**
  * Copies the values of `extra` into the draft, except where the user has already typed. With `onlyEmpty`, values
  * that are already there stay as well: what the patterns found is not replaced by what a model read. Returns what
  * was filled in: the paths of the fields, and one path per line item ("lines.2") where the lines were taken over.
  */
-export function merge(extra: object, onlyEmpty = false, prefix = '', filled: string[] = []): string[] {
-  for (const [key, value] of Object.entries(extra ?? {})) {
-    const path = prefix ? `${prefix}.${key}` : key;
-    if (isEmpty(value)) continue;
-    if (key === 'lines' && Array.isArray(value)) {
-      const typed = [...state.touched].some((p) => p.startsWith('lines.'));
-      if (!typed && !(onlyEmpty && hasContent(state.draft.lines)) && hasContent(value)) {
-        state.draft.lines = value.map(normalise) as InvoiceDraft['lines'];
-        filled.push(...value.map((_, i) => `lines.${i}`));
+export function merge(target: Target, extra: object, { onlyEmpty = false } = {}): string[] {
+  const filled: string[] = [];
+  const copy = (from: object, prefix: string) => {
+    for (const [key, value] of Object.entries(from)) {
+      const path = prefix ? `${prefix}.${key}` : key;
+      if (isEmpty(value)) continue;
+      if (key === 'lines' && Array.isArray(value)) {
+        const typed = [...target.touched].some((p) => p.startsWith('lines.'));
+        if (!typed && !(onlyEmpty && hasContent(target.draft.lines)) && hasContent(value)) {
+          target.draft.lines = value.map(normalise) as InvoiceDraft['lines'];
+          filled.push(...value.map((_, i) => `lines.${i}`));
+        }
+      } else if (typeof value === 'object') copy(value, path);
+      else if (!target.touched.has(path) && !(onlyEmpty && !isEmpty(valueAt(target.draft, path)))) {
+        setPath(target.draft, path, isNumberField(path) ? toNumber(value) : value);
+        filled.push(path);
       }
-    } else if (typeof value === 'object') merge(value, onlyEmpty, path, filled);
-    else if (!state.touched.has(path) && !(onlyEmpty && !isEmpty(valueAt(state.draft, path)))) {
-      setPath(state.draft, path, NUMERIC.test(path) ? toNumber(value) : value);
-      filled.push(path);
     }
-  }
+  };
+  copy(extra, '');
   return filled;
 }
 
-const NUMERIC = /(quantity|unitPrice|netAmount|vatRate|prepaidAmount|totals\.\w+)$/;
+/** A part of the JSON Schema, as far as it is walked here. */
+interface SchemaPart {
+  type?: unknown;
+  properties?: Record<string, SchemaPart>;
+  items?: SchemaPart;
+}
+/** The names of the fields the schema of the invoice holds as numbers, at any depth: quantity, unitPrice, net, ... */
+const NUMBER_FIELDS = new Set<string>();
+(function collect(part: SchemaPart, name?: string) {
+  if (part.type === 'number' && name) NUMBER_FIELDS.add(name);
+  for (const [key, value] of Object.entries(part.properties ?? {})) collect(value, key);
+  if (part.items) collect(part.items, name);
+})(invoiceJsonSchema);
+/** Whether the field at a path, or of that name, holds a number. */
+const isNumberField = (path: string) => NUMBER_FIELDS.has(path.split('.').at(-1)!);
+
 /** Models sometimes answer "1.499,00" although asked for a number. */
 function toNumber(value: unknown): unknown {
   if (typeof value !== 'string') return value;
@@ -58,7 +82,7 @@ function toNumber(value: unknown): unknown {
   return Number.isFinite(number) && digits ? number : value;
 }
 const normalise = (line: unknown) =>
-  Object.fromEntries(Object.entries(line ?? {}).map(([k, v]) => [k, NUMERIC.test(k) ? toNumber(v) : v]));
+  Object.fromEntries(Object.entries(line ?? {}).map(([k, v]) => [k, isNumberField(k) ? toNumber(v) : v]));
 /** Turns the number-like strings of a model answer into numbers, everywhere in the draft. */
 export const normaliseDraft = (draft: any): InvoiceDraft => ({
   ...draft,

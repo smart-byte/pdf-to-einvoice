@@ -18,7 +18,6 @@ import {
   packageVersion,
   readJson,
   readPdf,
-  sameFile,
   validateFile,
 } from './files.js';
 
@@ -103,15 +102,14 @@ const COMMANDS: Record<string, Command> = {
     args: 1,
     async run([dataPath], values, io) {
       const invoice = await readJson(dataPath!);
-      if (values.output !== undefined && sameFile(values.output, dataPath!)) {
-        throw new Error(
-          'The output path is the data file. Choose another output path; the input is never overwritten.',
-        );
-      }
       const result =
         values.output === undefined
           ? await createXRechnung({ invoice, syntax: values.syntax })
-          : await createXRechnungFile(invoice, values.output, { overwrite: values.force, syntax: values.syntax });
+          : await createXRechnungFile(invoice, values.output, {
+              dataPath,
+              overwrite: values.force,
+              syntax: values.syntax,
+            });
       for (const finding of result.findings) io.stderr(`${formatFinding(finding)}\n`);
       io.stdout(`${'xml' in result ? result.xml.replace(/\n$/, '') : result.outputPath}\n`);
       return 0;

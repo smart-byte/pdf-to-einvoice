@@ -64,7 +64,7 @@ async function open(pdf: Uint8Array, fileName: string): Promise<void> {
       state.fileFindings = result.findings.filter((finding) => FILE_CODES.has(finding.code));
       $('#read-status').textContent = result.profile ? t('valid.profile', { p: result.profile }) : '';
     } else {
-      merge(guessFromText(text, { blocks }));
+      merge(state, guessFromText(text, { blocks }));
       // What was read from the PDF, before anything is suggested.
       const found = JSON.stringify(state.draft).match(/":("|\d|-)/g)?.length ?? 0;
       // An invoice that shows no VAT gets its VAT category from the buyer's country, the same for every line: a person
