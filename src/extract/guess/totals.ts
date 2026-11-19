@@ -3,6 +3,117 @@ import { after, AMOUNT, anyOf, MONEY, SEPARATOR, toNumber } from './values.js';
 
 // Totals: three printed amounts with net + VAT = gross, picked by their labels where several fit.
 
+export type Totals = { net?: number; vat?: number; gross?: number };
+
+/**
+ * The totals: three printed amounts with net + VAT = gross. Labels say which three when several fit, and nothing
+ * else: an amount after a label is not believed against the sum. One or two labelled amounts are kept when no
+ * three amounts fit, as on an invoice without VAT.
+ */
+export function readTotals(searched: string, text: string): Totals {
+  const labelled = labelledIn(searched);
+  return labelledSum(labelled) ?? sumOnPage(text, labelled) ?? labelledAlone(labelled);
+}
+
+/** The amounts after each label, in cents, in the order they stand. */
+type Labelled = Record<'net' | 'vat' | 'gross', number[]>;
+
+function labelledIn(searched: string): Labelled {
+  const labelled = (label: RegExp) => centsOf(after(searched, label, AMOUNT).map(({ hit }) => hit[1]!));
+  return { net: labelled(NET_LABEL), vat: labelled(VAT_LABEL), gross: labelled(GROSS_LABEL) };
+}
+
+/** The first amount after each label, where they add up: net + VAT = gross, or net = gross and no VAT. */
+function labelledSum({ net: [net], vat: [vat], gross: [gross] }: Labelled): Totals | undefined {
+  if (net !== undefined && vat !== undefined && net + vat === gross) {
+    return { net: euros(net), vat: euros(vat), gross: euros(gross) };
+  }
+  // The same amount as net and as gross, and no VAT: an invoice without VAT, whatever else adds up on the page.
+  if (net !== undefined && net === gross && vat === undefined) return { net: euros(net), gross: euros(gross) };
+  return undefined;
+}
+
+/**
+ * Three amounts printed anywhere on the page that add up, scored by how many of them stand after their label. The
+ * best is believed when no other scores as high; where the page labels no amount at all, when it is the only one
+ * that charges VAT.
+ */
+function sumOnPage(text: string, labelled: Labelled): Totals | undefined {
+  const printed = new Set(centsOf([...text.matchAll(PRINTED_AMOUNT)].map((match) => match[1]!)));
+  // VAT of nothing is believed when a label says so; "0,00" alone may be anything.
+  const fits = (n: number, v: number) =>
+    n !== 0 && printed.has(n + v) && share(v, n) && (v !== 0 || labelled.vat.includes(0));
+  const sums: { net: number; vat: number; gross: number; score: number }[] = [];
+  for (const n of printed) {
+    for (const v of printed) {
+      if (!fits(n, v)) continue;
+      sums.push({
+        net: n / 100,
+        vat: v / 100,
+        gross: (n + v) / 100,
+        score: +labelled.net.includes(n) + +labelled.vat.includes(v) + +labelled.gross.includes(n + v),
+      });
+    }
+  }
+  sums.sort((a, b) => b.score - a.score);
+  const unlabelled = !labelled.net.length && !labelled.vat.length && !labelled.gross.length;
+  const [best, second] = sums[0]?.score ? sums : sums.filter((sum) => unlabelled && sum.vat !== 0);
+  return best && best.score > (second?.score ?? -1) ? { net: best.net, vat: best.vat, gross: best.gross } : undefined;
+}
+
+/**
+ * One or two labelled amounts, where no three add up, as on an invoice without VAT. Amounts that cannot belong
+ * together are not believed either. Net and gross may: the VAT between them is printed in parts where an invoice has
+ * several rates.
+ */
+function labelledAlone({ net: [net], vat: [vat], gross: [gross] }: Labelled): Totals {
+  if (net !== undefined && gross !== undefined) {
+    return share(gross - net, net) ? { net: euros(net), gross: euros(gross) } : {};
+  }
+  const whole = net ?? gross;
+  return vat === undefined || whole === undefined || share(vat, whole)
+    ? { net: euros(net), vat: euros(vat), gross: euros(gross) }
+    : {};
+}
+
+/** Whether `part` can be the VAT on `whole`: not negative, and no more than the highest rate. */
+function share(part: number, whole: number): boolean {
+  return part / whole >= 0 && part / whole <= MAX_VAT_SHARE;
+}
+
+/** Printed amounts in cents. An amount too large to calculate with is none. */
+function centsOf(printed: string[]): number[] {
+  return printed.map((amount) => cents(toNumber(amount))).filter((c) => !Number.isNaN(c));
+}
+
+function euros(c: number | undefined): number | undefined {
+  return c === undefined ? undefined : c / 100;
+}
+
+/**
+ * The currency after its label, or the one currency the page shows. A page with two, such as one that also gives the
+ * VAT in euros, is in the one currency of its totals; where they do not tell either, it stays unread.
+ */
+export function findCurrency(text: string): string | undefined {
+  const shown = (part: string) => CURRENCY_SIGNS.filter(([pattern]) => pattern.test(part)).map(([, code]) => code);
+  const totalsRows = text
+    .split('\n')
+    .filter((row) => TOTALS_ROW.test(row))
+    .join('\n');
+  const one = [shown(text), shown(totalsRows)].find((codes) => codes.length === 1) ?? [];
+  return after(text, CURRENCY_LABEL, CURRENCY_CODE)[0]?.hit[1] ?? one[0];
+}
+
+/** The VAT rate at which `vat` is the tax on `net`, give or take a cent of rounding. */
+export function rateOf(net: number, vat: number): number | undefined {
+  const off = (rate: number) => Math.abs((cents(net) * rate) / 100 - cents(vat));
+  const rate = RATES.reduce((best, candidate) => (off(candidate) < off(best) ? candidate : best));
+  return net !== 0 && off(rate) <= (rate === 0 ? 0 : 1) ? rate : undefined;
+}
+
+// What the page is searched for. The functions above use these only when a page is read, so they may stand below
+// them; `TOTALS_ROW` and `TOTALS_CELL` are used by the items as well.
+
 const VAT_WORD = '(?:ust|mwst|umsatzsteuer|mehrwertsteuer|vat|tax|tva|taxes)\\.?';
 const NET_LABEL = new RegExp(
   [
@@ -50,6 +161,7 @@ const GROSS_LABEL = new RegExp(
     `(?:inkl\\.?|incl(?:\\.|uding)?)\\s+${VAT_WORD}`,
   ].join('|'),
 );
+
 /** A row that sums up: it starts with a word for a total ("Taxi" and "Nettopreis" are none), or a cell of it is one ("Positionssumme", "Zahlbetrag", "Total HT"). */
 export const TOTALS_ROW = new RegExp(
   `^(?:\\d{1,2}(?:[.,]\\d+)?\\s?%\\s*)?(?:${anyOf(
@@ -61,105 +173,11 @@ export const TOTALS_ROW = new RegExp(
   'i',
 );
 export const TOTALS_CELL = /(?:summe|betrag)(?![\p{L}])|\btotal\b/iu;
+
 /** An amount that stands on its own: not part of a date, a longer number or a percentage. */
 const PRINTED_AMOUNT = new RegExp(`(?<![\\d.,])${MONEY}(?![.,]?\\d)(?!\\s?%)`, 'g');
-// Known limit: the standard and reduced rates of the EU and Switzerland as of 2026; a rate that is not listed reads as no rate.
-const RATES = [
-  0, 2.1, 2.6, 3.8, 4, 4.8, 5, 5.5, 6, 7, 8, 8.1, 9, 9.5, 10, 12, 13, 13.5, 14, 15, 17, 18, 19, 20, 21, 22, 23, 24, 25,
-  25.5, 27,
-];
 /** No invoice carries more VAT than the highest rate; one with several rates carries less. */
 const MAX_VAT_SHARE = 0.3;
-
-/** The VAT rate at which `vat` is the tax on `net`, give or take a cent of rounding. */
-export function rateOf(net: number, vat: number): number | undefined {
-  const off = (rate: number) => Math.abs((cents(net) * rate) / 100 - cents(vat));
-  const rate = RATES.reduce((best, candidate) => (off(candidate) < off(best) ? candidate : best));
-  return net !== 0 && off(rate) <= (rate === 0 ? 0 : 1) ? rate : undefined;
-}
-
-export type Totals = { net?: number; vat?: number; gross?: number };
-
-/** The amounts after each label, in cents, in the order they stand. */
-type Labelled = Record<'net' | 'vat' | 'gross', number[]>;
-
-/** Printed amounts in cents. An amount too large to calculate with is none. */
-const centsOf = (printed: string[]) => printed.map((amount) => cents(toNumber(amount))).filter((c) => !Number.isNaN(c));
-const euros = (c: number | undefined) => (c === undefined ? undefined : c / 100);
-
-function labelledIn(searched: string): Labelled {
-  const labelled = (label: RegExp) => centsOf(after(searched, label, AMOUNT).map(({ hit }) => hit[1]!));
-  return { net: labelled(NET_LABEL), vat: labelled(VAT_LABEL), gross: labelled(GROSS_LABEL) };
-}
-
-/** The first amount after each label, where they add up: net + VAT = gross, or net = gross and no VAT. */
-function labelledSum({ net: [net], vat: [vat], gross: [gross] }: Labelled): Totals | undefined {
-  if (net !== undefined && vat !== undefined && net + vat === gross) {
-    return { net: euros(net), vat: euros(vat), gross: euros(gross) };
-  }
-  // The same amount as net and as gross, and no VAT: an invoice without VAT, whatever else adds up on the page.
-  if (net !== undefined && net === gross && vat === undefined) return { net: euros(net), gross: euros(gross) };
-  return undefined;
-}
-
-/**
- * Three amounts printed anywhere on the page that add up, scored by how many of them stand after their label. The
- * best is believed when no other scores as high; where the page labels no amount at all, when it is the only one
- * that charges VAT.
- */
-function sumOnPage(text: string, labelled: Labelled): Totals | undefined {
-  const printed = new Set(centsOf([...text.matchAll(PRINTED_AMOUNT)].map((match) => match[1]!)));
-  const sums: { net: number; vat: number; gross: number; score: number }[] = [];
-  for (const n of printed) {
-    for (const v of printed) {
-      // VAT of nothing is believed when a label says so; "0,00" alone may be anything.
-      if (
-        n === 0 ||
-        !printed.has(n + v) ||
-        v / n < 0 ||
-        v / n > MAX_VAT_SHARE ||
-        (v === 0 && !labelled.vat.includes(0))
-      )
-        continue;
-      sums.push({
-        net: n / 100,
-        vat: v / 100,
-        gross: (n + v) / 100,
-        score: +labelled.net.includes(n) + +labelled.vat.includes(v) + +labelled.gross.includes(n + v),
-      });
-    }
-  }
-  sums.sort((a, b) => b.score - a.score);
-  const unlabelled = !labelled.net.length && !labelled.vat.length && !labelled.gross.length;
-  const [best, second] = sums[0]?.score ? sums : sums.filter((sum) => unlabelled && sum.vat !== 0);
-  return best && best.score > (second?.score ?? -1) ? { net: best.net, vat: best.vat, gross: best.gross } : undefined;
-}
-
-/**
- * One or two labelled amounts, where no three add up, as on an invoice without VAT. Amounts that cannot belong
- * together are not believed either. Net and gross may: the VAT between them is printed in parts where an invoice has
- * several rates.
- */
-function labelledAlone({ net: [net], vat: [vat], gross: [gross] }: Labelled): Totals {
-  const share = (part: number, whole: number) => part / whole >= 0 && part / whole <= MAX_VAT_SHARE;
-  if (net !== undefined && gross !== undefined) {
-    return share(gross - net, net) ? { net: euros(net), gross: euros(gross) } : {};
-  }
-  const whole = net ?? gross;
-  return vat === undefined || whole === undefined || share(vat, whole)
-    ? { net: euros(net), vat: euros(vat), gross: euros(gross) }
-    : {};
-}
-
-/**
- * The totals: three printed amounts with net + VAT = gross. Labels say which three when several fit, and nothing
- * else: an amount after a label is not believed against the sum. One or two labelled amounts are kept when no
- * three amounts fit, as on an invoice without VAT.
- */
-export function readTotals(searched: string, text: string): Totals {
-  const labelled = labelledIn(searched);
-  return labelledSum(labelled) ?? sumOnPage(text, labelled) ?? labelledAlone(labelled);
-}
 
 const CURRENCY_SIGNS: [RegExp, string][] = [
   [/€|\bEUR\b/, 'EUR'],
@@ -167,22 +185,11 @@ const CURRENCY_SIGNS: [RegExp, string][] = [
   [/£|\bGBP\b/, 'GBP'],
   [/\bCHF\b/, 'CHF'],
 ];
+const CURRENCY_LABEL = /währung|currency|devise/;
+const CURRENCY_CODE = new RegExp(`${SEPARATOR}([A-Z]{3})\\b`);
 
-/**
- * The currency after its label, or the one currency the page shows. A page with two, such as one that also gives the
- * VAT in euros, is in the one currency of its totals; where they do not tell either, it stays unread.
- */
-export function findCurrency(text: string): string | undefined {
-  const shown = (part: string) => CURRENCY_SIGNS.filter(([pattern]) => pattern.test(part)).map(([, code]) => code);
-  const [onPage, inTotals] = [
-    shown(text),
-    shown(
-      text
-        .split('\n')
-        .filter((row) => TOTALS_ROW.test(row))
-        .join('\n'),
-    ),
-  ];
-  const one = [onPage, inTotals].find((codes) => codes.length === 1) ?? [];
-  return after(text, /währung|currency|devise/, new RegExp(`${SEPARATOR}([A-Z]{3})\\b`))[0]?.hit[1] ?? one[0];
-}
+// Known limit: the standard and reduced rates of the EU and Switzerland as of 2026; a rate that is not listed reads as no rate.
+const RATES = [
+  0, 2.1, 2.6, 3.8, 4, 4.8, 5, 5.5, 6, 7, 8, 8.1, 9, 9.5, 10, 12, 13, 13.5, 14, 15, 17, 18, 19, 20, 21, 22, 23, 24, 25,
+  25.5, 27,
+];
