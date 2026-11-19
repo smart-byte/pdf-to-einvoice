@@ -1,5 +1,6 @@
 // How the page words what the library says: findings in the language of the page, errors, amounts, field names.
 import { lineBase, percentOf } from '../../src/domain/calculate.js';
+import { isCurrencyCode } from '../../src/domain/formats.js';
 import { lang, STRINGS, t } from '../shared/i18n.js';
 import { state } from './state.js';
 
@@ -46,7 +47,7 @@ export const reasonOf = (error: unknown) =>
 export const formatMoney = (n: number) =>
   new Intl.NumberFormat(lang, {
     style: 'currency',
-    currency: /^[A-Z]{3}$/.test(String(state.draft.currency ?? '')) ? String(state.draft.currency) : 'EUR',
+    currency: isCurrencyCode(state.draft.currency) ? state.draft.currency : 'EUR',
   }).format(n);
 
 export function fieldLabel(path: string): string {

@@ -37,6 +37,11 @@ describe('keepWhatThePdfShows', () => {
     });
   });
 
+  it('drops an e-mail address that check() would reject, such as one with the full stop of its sentence', () => {
+    const text = `${pdfText}\nFragen? Schreiben Sie an rechnung@muster-software.example.`;
+    expect(keepWhatThePdfShows({ seller: { email: 'rechnung@muster-software.example.' } }, text)).toEqual({});
+  });
+
   it('drops invented identifiers, dates and amounts', () => {
     const invented = {
       dueDate: '2026-11-17',

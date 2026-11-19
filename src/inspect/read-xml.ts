@@ -1,5 +1,6 @@
 import { XMLParser } from 'fast-xml-parser';
 import { lineBase, micro, percentAgrees, slackOf } from '../domain/calculate.js';
+import { isVatId } from '../domain/formats.js';
 import type { Allowance, DocumentAllowance, InvoiceDraft, InvoiceType, VatCategory } from '../domain/model.js';
 import { messageOf } from '../util/errors.js';
 
@@ -73,7 +74,7 @@ function party(node: Node, who: 'seller' | 'buyer') {
     city: text(address, 'CityName'),
     country: text(address, 'CountryID'),
     // Without any tax registration, the plain identifier of the seller is its tax ID (see BR-O-02 in ubl.ts).
-    vatId: taxId('VA') ?? (/^[A-Z]{2}[A-Z0-9]{2,12}$/.test(plainId ?? '') ? plainId : undefined),
+    vatId: taxId('VA') ?? (isVatId(plainId) ? plainId : undefined),
     taxNumber: taxId('FC') ?? (/^\d[\d/ -]{7,}$/.test(plainId ?? '') ? plainId : undefined),
     email:
       text(contact, 'EmailURIUniversalCommunication', 'URIID') ??

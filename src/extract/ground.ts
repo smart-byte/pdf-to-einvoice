@@ -1,4 +1,4 @@
-import { isDate, isIban } from '../domain/check.js';
+import { isBic, isDate, isEmail, isIban, isTaxNumber, isVatId } from '../domain/formats.js';
 import { amountSpellings, dateSpellings, MONTHS } from '../domain/spellings.js';
 import type { InvoiceDraft } from '../domain/model.js';
 import { escapeRegExp } from '../util/regexp.js';
@@ -30,10 +30,11 @@ export function keepWhatThePdfShows(input: unknown, pdfText: string): InvoiceDra
       .split(/[\s,;]+/)
       .every((word) => words.has(word.toLowerCase()) || words.has(word.toLowerCase().replace(edge, '')));
   const exact: Rule = (v) => typeof v === 'string' && shows([v]);
+  // A value of its kind, spaces aside, that the page shows.
   const shaped =
-    (pattern: RegExp): Rule =>
+    (fits: (compact: string) => boolean): Rule =>
     (v) =>
-      typeof v === 'string' && pattern.test(v.replace(/\s+/g, '')) && shows([v]);
+      typeof v === 'string' && fits(v.replace(/\s+/g, '')) && shows([v]);
   // A date that does not exist is dropped even if its digits are printed: "13/01/2026" does not show a 13th month.
   const date: Rule = (v) => typeof v === 'string' && isDate(v) && shows(dateSpellings(v));
   // An amount has to stand on its own: "3.11" inside the date "03.11.2026" is not one.
@@ -83,11 +84,11 @@ export function keepWhatThePdfShows(input: unknown, pdfText: string): InvoiceDra
     street: text,
     city: text,
     contactName: text,
-    postalCode: shaped(/^[A-Z0-9-]{3,10}$/i),
+    postalCode: shaped((v) => /^[A-Z0-9-]{3,10}$/i.test(v)),
     country,
-    vatId: shaped(/^[A-Z]{2}[A-Z0-9]{2,12}$/),
-    taxNumber: shaped(/^\d[\d/-]{7,}$/),
-    email: shaped(/^[^@\s]+@[^@\s]+\.[^@\s]+$/),
+    vatId: shaped(isVatId),
+    taxNumber: shaped(isTaxNumber),
+    email: shaped(isEmail),
     phone: (v) =>
       typeof v === 'string' &&
       v.replace(/\D/g, '').length >= 6 &&
@@ -115,7 +116,7 @@ export function keepWhatThePdfShows(input: unknown, pdfText: string): InvoiceDra
     paymentTerms: text,
     vatExemptionReason: text,
     iban: (v) => typeof v === 'string' && isIban(v.replace(/\s+/g, '').toUpperCase()) && shows([v]),
-    bic: shaped(/^[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?$/),
+    bic: shaped(isBic),
     prepaidAmount: amount,
   };
   const totals: Record<string, Rule> = { net: amount, vat: amount, gross: amount, due: amount };

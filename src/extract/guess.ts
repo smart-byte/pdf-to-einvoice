@@ -1,4 +1,5 @@
 import { cents } from '../domain/calculate.js';
+import { BIC } from '../domain/formats.js';
 import type { InvoiceDraft, Party } from '../domain/model.js';
 import { readContact } from './guess/contact.js';
 import { readBuyerReference, readNumber, readPaymentTerms, readPeriod, readType } from './guess/head.js';
@@ -152,9 +153,7 @@ export function guessFromText(text: string, options: GuessOptions = {}): Invoice
     currency: findCurrency(text),
     iban,
     // A BIC belongs to an IBAN; with another kind of account it has no place in the invoice data.
-    bic: iban
-      ? first(/\b(?:bic|swift)(?:[-/ ]?code)?/, new RegExp(`${SEPARATOR}([A-Z]{6}[A-Z0-9]{2}(?:[A-Z0-9]{3})?)\\b`))
-      : undefined,
+    bic: iban ? first(/\b(?:bic|swift)(?:[-/ ]?code)?/, new RegExp(`${SEPARATOR}(${BIC.source})\\b`)) : undefined,
     vatExemptionReason,
     seller: {
       ...seller,

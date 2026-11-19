@@ -1,4 +1,4 @@
-import { isIban } from '../../domain/check.js';
+import { isIban } from '../../domain/formats.js';
 import { MONTHS } from '../../domain/spellings.js';
 
 // How values are recognised in the text: dates, amounts, currencies, IBANs, VAT IDs, and a value after its label.
