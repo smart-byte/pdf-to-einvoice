@@ -15,6 +15,7 @@ import {
   createFile,
   createXRechnungFile,
   describePdf,
+  outputExists,
   packageVersion,
   readJson,
   readPdf,
@@ -215,7 +216,7 @@ export async function run(argv: string[], io: Io): Promise<number> {
       for (const finding of e.findings) io.stderr(`${formatFinding(finding)}\n`);
       // For invalid data the findings say it all; every other code has its cause in the message.
       if (e.code !== 'invalid-invoice') io.stderr(`error: ${e.message}\n`);
-    } else if ((e as NodeJS.ErrnoException).code === 'EEXIST') {
+    } else if (outputExists(e)) {
       io.stderr(`error: ${messageOf(e)} Use --force to overwrite it.\n`);
     } else {
       io.stderr(`error: ${messageOf(e)}\n`);

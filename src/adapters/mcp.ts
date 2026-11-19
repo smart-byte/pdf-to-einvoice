@@ -9,6 +9,7 @@ import {
   createFile,
   createXRechnungFile,
   describePdf,
+  outputExists,
   packageVersion,
   readPdf,
   validateFile,
@@ -208,7 +209,7 @@ const HANDLERS: Record<string, (args: Args) => Promise<object | string>> = {
 function describeError(e: unknown): object {
   if (e instanceof InvoiceError) return { error: e.code, message: e.message, findings: e.findings };
   const message = messageOf(e);
-  if ((e as NodeJS.ErrnoException).code === 'EEXIST')
+  if (outputExists(e))
     return { error: `${message} Pass "overwrite": true to replace it, or choose another output_path.` };
   return { error: message };
 }

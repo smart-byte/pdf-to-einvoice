@@ -50,6 +50,28 @@ export function sameFile(a: string, b: string): boolean {
 }
 
 /**
+ * Whether an error says that the output is there already: refused before writing because `overwrite` is not set, or
+ * by the file system, where the file appeared in the meantime.
+ */
+export const outputExists = (e: unknown): boolean => e instanceof Error && 'code' in e && e.code === 'EEXIST';
+
+/**
+ * The output path, resolved, after making sure it may be written: never the input, `input` (`what` says which one
+ * it is), and an existing file only with `overwrite`.
+ */
+function outputFor(outputPath: string, input: { path?: string; what: string }, overwrite: boolean): string {
+  const output = resolve(outputPath);
+  if (input.path !== undefined && sameFile(output, input.path))
+    throw new Error(`The output path is ${input.what}. Choose another output path; the input is never overwritten.`);
+  if (!overwrite && existsSync(output)) throw Object.assign(new Error(`${output} already exists.`), { code: 'EEXIST' });
+  return output;
+}
+
+/** Writes the file, without `overwrite` only where none is there yet, even one that appeared since it was checked. */
+const writeOutput = (output: string, data: string | Uint8Array, overwrite: boolean) =>
+  writeFile(output, data, { flag: overwrite ? 'w' : 'wx' });
+
+/**
  * Creates the e-invoice and writes it to disk. Never writes over the input,
  * and over another existing file only when `overwrite` is set (the error then
  * carries the code `EEXIST`). The findings include the comparison with the
@@ -64,13 +86,9 @@ export async function createFile(
     profile,
   }: { outputPath?: string; overwrite?: boolean; profile?: CreateOptions['profile'] } = {},
 ): Promise<{ outputPath: string; findings: Finding[]; totals: Totals }> {
-  const output = resolve(outputPath);
-  if (sameFile(output, pdfPath))
-    throw new Error('The output path is the input PDF. Choose another output path; the input is never overwritten.');
-  if (!overwrite && existsSync(output)) throw Object.assign(new Error(`${output} already exists.`), { code: 'EEXIST' });
-
+  const output = outputFor(outputPath, { path: pdfPath, what: 'the input PDF' }, overwrite);
   const result = await createEInvoice({ pdf: await readPdf(pdfPath), invoice, profile });
-  await writeFile(output, result.pdf, { flag: overwrite ? 'w' : 'wx' });
+  await writeOutput(output, result.pdf, overwrite);
   return { outputPath: output, findings: result.findings, totals: result.totals };
 }
 
@@ -87,12 +105,9 @@ export async function createXRechnungFile(
     syntax,
   }: { dataPath?: string; overwrite?: boolean; syntax?: XRechnungOptions['syntax'] } = {},
 ): Promise<{ outputPath: string; findings: Finding[]; totals: Totals }> {
-  const output = resolve(outputPath);
-  if (dataPath !== undefined && sameFile(output, dataPath))
-    throw new Error('The output path is the data file. Choose another output path; the input is never overwritten.');
-  if (!overwrite && existsSync(output)) throw Object.assign(new Error(`${output} already exists.`), { code: 'EEXIST' });
+  const output = outputFor(outputPath, { path: dataPath, what: 'the data file' }, overwrite);
   const result = await createXRechnung({ invoice, syntax });
-  await writeFile(output, result.xml, { flag: overwrite ? 'w' : 'wx' });
+  await writeOutput(output, result.xml, overwrite);
   return { outputPath: output, findings: result.findings, totals: result.totals };
 }
 

@@ -2,7 +2,7 @@ import { linkSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { createXRechnungFile } from '../../src/adapters/files.js';
+import { createXRechnungFile, outputExists } from '../../src/adapters/files.js';
 import type { InvoiceDraft } from '../../src/domain/model.js';
 
 /** The sample data with what XRechnung asks for on top. */
@@ -34,5 +34,23 @@ describe('createXRechnungFile', () => {
     const out = join(mkdtempSync(join(tmpdir(), 'pdf-to-einvoice-files-')), 'out.xml');
     await createXRechnungFile(xrechnungInvoice(), out);
     expect(readFileSync(out, 'utf8')).toContain('<cbc:ID>RE-2026-0042</cbc:ID>');
+  });
+});
+
+describe('outputExists', () => {
+  it('tells an output that is there already, refused here or by the file system, from any other error', async () => {
+    const out = join(mkdtempSync(join(tmpdir(), 'pdf-to-einvoice-files-')), 'out.xml');
+    writeFileSync(out, 'there');
+    const refused = await createXRechnungFile(xrechnungInvoice(), out).catch((e: unknown) => e);
+    expect(outputExists(refused)).toBe(true);
+    let raced: unknown;
+    try {
+      writeFileSync(out, 'again', { flag: 'wx' });
+    } catch (e) {
+      raced = e;
+    }
+    expect(outputExists(raced)).toBe(true);
+    expect(outputExists(new Error('EEXIST'))).toBe(false);
+    expect(outputExists('EEXIST')).toBe(false);
   });
 });
