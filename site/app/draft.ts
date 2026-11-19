@@ -1,5 +1,6 @@
 // Paths into the draft, e.g. "seller.name" or "lines.0.unitPrice", and merging what was read into it.
 import { invoiceJsonSchema, type InvoiceDraft } from '../../src/domain/model.js';
+import { toNumber } from '../../src/extract/guess/values.js';
 import { valueAt } from '../../src/util/objects.js';
 
 /** An object or a list of the draft, by key or index. */
@@ -46,7 +47,7 @@ export function merge(target: Target, extra: object, { onlyEmpty = false } = {})
         }
       } else if (typeof value === 'object') copy(value, path);
       else if (!target.touched.has(path) && !(onlyEmpty && !isEmpty(valueAt(target.draft, path)))) {
-        setPath(target.draft, path, isNumberField(path) ? toNumber(value) : value);
+        setPath(target.draft, path, isNumberField(path) ? numberOf(value) : value);
         filled.push(path);
       }
     }
@@ -71,18 +72,18 @@ const NUMBER_FIELDS = new Set<string>();
 /** Whether the field at a path, or of that name, holds a number. */
 const isNumberField = (path: string) => NUMBER_FIELDS.has(path.split('.').at(-1)!);
 
-/** Models sometimes answer "1.499,00" although asked for a number. */
-function toNumber(value: unknown): unknown {
-  if (typeof value !== 'string') return value;
-  const digits = value.replace(/[^\d,.-]/g, '');
-  const decimal = Math.max(digits.lastIndexOf(','), digits.lastIndexOf('.'));
-  const number = Number(
-    decimal < 0 ? digits : `${digits.slice(0, decimal).replace(/[,.]/g, '')}.${digits.slice(decimal + 1)}`,
-  );
-  return Number.isFinite(number) && digits ? number : value;
+/**
+ * A number for a string that prints one, read as the reader reads the page: "1.499,00" is 1499, and so is "1.000"
+ * (three digits behind the only separator are thousands). Models sometimes answer like this although asked for a
+ * number. Anything else stays as it is.
+ */
+function numberOf(value: unknown): unknown {
+  if (typeof value !== 'string' || !/\d/.test(value)) return value;
+  const number = toNumber(value);
+  return Number.isFinite(number) ? number : value;
 }
 const normalise = (line: unknown) =>
-  Object.fromEntries(Object.entries(line ?? {}).map(([k, v]) => [k, isNumberField(k) ? toNumber(v) : v]));
+  Object.fromEntries(Object.entries(line ?? {}).map(([k, v]) => [k, isNumberField(k) ? numberOf(v) : v]));
 /** Turns the number-like strings of a model answer into numbers, everywhere in the draft. */
 export const normaliseDraft = (draft: any): InvoiceDraft => ({
   ...draft,

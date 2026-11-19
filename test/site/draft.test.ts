@@ -39,6 +39,20 @@ describe('merge', () => {
 });
 
 describe('normaliseDraft', () => {
+  it('reads printed numbers as the reader does: three digits behind the only separator are thousands', () => {
+    const quantities = ['1.000', '1,000', '0.025', '1.499,00', '1,499.00', '1,5', '12.345.678', 'zwei'];
+    expect(normaliseDraft({ lines: quantities.map((quantity) => ({ quantity })) }).lines).toEqual([
+      { quantity: 1000 },
+      { quantity: 1000 },
+      { quantity: 0.025 },
+      { quantity: 1499 },
+      { quantity: 1499 },
+      { quantity: 1.5 },
+      { quantity: 12345678 },
+      { quantity: 'zwei' },
+    ]);
+  });
+
   it('turns the number-like strings of a model answer into numbers, in the lines and in the totals', () => {
     expect(
       normaliseDraft({ lines: [{ name: '10', quantity: '2', unitPrice: '1.499,00' }], totals: { net: '2.998,00' } }),
