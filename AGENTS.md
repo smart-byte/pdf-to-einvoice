@@ -34,8 +34,8 @@ A change is done when `npm test`, `npm run type-check`, `npm run lint` and `npm 
 | `src/domain/`        | the data model and its JSON Schema (`model.ts`), totals in exact cents (`calculate.ts`), the rules | nothing else     |
 |                      | the data has to meet (`check.ts`), and `Finding`, what all of them report (`finding.ts`)           |                  |
 | `src/pdf/`           | text and layout of a PDF (`text.ts`), its structure, embedded XML and PDF/A repair (`file.ts`)     | nothing else     |
-| `src/extract/`       | reading an invoice from the text without a model (`guess.ts`), dropping what a language model      | domain           |
-|                      | returned but the PDF does not show (`ground.ts`)                                                   |                  |
+| `src/extract/`       | reading an invoice from the text without a model (`guess.ts`, parts in `guess/`), dropping         | domain           |
+|                      | what a language model returned but the PDF does not show (`ground.ts`)                             |                  |
 | `src/generate/`      | the XML (`ubl.ts`) and the e-invoice, in the PDF/A-3 or alone as XRechnung (`create.ts`)           | domain, pdf      |
 | `src/inspect/`       | reading (`read-xml.ts`) and checking (`validate.ts`) an existing e-invoice                         | domain, pdf      |
 | `src/adapters/`      | command line (`cli.ts`), MCP server (`mcp.ts`), and the work with files on disk both share         | all of the above |
@@ -52,8 +52,9 @@ A change is done when `npm test`, `npm run type-check`, `npm run lint` and `npm 
   (`site/shared/i18n.ts`).
 - No real invoice and no data from one enters the repository, not in fixtures, tests, screenshots or issues.
   `examples/` is invented; `npm run sample` rebuilds it.
-- The reader must not be fitted to single layouts. A change to `src/extract/guess.ts` or `src/pdf/text.ts` comes with the table
-  of `npm run eval:reader` before and after. A wrong value is worse than a missing one.
+- The reader must not be fitted to single layouts. A change to `src/extract/guess.ts`, `src/extract/guess/` or
+  `src/pdf/text.ts` comes with the table of `npm run eval:reader` before and after. A wrong value is worse than a
+  missing one.
 - A change to how files are written comes with `npm run test:reference`.
 - A change to the website comes with `npm run test:browser`; a new flow gets a test in `test/site/browser.test.ts`.
 - Money is calculated in whole cents (`src/domain/calculate.ts`), never in floating point euros.
