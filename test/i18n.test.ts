@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
-import { check } from '../src/check.js';
-import type { InvoiceDraft } from '../src/model.js';
+import { check } from '../src/domain/check.js';
+import type { InvoiceDraft } from '../src/domain/model.js';
 
 const source = (file: string) => readFileSync(new URL(`../src/${file}`, import.meta.url), 'utf8');
 
@@ -18,11 +18,11 @@ function libraryCodes(): Set<string> {
       new RegExp(`\\bcode: ${literal}`, 'g'),
       new RegExp(`new InvoiceError\\(${literal}`, 'g'),
     ].flatMap((pattern) => [...text.matchAll(pattern)].map((match) => match[1]!));
-  const rules = source('check.ts');
+  const rules = source('domain/check.ts');
   const start = rules.indexOf('function xrechnungFindings(');
   const end = rules.indexOf('\n}\n', start);
   return new Set([
-    ...codesIn(rules.slice(0, start) + rules.slice(end) + source('calculate.ts') + source('create.ts') + source('validate.ts')),
+    ...codesIn(rules.slice(0, start) + rules.slice(end) + source('domain/calculate.ts') + source('generate/create.ts') + source('inspect/validate.ts')),
     ...codesIn(rules.slice(start, end)).map((code) => `xrechnung-${code}`),
   ]);
 }

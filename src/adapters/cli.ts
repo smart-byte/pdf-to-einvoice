@@ -1,17 +1,15 @@
 #!/usr/bin/env node
-import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs';
-import { readFile, writeFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
-import type { Totals } from './calculate.js';
-import { check, type Finding } from './check.js';
-import { createEInvoice, createXRechnung, InvoiceError, type CreateOptions, type XRechnungOptions } from './create.js';
-import { guessFromText } from './guess.js';
-import { invoiceJsonSchema, type InvoiceDraft } from './model.js';
-import { inspectPdf, readEmbeddedXml } from './pdf.js';
-import { extractLayout, extractText } from './text.js';
-import { validateEInvoice, type ValidationResult } from './validate.js';
+import type { Totals } from '../domain/calculate.js';
+import { check } from '../domain/check.js';
+import type { Finding } from '../domain/finding.js';
+import { invoiceJsonSchema } from '../domain/model.js';
+import { createXRechnung, InvoiceError } from '../generate/create.js';
+import { readEmbeddedXml } from '../pdf/file.js';
+import { extractText } from '../pdf/text.js';
+import { CHOICES, createFile, createXRechnungFile, describePdf, packageVersion, readJson, readPdf, reason, sameFile, validateFile } from './files.js';
 
 export interface Io {
   stdout: (text: string) => void;
@@ -49,94 +47,7 @@ Results go to standard output. check and validate print their findings there too
 create and xrechnung print findings to standard error, where errors go.
 Exit codes: 0 done, 1 failed or the data has errors, 2 used wrongly.`;
 
-const reason = (e: unknown) => (e instanceof Error ? e.message : String(e));
-const readPdf = async (path: string) => new Uint8Array(await readFile(path));
 const formatFinding = (f: Finding) => `${f.severity}${f.path ? ` ${f.path}` : ''}: ${f.message}`;
-
-export const packageVersion = (): string => JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;
-
-async function readJson(path: string): Promise<InvoiceDraft> {
-  const text = await readFile(path, 'utf8');
-  try {
-    return JSON.parse(text);
-  } catch (e) {
-    throw new Error(`${path} is not valid JSON: ${reason(e)}`, { cause: e });
-  }
-}
-
-/** The text of an invoice PDF, the values guessed from it, and what matters about the file. */
-export async function describePdf(pdfPath: string) {
-  const pdf = await readPdf(pdfPath);
-  const info = await inspectPdf(pdf);
-  const { text, blocks } = await extractLayout(pdf);
-  return {
-    text,
-    guess: guessFromText(text, { blocks }),
-    pdf: { pages: info.pages, unembeddedFonts: info.unembeddedFonts, isEInvoice: info.embeddedXml !== null },
-  };
-}
-
-/** Where the e-invoice goes when no output is named: invoice.pdf becomes invoice.einvoice.pdf. */
-export const defaultOutput = (pdfPath: string) => pdfPath.replace(/(\.pdf)?$/i, '.einvoice.pdf');
-
-/** True if both paths name one file, also through a symlink, a hard link or different letter case. */
-function sameFile(a: string, b: string): boolean {
-  if (resolve(a) === resolve(b)) return true;
-  if (!existsSync(a) || !existsSync(b)) return false;
-  const [one, other] = [statSync(a, { bigint: true }), statSync(b, { bigint: true })];
-  return one.dev === other.dev && one.ino === other.ino;
-}
-
-/**
- * Creates the e-invoice and writes it to disk. Never writes over the input,
- * and over another existing file only when `overwrite` is set (the error then
- * carries the code `EEXIST`). The findings include the comparison with the
- * text of the PDF.
- */
-export async function createFile(
-  pdfPath: string,
-  invoice: InvoiceDraft,
-  outputPath = defaultOutput(pdfPath),
-  overwrite = false,
-  profile?: CreateOptions['profile'],
-): Promise<{ outputPath: string; findings: Finding[]; totals: Totals }> {
-  const output = resolve(outputPath);
-  if (sameFile(output, pdfPath)) throw new Error('The output path is the input PDF. Choose another output path; the input is never overwritten.');
-  if (!overwrite && existsSync(output)) throw Object.assign(new Error(`${output} already exists.`), { code: 'EEXIST' });
-
-  const result = await createEInvoice({ pdf: await readPdf(pdfPath), invoice, profile });
-  await writeFile(output, result.pdf, { flag: overwrite ? 'w' : 'wx' });
-  return { outputPath: output, findings: result.findings, totals: result.totals };
-}
-
-/**
- * Writes the invoice as an XRechnung XML file, over an existing file only when `overwrite` is set (the error then
- * carries the code `EEXIST`).
- */
-export async function createXRechnungFile(
-  invoice: InvoiceDraft,
-  outputPath: string,
-  syntax?: XRechnungOptions['syntax'],
-  overwrite = false,
-): Promise<{ outputPath: string; findings: Finding[]; totals: Totals }> {
-  const output = resolve(outputPath);
-  if (!overwrite && existsSync(output)) throw Object.assign(new Error(`${output} already exists.`), { code: 'EEXIST' });
-  const result = await createXRechnung({ invoice, syntax });
-  await writeFile(output, result.xml, { flag: overwrite ? 'w' : 'wx' });
-  return { outputPath: output, findings: result.findings, totals: result.totals };
-}
-
-/**
- * Validates an e-invoice on disk, comparing its XML with the text of its own pages. The raw XML is left out of the
- * result; `readEmbeddedXml` returns it.
- */
-export async function validateFile(pdfPath: string): Promise<Omit<ValidationResult, 'xml'>> {
-  const pdf = await readPdf(pdfPath);
-  // As in createEInvoice: a PDF whose text cannot be read is reported as one, not as a failure.
-  const pdfText = await extractText(pdf).catch(() => '');
-  const { xml: _xml, ...result } = await validateEInvoice(pdf, { pdfText });
-  return result;
-}
 
 function printFindings({ findings, totals }: { findings: Finding[]; totals?: Totals }, io: Io): void {
   io.stdout(findings.length ? `${findings.map(formatFinding).join('\n')}\n` : 'No findings.\n');
@@ -154,9 +65,6 @@ const OPTIONS = {
   help: { type: 'boolean', short: 'h' },
   version: { type: 'boolean', short: 'v' },
 } as const;
-
-/** The options that take one of a few words, here and as arguments of the MCP tools. */
-export const CHOICES = { profile: ['en16931', 'xrechnung'], syntax: ['ubl', 'cii'], rules: ['xrechnung'] } as const;
 
 type Values = { output?: string; force?: boolean; pdf?: string; json?: boolean } & { [K in keyof typeof CHOICES]?: (typeof CHOICES)[K][number] };
 type Command = { args: number; run: (args: string[], values: Values, io: Io) => Promise<number> };

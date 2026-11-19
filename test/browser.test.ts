@@ -7,9 +7,9 @@ import { chromium, type Browser, type Download, type Page } from 'playwright-cor
 import { preview, type PreviewServer } from 'vite';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { extractionSchema } from '../site/answer.js';
-import { createEInvoice } from '../src/create.js';
-import type { InvoiceDraft } from '../src/model.js';
-import { validateEInvoice } from '../src/validate.js';
+import { createEInvoice } from '../src/generate/create.js';
+import type { InvoiceDraft } from '../src/domain/model.js';
+import { validateEInvoice } from '../src/inspect/validate.js';
 
 // npm names the script it runs: only `npm run test:browser` runs these tests.
 const asked = process.env.npm_lifecycle_event === 'test:browser';

@@ -1,9 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { PDFArray, PDFBool, PDFDict, PDFDocument, PDFName, PDFRawStream, PDFString, StandardFonts, decodePDFRawStream } from '@cantoo/pdf-lib';
 import { describe, expect, it } from 'vitest';
-import { createEInvoice, createXRechnung, InvoiceError } from '../src/create.js';
-import { readEmbeddedXml } from '../src/pdf.js';
-import type { InvoiceDraft } from '../src/model.js';
+import { createEInvoice, createXRechnung, InvoiceError } from '../src/generate/create.js';
+import { readEmbeddedXml } from '../src/pdf/file.js';
+import type { InvoiceDraft } from '../src/domain/model.js';
 
 const file = (name: string) => readFileSync(new URL(`../examples/${name}`, import.meta.url));
 const samplePdf = () => new Uint8Array(file('sample-invoice.pdf'));

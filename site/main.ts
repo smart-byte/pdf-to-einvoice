@@ -1,13 +1,14 @@
 import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.mjs';
 import pdfWorkerUrl from 'pdfjs-dist/legacy/build/pdf.worker.mjs?url';
 import sampleUrl from '../examples/sample-invoice.pdf?url';
-import { lineBase, percentOf } from '../src/calculate.js';
-import { check, type CheckResult, type Finding } from '../src/check.js';
-import { keepWhatThePdfShows } from '../src/ground.js';
-import { guessFromText, languageOf } from '../src/guess.js';
-import { INVOICE_TYPES, VAT_CATEGORIES, type InvoiceDraft } from '../src/model.js';
-import { inspectPdf } from '../src/pdf.js';
-import { extractLayout } from '../src/text.js';
+import { lineBase, percentOf } from '../src/domain/calculate.js';
+import { check, type CheckResult } from '../src/domain/check.js';
+import type { Finding } from '../src/domain/finding.js';
+import { keepWhatThePdfShows } from '../src/extract/ground.js';
+import { guessFromText, languageOf } from '../src/extract/guess.js';
+import { INVOICE_TYPES, VAT_CATEGORIES, type InvoiceDraft } from '../src/domain/model.js';
+import { inspectPdf } from '../src/pdf/file.js';
+import { extractLayout } from '../src/pdf/text.js';
 import { lang, setLang, STRINGS, t } from './i18n.js';
 import { countVisit } from './count.js';
 import { DEFAULT_MODEL, MODELS, hasWebGpu, readWithBrowserModel, readWithEndpoint } from './llm.js';
@@ -817,7 +818,7 @@ async function open(pdf: Uint8Array, fileName: string): Promise<void> {
     });
     if (state.mode === 'validate') {
       // The PDF already is an e-invoice: show what its XML says, next to the page it belongs to.
-      const { validateEInvoice } = await import('../src/validate.js');
+      const { validateEInvoice } = await import('../src/inspect/validate.js');
       const result = await validateEInvoice(pdf, { pdfText: text });
       state.draft = result.invoice ?? {};
       state.adjustedLines = result.adjustedLines ?? [];
@@ -1007,7 +1008,7 @@ async function renderXml(): Promise<void> {
   if (pair.hidden) status.textContent = t('xml.busy');
   try {
     const invoice = structuredClone(state.draft);
-    const { createEInvoice, createXRechnung } = await import('../src/create.js');
+    const { createEInvoice, createXRechnung } = await import('../src/generate/create.js');
     const { xml, totals } = shownFormat() === 'xrechnung' ? await createXRechnung({ invoice }) : await createEInvoice({ pdf: state.pdf, invoice });
     // The data has changed again in the meantime: the newer run shows its XML.
     if (run !== xmlRun) return;
@@ -1087,7 +1088,7 @@ $('#create').onclick = async () => {
   const xr = state.format === 'xrechnung';
   try {
     // Loaded on demand: the XML writer is the heaviest part of the page.
-    const { createEInvoice, createXRechnung } = await import('../src/create.js');
+    const { createEInvoice, createXRechnung } = await import('../src/generate/create.js');
     // No language is passed on. The library that writes the XML asks the server for a catalogue of translations in
     // whatever language it is given, and ships none: for English, its default here, the site answers with an empty
     // one (public/assets/locale).

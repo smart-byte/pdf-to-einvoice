@@ -1,6 +1,6 @@
 import { XMLParser } from 'fast-xml-parser';
-import { lineBase, micro, percentAgrees, slackOf } from './calculate.js';
-import type { Allowance, DocumentAllowance, InvoiceDraft, InvoiceType, VatCategory } from './model.js';
+import { lineBase, micro, percentAgrees, slackOf } from '../domain/calculate.js';
+import type { Allowance, DocumentAllowance, InvoiceDraft, InvoiceType, VatCategory } from '../domain/model.js';
 
 type Node = Record<string, any> | string | undefined;
 

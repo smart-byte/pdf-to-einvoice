@@ -3,8 +3,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { run } from '../src/cli.js';
-import { readEmbeddedXml } from '../src/pdf.js';
+import { run } from '../src/adapters/cli.js';
+import { readEmbeddedXml } from '../src/pdf/file.js';
 
 const example = (name: string) => fileURLToPath(new URL(`../examples/${name}`, import.meta.url));
 const SAMPLE_PDF = example('sample-invoice.pdf');

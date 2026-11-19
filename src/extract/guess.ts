@@ -1,6 +1,6 @@
-import { isIban } from './check.js';
+import { isIban } from '../domain/check.js';
 import { COUNTRY_NAMES } from './ground.js';
-import type { InvoiceDraft, InvoiceType, Line, Party, VatCategory } from './model.js';
+import type { InvoiceDraft, InvoiceType, Line, Party, VatCategory } from '../domain/model.js';
 
 // Known limit: patterns for German, English and French invoices, no model. A value is believed for what it fits to, not
 // for where it stands: the totals are three printed amounts with net + VAT = gross, the items are rows that add up to

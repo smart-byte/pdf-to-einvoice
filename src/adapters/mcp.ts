@@ -3,12 +3,12 @@ import { isAbsolute } from 'node:path';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ErrorCode, ListToolsRequestSchema, McpError } from '@modelcontextprotocol/sdk/types.js';
-import { check } from './check.js';
-import { CHOICES, createFile, createXRechnungFile, describePdf, packageVersion, validateFile } from './cli.js';
-import { InvoiceError } from './create.js';
-import { invoiceJsonSchema, type InvoiceDraft } from './model.js';
-import { readEmbeddedXml } from './pdf.js';
-import { extractText } from './text.js';
+import { check } from '../domain/check.js';
+import { CHOICES, createFile, createXRechnungFile, describePdf, packageVersion, validateFile } from './files.js';
+import { InvoiceError } from '../generate/create.js';
+import { invoiceJsonSchema, type InvoiceDraft } from '../domain/model.js';
+import { readEmbeddedXml } from '../pdf/file.js';
+import { extractText } from '../pdf/text.js';
 
 const INSTRUCTIONS = `pdf-to-einvoice turns an existing invoice PDF into an EN 16931 e-invoice (ZUGFeRD / Factur-X): the invoice data is attached to the PDF as XML, the pages stay as they are. It also writes the data as an XRechnung, the XML German public bodies ask for. The tools run on the user's machine and send nothing. What you read through them is yours to handle: if your model runs elsewhere, the content of the invoice goes there, so do not tell the user that it stays on their machine unless that holds for you.
 

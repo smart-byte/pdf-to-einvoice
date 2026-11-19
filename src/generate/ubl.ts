@@ -1,6 +1,6 @@
 import type { Invoice as EInvoiceEuInvoice } from '@e-invoice-eu/core';
-import type { Totals } from './calculate.js';
-import type { Invoice, Party } from './model.js';
+import type { Totals } from '../domain/calculate.js';
+import type { Invoice, Party } from '../domain/model.js';
 
 type Bag = Record<string, unknown>;
 

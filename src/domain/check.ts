@@ -1,14 +1,6 @@
 import { calculate, lineBase, micro, percentAgrees, percentOf, resolveAdjustments, slackOf, type Totals } from './calculate.js';
+import type { Finding } from './finding.js';
 import { INVOICE_TYPES, VAT_CATEGORIES, type Invoice, type InvoiceDraft, type VatCategory } from './model.js';
-
-export interface Finding {
-  /** Dotted path of the field, e.g. `seller.vatId` or `lines.0.unitPrice`. */
-  path: string;
-  /** An error blocks the e-invoice; a warning asks for a second look. */
-  severity: 'error' | 'warning';
-  code: string;
-  message: string;
-}
 
 export interface CheckResult {
   findings: Finding[];

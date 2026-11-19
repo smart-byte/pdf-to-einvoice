@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { calculate, percentAgrees, resolveAdjustments, slackOf } from '../src/calculate.js';
-import type { DocumentAllowance, Invoice, Line } from '../src/model.js';
+import { calculate, percentAgrees, resolveAdjustments, slackOf } from '../src/domain/calculate.js';
+import type { DocumentAllowance, Invoice, Line } from '../src/domain/model.js';
 
 const line = (over: Partial<Line> = {}): Line => ({
   name: 'Item',

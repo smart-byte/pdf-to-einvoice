@@ -192,7 +192,7 @@ its `netAmount` may differ from quantity x unit price less the discount by round
 `charges` hold those on the whole invoice, the same way, with a `reason` (required for a charge) and the `vatCategory`
 and `vatRate` they belong to where the invoice names them. A percentage is taken of each VAT rate of the lines; an
 amount is never split between rates, so where the lines have several, it needs its rate. The full list of fields is in
-[`src/model.ts`](src/model.ts) and in `npx pdf-to-einvoice schema`.
+[`src/domain/model.ts`](src/domain/model.ts) and in `npx pdf-to-einvoice schema`.
 
 ## XRechnung
 

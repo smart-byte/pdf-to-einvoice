@@ -1,9 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { PDFDocument } from '@cantoo/pdf-lib';
 import { describe, expect, it } from 'vitest';
-import { check } from '../src/check.js';
-import { guessFromText } from '../src/guess.js';
-import { extractText } from '../src/text.js';
+import { check } from '../src/domain/check.js';
+import { guessFromText } from '../src/extract/guess.js';
+import { extractText } from '../src/pdf/text.js';
 
 const file = (name: string) => readFileSync(new URL(`../examples/${name}`, import.meta.url));
 const samplePdf = () => new Uint8Array(file('sample-invoice.pdf'));

@@ -1,9 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { check } from '../src/check.js';
-import { createEInvoice } from '../src/create.js';
-import type { InvoiceDraft } from '../src/model.js';
-import { readInvoiceXml } from '../src/read.js';
+import { check } from '../src/domain/check.js';
+import { createEInvoice } from '../src/generate/create.js';
+import type { InvoiceDraft } from '../src/domain/model.js';
+import { readInvoiceXml } from '../src/inspect/read-xml.js';
 
 const file = (name: string) => readFileSync(new URL(`../examples/${name}`, import.meta.url));
 const samplePdf = () => new Uint8Array(file('sample-invoice.pdf'));
@@ -101,7 +101,7 @@ describe('readInvoiceXml returns what createEInvoice wrote', () => {
       sample((d) => {
         for (const line of d.lines) Object.assign(line, { vatCategory: 'O', vatRate: 0 });
         d.vatExemptionReason = 'Nicht steuerbar.';
-        // Category O moves the VAT ID out of the tax registration (see src/ubl.ts); it does not come back as vatId.
+        // Category O moves the VAT ID out of the tax registration (see src/generate/ubl.ts); it does not come back as vatId.
         delete d.seller.vatId;
         d.seller.taxNumber = '12/345/67890';
       }),

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { guessFromText, languageOf } from '../src/guess.js';
+import { guessFromText, languageOf } from '../src/extract/guess.js';
 
 // The shape of a real invoice, with made-up data: sender line, address block next to a block of labels,
 // a table without quantity and unit price, a row that wraps, a date written with slashes.

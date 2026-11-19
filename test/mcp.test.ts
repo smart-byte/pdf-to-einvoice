@@ -7,8 +7,8 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { Ajv } from 'ajv';
 import { describe, expect, it } from 'vitest';
 import type { Adjustment, Allowance, DocumentAllowance, Invoice } from '../src/index.js';
-import { createServer } from '../src/mcp.js';
-import { readEmbeddedXml } from '../src/pdf.js';
+import { createServer } from '../src/adapters/mcp.js';
+import { readEmbeddedXml } from '../src/pdf/file.js';
 
 const example = (name: string) => fileURLToPath(new URL(`../examples/${name}`, import.meta.url));
 const SAMPLE_PDF = example('sample-invoice.pdf');

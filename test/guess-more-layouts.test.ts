@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { guessFromText } from '../src/guess.js';
+import { guessFromText } from '../src/extract/guess.js';
 
 // Three more layouts met in real invoices, rebuilt with made-up data.
 

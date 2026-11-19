@@ -1,5 +1,5 @@
-import { amountSpellings, dateSpellings, isDate, isIban, MONTHS } from './check.js';
-import type { InvoiceDraft } from './model.js';
+import { amountSpellings, dateSpellings, isDate, isIban, MONTHS } from '../domain/check.js';
+import type { InvoiceDraft } from '../domain/model.js';
 
 type Bag = Record<string, any>;
 type Rule = (value: any, siblings: Bag) => boolean;

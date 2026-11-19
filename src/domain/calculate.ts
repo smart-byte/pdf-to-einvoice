@@ -1,4 +1,4 @@
-import type { Finding } from './check.js';
+import type { Finding } from './finding.js';
 import { VAT_CATEGORIES, type Invoice, type Line, type VatCategory } from './model.js';
 
 export interface VatGroup {

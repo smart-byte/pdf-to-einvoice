@@ -1,8 +1,9 @@
-import type { Totals } from './calculate.js';
-import { check, type Finding } from './check.js';
-import type { InvoiceDraft } from './model.js';
-import { inspectPdf } from './pdf.js';
-import { readInvoiceXml } from './read.js';
+import type { Totals } from '../domain/calculate.js';
+import { check } from '../domain/check.js';
+import type { Finding } from '../domain/finding.js';
+import type { InvoiceDraft } from '../domain/model.js';
+import { inspectPdf } from '../pdf/file.js';
+import { readInvoiceXml } from './read-xml.js';
 
 export interface ValidationResult {
   /** True when the PDF carries Cross Industry Invoice XML in an EN 16931 profile, whatever else is found. */

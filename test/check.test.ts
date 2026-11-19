@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { check, percentSpellings } from '../src/check.js';
-import type { InvoiceDraft } from '../src/model.js';
+import { check, percentSpellings } from '../src/domain/check.js';
+import type { InvoiceDraft } from '../src/domain/model.js';
 
 const sample = (): InvoiceDraft => JSON.parse(readFileSync(new URL('../examples/sample-invoice.json', import.meta.url), 'utf8'));
 

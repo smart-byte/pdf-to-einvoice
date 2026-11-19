@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { keepWhatThePdfShows } from '../src/ground.js';
+import { keepWhatThePdfShows } from '../src/extract/ground.js';
 
 const pdfText = [
   'Muster Software GmbH · Beispielweg 1 · 12345 Musterstadt · Deutschland',

@@ -1,11 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { PDFDocument, PDFName, PDFString, StandardFonts } from '@cantoo/pdf-lib';
 import { describe, expect, it } from 'vitest';
-import { createEInvoice } from '../src/create.js';
-import type { InvoiceDraft } from '../src/model.js';
-import { inspectPdf } from '../src/pdf.js';
-import { extractText } from '../src/text.js';
-import { validateEInvoice } from '../src/validate.js';
+import { createEInvoice } from '../src/generate/create.js';
+import type { InvoiceDraft } from '../src/domain/model.js';
+import { inspectPdf } from '../src/pdf/file.js';
+import { extractText } from '../src/pdf/text.js';
+import { validateEInvoice } from '../src/inspect/validate.js';
 
 const file = (name: string) => readFileSync(new URL(`../examples/${name}`, import.meta.url));
 const samplePdf = () => new Uint8Array(file('sample-invoice.pdf'));

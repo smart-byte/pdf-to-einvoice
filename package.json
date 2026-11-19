@@ -40,7 +40,7 @@
     "node": ">=22.13.0"
   },
   "bin": {
-    "pdf-to-einvoice": "dist/cli.js"
+    "pdf-to-einvoice": "dist/adapters/cli.js"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { PDFDocument, StandardFonts } from '@cantoo/pdf-lib';
 import { describe, expect, it } from 'vitest';
-import { extractLayout, extractText } from '../src/text.js';
+import { extractLayout, extractText } from '../src/pdf/text.js';
 
 type Drawn = [text: string, x: number, y: number, size?: number];
 

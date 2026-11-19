@@ -1,9 +1,10 @@
 import { InvoiceService } from '@e-invoice-eu/core';
-import type { Totals } from './calculate.js';
-import { check, type Finding } from './check.js';
-import type { Invoice, InvoiceDraft } from './model.js';
-import { inspectPdf, readEmbeddedXml, repairForPdfA, type PdfInfo } from './pdf.js';
-import { extractText } from './text.js';
+import type { Totals } from '../domain/calculate.js';
+import { check } from '../domain/check.js';
+import type { Finding } from '../domain/finding.js';
+import type { Invoice, InvoiceDraft } from '../domain/model.js';
+import { inspectPdf, readEmbeddedXml, repairForPdfA, type PdfInfo } from '../pdf/file.js';
+import { extractText } from '../pdf/text.js';
 import { toUbl } from './ubl.js';
 
 export interface CreateOptions {
