@@ -9,6 +9,7 @@ import {
   type Unchecked,
   type VatCategory,
 } from './model.js';
+import { vatRateError } from './vat.js';
 
 export interface VatGroup {
   category: VatCategory;
@@ -218,10 +219,11 @@ function checkEntry(raw: unknown, list: List, index: number): { checked?: Checke
     refuse(at('vatCategory'), 'format.category');
   } else if (isNumber(entry.vatRate)) {
     if (category === undefined && entry.vatRate > 0) category = 'S';
-    if (entry.vatRate < 0) refuse(at('vatRate'), 'vat-rate.negative');
-    else if (category === 'S' && entry.vatRate === 0) refuse(at('vatRate'), 'vat-rate.standard');
-    else if (category !== undefined && category !== 'S' && entry.vatRate !== 0)
-      refuse(at('vatRate'), 'vat-rate.zero', { category });
+    const rateError = vatRateError(at('vatRate'), category, entry.vatRate);
+    if (rateError) {
+      problems.push(rateError);
+      usable = false;
+    }
   }
   if (!usable) return { problems };
 

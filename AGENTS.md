@@ -33,8 +33,9 @@ through them). A layer imports only the layers listed beside it;
 | path                 | what it holds                                                                                      | imports          |
 | -------------------- | -------------------------------------------------------------------------------------------------- | ---------------- |
 | `src/domain/`        | the data model and its JSON Schema (`model.ts`), totals in exact cents (`calculate.ts`), the rules | nothing else     |
-|                      | the data has to meet (`check.ts`), how a date or an amount is printed (`spellings.ts`), `Finding`, |                  |
-|                      | what all of them report (`finding.ts`), and the English text of every finding (`messages.ts`)      |                  |
+|                      | the data has to meet (`check.ts`), the one rule for a VAT rate both use (`vat.ts`), how a date or  |                  |
+|                      | an amount is printed (`spellings.ts`), `Finding`, what all of them report (`finding.ts`), and the  |                  |
+|                      | English text of every finding (`messages.ts`)                                                      |                  |
 | `src/pdf/`           | text and layout of a PDF (`text.ts`), its structure, embedded XML and PDF/A repair (`file.ts`)     | nothing else     |
 | `src/extract/`       | reading an invoice from the text without a model (`guess.ts`, parts in `guess/`), dropping         | domain           |
 |                      | what a language model returned but the PDF does not show (`ground.ts`)                             |                  |

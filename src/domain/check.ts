@@ -25,6 +25,7 @@ import {
   type Unchecked,
   type VatCategory,
 } from './model.js';
+import { vatRateError } from './vat.js';
 
 export interface CheckResult {
   findings: Finding[];
@@ -279,12 +280,8 @@ function checkLine(line: Unchecked<Line>, i: number): { findings: Finding[]; cal
   if (!isVatCategory(line.vatCategory)) {
     findings.push(error(at('vatCategory'), 'format.category'));
   } else if (isNumber(line.vatRate)) {
-    if (line.vatCategory === 'S' && line.vatRate <= 0) {
-      findings.push(error(at('vatRate'), 'vat-rate.standard'));
-    }
-    if (line.vatCategory !== 'S' && line.vatRate !== 0) {
-      findings.push(error(at('vatRate'), 'vat-rate.zero', { category: line.vatCategory }));
-    }
+    const rateError = vatRateError(at('vatRate'), line.vatCategory, line.vatRate);
+    if (rateError) findings.push(rateError);
   }
   return { findings, calculable };
 }
