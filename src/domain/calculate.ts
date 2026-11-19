@@ -406,33 +406,26 @@ const adjustmentOf = ({ cents: amount, base, percent, reason, ...entry }: Entry)
 });
 
 /**
- * The discounts and charges on the whole invoice, put into VAT groups as `calculate` does, with what is wrong with
- * them. `resolved` is false while any of them cannot be placed; `calculate` then refuses the invoice. Never throws.
- * With `lines` false (their numbers are not all there yet) only what each entry needs by itself is checked.
+ * What is wrong with each discount and charge on the whole invoice by itself, without the lines: for data whose lines
+ * cannot be calculated yet, so that nothing can be placed in a VAT group. Never throws.
  */
-export function resolveAdjustments(
-  invoice: Adjustable,
-  lines = true,
-): { adjustments: Adjustment[]; problems: Finding[]; resolved: boolean } {
-  const { entries, problems, resolved } = resolve(invoice, lines ? linesInCents(invoice.lines).lineCents : undefined);
-  return { adjustments: entries.map(adjustmentOf), problems, resolved };
-}
+export const checkAdjustments = (invoice: Adjustable): Finding[] => resolve(invoice).problems;
 
 /**
  * `calculate` for data that may not allow it: the totals, where every discount and charge on the whole invoice could
- * be placed in a VAT group, and what is wrong with these entries. Never throws. With `lines` false (their numbers are
- * not all there yet) only what each entry needs by itself is checked, and there are no totals.
+ * be placed in a VAT group, and what is wrong with these entries. Never throws, but expects the numbers of every line;
+ * without them `checkAdjustments` says what it can.
  */
-export function tryCalculate(invoice: Invoice, lines = true): { totals?: Totals; problems: Finding[] } {
-  const inCents = lines ? linesInCents(invoice.lines) : undefined;
-  const { entries, problems, resolved } = resolve(invoice, inCents?.lineCents);
-  return resolved && inCents ? { totals: totalsOf(invoice, inCents, entries), problems } : { problems };
+export function tryCalculate(invoice: Invoice): { totals?: Totals; problems: Finding[] } {
+  const inCents = linesInCents(invoice.lines);
+  const { entries, problems, resolved } = resolve(invoice, inCents.lineCents);
+  return resolved ? { totals: totalsOf(invoice, inCents, entries), problems } : { problems };
 }
 
 /**
  * Derives every total from the lines and the discounts and charges on the whole invoice, following the EN 16931
  * calculation rules: VAT is calculated per category and rate on the summed base (BR-CO-17), not per line. Throws if a
- * discount or charge on the whole invoice cannot be placed in a VAT group (see `resolveAdjustments`).
+ * discount or charge on the whole invoice cannot be placed in a VAT group (see `tryCalculate`).
  */
 export function calculate(invoice: Invoice): Totals {
   const { totals, problems } = tryCalculate(invoice);

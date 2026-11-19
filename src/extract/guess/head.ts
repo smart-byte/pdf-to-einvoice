@@ -1,11 +1,33 @@
 import type { InvoiceType } from '../../domain/model.js';
 import { escapeRegExp } from '../../util/regexp.js';
-import { MAX_WRAPPED } from './items.js';
-import { cells, KEY_VALUE, NAMED, TITLE, TYPES } from './parties.js';
-import { after, anyOf, DATE, MONTH, monthNumber, pad, SEPARATOR, toIsoDate } from './values.js';
+import { cells, KEY_VALUE, MAX_WRAPPED } from './rows.js';
+import { after, anyOf, DATE, monthAs, monthNumber, pad, SEPARATOR, toIsoDate } from './values.js';
 
 // The head of the invoice: its number and type, its dates, the service period, the payment terms and the reference
 // of the buyer.
+
+/** The words that title an invoice, also as the end of a longer one ("Teilrechnung"). */
+const TITLE_WORD = [
+  '\\p{L}*rechnung',
+  'rechnungskorrektur',
+  'gutschrift',
+  '(?:partial|prepayment|advance|corrected)\\s+invoice',
+  'invoice',
+  'facture',
+  'avoir',
+  'credit\\s+note',
+].join('|');
+/** The title of the document, alone or at the end of a cell ("Ihre Rechnung"). */
+export const TITLE = new RegExp(`(?:^|\\s)(?:${TITLE_WORD})$`, 'iu');
+/** The title with its number: "Rechnung 2301". */
+const NAMED = new RegExp(`^(${TITLE_WORD})[ \\t]+([A-Z]{0,3}[-/]?\\d{2,}[\\w/-]*)$`, 'iu');
+/** The kinds of invoice a title names. A "Gutschrift" may be a credit note or an invoice the buyer issued, and stays open. */
+const TYPES: [RegExp, InvoiceType][] = [
+  [/^(?:teilrechnung|partial\s+invoice)$/i, '326'],
+  [/^(?:(?:abschlags|anzahlungs|vorauszahlungs)rechnung|(?:prepayment|advance)\s+invoice)$/i, '386'],
+  [/^(?:(?:storno|korrektur)rechnung|rechnungskorrektur|corrected\s+invoice)$/i, '384'],
+  [/^(?:credit\s+note|avoir)$/i, '381'],
+];
 
 const PERIOD_LABEL = new RegExp(
   anyOf(
@@ -17,24 +39,28 @@ const PERIOD_LABEL = new RegExp(
     /period/,
   ),
 );
-const DOTTED = '(\\d{1,2})\\.(\\d{1,2})\\.(\\d{4})';
+/** A date written with dots, "01.10.2026", its parts in the groups `${end}Day`, `${end}Month` and `${end}Year`. */
+const dotted = (end: 'from' | 'to') => `(?<${end}Day>\\d{1,2})\\.(?<${end}Month>\\d{1,2})\\.(?<${end}Year>\\d{4})`;
 const PERIOD = new RegExp(
   `${SEPARATOR}(?:${[
     // A quarter: "Q3 2026", "3. Quartal 2026".
-    'Q([1-4])[ /]?(\\d{4})',
-    '([1-4])\\.\\s?Quartal\\s+(\\d{4})',
+    'Q(?<quarter>[1-4])[ /]?(?<quarterYear>\\d{4})',
+    '(?<quartal>[1-4])\\.\\s?Quartal\\s+(?<quartalYear>\\d{4})',
     // Two dates: "01.10.2026 - 31.10.2026".
-    `${DOTTED}\\s*(?:-|–|bis|to)\\s*${DOTTED}`,
+    `${dotted('from')}\\s*(?:-|–|bis|to)\\s*${dotted('to')}`,
     // A month: "Oktober 2026", "10/2026", "2026-10".
-    `${MONTH}\\s+(\\d{4})`,
-    '(\\d{1,2})[./-](\\d{4})(?!\\d)',
-    '(\\d{4})-(\\d{2})(?![-\\d])',
+    `${monthAs('month')}\\s+(?<monthYear>\\d{4})`,
+    '(?<numberedMonth>\\d{1,2})[./-](?<numberedYear>\\d{4})(?!\\d)',
+    '(?<isoYear>\\d{4})-(?<isoMonth>\\d{2})(?![-\\d])',
   ].join('|')})`,
   'i',
 );
 const UNTIL = '(?:-|–|bis|to|until)';
-const MONTH_RANGE = new RegExp(`${SEPARATOR}${MONTH}\\s+(\\d{4})\\s*${UNTIL}\\s*${MONTH}\\s+(\\d{4})`, 'i');
-const MONTH_ROW = new RegExp(`^${MONTH}\\s+(\\d{4})$`, 'i');
+const MONTH_RANGE = new RegExp(
+  `${SEPARATOR}${monthAs('fromMonth')}\\s+(?<fromYear>\\d{4})\\s*${UNTIL}\\s*${monthAs('toMonth')}\\s+(?<toYear>\\d{4})`,
+  'i',
+);
+const MONTH_ROW = new RegExp(`^${monthAs('month')}\\s+(?<year>\\d{4})$`, 'i');
 /** The label of payment terms: what follows it is the terms, whatever words they use. */
 const TERMS_LABEL = new RegExp(
   `^(?:${anyOf(
@@ -94,7 +120,7 @@ export function readPaymentTerms(rows: string[]): string | undefined {
 }
 
 /** "im September 2026", "für Oktober 2026", "for March 2026". */
-const MONTH_NAMED = new RegExp(`\\b(?:im|für|for|in)\\s+${MONTH}\\s+(\\d{4})\\b`, 'i');
+const MONTH_NAMED = new RegExp(`\\b(?:im|für|for|in)\\s+${monthAs('month')}\\s+(?<year>\\d{4})\\b`, 'i');
 
 /**
  * A service period given as a quarter ("Q2 2026"), a month ("Oktober 2026", "10/2026") or two dates, after its
@@ -111,32 +137,38 @@ export function readPeriod(text: string, rows: string[]): { periodStart?: string
     };
   };
   // "September 2026 bis Januar 2027": from the first day of the one month to the last day of the other.
-  for (const { hit: m } of after(text, PERIOD_LABEL, MONTH_RANGE)) {
+  for (const { hit } of after(text, PERIOD_LABEL, MONTH_RANGE)) {
+    const g = hit.groups ?? {};
     const [from, to] = [
-      months(m[2]!, monthNumber(m[1]!), monthNumber(m[1]!)),
-      months(m[4]!, monthNumber(m[3]!), monthNumber(m[3]!)),
+      months(g.fromYear!, monthNumber(g.fromMonth!), monthNumber(g.fromMonth!)),
+      months(g.toYear!, monthNumber(g.toMonth!), monthNumber(g.toMonth!)),
     ];
     if (from && to && from.periodStart < to.periodEnd)
       return { periodStart: from.periodStart, periodEnd: to.periodEnd };
   }
-  for (const { hit: m } of after(text, PERIOD_LABEL, PERIOD)) {
-    const quarter = Number(m[1] ?? m[3]);
+  for (const { hit } of after(text, PERIOD_LABEL, PERIOD)) {
+    const g = hit.groups ?? {};
+    const quarter = Number(g.quarter ?? g.quartal);
     const period = quarter
-      ? months(m[2] ?? m[4]!, quarter * 3 - 2, quarter * 3)
-      : m[5]
-        ? { periodStart: `${m[7]}-${pad(m[6]!)}-${pad(m[5])}`, periodEnd: `${m[10]}-${pad(m[9]!)}-${pad(m[8]!)}` }
-        : m[11]
-          ? months(m[12]!, monthNumber(m[11]), monthNumber(m[11]))
-          : m[13]
-            ? months(m[14]!, Number(m[13]), Number(m[13]))
-            : months(m[15]!, Number(m[16]), Number(m[16]));
+      ? months(g.quarterYear ?? g.quartalYear!, quarter * 3 - 2, quarter * 3)
+      : g.fromDay
+        ? {
+            periodStart: `${g.fromYear}-${pad(g.fromMonth!)}-${pad(g.fromDay)}`,
+            periodEnd: `${g.toYear}-${pad(g.toMonth!)}-${pad(g.toDay!)}`,
+          }
+        : g.month
+          ? months(g.monthYear!, monthNumber(g.month), monthNumber(g.month))
+          : g.numberedMonth
+            ? months(g.numberedYear!, Number(g.numberedMonth), Number(g.numberedMonth))
+            : months(g.isoYear!, Number(g.isoMonth), Number(g.isoMonth));
     if (period) return period;
   }
   const titled = rows.findIndex((row) => cells(row).some((cell) => TITLE.test(cell)));
   const named =
     rows.map((row) => MONTH_ROW.exec(row.trim())).find(Boolean) ??
     (titled < 0 ? null : MONTH_NAMED.exec(`${rows[titled]}\n${rows[titled + 1] ?? ''}`));
-  return (named && months(named[2]!, monthNumber(named[1]!), monthNumber(named[1]!))) || {};
+  const { month, year } = named?.groups ?? {};
+  return (month && year && months(year, monthNumber(month), monthNumber(month))) || {};
 }
 
 const NUMBER_LABEL = new RegExp(

@@ -1,12 +1,11 @@
-import type { InvoiceType, Party } from '../../domain/model.js';
-import { COUNTRY_NAMES } from '../ground.js';
-import { anyOf, lastIndex, VAT_ID_LABEL, VAT_ID_LINE } from './values.js';
+import type { Party } from '../../domain/model.js';
+import { TITLE } from './head.js';
+import { cells, KEY_VALUE } from './rows.js';
+import { anyOf, COUNTRY_NAMES, lastIndex, VAT_ID_LABEL, VAT_ID_LINE } from './values.js';
 
-// Parties. extractLayout() writes three spaces between columns, so a row splits into cells; its blocks are the
-// columns themselves. Without blocks, the first cells of the rows stand in for the one column that matters most.
+// Parties. The blocks of a page are its columns; without blocks, the first cells of the rows stand in for the one
+// column that matters most.
 
-/** A value that starts with a colon stays with its label: "Nummer   : 77" is one cell. */
-export const cells = (row: string) => row.split(/\s{3,}(?!:)/).map((cell) => cell.trim());
 /** "Name · Street 1 · 12345 City", also written with dashes, bars or dots. */
 const SENDER_SEPARATOR = /\s[·|•●–—-]\s/;
 /** "12345 Musterstadt", "DE-12345 Musterstadt", "D-12345 Musterstadt", "DE 12345 Musterstadt", and the Dutch "1234 AB Voorbeeldstad". */
@@ -94,31 +93,8 @@ export const [BUYER_HEADING, SELLER_HEADING] = [heading(BUYER), heading(SELLER)]
 const BUYER_START = new RegExp(`^(?:${BUYER})\\b`, 'i');
 /** Other headings of an address: a label without a value, or one that says so ("Adresse de livraison", "Warenempfänger"). */
 const OTHER_HEADING = /:$|adresse|address|anschrift|empfänger/i;
-/** A line with a label and its value, such as "Kundennummer: 77" or "GLN 4012345000009". */
-export const KEY_VALUE = /\S\s*:\s*\S|^\p{L}[\p{L}.-]*\s+\d[\d ]{7,}$/u;
 /** A date or an amount of money: no line of an address holds one. */
 export const DATE_OR_AMOUNT = /\d{1,2}[./]\d{1,2}[./]\d{2,4}|\d{4}-\d{2}-\d{2}|\d[.,]\d{2}(?!\d)/;
-/** The title of the document, alone or at the end of a cell ("Ihre Rechnung"), and with its number ("Rechnung 2301"). */
-/** The words that title an invoice, also as the end of a longer one ("Teilrechnung"). */
-const TITLE_WORD = [
-  '\\p{L}*rechnung',
-  'rechnungskorrektur',
-  'gutschrift',
-  '(?:partial|prepayment|advance|corrected)\\s+invoice',
-  'invoice',
-  'facture',
-  'avoir',
-  'credit\\s+note',
-].join('|');
-export const TITLE = new RegExp(`(?:^|\\s)(?:${TITLE_WORD})$`, 'iu');
-export const NAMED = new RegExp(`^(${TITLE_WORD})[ \\t]+([A-Z]{0,3}[-/]?\\d{2,}[\\w/-]*)$`, 'iu');
-/** The kinds of invoice a title names. A "Gutschrift" may be a credit note or an invoice the buyer issued, and stays open. */
-export const TYPES: [RegExp, InvoiceType][] = [
-  [/^(?:teilrechnung|partial\s+invoice)$/i, '326'],
-  [/^(?:(?:abschlags|anzahlungs|vorauszahlungs)rechnung|(?:prepayment|advance)\s+invoice)$/i, '386'],
-  [/^(?:(?:storno|korrektur)rechnung|rechnungskorrektur|corrected\s+invoice)$/i, '384'],
-  [/^(?:credit\s+note|avoir)$/i, '381'],
-];
 const SALUTATION = /^(?:herrn?|frau|mr\.?|mrs\.?|ms\.?|monsieur|madame|mme\.?)$/i;
 const LEGAL_FORMS = anyOf(
   /gmbh|mbh|ag|kg|ohg|gbr|e\.\s?[vk]\.|a\.\s?g\./, // German

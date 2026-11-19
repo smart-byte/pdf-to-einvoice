@@ -1,19 +1,40 @@
-import { isIban, MONTHS } from '../../domain/check.js';
+import { isIban } from '../../domain/check.js';
+import { MONTHS } from '../../domain/spellings.js';
 
 // How values are recognised in the text: dates, amounts, currencies, IBANs, VAT IDs, and a value after its label.
 
-/** A month by any of its names in `MONTHS`, and what an invoice adds to it: "Okt.", "Sept", "Mars". */
-export const MONTH = `(${MONTHS.flat().join('|')})[a-zä]*\\.?`;
+/**
+ * A month by any of its names in `MONTHS`, and what an invoice adds to it: "Okt.", "Sept", "Mars". The name goes into
+ * the group `name`, for `monthNumber`.
+ */
+export const monthAs = (name: string) => `(?<${name}>${MONTHS.flat().join('|')})[a-zä]*\\.?`;
 export const SEPARATOR = '^\\s*[:#.]?\\s*';
+
+/** How a country is written on a page, in lower case. */
+export const COUNTRY_NAMES: Record<string, string[]> = {
+  DE: ['deutschland', 'germany'],
+  AT: ['österreich', 'austria'],
+  CH: ['schweiz', 'switzerland', 'suisse'],
+  FR: ['frankreich', 'france'],
+  IT: ['italien', 'italy', 'italia'],
+  NL: ['niederlande', 'netherlands', 'nederland'],
+  BE: ['belgien', 'belgium', 'belgique'],
+  LU: ['luxemburg', 'luxembourg'],
+  PL: ['polen', 'poland', 'polska'],
+  ES: ['spanien', 'spain', 'españa'],
+  IE: ['irland', 'ireland'],
+  GB: ['großbritannien', 'vereinigtes königreich', 'united kingdom', 'great britain'],
+  US: ['usa', 'united states', 'vereinigte staaten'],
+};
 
 /** ISO, 3.11.2026, 3.11.26, 3 November 2026, November 3, 2026, and 08/10/2026 where it can be read in one way only. */
 export const DATE = new RegExp(
   `${SEPARATOR}(?:${[
-    '(\\d{4})-(\\d{2})-(\\d{2})', // 2026-11-03
-    '(\\d{1,2})\\.\\s?(\\d{1,2})\\.\\s?(\\d{4}|\\d{2})(?!\\d)', // 3.11.2026, 3.11.26
-    `(\\d{1,2})\\.?\\s+${MONTH}\\s+(\\d{4})`, // 3 November 2026
-    `${MONTH}\\s+(\\d{1,2}),?\\s+(\\d{4})`, // November 3, 2026
-    '(\\d{1,2})/(\\d{1,2})/(\\d{4}|\\d{2})(?!\\d)', // 08/10/2026
+    '(?<isoYear>\\d{4})-(?<isoMonth>\\d{2})-(?<isoDay>\\d{2})', // 2026-11-03
+    '(?<dotDay>\\d{1,2})\\.\\s?(?<dotMonth>\\d{1,2})\\.\\s?(?<dotYear>\\d{4}|\\d{2})(?!\\d)', // 3.11.2026, 3.11.26
+    `(?<textDay>\\d{1,2})\\.?\\s+${monthAs('textMonth')}\\s+(?<textYear>\\d{4})`, // 3 November 2026
+    `${monthAs('usMonth')}\\s+(?<usDay>\\d{1,2}),?\\s+(?<usYear>\\d{4})`, // November 3, 2026
+    '(?<slashFirst>\\d{1,2})/(?<slashSecond>\\d{1,2})/(?<slashYear>\\d{4}|\\d{2})(?!\\d)', // 08/10/2026
   ].join('|')})`,
   'i',
 );
@@ -35,7 +56,7 @@ export const anyOf = (...alternatives: RegExp[]): string => alternatives.map((pa
 
 export const pad = (n: string | number) => String(n).padStart(2, '0');
 const century = (year: string) => (year.length === 2 ? `20${year}` : year);
-/** The number of a month whose name `MONTH` matched, 1 to 12. */
+/** The number of a month whose name `monthAs` matched, 1 to 12. */
 export function monthNumber(name: string): number {
   const lower = name.toLowerCase();
   return MONTHS.findIndex((names) => names.some((known) => lower.startsWith(known))) + 1;
@@ -44,15 +65,17 @@ export function monthNumber(name: string): number {
 export const lastIndex = <T>(items: T[], test: (item: T) => unknown) =>
   items.reduce((last, item, i) => (test(item) ? i : last), -1);
 
+/** The day a match of `DATE` names, as YYYY-MM-DD. */
 export function toIsoDate(m: RegExpExecArray, dayFirst: boolean): string | undefined {
-  if (m[1]) return `${m[1]}-${m[2]}-${m[3]}`;
-  if (m[4]) return `${century(m[6]!)}-${pad(m[5]!)}-${pad(m[4])}`;
-  if (m[7]) return `${m[9]}-${pad(monthNumber(m[8]!))}-${pad(m[7])}`;
-  if (m[10]) return `${m[12]}-${pad(monthNumber(m[10]))}-${pad(m[11]!)}`;
+  const g = m.groups ?? {};
+  if (g.isoYear) return `${g.isoYear}-${g.isoMonth}-${g.isoDay}`;
+  if (g.dotDay) return `${century(g.dotYear!)}-${pad(g.dotMonth!)}-${pad(g.dotDay)}`;
+  if (g.textDay) return `${g.textYear}-${pad(monthNumber(g.textMonth!))}-${pad(g.textDay)}`;
+  if (g.usMonth) return `${g.usYear}-${pad(monthNumber(g.usMonth))}-${pad(g.usDay!)}`;
   // With slashes, day and month can be told apart when one is above 12, or when a German or French label says who wrote it.
-  const [a, b] = [Number(m[13]), Number(m[14])];
-  if (b > 12 && a <= 12) return `${century(m[15]!)}-${pad(a)}-${pad(b)}`;
-  if ((a > 12 || dayFirst) && b <= 12) return `${century(m[15]!)}-${pad(b)}-${pad(a)}`;
+  const [a, b] = [Number(g.slashFirst), Number(g.slashSecond)];
+  if (b > 12 && a <= 12) return `${century(g.slashYear!)}-${pad(a)}-${pad(b)}`;
+  if ((a > 12 || dayFirst) && b <= 12) return `${century(g.slashYear!)}-${pad(b)}-${pad(a)}`;
   return undefined;
 }
 

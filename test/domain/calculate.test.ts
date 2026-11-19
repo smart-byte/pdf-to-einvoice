@@ -4,7 +4,7 @@ import {
   cents,
   lineAgrees,
   percentAgrees,
-  resolveAdjustments,
+  checkAdjustments,
   slackOf,
   tryCalculate,
 } from '../../src/domain/calculate.js';
@@ -145,7 +145,7 @@ describe('discounts and charges on the whole invoice', () => {
   const mixed = [at(7), at(19)];
   const freight = (over: DocumentAllowance = {}): DocumentAllowance => ({ amount: 5, reason: 'Fracht', ...over });
   const problems = (lines: Line[], over: Partial<Invoice>) =>
-    resolveAdjustments(invoice(lines, over)).problems.map(({ path, code, severity }) => ({ path, code, severity }));
+    tryCalculate(invoice(lines, over)).problems.map(({ path, code, severity }) => ({ path, code, severity }));
 
   it('takes a percentage off every VAT group and a charge in its own, and adds up to BT-106 to BT-109', () => {
     const t = calculate(invoice(mixed, { discounts: [{ percent: 10 }], charges: [freight({ vatRate: 19 })] }));
@@ -215,8 +215,7 @@ describe('discounts and charges on the whole invoice', () => {
     );
     expect(t).toMatchObject({ lineTotal: -100, allowances: -10, charges: -5, net: -95, vat: -18.05 });
     expect(
-      resolveAdjustments(invoice([line({ quantity: -2, unitPrice: 50 })], { charges: [freight({ amount: -5 })] }))
-        .problems,
+      tryCalculate(invoice([line({ quantity: -2, unitPrice: 50 })], { charges: [freight({ amount: -5 })] })).problems,
     ).toEqual([]);
   });
 
@@ -287,10 +286,9 @@ describe('discounts and charges on the whole invoice', () => {
   });
 
   it('without the lines checks each entry by itself and places none', () => {
-    const t = resolveAdjustments(invoice(mixed, { discounts: [{ amount: 10 }, { percent: -1 }] }), false);
-    expect(t).toMatchObject({ adjustments: [], resolved: false });
-    expect(t.problems.map(({ path, code }) => `${path} ${code}`)).toEqual(['discounts.1.percent adjustment']);
-    expect(resolveAdjustments(invoice(mixed), false)).toEqual({ adjustments: [], problems: [], resolved: false });
+    const found = checkAdjustments(invoice(mixed, { discounts: [{ amount: 10 }, { percent: -1 }] }));
+    expect(found.map(({ path, code }) => `${path} ${code}`)).toEqual(['discounts.1.percent adjustment']);
+    expect(checkAdjustments(invoice(mixed))).toEqual([]);
   });
 
   it('gives the totals with the problems of the entries, and none while one cannot be placed, without throwing', () => {
@@ -300,11 +298,10 @@ describe('discounts and charges on the whole invoice', () => {
     const stuck = tryCalculate(invoice(mixed, { discounts: [{ amount: 10 }] }));
     expect(stuck.totals).toBeUndefined();
     expect(stuck.problems).toMatchObject([{ path: 'discounts.0.vatRate', severity: 'error' }]);
-    expect(tryCalculate(invoice(mixed), false)).toEqual({ problems: [] });
   });
 
   it('warns about an amount against the sign of its lines, but not in a group of its own', () => {
-    const t = resolveAdjustments(invoice([line()], { discounts: [{ amount: -10 }] }));
+    const t = tryCalculate(invoice([line()], { discounts: [{ amount: -10 }] }));
     expect(t.problems).toMatchObject([{ path: 'discounts.0.amount', code: 'adjustment-sign', severity: 'warning' }]);
     expect(calculate(invoice([line()], { discounts: [{ amount: -10 }] })).net).toBe(110);
     expect(problems([line()], { charges: [freight({ amount: -3, vatCategory: 'E' })] })).toEqual([]);

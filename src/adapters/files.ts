@@ -58,9 +58,11 @@ export function sameFile(a: string, b: string): boolean {
 export async function createFile(
   pdfPath: string,
   invoice: InvoiceDraft,
-  outputPath = defaultOutput(pdfPath),
-  overwrite = false,
-  profile?: CreateOptions['profile'],
+  {
+    outputPath = defaultOutput(pdfPath),
+    overwrite = false,
+    profile,
+  }: { outputPath?: string; overwrite?: boolean; profile?: CreateOptions['profile'] } = {},
 ): Promise<{ outputPath: string; findings: Finding[]; totals: Totals }> {
   const output = resolve(outputPath);
   if (sameFile(output, pdfPath))
@@ -79,8 +81,7 @@ export async function createFile(
 export async function createXRechnungFile(
   invoice: InvoiceDraft,
   outputPath: string,
-  syntax?: XRechnungOptions['syntax'],
-  overwrite = false,
+  { overwrite = false, syntax }: { overwrite?: boolean; syntax?: XRechnungOptions['syntax'] } = {},
 ): Promise<{ outputPath: string; findings: Finding[]; totals: Totals }> {
   const output = resolve(outputPath);
   if (!overwrite && existsSync(output)) throw Object.assign(new Error(`${output} already exists.`), { code: 'EEXIST' });

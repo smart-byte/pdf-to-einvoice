@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { check, percentSpellings } from '../../src/domain/check.js';
+import { check } from '../../src/domain/check.js';
+import { percentSpellings } from '../../src/domain/spellings.js';
 import type { InvoiceDraft } from '../../src/domain/model.js';
 
 const sample = (): InvoiceDraft =>

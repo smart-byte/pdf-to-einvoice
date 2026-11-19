@@ -1,27 +1,13 @@
-import { amountSpellings, dateSpellings, isDate, isIban, MONTHS } from '../domain/check.js';
+import { isDate, isIban } from '../domain/check.js';
+import { amountSpellings, dateSpellings, MONTHS } from '../domain/spellings.js';
 import type { InvoiceDraft } from '../domain/model.js';
 import { escapeRegExp } from '../util/regexp.js';
+import { COUNTRY_NAMES } from './guess/values.js';
 
 /** The fields of one object of the draft: the invoice, a party, a line or the totals. */
 type Fields = Record<string, unknown>;
 type Rule = (value: unknown, siblings: Fields) => boolean;
 
-/** How a country is written on a page, in lower case. */
-export const COUNTRY_NAMES: Record<string, string[]> = {
-  DE: ['deutschland', 'germany'],
-  AT: ['österreich', 'austria'],
-  CH: ['schweiz', 'switzerland', 'suisse'],
-  FR: ['frankreich', 'france'],
-  IT: ['italien', 'italy', 'italia'],
-  NL: ['niederlande', 'netherlands', 'nederland'],
-  BE: ['belgien', 'belgium', 'belgique'],
-  LU: ['luxemburg', 'luxembourg'],
-  PL: ['polen', 'poland', 'polska'],
-  ES: ['spanien', 'spain', 'españa'],
-  IE: ['irland', 'ireland'],
-  GB: ['großbritannien', 'vereinigtes königreich', 'united kingdom', 'great britain'],
-  US: ['usa', 'united states', 'vereinigte staaten'],
-};
 const CURRENCY_SIGNS: Record<string, string> = { EUR: '€', USD: '$', GBP: '£' };
 
 /**

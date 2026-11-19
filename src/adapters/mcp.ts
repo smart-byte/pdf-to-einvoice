@@ -179,23 +179,19 @@ const HANDLERS: Record<string, (args: Args) => Promise<object | string>> = {
 
   async create_einvoice(args) {
     const output = args.output_path === undefined ? undefined : pathArg(args, 'output_path');
-    const result = await createFile(
-      pathArg(args, 'pdf_path'),
-      invoiceArg(args),
-      output,
-      args.overwrite === true,
-      choiceArg(args, 'profile'),
-    );
+    const result = await createFile(pathArg(args, 'pdf_path'), invoiceArg(args), {
+      outputPath: output,
+      overwrite: args.overwrite === true,
+      profile: choiceArg(args, 'profile'),
+    });
     return { output_path: result.outputPath, findings: result.findings, totals: result.totals };
   },
 
   async create_xrechnung(args) {
-    const result = await createXRechnungFile(
-      invoiceArg(args),
-      pathArg(args, 'output_path'),
-      choiceArg(args, 'syntax'),
-      args.overwrite === true,
-    );
+    const result = await createXRechnungFile(invoiceArg(args), pathArg(args, 'output_path'), {
+      overwrite: args.overwrite === true,
+      syntax: choiceArg(args, 'syntax'),
+    });
     return { output_path: result.outputPath, findings: result.findings, totals: result.totals };
   },
 

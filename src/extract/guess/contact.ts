@@ -1,15 +1,7 @@
 import type { Party } from '../../domain/model.js';
-import {
-  BUYER_HEADING,
-  cells,
-  DATE_OR_AMOUNT,
-  type Found,
-  type Role,
-  roleOf,
-  SELLER_HEADING,
-  senderOf,
-  TITLE,
-} from './parties.js';
+import { TITLE } from './head.js';
+import { BUYER_HEADING, DATE_OR_AMOUNT, type Found, type Role, roleOf, SELLER_HEADING, senderOf } from './parties.js';
+import { cells } from './rows.js';
 import { after, CUSTOMER, SEPARATOR } from './values.js';
 
 // Contact data. A contact is read for a party only where a heading, a label or the party's recognised address

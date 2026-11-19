@@ -89,7 +89,11 @@ const COMMANDS: Record<string, Command> = {
   create: {
     args: 2,
     async run([pdfPath, dataPath], values, io) {
-      const result = await createFile(pdfPath!, await readJson(dataPath!), values.output, values.force, values.profile);
+      const result = await createFile(pdfPath!, await readJson(dataPath!), {
+        outputPath: values.output,
+        overwrite: values.force,
+        profile: values.profile,
+      });
       for (const finding of result.findings) io.stderr(`${formatFinding(finding)}\n`);
       io.stdout(`${result.outputPath}\n`);
       return 0;
@@ -107,7 +111,7 @@ const COMMANDS: Record<string, Command> = {
       const result =
         values.output === undefined
           ? await createXRechnung({ invoice, syntax: values.syntax })
-          : await createXRechnungFile(invoice, values.output, values.syntax, values.force);
+          : await createXRechnungFile(invoice, values.output, { overwrite: values.force, syntax: values.syntax });
       for (const finding of result.findings) io.stderr(`${formatFinding(finding)}\n`);
       io.stdout(`${'xml' in result ? result.xml.replace(/\n$/, '') : result.outputPath}\n`);
       return 0;

@@ -3,7 +3,8 @@ import type { InvoiceDraft, Party } from '../domain/model.js';
 import { readContact } from './guess/contact.js';
 import { readBuyerReference, readNumber, readPaymentTerms, readPeriod, readType } from './guess/head.js';
 import { NOTE_CATEGORIES, readItems, readVatNote } from './guess/items.js';
-import { believed, cells, countryOfVatId, EU, type Found, ISSUER_OR_BANK, readParties } from './guess/parties.js';
+import { believed, countryOfVatId, EU, type Found, ISSUER_OR_BANK, readParties } from './guess/parties.js';
+import { cells } from './guess/rows.js';
 import { findCurrency, readTotals } from './guess/totals.js';
 import { after, anyOf, DATE, findIban, SEPARATOR, toIsoDate, vatIdsIn } from './guess/values.js';
 
