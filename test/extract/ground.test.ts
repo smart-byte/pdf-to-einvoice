@@ -98,6 +98,12 @@ describe('keepWhatThePdfShows', () => {
     expect(keepWhatThePdfShows({ periodStart: '2026-09-02', periodEnd: '2027-01-30' }, text)).toEqual({});
   });
 
+  it('keeps a period whose month name has an umlaut', () => {
+    const march = { periodStart: '2026-03-01', periodEnd: '2026-03-31' };
+    for (const printed of ['März 2026', 'Mär. 2026', 'MÄRZ 2026'])
+      expect(keepWhatThePdfShows(march, `${pdfText}\nLeistungszeitraum: ${printed}`), printed).toEqual(march);
+  });
+
   it('does not take a single day of a month for a period', () => {
     for (const day of ['15. September 2026', '15.09.2026', '2026-09-15']) {
       expect(keepWhatThePdfShows({ periodStart: '2026-09-01' }, `${pdfText}\nLieferdatum ${day}`), day).toEqual({});

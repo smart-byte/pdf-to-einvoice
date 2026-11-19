@@ -59,7 +59,7 @@ export function keepWhatThePdfShows(input: unknown, pdfText: string): InvoiceDra
       if (typeof v !== 'string' || !isDate(v)) return false;
       const [y, m, d] = v.split('-').map(Number) as [number, number, number];
       if (d !== (which === 'first' ? 1 : new Date(Date.UTC(y, m, 0)).getUTCDate())) return false;
-      const [mm, names] = [String(m).padStart(2, '0'), (MONTHS[m - 1] ?? []).map(escape).join('|')];
+      const [mm, names] = [String(m).padStart(2, '0'), (MONTHS[m - 1] ?? []).map(escapeRegExp).join('|')];
       // The month alone, not a day in it ("15. September 2026", "15.09.2026").
       return new RegExp(
         `(?<!\\d\\.?\\s*)\\b(?:${names})\\.?\\s*${y}\\b|(?<![\\d./-])${mm}[./]${y}(?!\\d)|(?<![\\d-])${y}-${mm}(?![-\\d])`,

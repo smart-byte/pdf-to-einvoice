@@ -6,3 +6,4 @@ site-dist
 *.tgz
 *.jar
 .env*
+/.idea/
