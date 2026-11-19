@@ -27,7 +27,7 @@ MUSTANG_JAR=$PWD/Mustang-CLI-2.26.0.jar npm run test:reference
 ```
 
 CI runs this on every push. A new kind of invoice (a VAT category, a document type, a field that changes the XML)
-gets a case in `test/reference.test.ts`.
+gets a case in `test/generate/reference.test.ts`.
 
 ## Measuring the reader
 
@@ -46,7 +46,7 @@ The last line also reads with a language model, as the web app does: in Chrome w
 invoice. Its second table compares the rules alone, the model alone, and the rules with the model for what they left
 empty.
 
-A change to `src/guess.ts`, `src/text.ts`, `src/ground.ts`, the prompt or the models in `site/llm.ts` comes with the
+A change to `src/extract/guess.ts`, `src/pdf/text.ts`, `src/extract/ground.ts`, the prompt or the models in `site/llm.ts` comes with the
 table before and after. Keep the corpus out of this repository, and write no rule for a single vendor's sample: most
 of its files come from very few generators.
 

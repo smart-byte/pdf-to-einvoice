@@ -1,5 +1,6 @@
-export { calculate, type Adjustment, type Totals, type VatGroup } from './calculate.js';
-export { check, type CheckOptions, type CheckResult, type Finding } from './check.js';
+export { calculate, type Adjustment, type Totals, type VatGroup } from './domain/calculate.js';
+export { check, type CheckOptions, type CheckResult } from './domain/check.js';
+export type { Finding } from './domain/finding.js';
 export {
   createEInvoice,
   createXRechnung,
@@ -9,9 +10,9 @@ export {
   type InvoiceErrorCode,
   type XRechnungOptions,
   type XRechnungResult,
-} from './create.js';
-export { keepWhatThePdfShows } from './ground.js';
-export { guessFromText, languageOf, type GuessOptions } from './guess.js';
+} from './generate/create.js';
+export { keepWhatThePdfShows } from './extract/ground.js';
+export { guessFromText, languageOf, type GuessOptions } from './extract/guess.js';
 export {
   INVOICE_TYPES,
   VAT_CATEGORIES,
@@ -25,8 +26,8 @@ export {
   type Party,
   type PrintedTotals,
   type VatCategory,
-} from './model.js';
-export { inspectPdf, readEmbeddedXml, type PdfInfo } from './pdf.js';
-export { readInvoiceXml } from './read.js';
-export { extractLayout, extractText, type Layout, type Piece } from './text.js';
-export { validateEInvoice, type ValidationResult } from './validate.js';
+} from './domain/model.js';
+export { inspectPdf, readEmbeddedXml, type PdfInfo } from './pdf/file.js';
+export { readInvoiceXml } from './inspect/read-xml.js';
+export { extractLayout, extractText, type Layout, type Piece } from './pdf/text.js';
+export { validateEInvoice, type ValidationResult } from './inspect/validate.js';

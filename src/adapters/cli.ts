@@ -1,0 +1,210 @@
+#!/usr/bin/env node
+import { realpathSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { parseArgs } from 'node:util';
+import type { Totals } from '../domain/calculate.js';
+import { check } from '../domain/check.js';
+import type { Finding } from '../domain/finding.js';
+import { invoiceJsonSchema } from '../domain/model.js';
+import { createXRechnung, InvoiceError } from '../generate/create.js';
+import { readEmbeddedXml } from '../pdf/file.js';
+import { extractText } from '../pdf/text.js';
+import { CHOICES, createFile, createXRechnungFile, describePdf, packageVersion, readJson, readPdf, reason, sameFile, validateFile } from './files.js';
+
+export interface Io {
+  stdout: (text: string) => void;
+  stderr: (text: string) => void;
+}
+
+const USAGE = `Turn an invoice PDF into an EN 16931 e-invoice (ZUGFeRD / Factur-X), or invoice data into an XRechnung.
+
+Usage:
+  pdf-to-einvoice create <invoice.pdf> <data.json> [-o out.pdf] [--profile en16931|xrechnung] [--force]
+      Write the e-invoice. Default output: <invoice>.einvoice.pdf next to the input.
+      With --profile xrechnung the data has to meet the XRechnung rules, and the XML in the PDF declares XRechnung 3.0.
+  pdf-to-einvoice xrechnung <data.json> [--syntax ubl|cii] [-o out.xml] [--force]
+      Write the invoice data as an XRechnung 3.0: XML without a PDF, in UBL (default) or CII.
+      Without -o the XML goes to standard output.
+  pdf-to-einvoice check <data.json> [--pdf invoice.pdf] [--rules xrechnung] [--json]
+      Check the invoice data; with --pdf also compare it with the text of the PDF, with --rules xrechnung also
+      with what XRechnung asks for.
+  pdf-to-einvoice read <invoice.pdf> [--json]
+      Print the text of the PDF; with --json also guessed values and facts about the PDF.
+  pdf-to-einvoice xml <einvoice.pdf>
+      Print the XML embedded in an e-invoice.
+  pdf-to-einvoice validate <einvoice.pdf> [--json]
+      Check an existing e-invoice: its profile, its data, and whether the XML says what the PDF shows.
+      A plausibility check, not a full EN 16931 validation. Exit code 1 if it is no e-invoice or has errors.
+  pdf-to-einvoice schema
+      Print the JSON Schema of the invoice data.
+  pdf-to-einvoice mcp
+      Start the MCP server on stdio.
+
+  -h, --help       Show this help.
+  -v, --version    Show the version.
+
+Results go to standard output. check and validate print their findings there too (with --json as JSON);
+create and xrechnung print findings to standard error, where errors go.
+Exit codes: 0 done, 1 failed or the data has errors, 2 used wrongly.`;
+
+const formatFinding = (f: Finding) => `${f.severity}${f.path ? ` ${f.path}` : ''}: ${f.message}`;
+
+function printFindings({ findings, totals }: { findings: Finding[]; totals?: Totals }, io: Io): void {
+  io.stdout(findings.length ? `${findings.map(formatFinding).join('\n')}\n` : 'No findings.\n');
+  if (totals) io.stdout(`${(['net', 'vat', 'gross', 'due'] as const).map((key) => `${key} ${totals[key].toFixed(2)}`).join('\n')}\n`);
+}
+
+const OPTIONS = {
+  output: { type: 'string', short: 'o' },
+  force: { type: 'boolean' },
+  pdf: { type: 'string' },
+  json: { type: 'boolean' },
+  profile: { type: 'string' },
+  syntax: { type: 'string' },
+  rules: { type: 'string' },
+  help: { type: 'boolean', short: 'h' },
+  version: { type: 'boolean', short: 'v' },
+} as const;
+
+type Values = { output?: string; force?: boolean; pdf?: string; json?: boolean } & { [K in keyof typeof CHOICES]?: (typeof CHOICES)[K][number] };
+type Command = { args: number; run: (args: string[], values: Values, io: Io) => Promise<number> };
+
+const COMMANDS: Record<string, Command> = {
+  create: {
+    args: 2,
+    async run([pdfPath, dataPath], values, io) {
+      const result = await createFile(pdfPath!, await readJson(dataPath!), values.output, values.force, values.profile);
+      for (const finding of result.findings) io.stderr(`${formatFinding(finding)}\n`);
+      io.stdout(`${result.outputPath}\n`);
+      return 0;
+    },
+  },
+  xrechnung: {
+    args: 1,
+    async run([dataPath], values, io) {
+      const invoice = await readJson(dataPath!);
+      if (values.output !== undefined && sameFile(values.output, dataPath!)) {
+        throw new Error('The output path is the data file. Choose another output path; the input is never overwritten.');
+      }
+      const result =
+        values.output === undefined
+          ? await createXRechnung({ invoice, syntax: values.syntax })
+          : await createXRechnungFile(invoice, values.output, values.syntax, values.force);
+      for (const finding of result.findings) io.stderr(`${formatFinding(finding)}\n`);
+      io.stdout(`${'xml' in result ? result.xml.replace(/\n$/, '') : result.outputPath}\n`);
+      return 0;
+    },
+  },
+  check: {
+    args: 1,
+    async run([dataPath], values, io) {
+      const data = await readJson(dataPath!);
+      const pdfText = values.pdf === undefined ? undefined : await extractText(await readPdf(values.pdf));
+      const { findings, totals } = check(data, { pdfText, rules: values.rules });
+      if (values.json) io.stdout(`${JSON.stringify({ findings, totals }, null, 2)}\n`);
+      else printFindings({ findings, totals }, io);
+      return findings.some((f) => f.severity === 'error') ? 1 : 0;
+    },
+  },
+  read: {
+    args: 1,
+    async run([pdfPath], values, io) {
+      const description = await describePdf(pdfPath!);
+      io.stdout(`${values.json ? JSON.stringify(description, null, 2) : description.text}\n`);
+      return 0;
+    },
+  },
+  xml: {
+    args: 1,
+    async run([pdfPath], _values, io) {
+      const xml = await readEmbeddedXml(await readPdf(pdfPath!));
+      if (xml === null) throw new Error(`${pdfPath} carries no e-invoice XML.`);
+      io.stdout(xml.endsWith('\n') ? xml : `${xml}\n`);
+      return 0;
+    },
+  },
+  validate: {
+    args: 1,
+    async run([pdfPath], values, io) {
+      const result = await validateFile(pdfPath!);
+      if (values.json) {
+        io.stdout(`${JSON.stringify(result, null, 2)}\n`);
+      } else {
+        io.stdout(`${result.isEInvoice ? 'E-invoice' : 'Not an e-invoice'}${result.profile ? `, profile ${result.profile}` : ''}\n`);
+        printFindings(result, io);
+      }
+      return result.isEInvoice && !result.findings.some((f) => f.severity === 'error') ? 0 : 1;
+    },
+  },
+  schema: {
+    args: 0,
+    async run(_args, _values, io) {
+      io.stdout(`${JSON.stringify(invoiceJsonSchema, null, 2)}\n`);
+      return 0;
+    },
+  },
+  mcp: {
+    args: 0,
+    async run() {
+      // Loaded on demand so the other commands do not pay for the MCP SDK.
+      await (await import('./mcp.js')).startStdio();
+      return 0;
+    },
+  },
+};
+
+/** Runs the command line and returns the exit code: 0 done, 1 failed, 2 used wrongly. */
+export async function run(argv: string[], io: Io): Promise<number> {
+  const misuse = (message: string) => {
+    io.stderr(`${message}\n\n${USAGE}\n`);
+    return 2;
+  };
+
+  let parsed;
+  try {
+    parsed = parseArgs({ args: argv, allowPositionals: true, options: OPTIONS });
+  } catch (e) {
+    return misuse(reason(e));
+  }
+  const { positionals } = parsed;
+  for (const [option, choices] of Object.entries(CHOICES)) {
+    const value = parsed.values[option as keyof typeof CHOICES];
+    if (value !== undefined && !(choices as readonly string[]).includes(value)) return misuse(`--${option} takes ${choices.join(' or ')}, not ${value}.`);
+  }
+  const values = parsed.values as Values & { help?: boolean; version?: boolean };
+  const [name, ...args] = positionals;
+  if (values.version) {
+    io.stdout(`${packageVersion()}\n`);
+    return 0;
+  }
+  if (values.help || name === undefined) {
+    io.stdout(`${USAGE}\n`);
+    return 0;
+  }
+  if (!Object.hasOwn(COMMANDS, name)) return misuse(`Unknown command: ${name}`);
+  const command = COMMANDS[name]!;
+  if (args.length !== command.args) return misuse(`${name} takes ${command.args} argument(s), got ${args.length}.`);
+
+  try {
+    return await command.run(args, values, io);
+  } catch (e) {
+    if (e instanceof InvoiceError) {
+      for (const finding of e.findings) io.stderr(`${formatFinding(finding)}\n`);
+      // For invalid data the findings say it all; every other code has its cause in the message.
+      if (e.code !== 'invalid-invoice') io.stderr(`error: ${e.message}\n`);
+    } else if ((e as NodeJS.ErrnoException).code === 'EEXIST') {
+      io.stderr(`error: ${reason(e)} Use --force to overwrite it.\n`);
+    } else {
+      io.stderr(`error: ${reason(e)}\n`);
+    }
+    return 1;
+  }
+}
+
+// Run only as the program, not when imported. Both sides go through realpath because npm starts the bin via a symlink.
+if (process.argv[1] && realpathSync.native(process.argv[1]) === realpathSync.native(fileURLToPath(import.meta.url))) {
+  // No top-level await: `mcp` imports a module that imports this one, which must have finished loading by then.
+  void run(process.argv.slice(2), { stdout: (text) => process.stdout.write(text), stderr: (text) => process.stderr.write(text) }).then((code) => {
+    process.exitCode = code;
+  });
+}

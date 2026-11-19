@@ -25,18 +25,24 @@ A change is done when `npm test`, `npm run type-check`, `npm run lint` and `npm 
 
 ## Where things are
 
-| path                             | what it holds                                                                                  |
-| -------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `src/model.ts`                   | the invoice data model and its JSON Schema                                                     |
-| `src/calculate.ts`               | totals and VAT in exact cents                                                                  |
-| `src/check.ts`                   | required fields, formats, arithmetic, the XRechnung rules, comparison with the text of the PDF |
-| `src/text.ts`, `src/guess.ts`    | text and layout of a PDF, and reading an invoice from them without a model                     |
-| `src/ground.ts`                  | drops what a language model returned but the PDF does not show                                 |
-| `src/ubl.ts`, `src/create.ts`    | the XML (in the PDF, or alone as XRechnung) and the PDF/A-3 file                               |
-| `src/read.ts`, `src/validate.ts` | reading and checking an existing e-invoice                                                     |
-| `src/cli.ts`, `src/mcp.ts`       | command line and MCP server; `server.json` describes the server for registries                 |
-| `site/`                          | the web app; it imports `src/` directly                                                        |
-| `test/`, `examples/`             | tests and the invented sample invoice                                                          |
+`src/` is split into layers, one folder each. A layer imports only the layers listed beside it;
+`test/architecture.test.ts` enforces this, and that there is no cycle between files. `test/` has the same folders, and
+`test/site/` for the web app.
+
+| path                 | what it holds                                                                                      | imports          |
+| -------------------- | -------------------------------------------------------------------------------------------------- | ---------------- |
+| `src/domain/`        | the data model and its JSON Schema (`model.ts`), totals in exact cents (`calculate.ts`), the rules | nothing else     |
+|                      | the data has to meet (`check.ts`), and `Finding`, what all of them report (`finding.ts`)           |                  |
+| `src/pdf/`           | text and layout of a PDF (`text.ts`), its structure, embedded XML and PDF/A repair (`file.ts`)     | nothing else     |
+| `src/extract/`       | reading an invoice from the text without a model (`guess.ts`), dropping what a language model      | domain           |
+|                      | returned but the PDF does not show (`ground.ts`)                                                   |                  |
+| `src/generate/`      | the XML (`ubl.ts`) and the e-invoice, in the PDF/A-3 or alone as XRechnung (`create.ts`)           | domain, pdf      |
+| `src/inspect/`       | reading (`read-xml.ts`) and checking (`validate.ts`) an existing e-invoice                         | domain, pdf      |
+| `src/adapters/`      | command line (`cli.ts`), MCP server (`mcp.ts`), and the work with files on disk both share         | all of the above |
+|                      | (`files.ts`); `server.json` describes the server for registries                                    |                  |
+| `src/index.ts`       | the public API of the package                                                                      | all but adapters |
+| `site/`              | the web app; it imports `src/` directly, never `src/adapters/`                                     |                  |
+| `test/`, `examples/` | tests, by layer, and the invented sample invoice                                                   |                  |
 
 ## Rules
 
@@ -44,11 +50,11 @@ A change is done when `npm test`, `npm run type-check`, `npm run lint` and `npm 
   (`site/i18n.ts`).
 - No real invoice and no data from one enters the repository, not in fixtures, tests, screenshots or issues.
   `examples/` is invented; `npm run sample` rebuilds it.
-- The reader must not be fitted to single layouts. A change to `src/guess.ts` or `src/text.ts` comes with the table
+- The reader must not be fitted to single layouts. A change to `src/extract/guess.ts` or `src/pdf/text.ts` comes with the table
   of `npm run eval:reader` before and after. A wrong value is worse than a missing one.
 - A change to how files are written comes with `npm run test:reference`.
-- A change to the website comes with `npm run test:browser`; a new flow gets a test in `test/browser.test.ts`.
-- Money is calculated in whole cents (`src/calculate.ts`), never in floating point euros.
+- A change to the website comes with `npm run test:browser`; a new flow gets a test in `test/site/browser.test.ts`.
+- Money is calculated in whole cents (`src/domain/calculate.ts`), never in floating point euros.
 - The website makes no request to a third party except the model download the user asks for. No scripts, styles or
   fonts from another origin, in any build. One further request exists, to the page counter of the project
   (`site/counter.ts`, `site/count.ts`): only a build that is given `ANALYTICS_WEBSITE_ID` counts, with the code in
