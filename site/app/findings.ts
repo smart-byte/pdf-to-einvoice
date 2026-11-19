@@ -6,7 +6,7 @@ import { t } from '../shared/i18n.js';
 import { focusedPath, highlight, point, renderMarks, turnTo } from './page.js';
 import { shownFormat, state } from './state.js';
 import { refreshXml } from './xml.js';
-import { describe, fieldLabel, money } from './wording.js';
+import { describe, fieldLabel, formatMoney } from './wording.js';
 
 /** The field of a path; the first field of a line item, discount or charge for the path of all of it, or of a value of it the form does not show. */
 const fieldOf = (path: string) => {
@@ -110,12 +110,12 @@ function renderTotals(result: CheckResult, findings: Finding[]): void {
       'div',
       { className: `total${key === 'gross' ? ' total--main' : ''}${mismatch ? ' total--off' : ''}` },
       el('dt', {}, t(`t.${key}`)),
-      el('dd', {}, money(result.totals[key])),
+      el('dd', {}, formatMoney(result.totals[key])),
     );
     // An existing e-invoice states its totals in its XML; for a PDF they are what the page prints.
     const printedAs = state.mode === 'validate' ? 't.printed.xml' : 't.printed';
     if (mismatch && typeof printed[key] === 'number')
-      row.append(el('dd', { className: 'total__printed' }, t(printedAs, { v: money(printed[key]!) })));
+      row.append(el('dd', { className: 'total__printed' }, t(printedAs, { v: formatMoney(printed[key]!) })));
     // A total has no field to focus: pointing at it shows where it stands, on whichever page that is.
     row.onmouseenter = () => {
       const path = `totals.${key}`;

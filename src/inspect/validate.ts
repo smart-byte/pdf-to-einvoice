@@ -4,6 +4,7 @@ import { error, warning, type Finding } from '../domain/finding.js';
 import { message } from '../domain/messages.js';
 import type { InvoiceDraft } from '../domain/model.js';
 import { inspectPdf, type PdfInfo } from '../pdf/file.js';
+import { messageOf } from '../util/errors.js';
 import { readInvoiceXml } from './read-xml.js';
 
 export interface ValidationResult {
@@ -83,7 +84,7 @@ function readXml(xml: string): { read?: ReturnType<typeof readInvoiceXml>; isEIn
   } catch (e) {
     return {
       isEInvoice: false,
-      findings: [error('', 'xml-syntax', { reason: e instanceof Error ? e.message : String(e) })],
+      findings: [error('', 'xml-syntax', { reason: messageOf(e) })],
     };
   }
   if (read.profile?.startsWith(EN16931)) return { read, isEInvoice: true, findings: [] };

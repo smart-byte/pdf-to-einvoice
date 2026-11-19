@@ -11,7 +11,7 @@ import { createEInvoice, createXRechnung, type CreateOptions, type XRechnungOpti
 import { validateEInvoice, type ValidationResult } from '../inspect/validate.js';
 import { inspectPdf } from '../pdf/file.js';
 import { extractLayout, extractText } from '../pdf/text.js';
-export const reason = (e: unknown) => (e instanceof Error ? e.message : String(e));
+import { messageOf } from '../util/errors.js';
 export const readPdf = async (path: string) => new Uint8Array(await readFile(path));
 
 export const packageVersion = (): string =>
@@ -22,7 +22,7 @@ export async function readJson(path: string): Promise<InvoiceDraft> {
   try {
     return JSON.parse(text);
   } catch (e) {
-    throw new Error(`${path} is not valid JSON: ${reason(e)}`, { cause: e });
+    throw new Error(`${path} is not valid JSON: ${messageOf(e)}`, { cause: e });
   }
 }
 

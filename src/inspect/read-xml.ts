@@ -1,6 +1,7 @@
 import { XMLParser } from 'fast-xml-parser';
 import { lineBase, micro, percentAgrees, slackOf } from '../domain/calculate.js';
 import type { Allowance, DocumentAllowance, InvoiceDraft, InvoiceType, VatCategory } from '../domain/model.js';
+import { messageOf } from '../util/errors.js';
 
 type Node = Record<string, any> | string | undefined;
 
@@ -210,7 +211,7 @@ export function readInvoiceXml(xml: string): {
   try {
     root = parser.parse(xml, true).CrossIndustryInvoice;
   } catch (e) {
-    throw new Error(`The XML is not well-formed (${e instanceof Error ? e.message : String(e)}).`, { cause: e });
+    throw new Error(`The XML is not well-formed (${messageOf(e)}).`, { cause: e });
   }
   if (root === undefined) {
     throw new Error(

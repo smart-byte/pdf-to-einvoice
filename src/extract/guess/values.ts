@@ -37,7 +37,6 @@ export const pad = (n: string | number) => String(n).padStart(2, '0');
 const century = (year: string) => (year.length === 2 ? `20${year}` : year);
 export const monthNumber = (name: string) => MONTHS.findIndex((m) => new RegExp(`^${m}`, 'i').test(name)) + 1;
 export const cents = (n: number) => Math.round(n * 100);
-export const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 /** The index of the last item that passes the test, or -1. */
 export const lastIndex = <T>(items: T[], test: (item: T) => unknown) =>
   items.reduce((last, item, i) => (test(item) ? i : last), -1);

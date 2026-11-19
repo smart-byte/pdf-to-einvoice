@@ -1,6 +1,6 @@
 // The XML that goes into the file, shown as it would be written.
 import { $, el, setText } from './dom.js';
-import { money, reasonOf } from './wording.js';
+import { formatMoney, reasonOf } from './wording.js';
 import { lang, t } from '../shared/i18n.js';
 import { shownFormat, state } from './state.js';
 
@@ -54,8 +54,8 @@ async function renderXml(): Promise<void> {
         String(invoice.seller?.name),
         inXml(['ram:SellerTradeParty', 'ram:Name'], ['cac:AccountingSupplierParty', 'cbc:RegistrationName']),
       ],
-      [t('t.vat'), money(totals.vat), inXml(['ram:TaxTotalAmount'], ['cac:TaxTotal', 'cbc:TaxAmount'])],
-      [t('t.gross'), money(totals.gross), inXml(['ram:GrandTotalAmount'], ['cbc:TaxInclusiveAmount'])],
+      [t('t.vat'), formatMoney(totals.vat), inXml(['ram:TaxTotalAmount'], ['cac:TaxTotal', 'cbc:TaxAmount'])],
+      [t('t.gross'), formatMoney(totals.gross), inXml(['ram:GrandTotalAmount'], ['cbc:TaxInclusiveAmount'])],
     ];
     // In a narrow column the XML breaks where a tag ends, not in the middle of a name.
     const code = (written: string) =>

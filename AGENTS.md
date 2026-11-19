@@ -41,6 +41,8 @@ A change is done when `npm test`, `npm run type-check`, `npm run lint` and `npm 
 | `src/inspect/`       | reading (`read-xml.ts`) and checking (`validate.ts`) an existing e-invoice                         | domain, pdf      |
 | `src/adapters/`      | command line (`cli.ts`), MCP server (`mcp.ts`), and the work with files on disk both share         | all of the above |
 |                      | (`files.ts`); `server.json` describes the server for registries                                    |                  |
+| `src/util/`          | small helpers without a subject of their own (`escapeRegExp`, `isNumber`, `messageOf`); every      | nothing else     |
+|                      | layer may use them                                                                                 |                  |
 | `src/index.ts`       | the public API of the package                                                                      | all but adapters |
 | `site/`              | the web app: `app/` the start page (`main.ts` loads one module per section), `legal/` the          |                  |
 |                      | legal pages, `shared/` what both use. A part uses `shared/` and `src/`, never another part or      |                  |

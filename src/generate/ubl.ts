@@ -42,7 +42,7 @@ interface Context {
 }
 
 /** An amount with its currency, as two keys: the element and its attribute. */
-const money = (ctx: Context, key: string, n: number) => ({
+const amountElement = (ctx: Context, key: string, n: number) => ({
   [key]: amount(n),
   [`${key}@currencyID`]: ctx.invoice.currency,
 });
@@ -194,18 +194,18 @@ function documentAllowance(ctx: Context, a: Adjustment): Bag {
     'cbc:AllowanceChargeReasonCode': a.reason || a.list === 'charges' ? undefined : '95',
     'cbc:AllowanceChargeReason': a.reason,
     'cbc:MultiplierFactorNumeric': a.percent !== undefined ? decimal(a.percent) : undefined,
-    ...money(ctx, 'cbc:Amount', a.amount),
-    ...(a.base !== undefined ? money(ctx, 'cbc:BaseAmount', a.base) : {}),
+    ...amountElement(ctx, 'cbc:Amount', a.amount),
+    ...(a.base !== undefined ? amountElement(ctx, 'cbc:BaseAmount', a.base) : {}),
     'cac:TaxCategory': taxCategory(ctx, a.category, a.rate, false),
   });
 }
 
 function taxTotal(ctx: Context): Bag {
   return {
-    ...money(ctx, 'cbc:TaxAmount', ctx.totals.vat),
+    ...amountElement(ctx, 'cbc:TaxAmount', ctx.totals.vat),
     'cac:TaxSubtotal': ctx.totals.vatBreakdown.map((group) => ({
-      ...money(ctx, 'cbc:TaxableAmount', group.taxable),
-      ...money(ctx, 'cbc:TaxAmount', group.tax),
+      ...amountElement(ctx, 'cbc:TaxableAmount', group.taxable),
+      ...amountElement(ctx, 'cbc:TaxAmount', group.tax),
       'cac:TaxCategory': taxCategory(ctx, group.category, group.rate, true),
     })),
   };
@@ -214,18 +214,18 @@ function taxTotal(ctx: Context): Bag {
 function monetaryTotal(ctx: Context): Bag {
   const { totals } = ctx;
   return compact({
-    ...money(ctx, 'cbc:LineExtensionAmount', totals.lineTotal),
-    ...money(ctx, 'cbc:TaxExclusiveAmount', totals.net),
-    ...money(ctx, 'cbc:TaxInclusiveAmount', totals.gross),
+    ...amountElement(ctx, 'cbc:LineExtensionAmount', totals.lineTotal),
+    ...amountElement(ctx, 'cbc:TaxExclusiveAmount', totals.net),
+    ...amountElement(ctx, 'cbc:TaxInclusiveAmount', totals.gross),
     // Written whenever there is a discount or charge, even at 0.00 (BR-CO-11, BR-CO-12).
     ...(totals.adjustments.some((a) => a.list === 'discounts')
-      ? money(ctx, 'cbc:AllowanceTotalAmount', totals.allowances)
+      ? amountElement(ctx, 'cbc:AllowanceTotalAmount', totals.allowances)
       : {}),
     ...(totals.adjustments.some((a) => a.list === 'charges')
-      ? money(ctx, 'cbc:ChargeTotalAmount', totals.charges)
+      ? amountElement(ctx, 'cbc:ChargeTotalAmount', totals.charges)
       : {}),
-    ...(totals.prepaid ? money(ctx, 'cbc:PrepaidAmount', totals.prepaid) : {}),
-    ...money(ctx, 'cbc:PayableAmount', totals.due),
+    ...(totals.prepaid ? amountElement(ctx, 'cbc:PrepaidAmount', totals.prepaid) : {}),
+    ...amountElement(ctx, 'cbc:PayableAmount', totals.due),
   });
 }
 
@@ -234,7 +234,7 @@ function invoiceLine(ctx: Context, line: Line, i: number): Bag {
     'cbc:ID': String(i + 1),
     'cbc:InvoicedQuantity': decimal(line.quantity),
     'cbc:InvoicedQuantity@unitCode': line.unit,
-    ...money(ctx, 'cbc:LineExtensionAmount', ctx.totals.lineNet[i]!),
+    ...amountElement(ctx, 'cbc:LineExtensionAmount', ctx.totals.lineNet[i]!),
     ...(line.discount ? { 'cac:AllowanceCharge': [lineDiscount(ctx, line.discount, i)] } : {}),
     'cac:Item': compact({
       'cbc:Description': line.description,
@@ -253,7 +253,7 @@ function lineDiscount(ctx: Context, discount: NonNullable<Line['discount']>, i: 
     'cbc:AllowanceChargeReasonCode': discount.reason ? undefined : '95',
     'cbc:AllowanceChargeReason': discount.reason,
     'cbc:MultiplierFactorNumeric': discount.percent !== undefined ? decimal(discount.percent) : undefined,
-    ...money(ctx, 'cbc:Amount', calculated.amount),
-    ...(discount.percent !== undefined ? money(ctx, 'cbc:BaseAmount', calculated.base) : {}),
+    ...amountElement(ctx, 'cbc:Amount', calculated.amount),
+    ...(discount.percent !== undefined ? amountElement(ctx, 'cbc:BaseAmount', calculated.base) : {}),
   });
 }

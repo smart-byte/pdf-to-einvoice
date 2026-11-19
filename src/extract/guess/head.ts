@@ -1,7 +1,8 @@
 import type { InvoiceType } from '../../domain/model.js';
+import { escapeRegExp } from '../../util/regexp.js';
 import { MAX_WRAPPED } from './items.js';
 import { cells, KEY_VALUE, NAMED, TITLE, TYPES } from './parties.js';
-import { after, anyOf, DATE, escape, MONTH, monthNumber, pad, SEPARATOR, toIsoDate } from './values.js';
+import { after, anyOf, DATE, MONTH, monthNumber, pad, SEPARATOR, toIsoDate } from './values.js';
 
 // The head of the invoice: its number and type, its dates, the service period, the payment terms and the reference
 // of the buyer.
@@ -169,8 +170,11 @@ export function readNumber(searched: string, rows: string[]): { number?: string;
   const titles = rows.map(cells).filter((parts) => parts.some((cell) => TITLE.test(cell) || NAMED.test(cell)));
   const dated =
     labelled &&
-    after(searched, new RegExp(`${escape(labelled.hit[1]!)}\\s+(?:vom|von|issued\\s+(?:at|on)|dated|du|of)`), DATE)[0]
-      ?.hit;
+    after(
+      searched,
+      new RegExp(`${escapeRegExp(labelled.hit[1]!)}\\s+(?:vom|von|issued\\s+(?:at|on)|dated|du|of)`),
+      DATE,
+    )[0]?.hit;
   return {
     number:
       labelled?.hit[1]!.replace(/ /g, '') ??

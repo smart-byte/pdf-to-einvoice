@@ -1,5 +1,6 @@
 import { amountSpellings, dateSpellings, isDate, isIban, MONTHS } from '../domain/check.js';
 import type { InvoiceDraft } from '../domain/model.js';
+import { escapeRegExp } from '../util/regexp.js';
 
 type Bag = Record<string, any>;
 type Rule = (value: any, siblings: Bag) => boolean;
@@ -32,7 +33,6 @@ export function keepWhatThePdfShows(draft: unknown, pdfText: string): InvoiceDra
   const lower = pdfText.toLowerCase();
   const compact = lower.replace(/\s+/g, '');
   const shows = (spellings: string[]) => spellings.some((s) => compact.includes(s.replace(/\s+/g, '').toLowerCase()));
-  const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
   // Whole words only: "Example" is not shown by a PDF that merely contains "info@shop.example".
   const edge = /^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu;
@@ -53,14 +53,14 @@ export function keepWhatThePdfShows(draft: unknown, pdfText: string): InvoiceDra
   const amount: Rule = (v) =>
     typeof v === 'number' &&
     amountSpellings(v).some((spelling) =>
-      new RegExp(`(?<![\\d.,])${escape(spelling)}(?![.,]?\\d)`).test(
+      new RegExp(`(?<![\\d.,])${escapeRegExp(spelling)}(?![.,]?\\d)`).test(
         pdfText.replace(/(\d)[ \u00a0](?=\d{3}\b)/g, '$1'),
       ),
     );
   // A bare number is only believed where it stands on its own, not inside a longer one. "24.000" shows 24000.
   const count: Rule = (v) => {
     if (typeof v !== 'number') return false;
-    const plain = escape(String(v)).replace('\\.', '[.,]');
+    const plain = escapeRegExp(String(v)).replace('\\.', '[.,]');
     const grouped = Number.isInteger(v) ? String(v).replace(/\B(?=(\d{3})+(?!\d))/g, "[.,' ]") : plain;
     return new RegExp(`(?<![\\d.,])(?:${plain}|${grouped})(?![\\d]|[.,]\\d)`).test(pdfText);
   };
@@ -80,15 +80,15 @@ export function keepWhatThePdfShows(draft: unknown, pdfText: string): InvoiceDra
     };
   const rate: Rule = (v) =>
     typeof v === 'number' &&
-    new RegExp(`(?<![\\d.,])${escape(String(v)).replace('\\.', '[.,]')}(?:[.,]0+)?\\s?%`).test(pdfText);
+    new RegExp(`(?<![\\d.,])${escapeRegExp(String(v)).replace('\\.', '[.,]')}(?:[.,]0+)?\\s?%`).test(pdfText);
   const country: Rule = (v, party) =>
     typeof v === 'string' &&
     ((COUNTRY_NAMES[v] ?? []).some((name) => lower.includes(name)) ||
-      new RegExp(`\\b${escape(v)}-\\d`).test(pdfText) ||
+      new RegExp(`\\b${escapeRegExp(v)}-\\d`).test(pdfText) ||
       (typeof party.vatId === 'string' && party.vatId.startsWith(v) && shows([party.vatId])));
   const currency: Rule = (v) =>
     typeof v === 'string' &&
-    (new RegExp(`\\b${escape(v)}\\b`).test(pdfText) || pdfText.includes(CURRENCY_SIGNS[v] ?? '\0'));
+    (new RegExp(`\\b${escapeRegExp(v)}\\b`).test(pdfText) || pdfText.includes(CURRENCY_SIGNS[v] ?? '\0'));
   const any: Rule = () => true;
 
   const party: Record<string, Rule> = {

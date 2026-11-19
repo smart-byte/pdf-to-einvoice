@@ -4,6 +4,7 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ErrorCode, ListToolsRequestSchema, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { check } from '../domain/check.js';
+import { messageOf } from '../util/errors.js';
 import { CHOICES, createFile, createXRechnungFile, describePdf, packageVersion, validateFile } from './files.js';
 import { InvoiceError } from '../generate/create.js';
 import { invoiceJsonSchema, type InvoiceDraft } from '../domain/model.js';
@@ -205,7 +206,7 @@ const HANDLERS: Record<string, (args: Args) => Promise<object | string>> = {
 /** What the model gets to read when a tool fails: enough to fix the call. */
 function describeError(e: unknown): object {
   if (e instanceof InvoiceError) return { error: e.code, message: e.message, findings: e.findings };
-  const message = e instanceof Error ? e.message : String(e);
+  const message = messageOf(e);
   if ((e as NodeJS.ErrnoException).code === 'EEXIST')
     return { error: `${message} Pass "overwrite": true to replace it, or choose another output_path.` };
   return { error: message };

@@ -6,6 +6,7 @@ import { message } from '../domain/messages.js';
 import type { Invoice, InvoiceDraft } from '../domain/model.js';
 import { inspectPdf, readEmbeddedXml, repairForPdfA, type PdfInfo } from '../pdf/file.js';
 import { extractText } from '../pdf/text.js';
+import { messageOf } from '../util/errors.js';
 import { toUbl } from './ubl.js';
 
 export interface CreateOptions {
@@ -65,8 +66,6 @@ export class InvoiceError extends Error {
   }
 }
 
-const reason = (e: unknown) => (e instanceof Error ? e.message : String(e));
-
 /** The data, cleaned and with its totals; throws what is wrong with it. */
 function checked(draft: InvoiceDraft, rules?: 'xrechnung', pdfText?: string) {
   const { findings, invoice, totals } = check(draft, { rules, pdfText });
@@ -119,7 +118,7 @@ async function write(
       },
     });
   } catch (e) {
-    throw new InvoiceError('generator', message('generator', { reason: reason(e) }), findings);
+    throw new InvoiceError('generator', message('generator', { reason: messageOf(e) }), findings);
   }
 }
 
@@ -163,7 +162,7 @@ export async function createEInvoice(options: CreateOptions): Promise<CreateResu
   try {
     info = await inspectPdf(options.pdf);
   } catch (e) {
-    throw new InvoiceError('invalid-pdf', message('invalid-pdf', { reason: reason(e) }));
+    throw new InvoiceError('invalid-pdf', message('invalid-pdf', { reason: messageOf(e) }));
   }
   if (info.embeddedXml !== null) throw new InvoiceError('already-einvoice', message('already-einvoice'));
   // A PDF whose text cannot be read is compared with no text: that is reported, and the file is written all the same.

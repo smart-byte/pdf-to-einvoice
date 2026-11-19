@@ -1,3 +1,4 @@
+import { isNumber } from '../util/numbers.js';
 import { error, warning, type Finding } from './finding.js';
 import type { MessageKey, MessageParams } from './messages.js';
 import { VAT_CATEGORIES, type Invoice, type Line, type VatCategory } from './model.js';
@@ -80,8 +81,7 @@ export function percentAgrees(base: number, percent: number, amount: number, sla
 /** How far a stated amount may be from the calculated one: two cents, half a forint where there are no cents (PEPPOL-EN16931-R120). */
 export const slackOf = (currency?: string) => (currency === 'HUF' ? 0.5 : 0.02);
 
-const isNumber = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
-const money = (cents: bigint) => fromCents(cents).toFixed(2);
+const formatCents = (cents: bigint) => fromCents(cents).toFixed(2);
 
 /** Each line in cents, and its discount with the base it was taken from. Expects the numbers of every line. */
 function linesInCents(lines: Line[]) {
@@ -230,10 +230,10 @@ function placePercent(entry: Checked & { percent: number }, matching: Group[], n
         problems.push(
           error(at('amount'), 'adjustment-mismatch', {
             percent,
-            base: money(part.g.cents),
-            expected: money(part.cents),
+            base: formatCents(part.g.cents),
+            expected: formatCents(part.cents),
             what,
-            stated: money(stated),
+            stated: formatCents(stated),
           }),
         );
       }
@@ -245,10 +245,10 @@ function placePercent(entry: Checked & { percent: number }, matching: Group[], n
         problems.push(
           error(at('amount'), 'adjustment-mismatch.split', {
             percent,
-            parts: parts.map((p) => money(p.cents)).join(' + '),
-            sum: money(sum),
+            parts: parts.map((p) => formatCents(p.cents)).join(' + '),
+            sum: formatCents(sum),
             what,
-            stated: money(stated),
+            stated: formatCents(stated),
           }),
         );
       }

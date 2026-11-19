@@ -1,3 +1,4 @@
+import { isNumber } from '../util/numbers.js';
 import {
   calculate,
   lineBase,
@@ -94,7 +95,6 @@ export function isIban(v: string): boolean {
   return BigInt(digits) % 97n === 1n;
 }
 
-const isNumber = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 const NEEDS_REASON: VatCategory[] = ['E', 'AE', 'K', 'G', 'O'];
 const DATE_FIELDS = ['issueDate', 'dueDate', 'deliveryDate', 'periodStart', 'periodEnd', 'precedingInvoiceDate'];
 

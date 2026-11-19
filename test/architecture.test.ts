@@ -6,21 +6,23 @@ import { describe, expect, it } from 'vitest';
 // The layers of `src/`, and which layers each may import. Like a package rule in ArchUnit: a folder alone does not
 // stop an import, this test does. AGENTS.md describes the layers.
 const LAYERS: Record<string, string[]> = {
+  /** Small helpers without a subject of their own: escaping, numbers, errors. Every layer may use them. */
+  util: ['util'],
   /** The invoice data, its totals and the rules it has to meet. Knows nothing of PDFs or files. */
-  domain: ['domain'],
+  domain: ['domain', 'util'],
   /** Reading the text of a PDF and its structure; knows nothing of invoices. */
-  pdf: ['pdf'],
+  pdf: ['pdf', 'util'],
   /** Invoice data from the text of a PDF. */
-  extract: ['domain', 'extract'],
+  extract: ['domain', 'extract', 'util'],
   /** The e-invoice from invoice data: XML, and the PDF/A-3 that carries it. */
-  generate: ['domain', 'pdf', 'generate'],
+  generate: ['domain', 'pdf', 'generate', 'util'],
   /** Reading and checking an existing e-invoice. */
-  inspect: ['domain', 'pdf', 'inspect'],
+  inspect: ['domain', 'pdf', 'inspect', 'util'],
   /** Command line and MCP server: files on disk, arguments, output. */
-  adapters: ['domain', 'pdf', 'extract', 'generate', 'inspect', 'adapters'],
+  adapters: ['domain', 'pdf', 'extract', 'generate', 'inspect', 'adapters', 'util'],
 };
 /** The public API of the package may export every layer except the adapters, which need Node. */
-const INDEX = ['domain', 'pdf', 'extract', 'generate', 'inspect'];
+const INDEX = ['domain', 'pdf', 'extract', 'generate', 'inspect', 'util'];
 /** Entry points: nothing in `src/` imports them. The command line starts the MCP server, never the other way round. */
 const ENTRY_POINTS = ['adapters/cli.ts'];
 

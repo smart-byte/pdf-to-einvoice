@@ -28,8 +28,8 @@ export function describe(finding: { code: string; message: string; path?: string
   const discount =
     line?.discount?.amount ?? (Number.isFinite(product) && Number.isFinite(percent) ? percentOf(product, percent) : 0);
   return t(key, {
-    a: line ? money(product - Number(discount)) : '',
-    b: line ? money(Number(line.netAmount)) : '',
+    a: line ? formatMoney(product - Number(discount)) : '',
+    b: line ? formatMoney(Number(line.netAmount)) : '',
     // Known limit: the value that could not be written is read from the quotes of the English message. Give the finding
     // the value itself if that message is ever worded differently.
     v: /"(.*)"/.exec(finding.message)?.[1] ?? '',
@@ -43,7 +43,7 @@ export const reasonOf = (error: unknown) =>
     : error instanceof Error
       ? error.message
       : String(error);
-export const money = (n: number) =>
+export const formatMoney = (n: number) =>
   new Intl.NumberFormat(lang, {
     style: 'currency',
     currency: /^[A-Z]{3}$/.test(String(state.draft.currency ?? '')) ? String(state.draft.currency) : 'EUR',

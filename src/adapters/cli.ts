@@ -9,6 +9,7 @@ import { invoiceJsonSchema } from '../domain/model.js';
 import { createXRechnung, InvoiceError } from '../generate/create.js';
 import { readEmbeddedXml } from '../pdf/file.js';
 import { extractText } from '../pdf/text.js';
+import { messageOf } from '../util/errors.js';
 import {
   CHOICES,
   createFile,
@@ -17,7 +18,6 @@ import {
   packageVersion,
   readJson,
   readPdf,
-  reason,
   sameFile,
   validateFile,
 } from './files.js';
@@ -184,7 +184,7 @@ export async function run(argv: string[], io: Io): Promise<number> {
   try {
     parsed = parseArgs({ args: argv, allowPositionals: true, options: OPTIONS });
   } catch (e) {
-    return misuse(reason(e));
+    return misuse(messageOf(e));
   }
   const { positionals } = parsed;
   for (const [option, choices] of Object.entries(CHOICES)) {
@@ -214,9 +214,9 @@ export async function run(argv: string[], io: Io): Promise<number> {
       // For invalid data the findings say it all; every other code has its cause in the message.
       if (e.code !== 'invalid-invoice') io.stderr(`error: ${e.message}\n`);
     } else if ((e as NodeJS.ErrnoException).code === 'EEXIST') {
-      io.stderr(`error: ${reason(e)} Use --force to overwrite it.\n`);
+      io.stderr(`error: ${messageOf(e)} Use --force to overwrite it.\n`);
     } else {
-      io.stderr(`error: ${reason(e)}\n`);
+      io.stderr(`error: ${messageOf(e)}\n`);
     }
     return 1;
   }
