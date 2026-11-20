@@ -1,18 +1,11 @@
 import { isNumber } from '../util/numbers.js';
 import { valueAt } from '../util/objects.js';
-import {
-  cents,
-  checkAdjustments,
-  lineAgrees,
-  lineBase,
-  percentAgrees,
-  percentOf,
-  slackOf,
-  tryCalculate,
-  type Totals,
-} from './calculate.js';
+import { checkAdjustments } from './adjustments.js';
+import { tryCalculate, type Totals } from './calculate.js';
 import { error, warning, type Finding } from './finding.js';
+import { isCountryCode, isCurrencyCode, isDate, isEmail, isIban } from './formats.js';
 import type { MessageKey, MessageParams } from './messages.js';
+import { cents, lineAgrees, lineBase, percentAgrees, percentOf, slackOf } from './money.js';
 import { amountSpellings, dateSpellings, percentSpellings } from './spellings.js';
 import {
   isInvoiceType,
@@ -25,6 +18,7 @@ import {
   type Unchecked,
   type VatCategory,
 } from './model.js';
+import { vatRateError } from './vat.js';
 
 export interface CheckResult {
   findings: Finding[];
@@ -69,8 +63,6 @@ function clean(value: unknown): unknown {
 
 const upper = (v: unknown) => (typeof v === 'string' ? v.toUpperCase() : v);
 const compact = (v: unknown) => (typeof v === 'string' ? v.replace(/\s+/g, '').toUpperCase() : v);
-/** Whether a value is a string the pattern matches. */
-const matches = (pattern: RegExp, v: unknown) => typeof v === 'string' && pattern.test(v);
 
 /** Unchecked data with its defaults: both parties are objects, the lines a list of objects, the type a string. */
 type Prepared = Unchecked & {
@@ -104,20 +96,6 @@ function withDefaults(input: InvoiceDraft): Prepared {
       return line;
     }),
   };
-}
-
-/** Whether a value is a day of the calendar written as `YYYY-MM-DD`; `2026-02-31` is not. */
-export function isDate(v: unknown): v is string {
-  if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
-  const parsed = new Date(`${v}T00:00:00Z`);
-  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().startsWith(v);
-}
-
-/** ISO 13616 mod-97 check. */
-export function isIban(v: string): boolean {
-  if (!/^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$/.test(v)) return false;
-  const digits = (v.slice(4) + v.slice(0, 4)).replace(/[A-Z]/g, (c) => String(c.charCodeAt(0) - 55));
-  return BigInt(digits) % 97n === 1n;
 }
 
 const NEEDS_REASON: VatCategory[] = ['E', 'AE', 'K', 'G', 'O'];
@@ -197,7 +175,7 @@ function checkHeader(draft: Prepared): Finding[] {
   if (!isInvoiceType(draft.typeCode)) {
     findings.push(error('typeCode', 'format.type'));
   }
-  if (!matches(/^[A-Z]{3}$/, draft.currency)) findings.push(error('currency', 'format.currency'));
+  if (!isCurrencyCode(draft.currency)) findings.push(error('currency', 'format.currency'));
   if (draft.iban !== undefined && !(typeof draft.iban === 'string' && isIban(draft.iban)))
     findings.push(error('iban', 'format.iban'));
   if (draft.prepaidAmount !== undefined && !isNumber(draft.prepaidAmount))
@@ -212,7 +190,7 @@ function checkHeader(draft: Prepared): Finding[] {
 /** The country code of a party, and the parts of its address German VAT law asks for (§ 14 UStG). */
 function checkAddress(party: Unchecked<Party>, who: 'seller' | 'buyer'): Finding[] {
   const findings: Finding[] = [];
-  if (party.country !== undefined && !matches(/^[A-Z]{2}$/, party.country)) {
+  if (party.country !== undefined && !isCountryCode(party.country)) {
     findings.push(error(`${who}.country`, 'format.country'));
   }
   for (const [field, name] of [
@@ -279,12 +257,8 @@ function checkLine(line: Unchecked<Line>, i: number): { findings: Finding[]; cal
   if (!isVatCategory(line.vatCategory)) {
     findings.push(error(at('vatCategory'), 'format.category'));
   } else if (isNumber(line.vatRate)) {
-    if (line.vatCategory === 'S' && line.vatRate <= 0) {
-      findings.push(error(at('vatRate'), 'vat-rate.standard'));
-    }
-    if (line.vatCategory !== 'S' && line.vatRate !== 0) {
-      findings.push(error(at('vatRate'), 'vat-rate.zero', { category: line.vatCategory }));
-    }
+    const rateError = vatRateError(at('vatRate'), line.vatCategory, line.vatRate);
+    if (rateError) findings.push(rateError);
   }
   return { findings, calculable };
 }
@@ -310,7 +284,7 @@ function checkVatTreatment(draft: Prepared, options: CheckOptions): Finding[] {
   if ((categories.has('AE') || categories.has('K')) && draft.buyer.vatId === undefined) {
     findings.push(error('buyer.vatId', 'buyer-vat-id'));
   }
-  if (draft.deliveryCountry !== undefined && !matches(/^[A-Z]{2}$/, draft.deliveryCountry)) {
+  if (draft.deliveryCountry !== undefined && !isCountryCode(draft.deliveryCountry)) {
     findings.push(error('deliveryCountry', 'format.country'));
   }
   // BR-IC-12 wants the country an intra-community supply went to. As an XRechnung it is refused anyway.
@@ -491,7 +465,7 @@ function xrechnungFindings(draft: Prepared): Finding[] {
     findings.push(warning('seller.phone', 'xrechnung-phone'));
   }
   // BR-DE-28
-  if (typeof draft.seller.email === 'string' && !/^[^@\s]+@([^@.\s]+\.)+[^@.\s]+$/.test(draft.seller.email)) {
+  if (typeof draft.seller.email === 'string' && !isEmail(draft.seller.email)) {
     findings.push(warning('seller.email', 'xrechnung-email'));
   }
   return findings;

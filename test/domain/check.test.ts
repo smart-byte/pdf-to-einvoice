@@ -535,6 +535,17 @@ describe('check', () => {
     ).toEqual(['error:vat-rate']);
   });
 
+  it('says a negative VAT rate of a line is negative, as for a discount or a charge', () => {
+    for (const vatCategory of ['S', 'E']) {
+      const draft = withChange((d) => Object.assign(d.lines[0], { vatCategory, vatRate: -19 }));
+      const findings = check(draft).findings.filter((f) => f.path === 'lines.0.vatRate');
+      expect(
+        findings.map((f) => f.message),
+        vatCategory,
+      ).toEqual(['A VAT rate is never negative.']);
+    }
+  });
+
   it('requires a zero rate, a reason and the buyer VAT ID for reverse charge', () => {
     const draft = withChange((d) => {
       for (const line of d.lines) Object.assign(line, { vatCategory: 'AE', vatRate: 19 });

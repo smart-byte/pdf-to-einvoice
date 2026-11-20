@@ -39,7 +39,7 @@ async function renderXml(): Promise<void> {
     // The data has changed again in the meantime: the newer run shows its XML.
     if (run !== xmlRun) return;
     const date = (iso: unknown) =>
-      new Intl.DateTimeFormat(lang, { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(`${iso}T00:00:00Z`));
+      new Intl.DateTimeFormat(lang(), { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(`${iso}T00:00:00Z`));
     // Where a value stands in CII (the PDF) and in UBL (the XRechnung): the path that is not in the XML finds nothing.
     const inXml = (cii: string[], ubl: string[]) => fragment(xml, ...cii) ?? fragment(xml, ...ubl);
     const rows: [label: string, value: string, written: string | undefined][] = [

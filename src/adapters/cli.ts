@@ -15,6 +15,7 @@ import {
   createFile,
   createXRechnungFile,
   describePdf,
+  outputExists,
   packageVersion,
   readJson,
   readPdf,
@@ -83,96 +84,79 @@ type Values = { output?: string; force?: boolean; pdf?: string; json?: boolean }
   [K in keyof typeof CHOICES]?: (typeof CHOICES)[K][number];
 };
 type Command = { args: number; run: (args: string[], values: Values, io: Io) => Promise<number> };
+type Args<N extends number> = N extends 2 ? [string, string] : N extends 1 ? [string] : [];
+
+/** A command that takes `count` arguments. `run` checks the count before `execute` gets them, so each is there. */
+const defineCommand = <N extends 0 | 1 | 2>(
+  count: N,
+  execute: (args: Args<N>, values: Values, io: Io) => Promise<number>,
+): Command => ({ args: count, run: execute as Command['run'] });
 
 const COMMANDS: Record<string, Command> = {
-  create: {
-    args: 2,
-    async run([pdfPath, dataPath], values, io) {
-      const result = await createFile(pdfPath!, await readJson(dataPath!), {
-        outputPath: values.output,
-        overwrite: values.force,
-        profile: values.profile,
-      });
-      for (const finding of result.findings) io.stderr(`${formatFinding(finding)}\n`);
-      io.stdout(`${result.outputPath}\n`);
-      return 0;
-    },
-  },
-  xrechnung: {
-    args: 1,
-    async run([dataPath], values, io) {
-      const invoice = await readJson(dataPath!);
-      const result =
-        values.output === undefined
-          ? await createXRechnung({ invoice, syntax: values.syntax })
-          : await createXRechnungFile(invoice, values.output, {
-              dataPath,
-              overwrite: values.force,
-              syntax: values.syntax,
-            });
-      for (const finding of result.findings) io.stderr(`${formatFinding(finding)}\n`);
-      io.stdout(`${'xml' in result ? result.xml.replace(/\n$/, '') : result.outputPath}\n`);
-      return 0;
-    },
-  },
-  check: {
-    args: 1,
-    async run([dataPath], values, io) {
-      const data = await readJson(dataPath!);
-      const pdfText = values.pdf === undefined ? undefined : await extractText(await readPdf(values.pdf));
-      const { findings, totals } = check(data, { pdfText, rules: values.rules });
-      if (values.json) io.stdout(`${JSON.stringify({ findings, totals }, null, 2)}\n`);
-      else printFindings({ findings, totals }, io);
-      return findings.some((f) => f.severity === 'error') ? 1 : 0;
-    },
-  },
-  read: {
-    args: 1,
-    async run([pdfPath], values, io) {
-      const description = await describePdf(pdfPath!);
-      io.stdout(`${values.json ? JSON.stringify(description, null, 2) : description.text}\n`);
-      return 0;
-    },
-  },
-  xml: {
-    args: 1,
-    async run([pdfPath], _values, io) {
-      const xml = await readEmbeddedXml(await readPdf(pdfPath!));
-      if (xml === null) throw new Error(`${pdfPath} carries no e-invoice XML.`);
-      io.stdout(xml.endsWith('\n') ? xml : `${xml}\n`);
-      return 0;
-    },
-  },
-  validate: {
-    args: 1,
-    async run([pdfPath], values, io) {
-      const result = await validateFile(pdfPath!);
-      if (values.json) {
-        io.stdout(`${JSON.stringify(result, null, 2)}\n`);
-      } else {
-        io.stdout(
-          `${result.isEInvoice ? 'E-invoice' : 'Not an e-invoice'}${result.profile ? `, profile ${result.profile}` : ''}\n`,
-        );
-        printFindings(result, io);
-      }
-      return result.isEInvoice && !result.findings.some((f) => f.severity === 'error') ? 0 : 1;
-    },
-  },
-  schema: {
-    args: 0,
-    async run(_args, _values, io) {
-      io.stdout(`${JSON.stringify(invoiceJsonSchema, null, 2)}\n`);
-      return 0;
-    },
-  },
-  mcp: {
-    args: 0,
-    async run() {
-      // Loaded on demand so the other commands do not pay for the MCP SDK.
-      await (await import('./mcp.js')).startStdio();
-      return 0;
-    },
-  },
+  create: defineCommand(2, async ([pdfPath, dataPath], values, io) => {
+    const result = await createFile(pdfPath, await readJson(dataPath), {
+      outputPath: values.output,
+      overwrite: values.force,
+      profile: values.profile,
+    });
+    for (const finding of result.findings) io.stderr(`${formatFinding(finding)}\n`);
+    io.stdout(`${result.outputPath}\n`);
+    return 0;
+  }),
+  xrechnung: defineCommand(1, async ([dataPath], values, io) => {
+    const invoice = await readJson(dataPath);
+    const result =
+      values.output === undefined
+        ? await createXRechnung({ invoice, syntax: values.syntax })
+        : await createXRechnungFile(invoice, values.output, {
+            dataPath,
+            overwrite: values.force,
+            syntax: values.syntax,
+          });
+    for (const finding of result.findings) io.stderr(`${formatFinding(finding)}\n`);
+    io.stdout(`${'xml' in result ? result.xml.replace(/\n$/, '') : result.outputPath}\n`);
+    return 0;
+  }),
+  check: defineCommand(1, async ([dataPath], values, io) => {
+    const data = await readJson(dataPath);
+    const pdfText = values.pdf === undefined ? undefined : await extractText(await readPdf(values.pdf));
+    const { findings, totals } = check(data, { pdfText, rules: values.rules });
+    if (values.json) io.stdout(`${JSON.stringify({ findings, totals }, null, 2)}\n`);
+    else printFindings({ findings, totals }, io);
+    return findings.some((f) => f.severity === 'error') ? 1 : 0;
+  }),
+  read: defineCommand(1, async ([pdfPath], values, io) => {
+    const description = await describePdf(pdfPath);
+    io.stdout(`${values.json ? JSON.stringify(description, null, 2) : description.text}\n`);
+    return 0;
+  }),
+  xml: defineCommand(1, async ([pdfPath], _values, io) => {
+    const xml = await readEmbeddedXml(await readPdf(pdfPath));
+    if (xml === null) throw new Error(`${pdfPath} carries no e-invoice XML.`);
+    io.stdout(xml.endsWith('\n') ? xml : `${xml}\n`);
+    return 0;
+  }),
+  validate: defineCommand(1, async ([pdfPath], values, io) => {
+    const result = await validateFile(pdfPath);
+    if (values.json) {
+      io.stdout(`${JSON.stringify(result, null, 2)}\n`);
+    } else {
+      io.stdout(
+        `${result.isEInvoice ? 'E-invoice' : 'Not an e-invoice'}${result.profile ? `, profile ${result.profile}` : ''}\n`,
+      );
+      printFindings(result, io);
+    }
+    return result.isEInvoice && !result.findings.some((f) => f.severity === 'error') ? 0 : 1;
+  }),
+  schema: defineCommand(0, async (_args, _values, io) => {
+    io.stdout(`${JSON.stringify(invoiceJsonSchema, null, 2)}\n`);
+    return 0;
+  }),
+  mcp: defineCommand(0, async () => {
+    // Loaded on demand so the other commands do not pay for the MCP SDK.
+    await (await import('./mcp.js')).startStdio();
+    return 0;
+  }),
 };
 
 /** Runs the command line and returns the exit code: 0 done, 1 failed, 2 used wrongly. */
@@ -215,7 +199,7 @@ export async function run(argv: string[], io: Io): Promise<number> {
       for (const finding of e.findings) io.stderr(`${formatFinding(finding)}\n`);
       // For invalid data the findings say it all; every other code has its cause in the message.
       if (e.code !== 'invalid-invoice') io.stderr(`error: ${e.message}\n`);
-    } else if ((e as NodeJS.ErrnoException).code === 'EEXIST') {
+    } else if (outputExists(e)) {
       io.stderr(`error: ${messageOf(e)} Use --force to overwrite it.\n`);
     } else {
       io.stderr(`error: ${messageOf(e)}\n`);

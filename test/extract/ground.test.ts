@@ -37,6 +37,11 @@ describe('keepWhatThePdfShows', () => {
     });
   });
 
+  it('drops an e-mail address that check() would reject, such as one with the full stop of its sentence', () => {
+    const text = `${pdfText}\nFragen? Schreiben Sie an rechnung@muster-software.example.`;
+    expect(keepWhatThePdfShows({ seller: { email: 'rechnung@muster-software.example.' } }, text)).toEqual({});
+  });
+
   it('drops invented identifiers, dates and amounts', () => {
     const invented = {
       dueDate: '2026-11-17',
@@ -96,6 +101,12 @@ describe('keepWhatThePdfShows', () => {
     const period = { periodStart: '2026-09-01', periodEnd: '2027-01-31' };
     expect(keepWhatThePdfShows(period, text)).toEqual(period);
     expect(keepWhatThePdfShows({ periodStart: '2026-09-02', periodEnd: '2027-01-30' }, text)).toEqual({});
+  });
+
+  it('keeps a period whose month name has an umlaut', () => {
+    const march = { periodStart: '2026-03-01', periodEnd: '2026-03-31' };
+    for (const printed of ['März 2026', 'Mär. 2026', 'MÄRZ 2026'])
+      expect(keepWhatThePdfShows(march, `${pdfText}\nLeistungszeitraum: ${printed}`), printed).toEqual(march);
   });
 
   it('does not take a single day of a month for a period', () => {

@@ -1,4 +1,5 @@
-export { calculate, type Adjustment, type Totals, type VatGroup } from './domain/calculate.js';
+export type { Adjustment } from './domain/adjustments.js';
+export { calculate, type Totals, type VatGroup } from './domain/calculate.js';
 export { check, type CheckOptions, type CheckResult } from './domain/check.js';
 export type { Finding } from './domain/finding.js';
 export {

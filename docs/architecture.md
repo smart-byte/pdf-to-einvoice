@@ -104,8 +104,9 @@ call may hold anything in any field. `Unchecked<T>` names the fields of `T` and 
 misspelt field does not compile and code that reads a value guards it first (`isNumber()`, `isVatCategory()` and the
 like); after `check()` it is an `Invoice` whose types hold.
 
-**Money is whole cents.** `domain/calculate.ts` sums amounts as integer cents in `BigInt` and rounds half away from
-zero; other code formats amounts and compares them in cents with `cents()`, it does not calculate with them.
+**Money is whole cents.** `domain/money.ts` takes amounts as integer cents in `BigInt` and rounds half away from
+zero; `domain/calculate.ts` sums the totals with it, `domain/adjustments.ts` the discounts and charges on the whole
+invoice. Other code formats amounts and compares them in cents with `cents()`, it does not calculate with them.
 
 **A finding has a code and a text from the catalog.** `error(path, key, values)` and `warning(...)` in
 `domain/finding.ts` take both from `domain/messages.ts`. The code is stable: the web app shows a German text for it from

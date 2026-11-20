@@ -1,5 +1,6 @@
 import type { Invoice as EInvoiceEuInvoice } from '@e-invoice-eu/core';
-import type { Adjustment, Totals } from '../domain/calculate.js';
+import type { Adjustment } from '../domain/adjustments.js';
+import type { Totals } from '../domain/calculate.js';
 import type { Invoice, Line, Party, VatCategory } from '../domain/model.js';
 
 /** A part of the UBL document as @e-invoice-eu/core takes it: element names as keys, `name@attribute` for attributes. */

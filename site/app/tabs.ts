@@ -14,7 +14,7 @@ for (const [i, tab] of tabs.entries()) {
   tab.onclick = () => selectTab(tab);
   // The arrow keys move from tab to tab, as in every list of tabs.
   tab.onkeydown = (event) => {
-    const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
+    const step = ({ ArrowRight: 1, ArrowLeft: -1 } as Record<string, number>)[event.key] ?? 0;
     if (!step) return;
     const next = tabs[(i + step + tabs.length) % tabs.length]!;
     selectTab(next);

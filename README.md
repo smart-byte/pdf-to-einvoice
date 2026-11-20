@@ -105,8 +105,9 @@ It works the same in a browser: `pdf` is a `Uint8Array` in and out. A bundler ne
 | `calculate(invoice)`                         | the totals, following the EN 16931 rounding rules                                                                  |
 | `invoiceJsonSchema`                          | JSON Schema of the invoice data, for forms, validation and language models                                         |
 
-A finding is `{ path, severity, code, message }`. An `error` blocks the e-invoice; a `warning` asks for a second
-look.
+A finding is `{ path, severity, code, message, params? }`. An `error` blocks the e-invoice; a `warning` asks for a
+second look. `params` holds the values the message was filled with, such as `{ expected: '0.99', stated: '0.50' }`, to
+word it in another language.
 
 ## On the command line
 

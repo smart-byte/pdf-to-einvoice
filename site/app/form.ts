@@ -51,7 +51,10 @@ const party = (who: 'seller' | 'buyer'): Field[] => [
       ] satisfies Field[])),
 ];
 
-const SECTIONS: { title: string; fields: Field[]; collapsed?: boolean }[] = [
+type Section = { title: string; fields: Field[]; collapsed?: boolean };
+
+/** The groups of fields above the line items. */
+const BEFORE_LINES: Section[] = [
   {
     title: 's.invoice',
     fields: [
@@ -65,6 +68,9 @@ const SECTIONS: { title: string; fields: Field[]; collapsed?: boolean }[] = [
   },
   { title: 's.seller', fields: party('seller') },
   { title: 's.buyer', fields: party('buyer') },
+];
+/** The groups of fields below the line items and the discounts and charges. */
+const AFTER_LINES: Section[] = [
   {
     title: 's.payment',
     fields: [
@@ -258,16 +264,19 @@ export function renderForm(): void {
   // Nothing goes into the file unseen: a field the format does not ask for is shown while it holds a value, and a
   // group of further fields is open while one of them does.
   const asked = (field: Field) => (field.only ?? format) === format;
-  const paths = new Set(SECTIONS.flatMap(({ fields }) => fields.filter(asked).map((field) => field.path)));
+  const paths = new Set(
+    [...BEFORE_LINES, ...AFTER_LINES].flatMap(({ fields }) => fields.filter(asked).map((field) => field.path)),
+  );
   const filled = (field: Field) => !isEmpty(valueAt(state.draft, field.path));
-  const [invoice, seller, buyer, payment, more] = SECTIONS.map(({ title, fields, collapsed }) => {
+  const render = ({ title, fields, collapsed }: Section) => {
     const shown = fields.filter((field) => asked(field) || (filled(field) && !paths.has(field.path)));
     return section(
       title,
       el('div', { className: 'fields' }, ...shown.map((field) => control(field, field.path))),
       collapsed ? shown.some(filled) : undefined,
     );
-  });
+  };
+  const [before, after] = [BEFORE_LINES.map(render), AFTER_LINES.map(render)];
   // Discounts and charges on the whole invoice: folded away until there is one. An existing e-invoice shows them only where it has them.
   const adjusted = Boolean(state.draft.discounts?.length || state.draft.charges?.length);
   const adjustments =
@@ -280,7 +289,7 @@ export function renderForm(): void {
             adjusted,
           ),
         ];
-  form.append(invoice!, seller!, buyer!, section('s.lines', renderLines()), ...adjustments, payment!, more!);
+  form.append(...before, section('s.lines', renderLines()), ...adjustments, ...after);
   if (state.mode === 'validate') {
     // Read only rather than disabled: a field can still take the focus, which shows where its value stands on the page.
     for (const field of form.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('input, textarea'))
@@ -295,13 +304,18 @@ export function renderForm(): void {
 }
 
 // The form is never sent anywhere: Enter in a field must not reload the page.
+/** The value of a field as the data holds it: a number field as a number, or nothing while it is empty. */
+function valueOf(input: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement): string | number | undefined {
+  if ((input as HTMLInputElement).type !== 'number') return input.value.trim();
+  return input.value === '' ? undefined : Number(input.value);
+}
+
 $('#form').addEventListener('submit', (event) => event.preventDefault());
 $('#form').addEventListener('input', (event) => {
   const input = event.target as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
   const path = input.dataset.path;
   if (!path) return;
-  const number = (input as HTMLInputElement).type === 'number';
-  setPath(state.draft, path, number ? (input.value === '' ? undefined : Number(input.value)) : input.value.trim());
+  setPath(state.draft, path, valueOf(input));
   state.touched.add(path);
   // Whoever changes a value has looked at it, and whoever changes a cell of a line has looked at the line.
   state.toCheck.delete(path);

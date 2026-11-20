@@ -5,7 +5,7 @@ import { $, el, setText, show } from './dom.js';
 import { validate } from './findings.js';
 import { describe, fieldLabel, reasonOf } from './wording.js';
 import { t } from '../shared/i18n.js';
-import { drawing } from './page.js';
+import { pageDrawn } from './page.js';
 import { state } from './state.js';
 
 let downloads: string[] = [];
@@ -84,7 +84,7 @@ $('#create').onclick = async () => {
     status.textContent = '';
     // The finished page shows the same preview, with the stamp landing on it. A page that is still being drawn is
     // waited for: leaving now would copy an empty sheet and leave the preview without a page to come back to.
-    await drawing.catch(() => {});
+    await pageDrawn().catch(() => {});
     const [from, to] = [$<HTMLCanvasElement>('#preview'), $<HTMLCanvasElement>('#done-preview')];
     Object.assign(to, { width: from.width, height: from.height });
     to.getContext('2d')!.drawImage(from, 0, 0);

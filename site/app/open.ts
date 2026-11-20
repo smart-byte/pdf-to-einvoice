@@ -36,55 +36,73 @@ const FILE_CODES = new Set([
   'xml-charge',
 ]);
 
+/** Forgets the file before: the page starts over with the one that was opened. */
+function startOver(pdf: Uint8Array, fileName: string, pdfText: string, mode: 'create' | 'validate'): void {
+  forgetPages();
+  closeXml();
+  Object.assign(state, {
+    pdf,
+    fileName,
+    pdfText,
+    draft: {},
+    touched: new Set(),
+    fileFindings: [],
+    toCheck: new Map(),
+    mode,
+    adjustedLines: undefined,
+    percentages: undefined,
+  });
+}
+
+/** The PDF already is an e-invoice: what its XML says is shown, next to the page it belongs to. */
+async function showExisting(pdf: Uint8Array, text: string): Promise<void> {
+  const { validateEInvoice } = await import('../../src/inspect/validate.js');
+  const result = await validateEInvoice(pdf, { pdfText: text });
+  state.draft = result.invoice ?? {};
+  state.adjustedLines = result.adjustedLines ?? [];
+  state.percentages = result.percentages ?? {};
+  state.fileFindings = result.findings.filter((finding) => FILE_CODES.has(finding.code));
+  $('#read-status').textContent = result.profile ? t('valid.profile', { p: result.profile }) : '';
+}
+
+/** A plain PDF: the invoice is read from its text, and what the page lacks is suggested. */
+function readNew(text: string, blocks: string[][]): void {
+  merge(state, guessFromText(text, { blocks }));
+  // What was read from the PDF, before anything is suggested.
+  const found = JSON.stringify(state.draft).match(/":("|\d|-)/g)?.length ?? 0;
+  // An invoice that shows no VAT gets its VAT category from the buyer's country, the same for every line: a person
+  // confirms it at the first line.
+  if ((state.draft.lines?.[0]?.vatCategory ?? 'S') !== 'S') state.toCheck.set('lines.0.vatCategory', 'inferred');
+  suggestPaymentTerms();
+  if (!text.trim()) $('#read-status').textContent = t('read.none');
+  else $('#read-status').textContent = t(found === 1 ? 'read.found.one' : 'read.found', { n: found });
+}
+
+/** The view of the work on one file: its title, the form, and the reader offered where much is left to fill in. */
+function showWork(fileName: string): void {
+  const existing = state.mode === 'validate';
+  document.body.dataset.mode = state.mode;
+  setText('#work-title', existing ? 'valid.title' : 'work.title');
+  setText('#work-lead', existing ? 'valid.lead' : 'work.lead');
+  $('#file-name').textContent = fileName;
+  $('#ai-status').textContent = '';
+  renderForm();
+  // Reading with a model is offered openly when the patterns left a lot to fill in.
+  const errors = state.result?.findings.filter((finding) => finding.severity === 'error').length ?? 0;
+  $<HTMLDetailsElement>('.reader details').open = errors > 2;
+  show('work');
+}
+
 async function open(pdf: Uint8Array, fileName: string): Promise<void> {
   const status = $('#drop-status');
   status.textContent = t('drop.reading');
   try {
     const info = await inspectPdf(pdf);
     const { text, blocks } = await extractLayout(pdf);
-    forgetPages();
-    closeXml();
-    Object.assign(state, {
-      pdf,
-      fileName,
-      pdfText: text,
-      draft: {},
-      touched: new Set(),
-      fileFindings: [],
-      toCheck: new Map(),
-      mode: info.embeddedXml === null ? 'create' : 'validate',
-    });
-    if (state.mode === 'validate') {
-      // The PDF already is an e-invoice: show what its XML says, next to the page it belongs to.
-      const { validateEInvoice } = await import('../../src/inspect/validate.js');
-      const result = await validateEInvoice(pdf, { pdfText: text });
-      state.draft = result.invoice ?? {};
-      state.adjustedLines = result.adjustedLines ?? [];
-      state.percentages = result.percentages ?? {};
-      state.fileFindings = result.findings.filter((finding) => FILE_CODES.has(finding.code));
-      $('#read-status').textContent = result.profile ? t('valid.profile', { p: result.profile }) : '';
-    } else {
-      merge(state, guessFromText(text, { blocks }));
-      // What was read from the PDF, before anything is suggested.
-      const found = JSON.stringify(state.draft).match(/":("|\d|-)/g)?.length ?? 0;
-      // An invoice that shows no VAT gets its VAT category from the buyer's country, the same for every line: a person
-      // confirms it at the first line.
-      if ((state.draft.lines?.[0]?.vatCategory ?? 'S') !== 'S') state.toCheck.set('lines.0.vatCategory', 'inferred');
-      suggestPaymentTerms();
-      $('#read-status').textContent = text.trim()
-        ? t(found === 1 ? 'read.found.one' : 'read.found', { n: found })
-        : t('read.none');
-    }
-    document.body.dataset.mode = state.mode;
-    setText('#work-title', state.mode === 'validate' ? 'valid.title' : 'work.title');
-    setText('#work-lead', state.mode === 'validate' ? 'valid.lead' : 'work.lead');
-    $('#file-name').textContent = fileName;
-    $('#ai-status').textContent = '';
-    renderForm();
-    // Reading with a model is offered openly when the patterns left a lot to fill in.
-    $<HTMLDetailsElement>('.reader details').open =
-      (state.result?.findings.filter((finding) => finding.severity === 'error').length ?? 0) > 2;
-    show('work');
+    startOver(pdf, fileName, text, info.embeddedXml === null ? 'create' : 'validate');
+    if (state.mode === 'validate') await showExisting(pdf, text);
+    else readNew(text, blocks);
+    showWork(fileName);
     await preview(pdf);
     status.textContent = '';
     // The patterns have read the page: one pass of the light shows it.

@@ -13,7 +13,7 @@ const modelSelect = $<HTMLSelectElement>('#ai-model');
 function showModel(): void {
   const model = MODELS.find((candidate) => candidate.id === modelSelect.value);
   $('#ai-model-note').textContent = model
-    ? t('ai.download', { size: new Intl.NumberFormat(lang).format(model.gigabytes) })
+    ? t('ai.download', { size: new Intl.NumberFormat(lang()).format(model.gigabytes) })
     : t('ai.endpoint.note');
   $('#ai-endpoint').hidden = model !== undefined;
 }
@@ -25,7 +25,7 @@ export function renderModels(): void {
       el(
         'option',
         { value: model.id, selected: model.id === chosen },
-        `${model.id.replace(/-q4f16_1-MLC$/, '')} (${model.note[lang]})`,
+        `${model.id.replace(/-q4f16_1-MLC$/, '')} (${model.note[lang()]})`,
       ),
     ),
     el('option', { value: 'endpoint', selected: chosen === 'endpoint' }, t('ai.endpoint')),
@@ -33,6 +33,15 @@ export function renderModels(): void {
   showModel();
 }
 modelSelect.onchange = showModel;
+
+/** What the status line says while a model is at work: loading, reading, or writing its answer line by line. */
+function statusOf(fraction: number, loading: boolean, written?: { fraction: number; line: number }): string {
+  if (loading) return t('ai.loading', { p: Math.round(fraction * 100) });
+  if (!written) return t('ai.reading');
+  return written.line
+    ? t('ai.writing.line', { n: written.line })
+    : t('ai.writing', { p: Math.round(written.fraction * 100) });
+}
 
 /**
  * Shows how far reading with a model is: below 1 the model is still loading and a bar says how much of it is there,
@@ -47,15 +56,7 @@ function reading(fraction?: number, written?: { fraction: number; line: number }
   $('#ai-cancel').hidden = fraction === undefined;
   bar.value = written?.fraction ?? fraction ?? 0;
   bar.setAttribute('aria-label', t(written ? 'ai.progress.answer' : 'ai.progress'));
-  if (fraction !== undefined) {
-    $('#ai-status').textContent = loading
-      ? t('ai.loading', { p: Math.round(fraction * 100) })
-      : !written
-        ? t('ai.reading')
-        : written.line
-          ? t('ai.writing.line', { n: written.line })
-          : t('ai.writing', { p: Math.round(written.fraction * 100) });
-  }
+  if (fraction !== undefined) $('#ai-status').textContent = statusOf(fraction, loading, written);
   scan(fraction !== undefined && !loading ? 'on' : 'off');
 }
 

@@ -21,7 +21,8 @@ function showCounting(): void {
       toggle.hidden = true;
       continue;
     }
-    state.textContent = t(doNotTrack ? 'optout.dnt' : off ? 'optout.off' : 'optout.on');
+    const counted = off ? 'optout.off' : 'optout.on';
+    state.textContent = t(doNotTrack ? 'optout.dnt' : counted);
     toggle.hidden = doNotTrack;
     toggle.textContent = t(off ? 'optout.start' : 'optout.stop');
     toggle.onclick = () => {
@@ -40,5 +41,5 @@ function apply(next: Lang): void {
 }
 for (const button of document.querySelectorAll<HTMLButtonElement>('[data-lang]'))
   button.onclick = () => apply(button.dataset.lang as Lang);
-apply(lang);
+apply(lang());
 countVisit();

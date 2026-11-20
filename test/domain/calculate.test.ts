@@ -1,13 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import {
-  calculate,
-  cents,
-  lineAgrees,
-  percentAgrees,
-  checkAdjustments,
-  slackOf,
-  tryCalculate,
-} from '../../src/domain/calculate.js';
+import { checkAdjustments } from '../../src/domain/adjustments.js';
+import { calculate, tryCalculate } from '../../src/domain/calculate.js';
+import { cents, exactSum, lineAgrees, percentAgrees, slackOf } from '../../src/domain/money.js';
 import type { DocumentAllowance, Invoice, Line } from '../../src/domain/model.js';
 
 const line = (over: Partial<Line> = {}): Line => ({
@@ -122,6 +116,13 @@ describe('calculate', () => {
     expect(cents(-1.005)).toBe(-101);
     expect(cents(7 * 0.145)).toBe(102);
     expect(cents(10.004)).toBe(1000);
+  });
+
+  it('sums amounts without floating point error', () => {
+    expect(0.1 + 0.2).not.toBe(0.3);
+    expect(exactSum([0.1, 0.2])).toBe(0.3);
+    expect(exactSum([1000.1, -0.1, 0.005])).toBe(1000.005);
+    expect(exactSum([])).toBe(0);
   });
 
   it('compares a line total with quantity times price less the discount before rounding', () => {

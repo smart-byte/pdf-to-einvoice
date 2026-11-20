@@ -266,6 +266,28 @@ describe('guessFromText with an invoice that charges no VAT', () => {
     expect(guess.vatExemptionReason).toContain(note);
   });
 
+  it('takes the category from the country of the customer where no reason is printed', () => {
+    const withAddress = (address: string[]) =>
+      [
+        'Muster Software GmbH · Beispielweg 1 · 12345 Musterstadt',
+        'Rechnung 2026-20   6. Oktober 2026',
+        ...address,
+        'Beratung   10 Std.   100,00 €   1.000,00 €',
+        'Nettobetrag   1.000,00 €',
+        'Gesamtbetrag   1.000,00 €',
+        'USt-IdNr. DE123456789',
+      ].join('\n');
+    for (const [address, category] of [
+      [['Voorbeeld B.V.', 'Voorbeeldstraat 5', '1234 AB Voorbeeldstad', 'NIEDERLANDE'], 'AE'],
+      [['Example Inc.', '5 Main Street', 'Springfield, IL 62701', 'USA'], 'O'],
+      [['Beispiel AG', 'Hauptstraße 5', '54321 Beispielstadt', 'DEUTSCHLAND'], 'E'],
+    ] as const) {
+      const guess = guessFromText(withAddress([...address]));
+      expect(guess.lines, category).toEqual([expect.objectContaining({ vatCategory: category, vatRate: 0 })]);
+      expect(guess.vatExemptionReason).toBeUndefined();
+    }
+  });
+
   it('believes the printed reason before the country of the customer', () => {
     const address = ['Voorbeeld B.V.', 'Voorbeeldstraat 5', '1234 AB Voorbeeldstad', 'NIEDERLANDE'];
     expect(guessFromText(invoice('Steuerfreie innergemeinschaftliche Lieferung.', address)).lines).toMatchObject([

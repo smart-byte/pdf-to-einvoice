@@ -11,6 +11,17 @@
     "unicorn/no-array-reverse": "off",
     "import/no-unassigned-import": "off",
     "import/default": "off",
-    "no-unmodified-loop-condition": "off"
-  }
+    "no-unmodified-loop-condition": "off",
+    "no-restricted-globals": [
+      "error",
+      { "name": "escape", "message": "Deprecated and not for regular expressions: use escapeRegExp." },
+      { "name": "unescape", "message": "Deprecated." }
+    ],
+    "no-nested-ternary": "error",
+    "complexity": ["error", 23],
+    "max-depth": ["error", 4],
+    "max-params": ["error", 5],
+    "max-lines-per-function": ["error", { "max": 61, "skipBlankLines": true, "skipComments": true }]
+  },
+  "overrides": [{ "files": ["test/**"], "rules": { "max-lines-per-function": "off" } }]
 }

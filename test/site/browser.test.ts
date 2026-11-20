@@ -189,6 +189,56 @@ describe.skipIf(!asked)('the web app in a browser', () => {
     );
   }, 120_000);
 
+  it('turns the preview to the page a value stands on, and starts again at one page for the next PDF', async () => {
+    const doc = await PDFDocument.create();
+    const font = await doc.embedFont(StandardFonts.Helvetica);
+    const pages = [
+      [
+        'Muster Software GmbH, Beispielweg 1, 12345 Musterstadt',
+        'Beispiel AG, Hauptstrasse 5, 54321 Beispielstadt',
+        'Rechnung Nr. RE-2026-0051   Rechnungsdatum 03.11.2026',
+      ],
+      ['Zahlbar bis 17.11.2026', 'IBAN DE02 1203 0000 0000 2020 51', 'USt-IdNr. DE123456789'],
+    ];
+    for (const rows of pages) {
+      const sheet = doc.addPage();
+      rows.forEach((row, i) => sheet.drawText(row, { x: 50, y: 760 - i * 24, size: 11, font }));
+    }
+    const page = await open();
+    await read(page, upload('two-pages.pdf', await doc.save()));
+    const pager = () =>
+      page.evaluate(() => ({
+        hidden: document.querySelector<HTMLElement>('#pager')!.hidden,
+        now: document.querySelector('#page-now')!.textContent,
+        prev: document.querySelector<HTMLButtonElement>('#page-prev')!.disabled,
+        next: document.querySelector<HTMLButtonElement>('#page-next')!.disabled,
+      }));
+    await page.waitForFunction(() => document.querySelector('#page-now')!.textContent === 'Seite 1 von 2');
+    expect(await pager()).toEqual({ hidden: false, now: 'Seite 1 von 2', prev: true, next: false });
+
+    // The second page is read in the background: the field turns to it once its text is known.
+    expect(await page.inputValue('[data-path="iban"]')).toBe('DE02120300000000202051');
+    for (let tries = 0; (await pager()).now !== 'Seite 2 von 2' && tries < 50; tries++) {
+      await page.focus('[data-path="number"]');
+      await page.focus('[data-path="iban"]');
+      await page.waitForTimeout(100);
+    }
+    expect(await pager()).toEqual({ hidden: false, now: 'Seite 2 von 2', prev: false, next: true });
+    expect(await page.textContent('#page-live')).toMatch(/2/);
+    await page.waitForSelector('#marks .mark.is-active');
+
+    await page.click('#page-prev');
+    await page.waitForFunction(() => document.querySelector('#page-now')!.textContent === 'Seite 1 von 2');
+    await page.click('#page-next');
+    await page.waitForFunction(() => document.querySelector('#page-now')!.textContent === 'Seite 2 von 2');
+
+    // Another PDF, of one page, is shown from its first page, without the pages of the one before.
+    await page.click('#other');
+    await read(page);
+    await page.waitForFunction(() => document.querySelector('#page-now')!.textContent === 'Seite 1 von 1');
+    expect(await pager()).toEqual({ hidden: true, now: 'Seite 1 von 1', prev: true, next: true });
+  }, 120_000);
+
   it('leaves a script of the PDF out of the e-invoice and says so', async () => {
     const doc = await PDFDocument.load(samplePdf(), { updateMetadata: false });
     doc.catalog.set(
@@ -500,14 +550,14 @@ describe.skipIf(!asked)('the web app in a browser', () => {
 
   it('shows how far a language model has come with its answer', async () => {
     // What a model answers for the sample: every key of the schema in its order, with the one value the patterns do not read.
-    const filled = (schema: any, key = ''): unknown =>
-      schema.type === 'object'
-        ? Object.fromEntries(Object.entries(schema.properties).map(([name, value]) => [name, filled(value, name)]))
-        : schema.type === 'array'
-          ? [filled(schema.items), filled(schema.items)]
-          : key === 'email'
-            ? 'rechnung@muster-software.example'
-            : null;
+    const filled = (schema: any, key = ''): unknown => {
+      if (schema.type === 'object')
+        return Object.fromEntries(
+          Object.entries(schema.properties).map(([name, value]) => [name, filled(value, name)]),
+        );
+      if (schema.type === 'array') return [filled(schema.items), filled(schema.items)];
+      return key === 'email' ? 'rechnung@muster-software.example' : null;
+    };
     // Stands in for the library that runs the model: no model is loaded, and the answer comes piece by piece.
     const library = `
       const answer = ${JSON.stringify(JSON.stringify(filled(extractionSchema())))};
