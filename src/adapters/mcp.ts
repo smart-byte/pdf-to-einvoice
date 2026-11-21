@@ -19,6 +19,113 @@ import { invoiceJsonSchema, type InvoiceDraft } from '../domain/model.js';
 import { readEmbeddedXml } from '../pdf/file.js';
 import { extractText } from '../pdf/text.js';
 
+/** The MCP server, not yet connected to a transport. */
+export function createServer(): Server {
+  const server = new Server(
+    { name: 'pdf-to-einvoice', version: packageVersion() },
+    { capabilities: { tools: {} }, instructions: INSTRUCTIONS },
+  );
+
+  server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS }));
+
+  server.setRequestHandler(CallToolRequestSchema, async ({ params }) => {
+    if (!Object.hasOwn(HANDLERS, params.name))
+      throw new McpError(ErrorCode.InvalidParams, `Unknown tool: ${params.name}`);
+    try {
+      return asText(await HANDLERS[params.name]!(params.arguments ?? {}));
+    } catch (e) {
+      return { ...asText(describeError(e)), isError: true };
+    }
+  });
+
+  return server;
+}
+
+/** Serves on stdin/stdout until the client closes the connection. */
+export async function startStdio(): Promise<void> {
+  await createServer().connect(new StdioServerTransport());
+}
+
+function asText(result: object | string) {
+  return {
+    content: [{ type: 'text' as const, text: typeof result === 'string' ? result : JSON.stringify(result, null, 2) }],
+  };
+}
+
+/** What the model gets to read when a tool fails: enough to fix the call. */
+function describeError(e: unknown): object {
+  if (e instanceof InvoiceError) return { error: e.code, message: e.message, findings: e.findings };
+  const message = messageOf(e);
+  if (outputExists(e))
+    return { error: `${message} Pass "overwrite": true to replace it, or choose another output_path.` };
+  return { error: message };
+}
+
+/** Each handler returns the result (an object, or text to pass on as it is) or throws what went wrong. */
+const HANDLERS: Record<string, (args: Args) => Promise<object | string>> = {
+  read_invoice_pdf: (args) => describePdf(pathArg(args, 'pdf_path')),
+
+  async check_invoice(args) {
+    const rules = choiceArg(args, 'rules');
+    const pdfText =
+      args.pdf_path === undefined ? undefined : await extractText(await readPdf(pathArg(args, 'pdf_path')));
+    const { findings, totals, invoice } = check(invoiceArg(args), { pdfText, rules });
+    return { ok: invoice !== undefined, findings, totals };
+  },
+
+  async create_einvoice(args) {
+    const output = args.output_path === undefined ? undefined : pathArg(args, 'output_path');
+    const result = await createFile(pathArg(args, 'pdf_path'), invoiceArg(args), {
+      outputPath: output,
+      overwrite: args.overwrite === true,
+      profile: choiceArg(args, 'profile'),
+    });
+    return { output_path: result.outputPath, findings: result.findings, totals: result.totals };
+  },
+
+  async create_xrechnung(args) {
+    const result = await createXRechnungFile(invoiceArg(args), pathArg(args, 'output_path'), {
+      overwrite: args.overwrite === true,
+      syntax: choiceArg(args, 'syntax'),
+    });
+    return { output_path: result.outputPath, findings: result.findings, totals: result.totals };
+  },
+
+  async read_einvoice_xml(args) {
+    const xml = await readEmbeddedXml(await readPdf(pathArg(args, 'pdf_path')));
+    if (xml === null) throw new Error('This PDF carries no e-invoice XML.');
+    return xml;
+  },
+
+  validate_einvoice: (args) => validateFile(pathArg(args, 'pdf_path')),
+};
+
+type Args = Record<string, unknown>;
+
+function pathArg(args: Args, key: string): string {
+  const value = args[key];
+  if (typeof value !== 'string' || !isAbsolute(value)) throw new Error(`${key} must be an absolute file path.`);
+  return value;
+}
+
+function invoiceArg(args: Args): InvoiceDraft {
+  const value = args.invoice;
+  if (typeof value !== 'object' || value === null || Array.isArray(value))
+    throw new Error('invoice must be an object holding the invoice data.');
+  return value as InvoiceDraft;
+}
+
+/** An optional argument that takes one of a few words. */
+function choiceArg<K extends keyof typeof CHOICES>(args: Args, key: K): (typeof CHOICES)[K][number] | undefined {
+  const value = args[key];
+  if (value !== undefined && !(CHOICES[key] as readonly unknown[]).includes(value))
+    throw new Error(`${key} must be ${CHOICES[key].join(' or ')}.`);
+  return value as (typeof CHOICES)[K][number] | undefined;
+}
+
+// What the model is told: how to use the tools, and what each takes. The functions above read these only when a
+// client asks, so they may stand below them; each stands below what it is built from.
+
 const INSTRUCTIONS = `pdf-to-einvoice turns an existing invoice PDF into an EN 16931 e-invoice (ZUGFeRD / Factur-X): the invoice data is attached to the PDF as XML, the pages stay as they are. It also writes the data as an XRechnung, the XML German public bodies ask for. The tools run on the user's machine and send nothing. What you read through them is yours to handle: if your model runs elsewhere, the content of the invoice goes there, so do not tell the user that it stays on their machine unless that holds for you.
 
 Workflow:
@@ -51,16 +158,19 @@ function optional(schema: unknown): unknown {
   );
 }
 const DRAFT_SCHEMA = optional(INVOICE_SCHEMA);
+
 // No tool reaches beyond this machine: files are read and written locally, nothing is sent anywhere.
 const READS = { readOnlyHint: true, openWorldHint: false };
 // A tool that creates writes one new file and replaces nothing unless `overwrite` is set.
 const WRITES = { readOnlyHint: false, destructiveHint: false, openWorldHint: false };
-const pathSchema = (description: string) => ({ type: 'string', description: `${description} Absolute path.` });
-const choiceSchema = (key: keyof typeof CHOICES, description: string) => ({
-  type: 'string',
-  enum: CHOICES[key],
-  description,
-});
+
+function pathSchema(description: string) {
+  return { type: 'string', description: `${description} Absolute path.` };
+}
+
+function choiceSchema(key: keyof typeof CHOICES, description: string) {
+  return { type: 'string', enum: CHOICES[key], description };
+}
 
 const TOOLS = [
   {
@@ -141,105 +251,3 @@ const TOOLS = [
     inputSchema: { type: 'object', properties: { pdf_path: pathSchema('The e-invoice PDF.') }, required: ['pdf_path'] },
   },
 ];
-
-type Args = Record<string, unknown>;
-
-function pathArg(args: Args, key: string): string {
-  const value = args[key];
-  if (typeof value !== 'string' || !isAbsolute(value)) throw new Error(`${key} must be an absolute file path.`);
-  return value;
-}
-
-function invoiceArg(args: Args): InvoiceDraft {
-  const value = args.invoice;
-  if (typeof value !== 'object' || value === null || Array.isArray(value))
-    throw new Error('invoice must be an object holding the invoice data.');
-  return value as InvoiceDraft;
-}
-
-/** An optional argument that takes one of a few words. */
-function choiceArg<K extends keyof typeof CHOICES>(args: Args, key: K): (typeof CHOICES)[K][number] | undefined {
-  const value = args[key];
-  if (value !== undefined && !(CHOICES[key] as readonly unknown[]).includes(value))
-    throw new Error(`${key} must be ${CHOICES[key].join(' or ')}.`);
-  return value as (typeof CHOICES)[K][number] | undefined;
-}
-
-/** Each handler returns the result (an object, or text to pass on as it is) or throws what went wrong. */
-const HANDLERS: Record<string, (args: Args) => Promise<object | string>> = {
-  read_invoice_pdf: (args) => describePdf(pathArg(args, 'pdf_path')),
-
-  async check_invoice(args) {
-    const rules = choiceArg(args, 'rules');
-    const pdfText =
-      args.pdf_path === undefined ? undefined : await extractText(await readPdf(pathArg(args, 'pdf_path')));
-    const { findings, totals, invoice } = check(invoiceArg(args), { pdfText, rules });
-    return { ok: invoice !== undefined, findings, totals };
-  },
-
-  async create_einvoice(args) {
-    const output = args.output_path === undefined ? undefined : pathArg(args, 'output_path');
-    const result = await createFile(pathArg(args, 'pdf_path'), invoiceArg(args), {
-      outputPath: output,
-      overwrite: args.overwrite === true,
-      profile: choiceArg(args, 'profile'),
-    });
-    return { output_path: result.outputPath, findings: result.findings, totals: result.totals };
-  },
-
-  async create_xrechnung(args) {
-    const result = await createXRechnungFile(invoiceArg(args), pathArg(args, 'output_path'), {
-      overwrite: args.overwrite === true,
-      syntax: choiceArg(args, 'syntax'),
-    });
-    return { output_path: result.outputPath, findings: result.findings, totals: result.totals };
-  },
-
-  async read_einvoice_xml(args) {
-    const xml = await readEmbeddedXml(await readPdf(pathArg(args, 'pdf_path')));
-    if (xml === null) throw new Error('This PDF carries no e-invoice XML.');
-    return xml;
-  },
-
-  validate_einvoice: (args) => validateFile(pathArg(args, 'pdf_path')),
-};
-
-/** What the model gets to read when a tool fails: enough to fix the call. */
-function describeError(e: unknown): object {
-  if (e instanceof InvoiceError) return { error: e.code, message: e.message, findings: e.findings };
-  const message = messageOf(e);
-  if (outputExists(e))
-    return { error: `${message} Pass "overwrite": true to replace it, or choose another output_path.` };
-  return { error: message };
-}
-
-const asText = (result: object | string) => ({
-  content: [{ type: 'text' as const, text: typeof result === 'string' ? result : JSON.stringify(result, null, 2) }],
-});
-
-/** The MCP server, not yet connected to a transport. */
-export function createServer(): Server {
-  const server = new Server(
-    { name: 'pdf-to-einvoice', version: packageVersion() },
-    { capabilities: { tools: {} }, instructions: INSTRUCTIONS },
-  );
-
-  server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS }));
-
-  server.setRequestHandler(CallToolRequestSchema, async ({ params }) => {
-    if (!Object.hasOwn(HANDLERS, params.name))
-      throw new McpError(ErrorCode.InvalidParams, `Unknown tool: ${params.name}`);
-    try {
-      return asText(await HANDLERS[params.name]!(params.arguments ?? {}));
-    } catch (e) {
-      return { ...asText(describeError(e)), isError: true };
-    }
-  });
-
-  return server;
-}
-
-/** Serves on stdin/stdout until the client closes the connection. */
-export async function startStdio(): Promise<void> {
-  await createServer().connect(new StdioServerTransport());
-}
