@@ -88,7 +88,11 @@ function refusalOf(viaEndpoint: boolean): string | undefined {
 /** The answer of the model in the browser, which reports how far it is, or of the service the user named. */
 function askModel(viaEndpoint: boolean, signal: AbortSignal) {
   if (!viaEndpoint) {
-    return readWithBrowserModel(state.pdfText, modelSelect.value, reading, signal, (written) => reading(1, written));
+    return readWithBrowserModel(state.pdfText, modelSelect.value, {
+      onProgress: reading,
+      onWriting: (written) => reading(1, written),
+      signal,
+    });
   }
   const endpoint = {
     url: $<HTMLInputElement>('#ai-url').value,
