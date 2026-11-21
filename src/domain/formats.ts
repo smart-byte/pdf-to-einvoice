@@ -1,12 +1,6 @@
 // The shapes a value of the invoice data has to have, in one place for the checks, the reader and the comparison with
 // the page. A pattern without anchors is for finding the value in a text; the function beside it takes a whole value.
 
-/** A pattern that takes a whole value: `pattern` from its first to its last character. */
-function whole(pattern: RegExp): (value: unknown) => value is string {
-  const anchored = new RegExp(`^(?:${pattern.source})$`, pattern.flags);
-  return (value: unknown): value is string => typeof value === 'string' && anchored.test(value);
-}
-
 /** Whether a value is a day of the calendar written as `YYYY-MM-DD`; `2026-02-31` is not. */
 export function isDate(value: unknown): value is string {
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
@@ -39,3 +33,12 @@ export const isCountryCode = whole(/[A-Z]{2}/);
 
 /** ISO 4217, as the data holds a currency. */
 export const isCurrencyCode = whole(/[A-Z]{3}/);
+
+/**
+ * A pattern that takes a whole value: `pattern` from its first to its last character. The shapes above are made with
+ * it when the module loads; it is a function declaration, so it may stand below them.
+ */
+function whole(pattern: RegExp): (value: unknown) => value is string {
+  const anchored = new RegExp(`^(?:${pattern.source})$`, pattern.flags);
+  return (value: unknown): value is string => typeof value === 'string' && anchored.test(value);
+}
