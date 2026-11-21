@@ -8,10 +8,9 @@ import {
   showsWords,
   type PageText,
 } from '../domain/shown.js';
-import { dateSpellings, MONTHS } from '../domain/spellings.js';
+import { COUNTRY_NAMES, dateSpellings, MONTHS } from '../domain/spellings.js';
 import type { InvoiceDraft } from '../domain/model.js';
 import { escapeRegExp } from '../util/regexp.js';
-import { COUNTRY_NAMES } from './guess/values.js';
 
 // Comparing what a language model read with the text of the PDF: a value stays only where the page shows it, in a
 // field of the right kind.

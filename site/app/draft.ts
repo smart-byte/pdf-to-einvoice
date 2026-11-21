@@ -1,6 +1,6 @@
 // Paths into the draft, e.g. "seller.name" or "lines.0.unitPrice", and merging what was read into it.
 import { invoiceJsonSchema, type InvoiceDraft } from '../../src/domain/model.js';
-import { toNumber } from '../../src/extract/guess/values.js';
+import { toNumber } from '../../src/domain/spellings.js';
 import { valueAt } from '../../src/util/objects.js';
 
 /** What merging needs of the page: the draft, and the fields the user has typed into. */

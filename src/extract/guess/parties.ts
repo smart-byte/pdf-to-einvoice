@@ -1,8 +1,9 @@
 import type { Party } from '../../domain/model.js';
+import { COUNTRY_NAMES } from '../../domain/spellings.js';
 import { TITLE } from './head.js';
 import { cells } from '../../util/rows.js';
 import { KEY_VALUE } from './rows.js';
-import { anyOf, COUNTRY_NAMES, lastIndex, VAT_ID_LABEL, VAT_ID_LINE } from './values.js';
+import { anyOf, lastIndex, VAT_ID_LABEL, VAT_ID_LINE } from './values.js';
 
 // Parties. The blocks of a page are its columns; without blocks, the first cells of the rows stand in for the one
 // column that matters most.

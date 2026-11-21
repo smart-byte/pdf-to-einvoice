@@ -99,18 +99,6 @@ export const DATE = new RegExp(
 
 // Amounts.
 
-/**
- * "1.499,00" and "1,499.00" both mean 1499: the last separator is the decimal one. Three digits behind the only
- * separator are thousands ("1.000 Stk"), unless a zero stands in front ("0.025").
- */
-export function toNumber(printed: string): number {
-  const digits = printed.replace(/[^\d.,-]/g, '');
-  const last = Math.max(digits.lastIndexOf(','), digits.lastIndexOf('.'));
-  if (last < 0) return Number(digits);
-  const [whole, fraction] = [digits.slice(0, last).replace(/[.,]/g, ''), digits.slice(last + 1)];
-  return Number(fraction.length === 3 && Number(whole) !== 0 ? whole + fraction : `${whole}.${fraction}`);
-}
-
 export const MONEY = "(-?\\d{1,3}(?:[.,' ]\\d{3})*[.,]\\d{2}|-?\\d+[.,]\\d{2})";
 export const CURRENCY = '(?:€|EUR|US\\$|\\$|USD|£|GBP|CHF)';
 // A label may go on with a word in brackets: "Zwischensumme (netto)". A code such as the category in "USt (S)" is no word.
@@ -190,20 +178,3 @@ export function anyOf(...alternatives: RegExp[]): string {
 export function lastIndex<T>(items: T[], test: (item: T) => unknown): number {
   return items.reduce((last, item, i) => (test(item) ? i : last), -1);
 }
-
-/** How a country is written on a page, in lower case. */
-export const COUNTRY_NAMES: Record<string, string[]> = {
-  DE: ['deutschland', 'germany'],
-  AT: ['österreich', 'austria'],
-  CH: ['schweiz', 'switzerland', 'suisse'],
-  FR: ['frankreich', 'france'],
-  IT: ['italien', 'italy', 'italia'],
-  NL: ['niederlande', 'netherlands', 'nederland'],
-  BE: ['belgien', 'belgium', 'belgique'],
-  LU: ['luxemburg', 'luxembourg'],
-  PL: ['polen', 'poland', 'polska'],
-  ES: ['spanien', 'spain', 'españa'],
-  IE: ['irland', 'ireland'],
-  GB: ['großbritannien', 'vereinigtes königreich', 'united kingdom', 'great britain'],
-  US: ['usa', 'united states', 'vereinigte staaten'],
-};

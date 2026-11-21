@@ -1,10 +1,11 @@
 import { cents, lineBase, netOfGross, percentOf, perUnit } from '../../domain/money.js';
 import type { Line, VatCategory } from '../../domain/model.js';
+import { toNumber } from '../../domain/spellings.js';
 import { senderOf } from './parties.js';
 import { cells } from '../../util/rows.js';
 import { KEY_VALUE, MAX_WRAPPED } from './rows.js';
 import { rateOf, type Totals, TOTALS_CELL, TOTALS_ROW } from './totals.js';
-import { anyOf, CURRENCY, lastIndex, MONEY, toNumber } from './values.js';
+import { anyOf, CURRENCY, lastIndex, MONEY } from './values.js';
 
 // Items: the rows of the table that add up to the totals, with quantity, unit, price and VAT rate, and the note that
 // says why no VAT is charged.

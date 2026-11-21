@@ -1,5 +1,6 @@
 import { cents } from '../../domain/money.js';
-import { after, AMOUNT, anyOf, MONEY, SEPARATOR, toNumber } from './values.js';
+import { toNumber } from '../../domain/spellings.js';
+import { after, AMOUNT, anyOf, MONEY, SEPARATOR } from './values.js';
 
 // Totals: three printed amounts with net + VAT = gross, picked by their labels where several fit.
 

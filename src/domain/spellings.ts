@@ -1,5 +1,5 @@
-// How a value is printed on a page: the spellings of a date and of an amount, to look for in the text of a PDF, and
-// the names of the months.
+// How a value is printed on a page: the spellings of a date and of an amount, to look for in the text of a PDF, the
+// number a printed amount stands for, and the names of the months and of the countries.
 
 /** The names of the months, as German and English invoices print them, in lower case. */
 export const MONTHS = [
@@ -62,3 +62,32 @@ export function amountSpellings(amount: number): string[] {
   // A whole amount is also printed without its decimals; shown.ts and the web app's locate.ts take it only where it stands on its own.
   return frac === '00' ? [...spellings, int, grouped('.'), grouped(',')] : spellings;
 }
+
+/**
+ * "1.499,00" and "1,499.00" both mean 1499: the last separator is the decimal one. Three digits behind the only
+ * separator are thousands ("1.000 Stk"), unless a zero stands in front ("0.025").
+ */
+export function toNumber(printed: string): number {
+  const digits = printed.replace(/[^\d.,-]/g, '');
+  const last = Math.max(digits.lastIndexOf(','), digits.lastIndexOf('.'));
+  if (last < 0) return Number(digits);
+  const [whole, fraction] = [digits.slice(0, last).replace(/[.,]/g, ''), digits.slice(last + 1)];
+  return Number(fraction.length === 3 && Number(whole) !== 0 ? whole + fraction : `${whole}.${fraction}`);
+}
+
+/** How a country is written on a page, in lower case. */
+export const COUNTRY_NAMES: Record<string, string[]> = {
+  DE: ['deutschland', 'germany'],
+  AT: ['österreich', 'austria'],
+  CH: ['schweiz', 'switzerland', 'suisse'],
+  FR: ['frankreich', 'france'],
+  IT: ['italien', 'italy', 'italia'],
+  NL: ['niederlande', 'netherlands', 'nederland'],
+  BE: ['belgien', 'belgium', 'belgique'],
+  LU: ['luxemburg', 'luxembourg'],
+  PL: ['polen', 'poland', 'polska'],
+  ES: ['spanien', 'spain', 'españa'],
+  IE: ['irland', 'ireland'],
+  GB: ['großbritannien', 'vereinigtes königreich', 'united kingdom', 'great britain'],
+  US: ['usa', 'united states', 'vereinigte staaten'],
+};

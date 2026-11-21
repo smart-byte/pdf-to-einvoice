@@ -87,6 +87,21 @@ describe('the layers of src/', () => {
     expect(wrong).toEqual([]);
   });
 
+  it('leaves the parts of a file to that file', () => {
+    // `guess.ts` has its parts in `guess/`. What stands in such a folder is imported by the file of its name and by
+    // the parts beside it, and by nothing else: not by another file of the layer, and not by the web app.
+    const partsOf = (target: string) => {
+      const folder = dirname(target);
+      return files.includes(`${folder}.ts`) ? folder : undefined;
+    };
+    const wrong = [...files, ...sources('site')].flatMap((file) =>
+      importsOf(file)
+        .filter((target) => partsOf(target) && file !== `${partsOf(target)}.ts` && dirname(file) !== partsOf(target))
+        .map((target) => `${relative(root, file)} -> ${relative(root, target)}`),
+    );
+    expect(wrong).toEqual([]);
+  });
+
   it('imports no entry point', () => {
     const wrong = files.flatMap((file) =>
       importsOf(file)

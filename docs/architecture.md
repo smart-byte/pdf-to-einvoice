@@ -78,6 +78,10 @@ however indirectly.
 | `src/domain/`   | the data model, the rules, the totals, the findings and their texts; knows nothing of files | util              |
 | `src/util/`     | small helpers without a subject of their own                                                | nothing           |
 
+A file that has grown parts keeps them in a folder of its name, as `extract/guess.ts` does in `extract/guess/`. Only
+that file and the parts themselves import them; what another file or the web app needs of them belongs to a layer
+both may use, as `toNumber()` belongs to `domain/spellings.ts`. The same test enforces it.
+
 `src/index.ts` is the public API of the package: what it exports is all a user of the library can import
 (`package.json` exports no other entry; the command line is its `bin`). The adapters are not part of it, since they
 need Node.
