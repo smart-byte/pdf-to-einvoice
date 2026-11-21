@@ -72,29 +72,29 @@ export function readPeriod(text: string, rows: string[]): { periodStart?: string
 }
 
 /** The months a match of `MONTH_RANGE` names: from the first day of the one to the last day of the other. */
-function monthRangeOf(g: Record<string, string | undefined>): Period | undefined {
-  if (!g.fromYear || !g.fromMonth || !g.toYear || !g.toMonth) return undefined;
-  const from = month(g.fromYear, monthNumber(g.fromMonth));
-  const to = month(g.toYear, monthNumber(g.toMonth));
+function monthRangeOf(groups: Record<string, string | undefined>): Period | undefined {
+  if (!groups.fromYear || !groups.fromMonth || !groups.toYear || !groups.toMonth) return undefined;
+  const from = month(groups.fromYear, monthNumber(groups.fromMonth));
+  const to = month(groups.toYear, monthNumber(groups.toMonth));
   return from && to && from.periodStart < to.periodEnd
     ? { periodStart: from.periodStart, periodEnd: to.periodEnd }
     : undefined;
 }
 
 /** The period one alternative of `PERIOD` matched: a quarter, two dates, a month by its name or by its number. */
-function periodOf(g: Record<string, string | undefined>): Period | undefined {
-  const quarter = Number(g.quarter ?? g.quartal);
-  const quarterYear = g.quarterYear ?? g.quartalYear;
+function periodOf(groups: Record<string, string | undefined>): Period | undefined {
+  const quarter = Number(groups.quarter ?? groups.quartal);
+  const quarterYear = groups.quarterYear ?? groups.quartalYear;
   if (quarter && quarterYear) return months(quarterYear, quarter * 3 - 2, quarter * 3);
-  if (g.fromDay && g.fromMonth && g.toDay && g.toMonth) {
+  if (groups.fromDay && groups.fromMonth && groups.toDay && groups.toMonth) {
     return {
-      periodStart: `${g.fromYear}-${pad(g.fromMonth)}-${pad(g.fromDay)}`,
-      periodEnd: `${g.toYear}-${pad(g.toMonth)}-${pad(g.toDay)}`,
+      periodStart: `${groups.fromYear}-${pad(groups.fromMonth)}-${pad(groups.fromDay)}`,
+      periodEnd: `${groups.toYear}-${pad(groups.toMonth)}-${pad(groups.toDay)}`,
     };
   }
-  if (g.month && g.monthYear) return month(g.monthYear, monthNumber(g.month));
-  if (g.numberedMonth && g.numberedYear) return month(g.numberedYear, Number(g.numberedMonth));
-  return g.isoYear ? month(g.isoYear, Number(g.isoMonth)) : undefined;
+  if (groups.month && groups.monthYear) return month(groups.monthYear, monthNumber(groups.month));
+  if (groups.numberedMonth && groups.numberedYear) return month(groups.numberedYear, Number(groups.numberedMonth));
+  return groups.isoYear ? month(groups.isoYear, Number(groups.isoMonth)) : undefined;
 }
 
 /** A row that holds nothing but a month, or the month the title names in its own row or the next. */

@@ -41,17 +41,17 @@ function labelledSum({ net: [net], vat: [vat], gross: [gross] }: Labelled): Tota
 function sumOnPage(text: string, labelled: Labelled): Totals | undefined {
   const printed = new Set(centsOf([...text.matchAll(PRINTED_AMOUNT)].map((match) => match[1]!)));
   // VAT of nothing is believed when a label says so; "0,00" alone may be anything.
-  const fits = (n: number, v: number) =>
-    n !== 0 && printed.has(n + v) && share(v, n) && (v !== 0 || labelled.vat.includes(0));
+  const fits = (net: number, vat: number) =>
+    net !== 0 && printed.has(net + vat) && share(vat, net) && (vat !== 0 || labelled.vat.includes(0));
   const sums: { net: number; vat: number; gross: number; score: number }[] = [];
-  for (const n of printed) {
-    for (const v of printed) {
-      if (!fits(n, v)) continue;
+  for (const net of printed) {
+    for (const vat of printed) {
+      if (!fits(net, vat)) continue;
       sums.push({
-        net: n / 100,
-        vat: v / 100,
-        gross: (n + v) / 100,
-        score: +labelled.net.includes(n) + +labelled.vat.includes(v) + +labelled.gross.includes(n + v),
+        net: net / 100,
+        vat: vat / 100,
+        gross: (net + vat) / 100,
+        score: +labelled.net.includes(net) + +labelled.vat.includes(vat) + +labelled.gross.includes(net + vat),
       });
     }
   }
@@ -83,11 +83,11 @@ function share(part: number, whole: number): boolean {
 
 /** Printed amounts in cents. An amount too large to calculate with is none. */
 function centsOf(printed: string[]): number[] {
-  return printed.map((amount) => cents(toNumber(amount))).filter((c) => !Number.isNaN(c));
+  return printed.map((amount) => cents(toNumber(amount))).filter((inCents) => !Number.isNaN(inCents));
 }
 
-function euros(c: number | undefined): number | undefined {
-  return c === undefined ? undefined : c / 100;
+function euros(inCents: number | undefined): number | undefined {
+  return inCents === undefined ? undefined : inCents / 100;
 }
 
 /**

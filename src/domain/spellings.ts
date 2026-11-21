@@ -47,10 +47,10 @@ export function dateSpellings(iso: string): string[] {
 }
 
 /** The ways an amount is commonly printed, without whitespace. */
-export function amountSpellings(n: number): string[] {
+export function amountSpellings(amount: number): string[] {
   // A price may be finer than a cent ("0,4995 €"): it keeps its decimals, two at least.
-  const decimals = Math.min(Math.max(2, String(n).split('.')[1]?.length ?? 0), 6);
-  const [int, frac] = Math.abs(n).toFixed(decimals).split('.') as [string, string];
+  const decimals = Math.min(Math.max(2, String(amount).split('.')[1]?.length ?? 0), 6);
+  const [int, frac] = Math.abs(amount).toFixed(decimals).split('.') as [string, string];
   const grouped = (sep: string) => int.replace(/\B(?=(\d{3})+(?!\d))/g, sep);
   const spellings = [
     `${int},${frac}`,
@@ -64,8 +64,8 @@ export function amountSpellings(n: number): string[] {
 }
 
 /** The ways a percentage is commonly printed, without whitespace: "10%", "10,0%", "10.00%", "12,345%". */
-export function percentSpellings(p: number): string[] {
-  const own = String(p).split('.')[1]?.length ?? 0;
-  const forms = [own, 1, 2].filter((decimals) => decimals >= own).map((decimals) => p.toFixed(decimals));
+export function percentSpellings(percent: number): string[] {
+  const own = String(percent).split('.')[1]?.length ?? 0;
+  const forms = [own, 1, 2].filter((decimals) => decimals >= own).map((decimals) => percent.toFixed(decimals));
   return [...new Set(forms.flatMap((form) => [`${form}%`, `${form.replace('.', ',')}%`]))];
 }

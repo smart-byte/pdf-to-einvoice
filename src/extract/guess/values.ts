@@ -34,17 +34,20 @@ export const SEPARATOR = '^\\s*[:#.]?\\s*';
 // Dates.
 
 /** The day a match of `DATE` names, as YYYY-MM-DD. */
-export function toIsoDate(m: RegExpExecArray, dayFirst: boolean): string | undefined {
-  const g = m.groups ?? {};
-  if (g.isoYear) return `${g.isoYear}-${g.isoMonth}-${g.isoDay}`;
-  if (g.dotDay && g.dotMonth && g.dotYear) return `${century(g.dotYear)}-${pad(g.dotMonth)}-${pad(g.dotDay)}`;
-  if (g.textDay && g.textMonth) return `${g.textYear}-${pad(monthNumber(g.textMonth))}-${pad(g.textDay)}`;
-  if (g.usMonth && g.usDay) return `${g.usYear}-${pad(monthNumber(g.usMonth))}-${pad(g.usDay)}`;
-  if (!g.slashYear) return undefined;
+export function toIsoDate(match: RegExpExecArray, dayFirst: boolean): string | undefined {
+  const groups = match.groups ?? {};
+  if (groups.isoYear) return `${groups.isoYear}-${groups.isoMonth}-${groups.isoDay}`;
+  if (groups.dotDay && groups.dotMonth && groups.dotYear)
+    return `${century(groups.dotYear)}-${pad(groups.dotMonth)}-${pad(groups.dotDay)}`;
+  if (groups.textDay && groups.textMonth)
+    return `${groups.textYear}-${pad(monthNumber(groups.textMonth))}-${pad(groups.textDay)}`;
+  if (groups.usMonth && groups.usDay)
+    return `${groups.usYear}-${pad(monthNumber(groups.usMonth))}-${pad(groups.usDay)}`;
+  if (!groups.slashYear) return undefined;
   // With slashes, day and month can be told apart when one is above 12, or when a German or French label says who wrote it.
-  const [a, b] = [Number(g.slashFirst), Number(g.slashSecond)];
-  if (b > 12 && a <= 12) return `${century(g.slashYear)}-${pad(a)}-${pad(b)}`;
-  if ((a > 12 || dayFirst) && b <= 12) return `${century(g.slashYear)}-${pad(b)}-${pad(a)}`;
+  const [first, second] = [Number(groups.slashFirst), Number(groups.slashSecond)];
+  if (second > 12 && first <= 12) return `${century(groups.slashYear)}-${pad(first)}-${pad(second)}`;
+  if ((first > 12 || dayFirst) && second <= 12) return `${century(groups.slashYear)}-${pad(second)}-${pad(first)}`;
   return undefined;
 }
 
@@ -62,8 +65,8 @@ export function monthAs(name: string): string {
   return `(?<${name}>${MONTHS.flat().join('|')})[a-zä]*\\.?`;
 }
 
-export function pad(n: string | number): string {
-  return String(n).padStart(2, '0');
+export function pad(value: string | number): string {
+  return String(value).padStart(2, '0');
 }
 
 function century(year: string): string {

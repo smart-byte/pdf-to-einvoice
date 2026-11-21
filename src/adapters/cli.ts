@@ -111,8 +111,8 @@ function printFindings({ findings, totals }: { findings: Finding[]; totals?: Tot
     );
 }
 
-function formatFinding(f: Finding): string {
-  return `${f.severity}${f.path ? ` ${f.path}` : ''}: ${f.message}`;
+function formatFinding(finding: Finding): string {
+  return `${finding.severity}${finding.path ? ` ${finding.path}` : ''}: ${finding.message}`;
 }
 
 // The commands, options and usage. `run` reads them; the program below runs it when the module loads, so they stand
@@ -149,7 +149,7 @@ const COMMANDS: Record<string, Command> = {
     const { findings, totals } = check(data, { pdfText, rules: values.rules });
     if (values.json) io.stdout(`${JSON.stringify({ findings, totals }, null, 2)}\n`);
     else printFindings({ findings, totals }, io);
-    return findings.some((f) => f.severity === 'error') ? 1 : 0;
+    return findings.some((finding) => finding.severity === 'error') ? 1 : 0;
   }),
   read: defineCommand(1, async ([pdfPath], values, io) => {
     const description = await describePdf(pdfPath);
@@ -172,7 +172,7 @@ const COMMANDS: Record<string, Command> = {
       );
       printFindings(result, io);
     }
-    return result.isEInvoice && !result.findings.some((f) => f.severity === 'error') ? 0 : 1;
+    return result.isEInvoice && !result.findings.some((finding) => finding.severity === 'error') ? 0 : 1;
   }),
   schema: defineCommand(0, async (_args, _values, io) => {
     io.stdout(`${JSON.stringify(invoiceJsonSchema, null, 2)}\n`);

@@ -72,7 +72,7 @@ export function check(input: InvoiceDraft, options: CheckOptions = {}): CheckRes
     ...(options.rules === 'xrechnung' ? xrechnungFindings(draft) : []),
     ...(options.pdfText !== undefined ? compareWithPdf(draft, totals, options.pdfText, options.percentages) : []),
   ];
-  const ok = !findings.some((f) => f.severity === 'error');
+  const ok = !findings.some((finding) => finding.severity === 'error');
   return { findings, totals, invoice: ok ? (draft as Invoice) : undefined };
 }
 
@@ -113,22 +113,22 @@ function withDefaults(input: InvoiceDraft): Prepared {
 /** Drops null, undefined and blank strings; trims the rest. */
 function clean(value: unknown): unknown {
   if (typeof value === 'string') return value.trim() || undefined;
-  if (Array.isArray(value)) return value.map((v) => clean(v) ?? {});
+  if (Array.isArray(value)) return value.map((item) => clean(item) ?? {});
   if (value && typeof value === 'object') {
     const entries = Object.entries(value)
-      .map(([k, v]) => [k, clean(v)] as const)
-      .filter(([, v]) => v !== undefined);
+      .map(([key, item]) => [key, clean(item)] as const)
+      .filter(([, item]) => item !== undefined);
     return Object.fromEntries(entries);
   }
   return value ?? undefined;
 }
 
-function upper(v: unknown): unknown {
-  return typeof v === 'string' ? v.toUpperCase() : v;
+function upper(value: unknown): unknown {
+  return typeof value === 'string' ? value.toUpperCase() : value;
 }
 
-function compact(v: unknown): unknown {
-  return typeof v === 'string' ? v.replace(/\s+/g, '').toUpperCase() : v;
+function compact(value: unknown): unknown {
+  return typeof value === 'string' ? value.replace(/\s+/g, '').toUpperCase() : value;
 }
 
 /** The head of the invoice: its number and date, both parties, the formats of dates and codes, the seller's tax ID. */
@@ -264,7 +264,7 @@ function checkVatTreatment(draft: Prepared, options: CheckOptions): Finding[] {
   if (categories.has('O') && odd) {
     findings.push(error(odd.path, 'category-o'));
   }
-  if (NEEDS_REASON.some((c) => categories.has(c)) && draft.vatExemptionReason === undefined) {
+  if (NEEDS_REASON.some((category) => categories.has(category)) && draft.vatExemptionReason === undefined) {
     findings.push(error('vatExemptionReason', 'exemption-reason'));
   }
   if ((categories.has('AE') || categories.has('K')) && draft.buyer.vatId === undefined) {
@@ -513,7 +513,7 @@ function compareWithPdf(
 
 function shownIn(haystack: string, { spellings, words }: Expected): boolean {
   if (words && spellings[0]!.split(/\s+/).every((word) => haystack.includes(word.toLowerCase()))) return true;
-  return spellings.some((s) => haystack.includes(s.replace(/\s+/g, '').toLowerCase()));
+  return spellings.some((spelling) => haystack.includes(spelling.replace(/\s+/g, '').toLowerCase()));
 }
 
 /** The identifiers, the parties and the dates of the invoice. */

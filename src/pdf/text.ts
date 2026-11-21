@@ -69,14 +69,14 @@ interface Raw {
   str: string;
 }
 
-/** The pieces of text of page `n`, in the order the PDF holds them; blank ones are left out. */
-async function piecesOf(page: PDFPageProxy, n: number): Promise<Raw[]> {
+/** The pieces of text of page `pageNumber`, in the order the PDF holds them; blank ones are left out. */
+async function piecesOf(page: PDFPageProxy, pageNumber: number): Promise<Raw[]> {
   return (await page.getTextContent()).items.flatMap((item) => {
     if (!('str' in item) || !item.str.trim()) return [];
     // Typesetting writes a negative amount with the minus sign (U+2212); everything that reads amounts expects a hyphen.
     const text = item.str.trim().replace(/−/g, '-');
     const piece = {
-      page: n,
+      page: pageNumber,
       x: item.transform[4],
       y: item.transform[5],
       width: item.width,
