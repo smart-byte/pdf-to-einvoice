@@ -365,7 +365,8 @@ function checkLineNet(line: Unchecked<Line>, i: number, { totals, slack, adjuste
   // With totals every line has its numbers; a line without a total of its own has nothing to compare.
   if (!isNumber(line.netAmount) || !isNumber(line.quantity) || !isNumber(line.unitPrice)) return [];
   const discount = totals.lineDiscounts[i];
-  if (lineAgrees(line.quantity, line.unitPrice, discount?.amount ?? 0, totals.lineNet[i]!, slack)) return [];
+  const priced = { quantity: line.quantity, unitPrice: line.unitPrice };
+  if (lineAgrees(priced, discount?.amount ?? 0, totals.lineNet[i]!, slack)) return [];
   // In cents, as the XML has it: 1 x 1.005 is 1.01, not 1.005.
   const expected = (lineBase(line.quantity, line.unitPrice) - (discount?.amount ?? 0)).toFixed(2);
   const stated = totals.lineNet[i]!.toFixed(2);
