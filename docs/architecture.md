@@ -28,7 +28,8 @@ flowchart LR
 ```
 
 1. **Read the page.** `extractLayout()` returns the text of the PDF row by row, and its blocks: the columns as the page
-   sets them. Nothing about invoices is known at this point.
+   sets them. Nothing about invoices is known at this point. A row is one line of text with three spaces between its
+   columns; `util/rows.ts` writes it for `pdf/` and takes it apart for the reader, since neither may use the other.
 2. **Read the invoice from it**, in one of two ways. `guessFromText()` finds values by pattern, without a model: three
    amounts with net + VAT = gross, rows that add up to them, a party under its label. A language model reads more, but
    may invent; `keepWhatThePdfShows()` drops every value it returned that the text of the page does not show. Either

@@ -5,9 +5,9 @@ import { readContact } from './guess/contact.js';
 import { readBuyerReference, readNumber, readPaymentTerms, readPeriod, readType } from './guess/head.js';
 import { NOTE_CATEGORIES, readItems, readVatNote } from './guess/items.js';
 import { believed, countryOfVatId, EU, type Found, ISSUER_OR_BANK, readParties } from './guess/parties.js';
-import { cells } from './guess/rows.js';
 import { findCurrency, readTotals, type Totals } from './guess/totals.js';
 import { after, anyOf, DATE, findIban, SEPARATOR, toIsoDate, vatIdsIn } from './guess/values.js';
+import { cells, rowOf } from '../util/rows.js';
 
 // Known limit: patterns for German, English and French invoices, no model. A value is believed for what it fits to, not
 // for where it stands: the totals are three printed amounts with net + VAT = gross, the items are rows that add up to
@@ -74,7 +74,7 @@ function partiesOf(
   found: { seller?: Found; buyer?: Found },
   lines: Partial<Line>[] | undefined,
 ): { seller: Partial<Party>; buyer: Partial<Party> } {
-  const units = [...rows, ...(blocks ?? []).map((block) => block.join('   '))];
+  const units = [...rows, ...(blocks ?? []).map(rowOf)];
   const vatIds = vatIdsOf(searched, units, found);
   const buyer: Partial<Party> = { ...believed(found.buyer), vatId: vatIds.buyer };
   const seller: Partial<Party> = { ...believed(found.seller), vatId: vatIds.seller };

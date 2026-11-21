@@ -1,4 +1,5 @@
 import { getDocument, type PDFPageProxy } from 'pdfjs-dist/legacy/build/pdf.mjs';
+import { rowOf } from '../util/rows.js';
 
 /** One piece of text as the PDF places it: in points, with the origin at the bottom left of its page. */
 export interface Piece {
@@ -53,7 +54,7 @@ export async function extractLayout(pdf: Uint8Array): Promise<Layout> {
       const pieces = await piecesOf(page, n);
       layout.pieces.push(...pieces.map((raw) => raw.piece));
       const rows = rowsOf(pieces);
-      lines.push(...rows.map((cells) => cells.map((cell) => cell.text).join('   ')));
+      lines.push(...rows.map((cells) => rowOf(cells.map((cell) => cell.text))));
       layout.blocks.push(...blocksOf(rows.flat()));
     }
     layout.text = lines.join('\n');
@@ -150,7 +151,7 @@ function blocksOf(cells: Cell[]): string[][] {
 
 /** Pieces whose baselines are closer than this (in points) belong to one row. */
 const ROW_TOLERANCE = 3;
-/** A horizontal gap wider than this (in points) separates two columns; it is written as three spaces. */
+/** A horizontal gap wider than this (in points) separates two columns; `rowOf` writes it. */
 const COLUMN_GAP = 12;
 /** Pieces closer than this share of their height touch: a PDF may split a word into pieces, which then join without a space. */
 const WORD_GAP = 0.1;

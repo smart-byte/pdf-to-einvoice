@@ -1,6 +1,7 @@
 import type { InvoiceType } from '../../domain/model.js';
 import { escapeRegExp } from '../../util/regexp.js';
-import { cells, KEY_VALUE, MAX_WRAPPED } from './rows.js';
+import { cells } from '../../util/rows.js';
+import { KEY_VALUE, MAX_WRAPPED } from './rows.js';
 import { after, anyOf, DATE, monthAs, monthNumber, pad, SEPARATOR, toIsoDate } from './values.js';
 
 // The head of the invoice: its number and type, its dates, the service period, the payment terms and the reference

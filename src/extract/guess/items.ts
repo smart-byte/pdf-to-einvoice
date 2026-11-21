@@ -1,7 +1,8 @@
 import { cents, lineBase, netOfGross, percentOf, perUnit } from '../../domain/money.js';
 import type { Line, VatCategory } from '../../domain/model.js';
 import { senderOf } from './parties.js';
-import { cells, KEY_VALUE, MAX_WRAPPED } from './rows.js';
+import { cells } from '../../util/rows.js';
+import { KEY_VALUE, MAX_WRAPPED } from './rows.js';
 import { rateOf, type Totals, TOTALS_CELL, TOTALS_ROW } from './totals.js';
 import { anyOf, CURRENCY, lastIndex, MONEY, toNumber } from './values.js';
 
