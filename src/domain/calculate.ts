@@ -97,19 +97,12 @@ function totalsOf(
 
   return {
     lineNet: lineCents.map(fromCents),
-    lineDiscounts: discounts.map(
-      (discount) => discount && { base: fromCents(discount.base), amount: fromCents(discount.amount) },
-    ),
+    lineDiscounts: discounts.map((discount) => discount && centsToNumbers(discount)),
     lineTotal: fromCents(lineTotal),
     allowances: fromCents(allowances),
     charges: fromCents(charges),
     adjustments: entries.map(adjustmentOf),
-    vatBreakdown: breakdown.map((group) => ({
-      category: group.category,
-      rate: group.rate,
-      taxable: fromCents(group.cents),
-      tax: fromCents(group.tax),
-    })),
+    vatBreakdown: breakdown.map(vatGroupOf),
     net: fromCents(net),
     vat: fromCents(vat),
     gross: fromCents(net + vat),
@@ -131,6 +124,16 @@ function vatGroupsOf(lines: Line[], lineCents: bigint[], entries: Entry[]): (Gro
       cents: entry.list === 'charges' ? entry.cents : -entry.cents,
     })),
   ]).map((group) => ({ ...group, tax: divRound(group.cents * micro(group.rate), 10n ** 8n) }));
+}
+
+/** A discount of a line, from cents into numbers. */
+function centsToNumbers({ base, amount }: { base: bigint; amount: bigint }): { base: number; amount: number } {
+  return { base: fromCents(base), amount: fromCents(amount) };
+}
+
+/** A VAT group as the totals state it: its base and its VAT, from cents into numbers. */
+function vatGroupOf(group: Group & { tax: bigint }): VatGroup {
+  return { category: group.category, rate: group.rate, taxable: fromCents(group.cents), tax: fromCents(group.tax) };
 }
 
 /** The amounts of the discounts or of the charges on the whole invoice. */
