@@ -16,18 +16,6 @@ export interface Visit {
   screen: string;
 }
 
-/** An address without its query string and fragment. */
-const plain = (address: string, base: string): string => {
-  try {
-    const url = new URL(address, base);
-    url.search = '';
-    url.hash = '';
-    return url.toString();
-  } catch {
-    return address;
-  }
-};
-
 /**
  * What is sent for a page view, or for something that happened (`name`, with its kind in `data`): where the page is
  * and where the visitor came from, both without query string and fragment, the title, the language and the size of
@@ -50,6 +38,18 @@ export function visitOf(visit: Visit, name?: string, data?: Record<string, strin
     screen: visit.screen,
     ...(name ? { name, data } : {}),
   };
+}
+
+/** An address without its query string and fragment. */
+function plain(address: string, base: string): string {
+  try {
+    const url = new URL(address, base);
+    url.search = '';
+    url.hash = '';
+    return url.toString();
+  } catch {
+    return address;
+  }
 }
 
 /**
