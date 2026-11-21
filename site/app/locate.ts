@@ -23,6 +23,55 @@ export interface LocateOptions {
   widthOf?: (text: string) => number;
 }
 
+/**
+ * Finds where a value is printed: the rectangles of all its occurrences among the pieces of a page, from top to
+ * bottom. Text is compared without regard to case and whitespace (an IBAN is printed in groups), a date
+ * (`YYYY-MM-DD`) and a number in the ways they are commonly printed. A value may span adjacent pieces of a row, and
+ * a text may wrap over rows; then each part gets its rectangle. A value that is not printed yields no rectangle.
+ */
+export function locate(pieces: Piece[], value: unknown, options: LocateOptions = {}): Rect[] {
+  const { beside, widthOf = (text: string) => text.length } = options;
+  const sought = soughtOf(value);
+  if (!sought) return [];
+  const { kind, spellings } = sought;
+  const needles = [...new Set(spellings.map(fold))].filter(Boolean);
+  const rows = rowsOf(pieces).filter(
+    (row) =>
+      !beside || beside.some((rect) => rect.y + rect.height / 2 > row.top && rect.y + rect.height / 2 < row.bottom),
+  );
+  const hits = rows.flatMap((row) => {
+    const found = needles.flatMap((needle) => hitsIn(row, needle, kind, widthOf)).sort((a, b) => a.x - b.x);
+    return beside ? besideOnly(row, found, beside) : found;
+  });
+  if (hits.length || kind !== 'text') return hits;
+  const find = (needle: string) => rows.flatMap((row) => hitsIn(row, needle, 'text', widthOf));
+  return wrapped(spellings[0]!.trim().split(/\s+/).map(fold), find).flat();
+}
+
+type Kind = 'number' | 'date' | 'text';
+
+/** What is looked for: the kind of a value and the ways it is printed; none for a value that is not printed. */
+function soughtOf(value: unknown): { kind: Kind; spellings: string[] } | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    const plain = String(Math.abs(value));
+    return { kind: 'number', spellings: [...amountSpellings(value), plain, plain.replace('.', ',')] };
+  }
+  if (typeof value !== 'string') return undefined;
+  if (/^\d{4}-(0[1-9]|1[0-2])-\d{2}$/.test(value)) return { kind: 'date', spellings: dateSpellings(value) };
+  return { kind: 'text', spellings: [value] };
+}
+
+/** The hits of a row of `beside` that are not on these places themselves, those to their right where there are some. */
+function besideOnly(row: Row, found: Rect[], beside: Rect[]): Rect[] {
+  const others = found.filter(
+    (hit) => !beside.some((rect) => bottom(rect) > row.top && rect.y < row.bottom && overlap(rect, hit)),
+  );
+  const right = others.filter((hit) =>
+    beside.some((rect) => bottom(rect) > row.top && rect.y < row.bottom && hit.x >= rect.x + rect.width),
+  );
+  return right.length ? right : others;
+}
+
 interface Row {
   /** The text of the row from left to right, lower case and without whitespace. */
   text: string;
@@ -32,17 +81,10 @@ interface Row {
   bottom: number;
 }
 
-const bottom = (rect: Rect) => rect.y + rect.height;
-const overlap = (a: Rect, b: Rect) => a.x < b.x + b.width && b.x < a.x + a.width;
-/** Lower case, letter by letter, so that a position in the result is a position in the original. */
-const fold = (text: string) => text.replace(/\s+/g, '').replace(/./gs, (letter) => letter.toLowerCase());
-/** The space that groups thousands, as in "1 783,81": it belongs to the number. */
-const GROUPING = /^\d[  ]\d{3}(?!\d)/;
-
 /** Pieces whose lower edges are close belong to one row, whatever the size of their letters. */
 function rowsOf(pieces: Piece[]): Row[] {
   const rows: Piece[][] = [];
-  for (const piece of pieces.filter((p) => p.text.trim()).sort((a, b) => bottom(a) - bottom(b))) {
+  for (const piece of pieces.filter((each) => each.text.trim()).sort((a, b) => bottom(a) - bottom(b))) {
     const row = rows.at(-1);
     if (row && bottom(piece) - bottom(row[0]!) < 0.4 * Math.min(piece.height, row[0]!.height)) row.push(piece);
     else rows.push([piece]);
@@ -64,29 +106,8 @@ function rowsOf(pieces: Piece[]): Row[] {
         }
       }
     }
-    return { text, chars, top: Math.min(...row.map((p) => p.y)), bottom: Math.max(...row.map(bottom)) };
+    return { text, chars, top: Math.min(...row.map((piece) => piece.y)), bottom: Math.max(...row.map(bottom)) };
   });
-}
-
-type Kind = 'number' | 'date' | 'text';
-const SEPARATOR = /[.,']/;
-
-/**
- * Whether characters `start` to `end` of a row are a value of their own and not a part of a longer one: "10" is not
- * found in "100,00", "3.11" not in "03.11.2026", "DE" not in "DE02 1203 …". A text may not continue as a word, a
- * number not as a number; what stands behind a space or in another piece does not continue anything.
- */
-function standsAlone({ text, chars }: Row, start: number, end: number, kind: Kind): boolean {
-  const part = kind === 'text' ? /[\p{L}\p{N}]/u : /\d/;
-  const before = (i: number) => (i >= 0 && !chars[i + 1]!.gap ? text[i]! : '');
-  const after = (i: number) => (i < text.length && !chars[i]!.gap ? text[i]! : '');
-  const [first, last] = [text[start]!, text[end - 1]!];
-  if (kind === 'number' && chars.slice(start + 1, end).some((char) => char.gap)) return false;
-  if (part.test(first) && part.test(before(start - 1))) return false;
-  if (part.test(last) && part.test(after(end))) return false;
-  if (/\d/.test(first) && SEPARATOR.test(before(start - 1)) && /\d/.test(before(start - 2))) return false;
-  if (/\d/.test(last) && SEPARATOR.test(after(end)) && /\d/.test(after(end + 1))) return false;
-  return true;
 }
 
 /** Every place in a row where `needle` stands: one rectangle around the parts of the pieces it covers. */
@@ -110,9 +131,23 @@ function hitsIn(row: Row, needle: string, kind: Kind, widthOf: (text: string) =>
   return hits;
 }
 
-/** A part of a wrapped text continues the one above: a row further down, in the same column. */
-const follows = (above: Rect, below: Rect) =>
-  below.y > above.y + above.height / 2 && below.y < above.y + 2.5 * above.height && overlap(above, below);
+/**
+ * Whether characters `start` to `end` of a row are a value of their own and not a part of a longer one: "10" is not
+ * found in "100,00", "3.11" not in "03.11.2026", "DE" not in "DE02 1203 …". A text may not continue as a word, a
+ * number not as a number; what stands behind a space or in another piece does not continue anything.
+ */
+function standsAlone({ text, chars }: Row, start: number, end: number, kind: Kind): boolean {
+  const part = kind === 'text' ? /[\p{L}\p{N}]/u : /\d/;
+  const before = (i: number) => (i >= 0 && !chars[i + 1]!.gap ? text[i]! : '');
+  const after = (i: number) => (i < text.length && !chars[i]!.gap ? text[i]! : '');
+  const [first, last] = [text[start]!, text[end - 1]!];
+  if (kind === 'number' && chars.slice(start + 1, end).some((char) => char.gap)) return false;
+  if (part.test(first) && part.test(before(start - 1))) return false;
+  if (part.test(last) && part.test(after(end))) return false;
+  if (/\d/.test(first) && SEPARATOR.test(before(start - 1)) && /\d/.test(before(start - 2))) return false;
+  if (/\d/.test(last) && SEPARATOR.test(after(end)) && /\d/.test(after(end + 1))) return false;
+  return true;
+}
 
 /**
  * The places of a text that wraps over rows: the longest run of its first words, then the rest below it, and so on.
@@ -134,42 +169,22 @@ function wrapped(words: string[], find: (needle: string) => Rect[], above?: Rect
   return [];
 }
 
-/**
- * Finds where a value is printed: the rectangles of all its occurrences among the pieces of a page, from top to
- * bottom. Text is compared without regard to case and whitespace (an IBAN is printed in groups), a date
- * (`YYYY-MM-DD`) and a number in the ways they are commonly printed. A value may span adjacent pieces of a row, and
- * a text may wrap over rows; then each part gets its rectangle. A value that is not printed yields no rectangle.
- */
-export function locate(pieces: Piece[], value: unknown, options: LocateOptions = {}): Rect[] {
-  const { beside, widthOf = (text: string) => text.length } = options;
-  let kind: Kind;
-  let spellings: string[];
-  if (typeof value === 'number' && Number.isFinite(value)) {
-    const plain = String(Math.abs(value));
-    [kind, spellings] = ['number', [...amountSpellings(value), plain, plain.replace('.', ',')]];
-  } else if (typeof value !== 'string') return [];
-  else if (/^\d{4}-(0[1-9]|1[0-2])-\d{2}$/.test(value)) [kind, spellings] = ['date', dateSpellings(value)];
-  else [kind, spellings] = ['text', [value]];
-  const needles = [...new Set(spellings.map(fold))].filter(Boolean);
+/** A part of a wrapped text continues the one above: a row further down, in the same column. */
+function follows(above: Rect, below: Rect): boolean {
+  return below.y > above.y + above.height / 2 && below.y < above.y + 2.5 * above.height && overlap(above, below);
+}
 
-  const rows = rowsOf(pieces).filter(
-    (row) =>
-      !beside || beside.some((rect) => rect.y + rect.height / 2 > row.top && rect.y + rect.height / 2 < row.bottom),
-  );
-  const hits = rows.flatMap((row) => {
-    const found = needles.flatMap((needle) => hitsIn(row, needle, kind, widthOf)).sort((a, b) => a.x - b.x);
-    if (!beside) return found;
-    const others = found.filter(
-      (hit) => !beside.some((rect) => bottom(rect) > row.top && rect.y < row.bottom && overlap(rect, hit)),
-    );
-    const right = others.filter((hit) =>
-      beside.some((rect) => bottom(rect) > row.top && rect.y < row.bottom && hit.x >= rect.x + rect.width),
-    );
-    return right.length ? right : others;
-  });
-  if (hits.length || kind !== 'text') return hits;
-  const find = (needle: string) => rows.flatMap((row) => hitsIn(row, needle, 'text', widthOf));
-  return wrapped(spellings[0]!.trim().split(/\s+/).map(fold), find).flat();
+function bottom(rect: Rect): number {
+  return rect.y + rect.height;
+}
+
+function overlap(a: Rect, b: Rect): boolean {
+  return a.x < b.x + b.width && b.x < a.x + a.width;
+}
+
+/** Lower case, letter by letter, so that a position in the result is a position in the original. */
+function fold(text: string): string {
+  return text.replace(/\s+/g, '').replace(/./gs, (letter) => letter.toLowerCase());
 }
 
 /**
@@ -181,3 +196,7 @@ export function pageToShow<Page>(pages: Page[], shown: number, has: (page: Page)
   const first = pages.findIndex(has);
   return first < 0 ? undefined : first;
 }
+
+/** The space that groups thousands, as in "1 783,81": it belongs to the number. */
+const GROUPING = /^\d[  ]\d{3}(?!\d)/;
+const SEPARATOR = /[.,']/;
