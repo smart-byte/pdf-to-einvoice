@@ -8,15 +8,6 @@ import { shownFormat, state } from './state.js';
 import { refreshXml } from './xml.js';
 import { describe, fieldLabel, formatMoney } from './wording.js';
 
-/** The field of a path; the first field of a line item, discount or charge for the path of all of it, or of a value of it the form does not show. */
-const fieldOf = (path: string) => {
-  const item = /^(lines|discounts|charges)\.\d+/.exec(path)?.[0];
-  return (
-    document.querySelector<HTMLElement>(`[data-path="${path}"]`) ??
-    (item ? document.querySelector<HTMLElement>(`[data-path^="${item}."]`) : null)
-  );
-};
-
 /** Checks the form and shows the result: a hint at each field, the totals, and a summary with what is left to do. */
 export function validate(): void {
   const result = (state.result = check(state.draft, {
@@ -68,8 +59,8 @@ function findingsToShow(result: CheckResult, unchecked: Finding[]): Finding[] {
 function renderHints(findings: Finding[], unchecked: Finding[]): void {
   for (const hint of document.querySelectorAll<HTMLElement>('[data-hint]')) {
     const path = hint.dataset.hint!;
-    const own = findings.filter((f) => f.path === path);
-    const worst = own.find((f) => f.severity === 'error') ?? own[0];
+    const own = findings.filter((finding) => finding.path === path);
+    const worst = own.find((finding) => finding.severity === 'error') ?? own[0];
     hint.textContent = worst ? describe(worst) : '';
     hint.className = `hint${worst ? ` hint--${worst.severity}` : ''}`;
     const input = document.querySelector<HTMLElement>(`[data-path="${path}"]`);
@@ -79,20 +70,23 @@ function renderHints(findings: Finding[], unchecked: Finding[]): void {
     if (hint.parentElement?.matches('.line'))
       hint.parentElement.classList.toggle(
         'line--check',
-        unchecked.some((f) => f.path === path),
+        unchecked.some((finding) => finding.path === path),
       );
     // A value that is still to be checked can be ticked off where it stands, without typing it again.
-    if (worst && unchecked.includes(worst) && state.mode === 'create') {
-      const ok = el('button', { type: 'button', className: 'ok' }, t('hint.ok'));
-      ok.setAttribute('aria-label', t('hint.ok.label', { f: fieldLabel(path) }));
-      ok.onclick = () => {
-        state.toCheck.delete(path);
-        validate();
-        fieldOf(path)?.focus();
-      };
-      hint.append(' ', ok);
-    }
+    if (worst && unchecked.includes(worst) && state.mode === 'create') hint.append(' ', confirmButton(path));
   }
+}
+
+/** The button that ticks off a value still to be checked, and goes back to its field. */
+function confirmButton(path: string): HTMLElement {
+  const ok = el('button', { type: 'button', className: 'ok' }, t('hint.ok'));
+  ok.setAttribute('aria-label', t('hint.ok.label', { f: fieldLabel(path) }));
+  ok.onclick = () => {
+    state.toCheck.delete(path);
+    validate();
+    fieldOf(path)?.focus();
+  };
+  return ok;
 }
 
 /** The calculated totals, each beside what the PDF or the XML states where the two differ. */
@@ -105,7 +99,7 @@ function renderTotals(result: CheckResult, findings: Finding[]): void {
   }
   const printed = (state.draft.totals ?? {}) as Record<string, number | undefined>;
   for (const key of ['net', 'vat', 'gross', 'due'] as const) {
-    const mismatch = findings.some((f) => f.path === `totals.${key}`);
+    const mismatch = findings.some((finding) => finding.path === `totals.${key}`);
     const row = el(
       'div',
       { className: `total${key === 'gross' ? ' total--main' : ''}${mismatch ? ' total--off' : ''}` },
@@ -133,9 +127,9 @@ function renderTotals(result: CheckResult, findings: Finding[]): void {
 
 /** The errors and the warnings of the summary. What a model added is one thing to check, however many values it is. */
 function summarise(findings: Finding[], unchecked: Finding[]): { errors: Finding[]; warnings: Finding[] } {
-  const errors = findings.filter((f) => f.severity === 'error');
-  const added = unchecked.filter((f) => f.code === 'model');
-  const warnings = findings.filter((f) => f.severity === 'warning' && !added.includes(f));
+  const errors = findings.filter((finding) => finding.severity === 'error');
+  const added = unchecked.filter((finding) => finding.code === 'model');
+  const warnings = findings.filter((finding) => finding.severity === 'warning' && !added.includes(finding));
   if (added.length)
     warnings.push({
       ...added[0]!,
@@ -147,9 +141,15 @@ function summarise(findings: Finding[], unchecked: Finding[]): { errors: Finding
 /** The summary: how many errors and warnings, and each of them as a link to its field. */
 function renderSummary(errors: Finding[], warnings: Finding[]): void {
   const summary = $('#summary');
-  summary.replaceChildren();
   const tone = warnings.length ? 'warning' : 'ok';
   summary.className = `summary summary--${errors.length ? 'error' : tone}`;
+  summary.replaceChildren(el('p', { className: 'summary__title' }, headlineOf(errors, warnings)));
+  const list = el('ul', {}, ...[...errors, ...warnings].map(summaryItem));
+  if (list.children.length) summary.append(list);
+}
+
+/** How many errors and warnings there are, or that all is well. */
+function headlineOf(errors: Finding[], warnings: Finding[]): string {
   const count = (key: string, n: number) => (n ? t(n === 1 ? `${key}.one` : key, { n }) : '');
   const headline = [
     count(state.mode === 'validate' ? 'valid.errors' : 'sum.errors', errors.length),
@@ -157,25 +157,34 @@ function renderSummary(errors: Finding[], warnings: Finding[]): void {
   ]
     .filter(Boolean)
     .join(' · ');
-  summary.append(
-    el('p', { className: 'summary__title' }, headline || t(state.mode === 'validate' ? 'sum.valid' : 'sum.ok')),
-  );
-  const list = el('ul');
-  for (const finding of [...errors, ...warnings]) {
-    // The sentence about what a model added speaks for all those values; it leads to the first of them.
-    const where = finding.code === 'model' ? '' : fieldLabel(finding.path);
-    const text = `${where ? `${where}: ` : ''}${describe(finding)}`;
-    const target = fieldOf(finding.path);
-    const item = el('li', { className: finding.severity });
-    if (target) {
-      const jump = el('button', { type: 'button', className: 'link' }, text);
-      jump.onclick = () => {
-        target.closest('details')?.setAttribute('open', '');
-        target.focus();
-      };
-      item.append(jump);
-    } else item.append(text);
-    list.append(item);
+  return headline || t(state.mode === 'validate' ? 'sum.valid' : 'sum.ok');
+}
+
+/** A finding of the summary, as a link to its field where it has one. */
+function summaryItem(finding: Finding): HTMLElement {
+  // The sentence about what a model added speaks for all those values; it leads to the first of them.
+  const where = finding.code === 'model' ? '' : fieldLabel(finding.path);
+  const text = `${where ? `${where}: ` : ''}${describe(finding)}`;
+  const target = fieldOf(finding.path);
+  const item = el('li', { className: finding.severity });
+  if (!target) {
+    item.append(text);
+    return item;
   }
-  if (list.children.length) summary.append(list);
+  const jump = el('button', { type: 'button', className: 'link' }, text);
+  jump.onclick = () => {
+    target.closest('details')?.setAttribute('open', '');
+    target.focus();
+  };
+  item.append(jump);
+  return item;
+}
+
+/** The field of a path; the first field of a line item, discount or charge for the path of all of it, or of a value of it the form does not show. */
+function fieldOf(path: string): HTMLElement | null {
+  const item = /^(lines|discounts|charges)\.\d+/.exec(path)?.[0];
+  return (
+    document.querySelector<HTMLElement>(`[data-path="${path}"]`) ??
+    (item ? document.querySelector<HTMLElement>(`[data-path^="${item}."]`) : null)
+  );
 }
