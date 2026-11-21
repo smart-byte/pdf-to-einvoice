@@ -2,6 +2,9 @@ import { isAbsolute } from 'node:path';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ErrorCode, ListToolsRequestSchema, McpError } from '@modelcontextprotocol/sdk/types.js';
+import { invoiceJsonSchema, type InvoiceDraft } from '../domain/model.js';
+import { InvoiceError } from '../generate/create.js';
+import { readEmbeddedXml } from '../pdf/file.js';
 import { messageOf } from '../util/errors.js';
 import {
   checkFile,
@@ -14,9 +17,6 @@ import {
   readPdf,
   validateFile,
 } from './files.js';
-import { InvoiceError } from '../generate/create.js';
-import { invoiceJsonSchema, type InvoiceDraft } from '../domain/model.js';
-import { readEmbeddedXml } from '../pdf/file.js';
 
 /** The MCP server, not yet connected to a transport. */
 export function createServer(): Server {
@@ -122,7 +122,8 @@ function choiceArg<K extends keyof typeof CHOICES>(args: Args, key: K): (typeof 
 }
 
 // What the model is told: how to use the tools, and what each takes. The functions above read these only when a
-// client asks, so they may stand below them; each stands below what it is built from.
+// client asks, so they may stand below them. They are built when the module loads: a constant stands below the
+// constants it is built from, and a function below what is built with it.
 
 const INSTRUCTIONS = `pdf-to-einvoice turns an existing invoice PDF into an EN 16931 e-invoice (ZUGFeRD / Factur-X): the invoice data is attached to the PDF as XML, the pages stay as they are. It also writes the data as an XRechnung, the XML German public bodies ask for. The tools run on the user's machine and send nothing. What you read through them is yours to handle: if your model runs elsewhere, the content of the invoice goes there, so do not tell the user that it stays on their machine unless that holds for you.
 
@@ -146,6 +147,9 @@ Rules:
 
 const { $schema: _dialect, ...INVOICE_SCHEMA } = invoiceJsonSchema;
 /** The same schema for a draft: nothing is required, so an incomplete invoice can be sent to learn what it lacks. */
+const DRAFT_SCHEMA = optional(INVOICE_SCHEMA);
+
+/** A schema without what it requires, at any depth. */
 function optional(schema: unknown): unknown {
   if (Array.isArray(schema)) return schema.map(optional);
   if (!schema || typeof schema !== 'object') return schema;
@@ -155,20 +159,11 @@ function optional(schema: unknown): unknown {
       .map(([key, value]) => [key, optional(value)]),
   );
 }
-const DRAFT_SCHEMA = optional(INVOICE_SCHEMA);
 
 // No tool reaches beyond this machine: files are read and written locally, nothing is sent anywhere.
 const READS = { readOnlyHint: true, openWorldHint: false };
 // A tool that creates writes one new file and replaces nothing unless `overwrite` is set.
 const WRITES = { readOnlyHint: false, destructiveHint: false, openWorldHint: false };
-
-function pathSchema(description: string) {
-  return { type: 'string', description: `${description} Absolute path.` };
-}
-
-function choiceSchema(key: keyof typeof CHOICES, description: string) {
-  return { type: 'string', enum: CHOICES[key], description };
-}
 
 const TOOLS = [
   {
@@ -249,3 +244,13 @@ const TOOLS = [
     inputSchema: { type: 'object', properties: { pdf_path: pathSchema('The e-invoice PDF.') }, required: ['pdf_path'] },
   },
 ];
+
+/** An argument of a tool that takes the path of a file. */
+function pathSchema(description: string) {
+  return { type: 'string', description: `${description} Absolute path.` };
+}
+
+/** An argument of a tool that takes one of a few words (see `CHOICES`). */
+function choiceSchema(key: keyof typeof CHOICES, description: string) {
+  return { type: 'string', enum: CHOICES[key], description };
+}
