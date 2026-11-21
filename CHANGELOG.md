@@ -22,6 +22,13 @@ All notable changes to this project are documented here. The format follows
   not by "110 %", "Stadt" not by "Musterstadt". The comparison of a model's answer finds an amount whose thousands are
   grouped by a space that does not break, and a rate printed as "7,50 %".
 
+- `check` words a total that contradicts the lines as what the XML states when the data was read from an existing
+  e-invoice (`adjustedLines` given), and the `params` of that finding name the `stated` total. `validateEInvoice`
+  replaced the text afterwards, so the values of the finding no longer matched it.
+- The web app shows what the check of an existing e-invoice found when it was opened and does not check its data a
+  second time. An e-invoice whose XML cannot be read is told so, without every field of the empty form reported as
+  missing.
+
 ### Fixed
 
 - `check` reports a text that is given as a number, a list or an object, such as a postal code written as `1234`

@@ -39,7 +39,8 @@ export interface CheckOptions {
    * For data read from an existing e-invoice (`readInvoiceXml`): the lines, counted from 0, whose total its XML
    * explains by what the data does not hold: more than one discount, a surcharge or a price for several units. A line
    * total that is not quantity times price less the discount is then a warning, since the standard does not forbid
-   * it, and none at all for these lines.
+   * it, and none at all for these lines. Giving them, even none, also says where the data comes from: a total that
+   * contradicts the lines is then worded as what the XML states, not as what a PDF prints.
    */
   adjustedLines?: number[];
   /**
@@ -371,7 +372,7 @@ function checkTotals(draft: Prepared, totals: Totals, options: CheckOptions): Fi
   const context = { totals, slack: slackOf(String(draft.currency)), adjustedLines: options.adjustedLines };
   for (const [i, line] of draft.lines.entries())
     findings.push(...checkDiscountAmount(line, i, context), ...checkLineNet(line, i, context));
-  findings.push(...checkPrintedTotals(draft, totals));
+  findings.push(...checkStatedTotals(draft, totals, options.adjustedLines !== undefined));
   return findings;
 }
 
@@ -411,20 +412,23 @@ function checkLineNet(line: Unchecked<Line>, i: number, { totals, slack, adjuste
   return adjustedLines.includes(i) ? [] : [warning(`lines.${i}.netAmount`, 'line-net.xml', params)];
 }
 
-/** The totals as printed against the calculated ones, to the cent. */
-function checkPrintedTotals(draft: Prepared, totals: Totals): Finding[] {
+/**
+ * The totals the data states against the calculated ones, to the cent. For data typed in from a PDF they are what the
+ * page prints; with `fromXml` both sides of a contradiction are in the XML of an existing e-invoice, and it is worded
+ * so.
+ */
+function checkStatedTotals(draft: Prepared, totals: Totals, fromXml: boolean): Finding[] {
   const findings: Finding[] = [];
   for (const key of ['net', 'vat', 'gross', 'due'] as const) {
-    const printed = draft.totals?.[key];
-    if (printed === undefined) continue;
-    if (!isNumber(printed)) findings.push(error(`totals.${key}`, 'format.number'));
-    else if (cents(printed) !== cents(totals[key])) {
+    const stated = draft.totals?.[key];
+    if (stated === undefined) continue;
+    if (!isNumber(stated)) findings.push(error(`totals.${key}`, 'format.number'));
+    else if (cents(stated) !== cents(totals[key])) {
+      const [calculated, adjusted] = [totals[key].toFixed(2), totals.adjustments.length > 0];
       findings.push(
-        error(`totals.${key}`, 'totals-mismatch', {
-          printed: printed.toFixed(2),
-          calculated: totals[key].toFixed(2),
-          adjusted: totals.adjustments.length > 0,
-        }),
+        fromXml
+          ? error(`totals.${key}`, 'totals-mismatch.xml', { stated: stated.toFixed(2), calculated, adjusted })
+          : error(`totals.${key}`, 'totals-mismatch', { printed: stated.toFixed(2), calculated, adjusted }),
       );
     }
   }

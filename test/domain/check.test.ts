@@ -610,6 +610,18 @@ describe('check', () => {
     expect(codesAt(draft, 'totals.gross')).toEqual(['error:totals-mismatch']);
   });
 
+  it('words a total that contradicts the lines for the XML the data was read from', () => {
+    // With `adjustedLines` the data comes from an existing e-invoice: both sides of the contradiction are in its XML.
+    const draft = withChange((d) => (d.totals.gross = 1800));
+    const [finding] = check(draft, { adjustedLines: [] }).findings.filter((f) => f.path === 'totals.gross');
+    expect(finding).toMatchObject({
+      code: 'totals-mismatch',
+      severity: 'error',
+      params: { stated: '1800.00', calculated: '1783.81', adjusted: false },
+    });
+    expect(finding!.message).toMatch(/^The XML states a total of 1800\.00, but its lines add up to 1783\.81\./);
+  });
+
   it('warns when an address is incomplete', () => {
     expect(
       codesAt(

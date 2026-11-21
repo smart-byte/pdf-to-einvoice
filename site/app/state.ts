@@ -10,6 +10,7 @@ interface State {
   draft: InvoiceDraft;
   /** Fields the user has typed into; reading the PDF again never overwrites them. */
   touched: Set<string>;
+  /** What the check found: of the form, each time it changes; of an existing e-invoice, once, when it was opened. */
   result?: CheckResult;
   /** Findings about the file itself, e.g. fonts that are not embedded. */
   fileFindings: Finding[];
@@ -23,10 +24,6 @@ interface State {
    * until the user changes the value or says it is right.
    */
   toCheck: Map<string, 'suggested' | 'inferred' | 'model'>;
-  /** Of an existing e-invoice: the lines whose total its XML explains by a discount, a surcharge or a price for several units. */
-  adjustedLines?: number[];
-  /** Of an existing e-invoice: percentages of discounts and charges its XML states, which the data holds as amounts only. */
-  percentages?: Record<string, number>;
 }
 export type Format = 'pdf' | 'xrechnung';
 export const state: State = {

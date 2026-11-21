@@ -1,5 +1,6 @@
 // Opening a PDF: reading its text and layout, guessing the invoice, or showing an existing e-invoice.
 import sampleUrl from '../../examples/sample-invoice.pdf?url';
+import type { Finding } from '../../src/domain/finding.js';
 import { guessFromText, languageOf } from '../../src/extract/guess.js';
 import { inspectPdf } from '../../src/pdf/file.js';
 import { extractLayout } from '../../src/pdf/text.js';
@@ -68,8 +69,7 @@ function startOver(pdf: Uint8Array, fileName: string, pdfText: string, mode: 'cr
     fileFindings: [],
     toCheck: new Map(),
     mode,
-    adjustedLines: undefined,
-    percentages: undefined,
+    result: undefined,
   });
 }
 
@@ -77,10 +77,11 @@ function startOver(pdf: Uint8Array, fileName: string, pdfText: string, mode: 'cr
 async function showExisting(pdf: Uint8Array, text: string): Promise<void> {
   const { validateEInvoice } = await import('../../src/inspect/validate.js');
   const result = await validateEInvoice(pdf, { pdfText: text });
+  const aboutFile = (finding: Finding) => FILE_CODES.has(finding.code);
   state.draft = result.invoice ?? {};
-  state.adjustedLines = result.adjustedLines ?? [];
-  state.percentages = result.percentages ?? {};
-  state.fileFindings = result.findings.filter((finding) => FILE_CODES.has(finding.code));
+  state.fileFindings = result.findings.filter(aboutFile);
+  // Nothing of an existing e-invoice can be changed, so what the check of its data found stays: it is not run again.
+  state.result = { findings: result.findings.filter((finding) => !aboutFile(finding)), totals: result.totals };
   $('#read-status').textContent = result.profile ? t('valid.profile', { p: result.profile }) : '';
 }
 

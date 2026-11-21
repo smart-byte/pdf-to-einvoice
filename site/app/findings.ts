@@ -10,13 +10,7 @@ import { describe, fieldLabel, formatMoney } from './wording.js';
 
 /** Checks the form and shows the result: a hint at each field, the totals, and a summary with what is left to do. */
 export function validate(): void {
-  const result = (state.result = check(state.draft, {
-    ...(state.pdf ? { pdfText: state.pdfText } : {}),
-    ...(shownFormat() === 'xrechnung' ? { rules: 'xrechnung' as const } : {}),
-    ...(state.mode === 'validate'
-      ? { adjustedLines: state.adjustedLines ?? [], percentages: state.percentages ?? {} }
-      : {}),
-  }));
+  const result = (state.result = checked());
   const unchecked = uncheckedFindings();
   const findings = findingsToShow(result, unchecked);
   renderHints(findings, unchecked);
@@ -28,6 +22,18 @@ export function validate(): void {
   $('#work-stamp').hidden = !(state.mode === 'validate' && errors.length === 0 && warnings.length === 0);
   renderMarks();
   refreshXml();
+}
+
+/**
+ * What the check says about the form as it is now. An existing e-invoice was checked when it was opened, with what
+ * its XML states beyond the data (open.ts), and nothing of it can change: that result stays.
+ */
+function checked(): CheckResult {
+  if (state.mode === 'validate' && state.result) return state.result;
+  return check(state.draft, {
+    ...(state.pdf ? { pdfText: state.pdfText } : {}),
+    ...(shownFormat() === 'xrechnung' ? { rules: 'xrechnung' as const } : {}),
+  });
 }
 
 /**
