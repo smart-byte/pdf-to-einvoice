@@ -67,6 +67,8 @@ describe('locate', () => {
   it('finds an amount however it is printed', () => {
     expect(locate(page, 1783.81)).toEqual([{ x: 520, y: 300, width: 80, height: 10 }]);
     expect(locate([piece('Total 1 783.81 EUR', 0, 0)], 1783.81)).toEqual([{ x: 60, y: 0, width: 80, height: 10 }]);
+    // Typesetting groups thousands with a space that does not break.
+    expect(locate([piece('Total 1\u00a0783.81 EUR', 0, 0)], 1783.81)).toEqual([{ x: 60, y: 0, width: 80, height: 10 }]);
     expect(locate([piece('1,5 Std.', 0, 0)], 1.5)).toEqual([{ x: 0, y: 0, width: 30, height: 10 }]);
   });
 
