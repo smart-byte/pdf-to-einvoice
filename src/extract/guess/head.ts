@@ -29,7 +29,10 @@ function datedAfter(searched: string, number: string): RegExpExecArray | undefin
   return after(searched, dated, DATE)[0]?.hit;
 }
 
-const isoDate = (hit: RegExpExecArray | null | undefined) => (hit ? toIsoDate(hit, false) : undefined);
+/** The date a match of `DATE` holds, read with the month first where it is written with slashes. */
+function isoDate(hit: RegExpExecArray | null | undefined): string | undefined {
+  return hit ? toIsoDate(hit, false) : undefined;
+}
 
 /** The kind of invoice the title names: the first cell that is a title, alone or with the number. */
 export function readType(rows: string[]): InvoiceType | undefined {
@@ -218,8 +221,6 @@ const PERIOD_LABEL = new RegExp(
     /period/,
   ),
 );
-/** A date written with dots, "01.10.2026", its parts in the groups `${end}Day`, `${end}Month` and `${end}Year`. */
-const dotted = (end: 'from' | 'to') => `(?<${end}Day>\\d{1,2})\\.(?<${end}Month>\\d{1,2})\\.(?<${end}Year>\\d{4})`;
 const PERIOD = new RegExp(
   `${SEPARATOR}(?:${[
     // A quarter: "Q3 2026", "3. Quartal 2026".
@@ -234,6 +235,13 @@ const PERIOD = new RegExp(
   ].join('|')})`,
   'i',
 );
+/**
+ * A date written with dots, "01.10.2026", its parts in the groups `${end}Day`, `${end}Month` and `${end}Year`. `PERIOD`
+ * is built with it when the module loads; it is a function declaration, so it may stand below.
+ */
+function dotted(end: 'from' | 'to'): string {
+  return `(?<${end}Day>\\d{1,2})\\.(?<${end}Month>\\d{1,2})\\.(?<${end}Year>\\d{4})`;
+}
 const UNTIL = '(?:-|–|bis|to|until)';
 const MONTH_RANGE = new RegExp(
   `${SEPARATOR}${monthAs('fromMonth')}\\s+(?<fromYear>\\d{4})\\s*${UNTIL}\\s*${monthAs('toMonth')}\\s+(?<toYear>\\d{4})`,
