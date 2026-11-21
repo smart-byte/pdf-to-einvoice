@@ -20,6 +20,16 @@ const samplePdf = () => new Uint8Array(file('sample-invoice.pdf'));
 const sampleData = (): InvoiceDraft => JSON.parse(file('sample-invoice.json').toString());
 const upload = (name: string, bytes: Uint8Array) => ({ name, mimeType: 'application/pdf', buffer: Buffer.from(bytes) });
 const bytesOf = async (download: Download) => new Uint8Array(readFileSync(await download.path()));
+/** What a model answers for the sample: every key of the schema in its order, with the one value the patterns do not read. */
+const modelAnswer = () => {
+  const filled = (schema: any, key = ''): unknown => {
+    if (schema.type === 'object')
+      return Object.fromEntries(Object.entries(schema.properties).map(([name, value]) => [name, filled(value, name)]));
+    if (schema.type === 'array') return [filled(schema.items), filled(schema.items)];
+    return key === 'email' ? 'rechnung@muster-software.example' : null;
+  };
+  return filled(extractionSchema());
+};
 const sha256 = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
 /** Which file the finished page offers first, and the checksum it shows for it. */
 const offered = (page: Page) =>
@@ -570,18 +580,9 @@ describe.skipIf(!asked)('the web app in a browser', () => {
   }, 120_000);
 
   it('shows how far a language model has come with its answer', async () => {
-    // What a model answers for the sample: every key of the schema in its order, with the one value the patterns do not read.
-    const filled = (schema: any, key = ''): unknown => {
-      if (schema.type === 'object')
-        return Object.fromEntries(
-          Object.entries(schema.properties).map(([name, value]) => [name, filled(value, name)]),
-        );
-      if (schema.type === 'array') return [filled(schema.items), filled(schema.items)];
-      return key === 'email' ? 'rechnung@muster-software.example' : null;
-    };
     // Stands in for the library that runs the model: no model is loaded, and the answer comes piece by piece.
     const library = `
-      const answer = ${JSON.stringify(JSON.stringify(filled(extractionSchema())))};
+      const answer = ${JSON.stringify(JSON.stringify(modelAnswer()))};
       export async function CreateWebWorkerMLCEngine(worker, id, { initProgressCallback }) {
         initProgressCallback({ progress: 1 });
         const pieces = async function* () {
@@ -623,6 +624,39 @@ describe.skipIf(!asked)('the web app in a browser', () => {
     expect(writing.at(-1)![1]).toBeGreaterThan(0.9);
     expect(await page.textContent('#ai-status')).toBe('Fertig. Die KI hat 1 Angabe ergänzt: Bitte prüfen Sie sie.');
     expect(await page.isVisible('#ai-loading')).toBe(false);
+  }, 120_000);
+
+  it('reads with a service of your own, and asks for its full address first', async () => {
+    const page = await open();
+    await read(page);
+    if (!(await page.isVisible('#ai-run'))) await page.click('.reader summary');
+    await page.selectOption('#ai-model', 'endpoint');
+    await page.click('#ai-run');
+    expect(await page.textContent('#ai-status')).toBe(
+      'Bitte geben Sie die Adresse Ihres Dienstes vollständig ein, mit http:// oder https:// am Anfang.',
+    );
+    expect(await page.evaluate(() => document.activeElement?.id)).toBe('ai-url');
+    // Stands in for the service.
+    let request: { model?: string } = {};
+    await page.route(/\/own-service\/v1\/chat\/completions$/, (route) => {
+      request = route.request().postDataJSON();
+      return route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({ choices: [{ message: { content: JSON.stringify(modelAnswer()) } }] }),
+      });
+    });
+    await page.fill('#ai-url', `${base}own-service/v1/`);
+    await page.fill('#ai-name', 'some-model');
+    await page.click('#ai-run');
+    await page.waitForFunction(() => document.querySelector('#ai-status')!.textContent!.startsWith('Fertig'), null, {
+      timeout: 30_000,
+    });
+    expect(request.model).toBe('some-model');
+    expect(await page.textContent('#ai-status')).toBe('Fertig. Die KI hat 1 Angabe ergänzt: Bitte prüfen Sie sie.');
+    expect(await page.isDisabled('#ai-run')).toBe(false);
+    // The text of the PDF goes to the service the user named, and nowhere else.
+    expect(problems).toEqual([`POST with data to ${base}own-service/v1/chat/completions`]);
+    problems = [];
   }, 120_000);
 
   it('has no page counter in a build that is not given one, and says so', async () => {
