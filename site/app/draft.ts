@@ -68,6 +68,13 @@ export function setPath(object: object, path: string, value: unknown): void {
 /** An object or a list of the draft, by key or index. */
 type Tree = Record<string, unknown>;
 
+/** How many values a draft holds: every text and number in it, at any depth. */
+export function countValues(draft: unknown): number {
+  if (typeof draft === 'string' || typeof draft === 'number') return 1;
+  if (!draft || typeof draft !== 'object') return 0;
+  return Object.values(draft).reduce<number>((count, value) => count + countValues(value), 0);
+}
+
 export function isEmpty(value: unknown): boolean {
   return value === undefined || value === null || value === '';
 }

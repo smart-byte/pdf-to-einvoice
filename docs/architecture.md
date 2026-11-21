@@ -95,7 +95,8 @@ not through its inner parts, so a layer can be rebuilt inside without changing i
 **A module is the unit of encapsulation.** TypeScript has no package-private: what a file exports, any file may import,
 and what it does not export, no other file can reach. Where Java has a class with private methods, this code has a file
 with exported and unexported functions. Variables that hold state, as in the web app, are not exported; other modules
-change them through a function of their owner.
+change them through a function of their owner. What the start page knows of its invoice (`site/app/state.ts`) is
+exported to be read, and changed only by the functions beside it.
 
 **Imports name the `.js` file.** `import { check } from './check.js'` refers to `check.ts`. TypeScript does not rewrite
 paths when it compiles, and Node needs the name of the file that exists at run time.

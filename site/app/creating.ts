@@ -2,7 +2,7 @@
 import type { Finding } from '../../src/domain/finding.js';
 import { countVisit } from '../shared/count.js';
 import { $, el, setText, show } from './dom.js';
-import { validate } from './findings.js';
+import { anythingFound, validate } from './findings.js';
 import { describe, fieldLabel, reasonOf } from './wording.js';
 import { t } from '../shared/i18n.js';
 import { pageDrawn } from './page.js';
@@ -32,7 +32,7 @@ async function create(): Promise<void> {
     noted = onceEach([...result.findings, ...(plain?.findings ?? [])]);
     renderNotes();
     // The stamp reads like a seal: it lands only where neither the check nor the writing of the file found anything.
-    $('#done .stamp').hidden = noted.length > 0 || document.querySelector('#summary li') !== null;
+    $('#done .stamp').hidden = noted.length > 0 || anythingFound();
     status.textContent = '';
     await copyPreview();
     show('done');

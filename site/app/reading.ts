@@ -1,12 +1,12 @@
 // Reading the invoice with a language model, in the browser or at an endpoint the user names.
 import { keepWhatThePdfShows } from '../../src/extract/ground.js';
 import { $, el } from './dom.js';
-import { merge, normaliseDraft } from './draft.js';
+import { normaliseDraft } from './draft.js';
 import { renderForm } from './form.js';
 import { lang, t } from '../shared/i18n.js';
 import { DEFAULT_MODEL, hasWebGpu, MODELS, readWithBrowserModel, readWithEndpoint } from './model/llm.js';
 import { scan } from './page.js';
-import { state } from './state.js';
+import { fill, state } from './state.js';
 
 const modelSelect = $<HTMLSelectElement>('#ai-model');
 /** Each reading has a number: only the last one may fill in the form, and one that was cancelled fills in nothing. */
@@ -108,8 +108,7 @@ function askModel(viaEndpoint: boolean, signal: AbortSignal) {
  * good part is wrong: every value the model added is marked until the user has looked at it.
  */
 function takeOver(answer: Awaited<ReturnType<typeof askModel>>): string {
-  const added = merge(state, keepWhatThePdfShows(normaliseDraft(answer), state.pdfText), { onlyEmpty: true });
-  for (const path of added) state.toCheck.set(path, 'model');
+  const added = fill(keepWhatThePdfShows(normaliseDraft(answer), state.pdfText), { onlyEmpty: true, why: 'model' });
   renderForm();
   // Counted as the verdict counts them: a value the form has no field for is not shown, so it is not counted.
   const counted = added.filter((path) => document.querySelector(`[data-hint="${path}"]`)).length;

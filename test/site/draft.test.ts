@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { merge, normaliseDraft } from '../../site/app/draft.js';
+import { countValues, merge, normaliseDraft } from '../../site/app/draft.js';
 import type { InvoiceDraft } from '../../src/domain/model.js';
 
 /** A draft and the fields the user has typed into, as the page holds them. */
@@ -57,5 +57,18 @@ describe('normaliseDraft', () => {
     expect(
       normaliseDraft({ lines: [{ name: '10', quantity: '2', unitPrice: '1.499,00' }], totals: { net: '2.998,00' } }),
     ).toMatchObject({ lines: [{ name: '10', quantity: 2, unitPrice: 1499 }], totals: { net: 2998 } });
+  });
+});
+
+describe('countValues', () => {
+  it('counts every text and number of a draft, at any depth', () => {
+    const draft = {
+      number: 'RE-1',
+      seller: { name: 'Muster GmbH', country: 'DE' },
+      lines: [{ name: 'Beratung', quantity: 2, unitPrice: -5 }, {}],
+      totals: { net: 0 },
+    };
+    expect(countValues(draft)).toBe(7);
+    expect(countValues({ lines: [{}] })).toBe(0);
   });
 });

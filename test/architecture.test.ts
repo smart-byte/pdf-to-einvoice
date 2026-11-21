@@ -150,6 +150,21 @@ describe('the parts of site/', () => {
     expect(stray).toEqual([]);
   });
 
+  it('changes what the start page knows of its invoice in state.ts only', () => {
+    // The type of `state` forbids replacing one of its fields, or adding to its set and its map. It cannot forbid
+    // reaching into the draft, so that is looked for here.
+    const WRITE =
+      /\bstate\.draft\b[\w.[\]?!]*\s*(?:\?\?=|\|\|=|=(?!=))|\b(?:setPath|merge|Object\.assign)\(\s*state\b|\bdelete\s+state\./;
+    const wrong = files
+      .filter((file) => partOf(file) === 'app' && !file.endsWith('/state.ts'))
+      .flatMap((file) =>
+        readFileSync(file, 'utf8')
+          .split('\n')
+          .flatMap((line, i) => (WRITE.test(line) ? [`${relative(site, file)}:${i + 1}: ${line.trim()}`] : [])),
+      );
+    expect(wrong).toEqual([]);
+  });
+
   it('imports only from the parts each part may use', () => {
     const wrong = files.flatMap((file) => {
       const path = relative(site, file);

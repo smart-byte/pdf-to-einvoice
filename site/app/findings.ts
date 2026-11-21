@@ -4,24 +4,34 @@ import type { Finding } from '../../src/domain/finding.js';
 import { $, el } from './dom.js';
 import { t } from '../shared/i18n.js';
 import { focusedPath, highlight, point, renderMarks, turnTo } from './page.js';
-import { shownFormat, state } from './state.js';
+import { confirm, setResult, shownFormat, state } from './state.js';
 import { refreshXml } from './xml.js';
 import { describe, fieldLabel, formatMoney } from './wording.js';
 
+/** How many errors and warnings the summary lists since the form was last checked. */
+let listed = 0;
+
 /** Checks the form and shows the result: a hint at each field, the totals, and a summary with what is left to do. */
 export function validate(): void {
-  const result = (state.result = checked());
+  const result = checked();
+  setResult(result);
   const unchecked = uncheckedFindings();
   const findings = findingsToShow(result, unchecked);
   renderHints(findings, unchecked);
   renderTotals(result, findings);
   const { errors, warnings } = summarise(findings, unchecked);
   renderSummary(errors, warnings);
+  listed = errors.length + warnings.length;
   $<HTMLButtonElement>('#create').disabled = errors.length > 0 || !state.pdf;
   // The stamp reads like a seal: an existing e-invoice gets it only where the check found nothing at all.
   $('#work-stamp').hidden = !(state.mode === 'validate' && errors.length === 0 && warnings.length === 0);
   renderMarks();
   refreshXml();
+}
+
+/** Whether the summary lists anything: an error, a warning, or a value still to be checked. */
+export function anythingFound(): boolean {
+  return listed > 0;
 }
 
 /**
@@ -88,7 +98,7 @@ function confirmButton(path: string): HTMLElement {
   const ok = el('button', { type: 'button', className: 'ok' }, t('hint.ok'));
   ok.setAttribute('aria-label', t('hint.ok.label', { f: fieldLabel(path) }));
   ok.onclick = () => {
-    state.toCheck.delete(path);
+    confirm(path);
     validate();
     fieldOf(path)?.focus();
   };

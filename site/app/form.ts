@@ -2,11 +2,11 @@
 import { INVOICE_TYPES, VAT_CATEGORIES } from '../../src/domain/model.js';
 import { $, el, setText } from './dom.js';
 import { valueAt } from '../../src/util/objects.js';
-import { isEmpty, setPath } from './draft.js';
+import { isEmpty } from './draft.js';
 import { validate } from './findings.js';
 import { t } from '../shared/i18n.js';
 import { focusedPath } from './page.js';
-import { type Format, shownFormat, state } from './state.js';
+import { addItem, chooseFormat, enter, type Format, removeItem, shownFormat, state } from './state.js';
 
 type FieldType = 'text' | 'date' | 'number' | 'select' | 'email' | 'tel' | 'textarea';
 interface Field {
@@ -31,7 +31,7 @@ type Section = { title: string; fields: Field[]; collapsed?: boolean };
 const formats = [...document.querySelectorAll<HTMLInputElement>('input[name="format"]')];
 for (const radio of formats) {
   radio.onchange = () => {
-    state.format = radio.value as Format;
+    chooseFormat(radio.value as Format);
     showFormat();
     renderForm();
   };
@@ -44,11 +44,7 @@ $('#form').addEventListener('input', (event) => {
   const input = event.target as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
   const path = input.dataset.path;
   if (!path) return;
-  setPath(state.draft, path, valueOf(input));
-  state.touched.add(path);
-  // Whoever changes a value has looked at it, and whoever changes a cell of a line has looked at the line.
-  state.toCheck.delete(path);
-  state.toCheck.delete(path.replace(/^(lines\.\d+)\..*$/, '$1'));
+  enter(path, valueOf(input));
   validate();
 });
 
@@ -111,13 +107,11 @@ function adjustmentSection(expanded: Expanded): HTMLElement[] {
 
 function renderLines(): HTMLElement {
   const list = el('div', { className: 'lines' });
-  const lines = (state.draft.lines ??= [{}]);
-  lines.forEach((_, i) => {
+  (state.draft.lines ?? []).forEach((_, i) => {
     const remove = el('button', { type: 'button', className: 'icon', title: t('l.remove', { n: i + 1 }) }, '×');
     remove.setAttribute('aria-label', t('l.remove', { n: i + 1 }));
     remove.onclick = () => {
-      lines.splice(i, 1);
-      moveUp('lines', i);
+      removeItem('lines', i);
       renderForm();
     };
     list.append(
@@ -134,8 +128,7 @@ function renderLines(): HTMLElement {
   });
   const add = el('button', { type: 'button', className: 'quiet' }, t('l.add'));
   add.onclick = () => {
-    lines.push({});
-    state.touched.add('lines.added');
+    addItem('lines');
     renderForm();
   };
   list.append(add, el('p', { className: 'hint', dataset: { hint: 'lines' } }));
@@ -145,14 +138,11 @@ function renderLines(): HTMLElement {
 /** The discounts or the charges on the whole invoice, one frame each, and a button for one more. */
 function renderAdjustments(list: 'discounts' | 'charges'): HTMLElement[] {
   const one = list === 'discounts' ? 'discount' : 'charge';
-  const entries = state.draft[list] ?? [];
-  const rows = entries.map((_, i) => {
+  const rows = (state.draft[list] ?? []).map((_, i) => {
     const remove = el('button', { type: 'button', className: 'icon', title: t(`a.remove.${one}`, { n: i + 1 }) }, '×');
     remove.setAttribute('aria-label', t(`a.remove.${one}`, { n: i + 1 }));
     remove.onclick = () => {
-      entries.splice(i, 1);
-      if (!entries.length) delete state.draft[list];
-      moveUp(list, i);
+      removeItem(list, i);
       renderForm();
     };
     return el(
@@ -166,26 +156,11 @@ function renderAdjustments(list: 'discounts' | 'charges'): HTMLElement[] {
   });
   const add = el('button', { type: 'button', className: 'quiet' }, t(`a.add.${one}`));
   add.onclick = () => {
-    const added = (state.draft[list] ??= []).push({}) - 1;
-    state.touched.add(`${list}.added`);
+    const added = addItem(list);
     renderForm();
     document.querySelector<HTMLElement>(`[data-path="${list}.${added}.reason"]`)?.focus();
   };
   return [...rows, add, el('p', { className: 'hint', dataset: { hint: list } })];
-}
-
-/** Item `i` of a list is gone: the items below move up by one, and what was typed or is still to be checked moves with them. */
-function moveUp(list: string, i: number): void {
-  const moved = (path: string): string[] => {
-    const at = new RegExp(`^${list}\\.(\\d+)(.*)$`).exec(path);
-    if (!at || Number(at[1]) < i) return [path];
-    return Number(at[1]) === i ? [] : [`${list}.${Number(at[1]) - 1}${at[2]}`];
-  };
-  state.toCheck = new Map(
-    [...state.toCheck].flatMap(([path, why]) => moved(path).map((to): [string, typeof why] => [to, why])),
-  );
-  state.touched = new Set([...state.touched].flatMap(moved));
-  state.touched.add(`${list}.removed`);
 }
 
 /** Read only rather than disabled: a field can still take the focus, which shows where its value stands on the page. */
