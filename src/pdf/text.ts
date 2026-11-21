@@ -1,4 +1,4 @@
-import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
+import { getDocument, type PDFPageProxy } from 'pdfjs-dist/legacy/build/pdf.mjs';
 
 /** One piece of text as the PDF places it: in points, with the origin at the bottom left of its page. */
 export interface Piece {
@@ -25,21 +25,66 @@ export interface Layout {
   pages: { width: number; height: number }[];
 }
 
-/** Pieces whose baselines are closer than this (in points) belong to one row. */
-const ROW_TOLERANCE = 3;
-/** A horizontal gap wider than this (in points) separates two columns; it is written as three spaces. */
-const COLUMN_GAP = 12;
-/** Pieces closer than this share of their height touch: a PDF may split a word into pieces, which then join without a space. */
-const WORD_GAP = 0.1;
-/** Lines of one block start at the same left edge, give or take this many points. */
-const EDGE_TOLERANCE = 2;
-/** Lines of one block are at most this many line heights apart; an address may be set with double spacing. */
-const LINE_GAP = 2.5;
+/**
+ * Returns the text of a PDF as people read it: one line per printed row, the
+ * pieces of a row from left to right with three spaces between columns, pages one after another. A scanned PDF
+ * without a text layer yields an empty string.
+ */
+export async function extractText(pdf: Uint8Array): Promise<string> {
+  return (await extractLayout(pdf)).text;
+}
+
+/**
+ * Reads the text of a PDF with its layout: row by row, block by block and piece by piece. A scanned PDF without a
+ * text layer yields empty text and no pieces.
+ */
+export async function extractLayout(pdf: Uint8Array): Promise<Layout> {
+  // pdf.js takes ownership of the bytes it is given, so it gets a copy: a plain Uint8Array, which is what it accepts,
+  // also when the caller passed a Node Buffer (whose slice() would be a Buffer on the same memory).
+  const task = getDocument({ data: new Uint8Array(pdf), verbosity: 0, useSystemFonts: true });
+  const doc = await task.promise;
+  try {
+    const layout: Layout = { text: '', blocks: [], pieces: [], pages: [] };
+    const lines: string[] = [];
+    for (let n = 1; n <= doc.numPages; n++) {
+      const page = await doc.getPage(n);
+      const { width, height } = page.getViewport({ scale: 1 });
+      layout.pages.push({ width, height });
+      const pieces = await piecesOf(page, n);
+      layout.pieces.push(...pieces.map((raw) => raw.piece));
+      const rows = rowsOf(pieces);
+      lines.push(...rows.map((cells) => cells.map((cell) => cell.text).join('   ')));
+      layout.blocks.push(...blocksOf(rows.flat()));
+    }
+    layout.text = lines.join('\n');
+    return layout;
+  } finally {
+    await task.destroy();
+  }
+}
 
 /** A piece with its text as the PDF holds it: the spaces it starts or ends with tell words apart. */
 interface Raw {
   piece: Piece;
   str: string;
+}
+
+/** The pieces of text of page `n`, in the order the PDF holds them; blank ones are left out. */
+async function piecesOf(page: PDFPageProxy, n: number): Promise<Raw[]> {
+  return (await page.getTextContent()).items.flatMap((item) => {
+    if (!('str' in item) || !item.str.trim()) return [];
+    // Typesetting writes a negative amount with the minus sign (U+2212); everything that reads amounts expects a hyphen.
+    const text = item.str.trim().replace(/−/g, '-');
+    const piece = {
+      page: n,
+      x: item.transform[4],
+      y: item.transform[5],
+      width: item.width,
+      height: item.height,
+      text,
+    };
+    return [{ piece, str: item.str }];
+  });
 }
 
 /** A run of pieces in one row without a column gap between them. */
@@ -48,6 +93,18 @@ interface Cell {
   y: number;
   height: number;
   text: string;
+}
+
+/** The cells of each printed row of a page, from the top down: pieces whose baselines are close form one row. */
+function rowsOf(pieces: Raw[]): Cell[][] {
+  pieces.sort((a, b) => b.piece.y - a.piece.y || a.piece.x - b.piece.x);
+  const rows: Raw[][] = [];
+  for (const raw of pieces) {
+    const row = rows.at(-1);
+    if (row && Math.abs(row[0]!.piece.y - raw.piece.y) <= ROW_TOLERANCE) row.push(raw);
+    else rows.push([raw]);
+  }
+  return rows.map((row) => cellsOf(row));
 }
 
 /** Splits the pieces of one row, left to right, into cells at the column gaps. */
@@ -91,67 +148,13 @@ function blocksOf(cells: Cell[]): string[][] {
   return blocks.map((block) => block.map((cell) => cell.text));
 }
 
-/**
- * Reads the text of a PDF with its layout: row by row, block by block and piece by piece. A scanned PDF without a
- * text layer yields empty text and no pieces.
- */
-export async function extractLayout(pdf: Uint8Array): Promise<Layout> {
-  // pdf.js takes ownership of the bytes it is given, so it gets a copy: a plain Uint8Array, which is what it accepts,
-  // also when the caller passed a Node Buffer (whose slice() would be a Buffer on the same memory).
-  const task = getDocument({ data: new Uint8Array(pdf), verbosity: 0, useSystemFonts: true });
-  const doc = await task.promise;
-  try {
-    const layout: Layout = { text: '', blocks: [], pieces: [], pages: [] };
-    const lines: string[] = [];
-    for (let n = 1; n <= doc.numPages; n++) {
-      const page = await doc.getPage(n);
-      const { width, height } = page.getViewport({ scale: 1 });
-      layout.pages.push({ width, height });
-      const content = await page.getTextContent();
-      const pieces: Raw[] = [];
-      for (const item of content.items) {
-        if (!('str' in item) || !item.str.trim()) continue;
-        // Typesetting writes a negative amount with the minus sign (U+2212); everything that reads amounts expects a hyphen.
-        const text = item.str.trim().replace(/−/g, '-');
-        const piece = {
-          page: n,
-          x: item.transform[4],
-          y: item.transform[5],
-          width: item.width,
-          height: item.height,
-          text,
-        };
-        pieces.push({ piece, str: item.str });
-        layout.pieces.push(piece);
-      }
-      pieces.sort((a, b) => b.piece.y - a.piece.y || a.piece.x - b.piece.x);
-      const cells: Cell[] = [];
-      let row: Raw[] = [];
-      const flush = () => {
-        const rowCells = cellsOf(row);
-        if (rowCells.length) lines.push(rowCells.map((cell) => cell.text).join('   '));
-        cells.push(...rowCells);
-        row = [];
-      };
-      for (const raw of pieces) {
-        if (row.length && Math.abs(row[0]!.piece.y - raw.piece.y) > ROW_TOLERANCE) flush();
-        row.push(raw);
-      }
-      flush();
-      layout.blocks.push(...blocksOf(cells));
-    }
-    layout.text = lines.join('\n');
-    return layout;
-  } finally {
-    await task.destroy();
-  }
-}
-
-/**
- * Returns the text of a PDF as people read it: one line per printed row, the
- * pieces of a row from left to right with three spaces between columns, pages one after another. A scanned PDF
- * without a text layer yields an empty string.
- */
-export async function extractText(pdf: Uint8Array): Promise<string> {
-  return (await extractLayout(pdf)).text;
-}
+/** Pieces whose baselines are closer than this (in points) belong to one row. */
+const ROW_TOLERANCE = 3;
+/** A horizontal gap wider than this (in points) separates two columns; it is written as three spaces. */
+const COLUMN_GAP = 12;
+/** Pieces closer than this share of their height touch: a PDF may split a word into pieces, which then join without a space. */
+const WORD_GAP = 0.1;
+/** Lines of one block start at the same left edge, give or take this many points. */
+const EDGE_TOLERANCE = 2;
+/** Lines of one block are at most this many line heights apart; an address may be set with double spacing. */
+const LINE_GAP = 2.5;
