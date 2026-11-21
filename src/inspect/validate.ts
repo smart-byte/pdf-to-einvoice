@@ -1,9 +1,10 @@
 import type { Totals } from '../domain/calculate.js';
 import { check } from '../domain/check.js';
-import { error, warning, type Finding } from '../domain/finding.js';
+import type { Finding } from '../domain/finding.js';
 import type { InvoiceDraft } from '../domain/model.js';
 import { inspectPdf, type PdfInfo } from '../pdf/file.js';
 import { messageOf } from '../util/errors.js';
+import { error, warning } from './messages.js';
 import { readInvoiceXml } from './read-xml.js';
 
 export interface ValidationResult {

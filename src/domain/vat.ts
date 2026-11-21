@@ -1,4 +1,5 @@
-import { error, type Finding } from './finding.js';
+import type { Finding } from './finding.js';
+import { error } from './messages.js';
 import type { VatCategory } from './model.js';
 
 /**

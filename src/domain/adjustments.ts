@@ -1,7 +1,8 @@
 // Discounts and charges on the whole invoice (BG-20, BG-21): what each needs by itself, and how it goes into the VAT
 // groups of the lines, by percentage or by amount, with what is wrong with it.
 import { isNumber } from '../util/numbers.js';
-import { error, warning, type Finding } from './finding.js';
+import type { Finding } from './finding.js';
+import { error, warning } from './messages.js';
 import {
   isVatCategory,
   type DocumentAllowance,

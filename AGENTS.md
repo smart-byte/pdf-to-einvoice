@@ -37,13 +37,15 @@ in a folder of its name (`guess.ts`, `guess/`); only that file and the parts the
 |                      | (`calculate.ts`) with the discounts and charges on the whole invoice (`adjustments.ts`), the rules |                  |
 |                      | the data has to meet (`check.ts`), the one rule for a VAT rate both use (`vat.ts`), the shape of a |                  |
 |                      | date, an IBAN, an ID or an e-mail address (`formats.ts`), how a date or an amount is printed       |                  |
-|                      | (`spellings.ts`), whether the text of a page shows a value (`shown.ts`), `Finding`, what all of    |                  |
-|                      | them report (`finding.ts`), and the English text of every finding (`messages.ts`)                  |                  |
+|                      | (`spellings.ts`), whether the text of a page shows a value (`shown.ts`), `Finding`, what every     |                  |
+|                      | layer reports (`finding.ts`), and the English text of what this one reports (`messages.ts`)        |                  |
 | `src/pdf/`           | text and layout of a PDF (`text.ts`), its structure, embedded XML and PDF/A repair (`file.ts`)     | nothing else     |
 | `src/extract/`       | reading an invoice from the text without a model (`guess.ts`, parts in `guess/`), dropping         | domain           |
 |                      | what a language model returned but the PDF does not show (`ground.ts`)                             |                  |
-| `src/generate/`      | the XML (`ubl.ts`) and the e-invoice, in the PDF/A-3 or alone as XRechnung (`create.ts`)           | domain, pdf      |
-| `src/inspect/`       | reading (`read-xml.ts`) and checking (`validate.ts`) an existing e-invoice                         | domain, pdf      |
+| `src/generate/`      | the XML (`ubl.ts`) and the e-invoice, in the PDF/A-3 or alone as XRechnung (`create.ts`), and the  | domain, pdf      |
+|                      | English text of what writing reports (`messages.ts`)                                               |                  |
+| `src/inspect/`       | reading (`read-xml.ts`) and checking (`validate.ts`) an existing e-invoice, and the English text   | domain, pdf      |
+|                      | of what is reported about the file (`messages.ts`)                                                 |                  |
 | `src/adapters/`      | command line (`cli.ts`), MCP server (`mcp.ts`), and the work with files on disk both share         | all of the above |
 |                      | (`files.ts`); `server.json` describes the server for registries                                    |                  |
 | `src/util/`          | small helpers without a subject of their own (`escapeRegExp`, `isNumber`, `messageOf`,             | nothing else     |
@@ -66,9 +68,10 @@ in a folder of its name (`guess.ts`, `guess/`); only that file and the parts the
   missing one.
 - A change to how files are written comes with `npm run test:reference`.
 - A change to the website comes with `npm run test:browser`; a new flow gets a test in `test/site/browser.test.ts`.
-- A finding gets its code and its English text from `src/domain/messages.ts`, through `error()` and `warning()` of
-  `src/domain/finding.ts`. A new code needs a German text in `site/shared/i18n.ts`; `test/site/i18n.test.ts` says
-  which.
+- A finding gets its code and its English text from the catalog of its layer, the `messages.ts` beside the code that
+  reports it (`src/domain/`, `src/generate/`, `src/inspect/`), through the `error()` and `warning()` that catalog
+  exports. What is said about invoice data belongs to `src/domain/`, what is said about a file to the layer that reads
+  or writes it. A new code needs a German text in `site/shared/i18n.ts`; `test/site/i18n.test.ts` says which.
 - Money is calculated in whole cents (`src/domain/money.ts`), never in floating point euros.
 - oxlint caps how complex, how deeply nested and how long a function may be and how many parameters it takes, at the
   highest value in the code when the caps were set (`.oxlintrc.json`). A change that splits the function holding a

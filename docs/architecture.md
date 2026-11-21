@@ -68,15 +68,15 @@ this tool writes.
 other,
 however indirectly.
 
-| layer           | holds                                                                                       | may import        |
-| --------------- | ------------------------------------------------------------------------------------------- | ----------------- |
-| `src/adapters/` | command line, MCP server, and the work with files on disk both share                        | all other layers  |
-| `src/inspect/`  | reading and checking an existing e-invoice                                                  | domain, pdf, util |
-| `src/generate/` | the UBL document and the e-invoice file                                                     | domain, pdf, util |
-| `src/extract/`  | invoice data from the text of a PDF                                                         | domain, util      |
-| `src/pdf/`      | the text, the layout and the structure of a PDF; knows nothing of invoices                  | util              |
-| `src/domain/`   | the data model, the rules, the totals, the findings and their texts; knows nothing of files | util              |
-| `src/util/`     | small helpers without a subject of their own                                                | nothing           |
+| layer           | holds                                                                                   | may import        |
+| --------------- | --------------------------------------------------------------------------------------- | ----------------- |
+| `src/adapters/` | command line, MCP server, and the work with files on disk both share                    | all other layers  |
+| `src/inspect/`  | reading and checking an existing e-invoice                                              | domain, pdf, util |
+| `src/generate/` | the UBL document and the e-invoice file                                                 | domain, pdf, util |
+| `src/extract/`  | invoice data from the text of a PDF                                                     | domain, util      |
+| `src/pdf/`      | the text, the layout and the structure of a PDF; knows nothing of invoices              | util              |
+| `src/domain/`   | the data model, the rules, the totals, the findings on the data; knows nothing of files | util              |
+| `src/util/`     | small helpers without a subject of their own                                            | nothing           |
 
 A file that has grown parts keeps them in a folder of its name, as `extract/guess.ts` does in `extract/guess/`. Only
 that file and the parts themselves import them; what another file or the web app needs of them belongs to a layer
@@ -114,9 +114,11 @@ like); after `check()` it is an `Invoice` whose types hold.
 zero; `domain/calculate.ts` sums the totals with it, `domain/adjustments.ts` the discounts and charges on the whole
 invoice. Other code formats amounts and compares them in cents with `cents()`, it does not calculate with them.
 
-**A finding has a code and a text from the catalog.** `error(path, key, values)` and `warning(...)` in
-`domain/finding.ts` take both from `domain/messages.ts`. The code is stable: the web app shows a German text for it from
-`site/shared/i18n.ts`, and other front ends may do the same.
+**A finding has a code and a text from a catalog.** Each layer that reports findings has one, its `messages.ts`:
+`domain/` for what is wrong with invoice data, `generate/` and `inspect/` for what they say about a file.
+`catalog()` in `domain/finding.ts` makes the `error(path, key, values)` and `warning(...)` of a catalog, which take
+code and text from it. The code is stable: the web app shows a German text for it from `site/shared/i18n.ts`, and
+other front ends may do the same.
 
 **A reader does not guess.** `guessFromText()` believes a value for what it fits to, not for where it stands, and
 leaves out what does not fit. A missing value is filled in by a person; a wrong one may go unnoticed. A change to the
