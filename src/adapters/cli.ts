@@ -88,35 +88,10 @@ function reportFailure(e: unknown, io: Io): void {
   }
 }
 
-type Values = { output?: string; force?: boolean; pdf?: string; json?: boolean } & {
-  [K in keyof typeof CHOICES]?: (typeof CHOICES)[K][number];
-};
-type Command = { args: number; run: (args: string[], values: Values, io: Io) => Promise<number> };
-type Args<N extends number> = N extends 2 ? [string, string] : N extends 1 ? [string] : [];
-
-/** A command that takes `count` arguments. `run` checks the count before `execute` gets them, so each is there. */
-function defineCommand<N extends 0 | 1 | 2>(
-  count: N,
-  execute: (args: Args<N>, values: Values, io: Io) => Promise<number>,
-): Command {
-  return { args: count, run: execute as Command['run'] };
-}
-
-function printFindings({ findings, totals }: { findings: Finding[]; totals?: Totals }, io: Io): void {
-  io.stdout(findings.length ? `${findings.map(formatFinding).join('\n')}\n` : 'No findings.\n');
-  if (totals)
-    io.stdout(
-      `${(['net', 'vat', 'gross', 'due'] as const).map((key) => `${key} ${totals[key].toFixed(2)}`).join('\n')}\n`,
-    );
-}
-
-function formatFinding(finding: Finding): string {
-  return `${finding.severity}${finding.path ? ` ${finding.path}` : ''}: ${finding.message}`;
-}
-
-// The commands, options and usage. `run` reads them; the program below runs it when the module loads, so they stand
-// above it.
-
+/**
+ * The commands by name. Each is made with `defineCommand`, below. `run` reads them, and the program at the end of this
+ * file runs it when the module loads, so they stand above it.
+ */
 const COMMANDS: Record<string, Command> = {
   create: defineCommand(2, async ([pdfPath, dataPath], values, io) => {
     const result = await createFile(pdfPath, await readJson(dataPath), {
@@ -182,6 +157,35 @@ const COMMANDS: Record<string, Command> = {
     return 0;
   }),
 };
+
+type Values = { output?: string; force?: boolean; pdf?: string; json?: boolean } & {
+  [K in keyof typeof CHOICES]?: (typeof CHOICES)[K][number];
+};
+type Command = { args: number; run: (args: string[], values: Values, io: Io) => Promise<number> };
+type Args<N extends number> = N extends 2 ? [string, string] : N extends 1 ? [string] : [];
+
+/** A command that takes `count` arguments. `run` checks the count before `execute` gets them, so each is there. */
+function defineCommand<N extends 0 | 1 | 2>(
+  count: N,
+  execute: (args: Args<N>, values: Values, io: Io) => Promise<number>,
+): Command {
+  return { args: count, run: execute as Command['run'] };
+}
+
+function printFindings({ findings, totals }: { findings: Finding[]; totals?: Totals }, io: Io): void {
+  io.stdout(findings.length ? `${findings.map(formatFinding).join('\n')}\n` : 'No findings.\n');
+  if (totals)
+    io.stdout(
+      `${(['net', 'vat', 'gross', 'due'] as const).map((key) => `${key} ${totals[key].toFixed(2)}`).join('\n')}\n`,
+    );
+}
+
+function formatFinding(finding: Finding): string {
+  return `${finding.severity}${finding.path ? ` ${finding.path}` : ''}: ${finding.message}`;
+}
+
+// The options and the usage. `run` and its helpers read them; the program below runs `run` when the module loads, so
+// they stand above it.
 
 const OPTIONS = {
   output: { type: 'string', short: 'o' },
