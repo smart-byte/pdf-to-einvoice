@@ -12,64 +12,6 @@ import { validateEInvoice, type ValidationResult } from '../inspect/validate.js'
 import { inspectPdf } from '../pdf/file.js';
 import { extractLayout, extractText } from '../pdf/text.js';
 import { messageOf } from '../util/errors.js';
-export const readPdf = async (path: string) => new Uint8Array(await readFile(path));
-
-export const packageVersion = (): string =>
-  JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')).version;
-
-export async function readJson(path: string): Promise<InvoiceDraft> {
-  const text = await readFile(path, 'utf8');
-  try {
-    return JSON.parse(text);
-  } catch (e) {
-    throw new Error(`${path} is not valid JSON: ${messageOf(e)}`, { cause: e });
-  }
-}
-
-/** The text of an invoice PDF, the values guessed from it, and what matters about the file. */
-export async function describePdf(pdfPath: string) {
-  const pdf = await readPdf(pdfPath);
-  const info = await inspectPdf(pdf);
-  const { text, blocks } = await extractLayout(pdf);
-  return {
-    text,
-    guess: guessFromText(text, { blocks }),
-    pdf: { pages: info.pages, unembeddedFonts: info.unembeddedFonts, isEInvoice: info.embeddedXml !== null },
-  };
-}
-
-/** Where the e-invoice goes when no output is named: invoice.pdf becomes invoice.einvoice.pdf. */
-export const defaultOutput = (pdfPath: string) => pdfPath.replace(/(\.pdf)?$/i, '.einvoice.pdf');
-
-/** True if both paths name one file, also through a symlink, a hard link or different letter case. */
-export function sameFile(a: string, b: string): boolean {
-  if (resolve(a) === resolve(b)) return true;
-  if (!existsSync(a) || !existsSync(b)) return false;
-  const [one, other] = [statSync(a, { bigint: true }), statSync(b, { bigint: true })];
-  return one.dev === other.dev && one.ino === other.ino;
-}
-
-/**
- * Whether an error says that the output is there already: refused before writing because `overwrite` is not set, or
- * by the file system, where the file appeared in the meantime.
- */
-export const outputExists = (e: unknown): boolean => e instanceof Error && 'code' in e && e.code === 'EEXIST';
-
-/**
- * The output path, resolved, after making sure it may be written: never the input, `input` (`what` says which one
- * it is), and an existing file only with `overwrite`.
- */
-function outputFor(outputPath: string, input: { path?: string; what: string }, overwrite: boolean): string {
-  const output = resolve(outputPath);
-  if (input.path !== undefined && sameFile(output, input.path))
-    throw new Error(`The output path is ${input.what}. Choose another output path; the input is never overwritten.`);
-  if (!overwrite && existsSync(output)) throw Object.assign(new Error(`${output} already exists.`), { code: 'EEXIST' });
-  return output;
-}
-
-/** Writes the file, without `overwrite` only where none is there yet, even one that appeared since it was checked. */
-const writeOutput = (output: string, data: string | Uint8Array, overwrite: boolean) =>
-  writeFile(output, data, { flag: overwrite ? 'w' : 'wx' });
 
 /**
  * Creates the e-invoice and writes it to disk. Never writes over the input,
@@ -112,6 +54,44 @@ export async function createXRechnungFile(
 }
 
 /**
+ * The output path, resolved, after making sure it may be written: never the input, `input` (`what` says which one
+ * it is), and an existing file only with `overwrite`.
+ */
+function outputFor(outputPath: string, input: { path?: string; what: string }, overwrite: boolean): string {
+  const output = resolve(outputPath);
+  if (input.path !== undefined && sameFile(output, input.path))
+    throw new Error(`The output path is ${input.what}. Choose another output path; the input is never overwritten.`);
+  if (!overwrite && existsSync(output)) throw Object.assign(new Error(`${output} already exists.`), { code: 'EEXIST' });
+  return output;
+}
+
+/** Where the e-invoice goes when no output is named: invoice.pdf becomes invoice.einvoice.pdf. */
+export function defaultOutput(pdfPath: string): string {
+  return pdfPath.replace(/(\.pdf)?$/i, '.einvoice.pdf');
+}
+
+/** True if both paths name one file, also through a symlink, a hard link or different letter case. */
+export function sameFile(a: string, b: string): boolean {
+  if (resolve(a) === resolve(b)) return true;
+  if (!existsSync(a) || !existsSync(b)) return false;
+  const [one, other] = [statSync(a, { bigint: true }), statSync(b, { bigint: true })];
+  return one.dev === other.dev && one.ino === other.ino;
+}
+
+/** Writes the file, without `overwrite` only where none is there yet, even one that appeared since it was checked. */
+function writeOutput(output: string, data: string | Uint8Array, overwrite: boolean): Promise<void> {
+  return writeFile(output, data, { flag: overwrite ? 'w' : 'wx' });
+}
+
+/**
+ * Whether an error says that the output is there already: refused before writing because `overwrite` is not set, or
+ * by the file system, where the file appeared in the meantime.
+ */
+export function outputExists(e: unknown): boolean {
+  return e instanceof Error && 'code' in e && e.code === 'EEXIST';
+}
+
+/**
  * Validates an e-invoice on disk, comparing its XML with the text of its own pages. The raw XML is left out of the
  * result; `readEmbeddedXml` returns it.
  */
@@ -121,6 +101,35 @@ export async function validateFile(pdfPath: string): Promise<Omit<ValidationResu
   const pdfText = await extractText(pdf).catch(() => '');
   const { xml: _xml, ...result } = await validateEInvoice(pdf, { pdfText });
   return result;
+}
+
+/** The text of an invoice PDF, the values guessed from it, and what matters about the file. */
+export async function describePdf(pdfPath: string) {
+  const pdf = await readPdf(pdfPath);
+  const info = await inspectPdf(pdf);
+  const { text, blocks } = await extractLayout(pdf);
+  return {
+    text,
+    guess: guessFromText(text, { blocks }),
+    pdf: { pages: info.pages, unembeddedFonts: info.unembeddedFonts, isEInvoice: info.embeddedXml !== null },
+  };
+}
+
+export async function readJson(path: string): Promise<InvoiceDraft> {
+  const text = await readFile(path, 'utf8');
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    throw new Error(`${path} is not valid JSON: ${messageOf(e)}`, { cause: e });
+  }
+}
+
+export async function readPdf(path: string): Promise<Uint8Array> {
+  return new Uint8Array(await readFile(path));
+}
+
+export function packageVersion(): string {
+  return JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')).version;
 }
 
 /** The options that take one of a few words, here and as arguments of the MCP tools. */
