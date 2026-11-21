@@ -31,6 +31,11 @@ const modelAnswer = () => {
   return filled(extractionSchema());
 };
 const sha256 = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
+/** The rows of the XML section: a value as the form shows it, and the element of the XML that holds it. */
+const xmlRows = (page: Page) =>
+  page.$$eval('#xml-pair tbody tr', (rows) =>
+    (rows as HTMLTableRowElement[]).map((row) => [...row.cells].map((cell) => cell.textContent)),
+  );
 /** Which file the finished page offers first, and the checksum it shows for it. */
 const offered = (page: Page) =>
   page.evaluate(() => ({
@@ -134,6 +139,13 @@ describe.skipIf(!asked)('the web app in a browser', () => {
     expect(await page.$$eval('#marks .mark', (marks) => marks.length)).toBeGreaterThan(20);
     await page.click('#xml > summary');
     await page.waitForSelector('#xml-pair:not([hidden])');
+    expect(await xmlRows(page)).toEqual([
+      ['Rechnungsnummer RE-2026-0042', '<ram:ID>RE-2026-0042</ram:ID>'],
+      ['Rechnungsdatum 03.11.2026', '<udt:DateTimeString format="102">20261103</udt:DateTimeString>'],
+      ['Rechnungssteller Muster Software GmbH', '<ram:Name>Muster Software GmbH</ram:Name>'],
+      ['Umsatzsteuer 284,81\u00a0€', '<ram:TaxTotalAmount currencyID="EUR">284.81</ram:TaxTotalAmount>'],
+      ['Gesamt 1.783,81\u00a0€', '<ram:GrandTotalAmount>1783.81</ram:GrandTotalAmount>'],
+    ]);
     await page.click('#xml-whole > summary');
     const shown = await page.textContent('#xml-code');
     await create(page);
@@ -295,6 +307,16 @@ describe.skipIf(!asked)('the web app in a browser', () => {
     await page.fill('[data-path="seller.email"]', 'rechnung@muster-software.example');
     await page.fill('[data-path="buyer.email"]', 'einkauf@beispiel.example');
     expect(await said(page, '#summary li.error')).toEqual([]);
+    await page.click('#xml > summary');
+    await page.waitForFunction(() => document.querySelector('#xml-code')?.textContent?.includes('cbc:'));
+    // For an XRechnung the section shows the file of its own, in UBL.
+    expect(await xmlRows(page)).toEqual([
+      ['Rechnungsnummer RE-2026-0042', '<cbc:ID>RE-2026-0042</cbc:ID>'],
+      ['Rechnungsdatum 03.11.2026', '<cbc:IssueDate>2026-11-03</cbc:IssueDate>'],
+      ['Rechnungssteller Muster Software GmbH', '<cbc:RegistrationName>Muster Software GmbH</cbc:RegistrationName>'],
+      ['Umsatzsteuer 284,81\u00a0€', '<cbc:TaxAmount currencyID="EUR">284.81</cbc:TaxAmount>'],
+      ['Gesamt 1.783,81\u00a0€', '<cbc:TaxInclusiveAmount currencyID="EUR">1783.81</cbc:TaxInclusiveAmount>'],
+    ]);
     await create(page);
     const plain = await bytesOf(await download(page, '#download-xml'));
     // The XRechnung is the main file: it is offered first, and the checksum is its own.

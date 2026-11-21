@@ -21,7 +21,7 @@
     "complexity": ["error", 16],
     "max-depth": ["error", 4],
     "max-params": ["error", 5],
-    "max-lines-per-function": ["error", { "max": 53, "skipBlankLines": true, "skipComments": true }]
+    "max-lines-per-function": ["error", { "max": 52, "skipBlankLines": true, "skipComments": true }]
   },
   "overrides": [{ "files": ["test/**"], "rules": { "max-lines-per-function": "off" } }]
 }
