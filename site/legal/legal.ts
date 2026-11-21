@@ -4,6 +4,19 @@ import { lang, setLang, t, type Lang } from '../shared/i18n.js';
 import '../shared/styles.css';
 import '../shared/theme-switch.js';
 
+for (const button of document.querySelectorAll<HTMLButtonElement>('[data-lang]'))
+  button.onclick = () => apply(button.dataset.lang as Lang);
+apply(lang());
+countVisit();
+
+/** Shows the page in a language, with the box about counting in it and the switch saying which one is on. */
+function apply(next: Lang): void {
+  setLang(next);
+  showCounting();
+  for (const button of document.querySelectorAll<HTMLButtonElement>('[data-lang]'))
+    button.setAttribute('aria-pressed', String(button.dataset.lang === next));
+}
+
 /** Says whether visits are counted in this browser and offers to change it. A build without the counter has no such box. */
 function showCounting(): void {
   const doNotTrack = [navigator.doNotTrack, (window as { doNotTrack?: string }).doNotTrack].some(
@@ -32,14 +45,3 @@ function showCounting(): void {
     };
   }
 }
-
-function apply(next: Lang): void {
-  setLang(next);
-  showCounting();
-  for (const button of document.querySelectorAll<HTMLButtonElement>('[data-lang]'))
-    button.setAttribute('aria-pressed', String(button.dataset.lang === next));
-}
-for (const button of document.querySelectorAll<HTMLButtonElement>('[data-lang]'))
-  button.onclick = () => apply(button.dataset.lang as Lang);
-apply(lang());
-countVisit();

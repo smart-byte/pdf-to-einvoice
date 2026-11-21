@@ -1,6 +1,6 @@
 import { XMLParser } from 'fast-xml-parser';
 import { exactSum, lineBase, percentAgrees, slackOf } from '../domain/money.js';
-import { isVatId } from '../domain/formats.js';
+import { isTaxNumber, isVatId } from '../domain/formats.js';
 import type { Allowance, DocumentAllowance, InvoiceDraft, InvoiceType, VatCategory } from '../domain/model.js';
 import { messageOf } from '../util/errors.js';
 
@@ -37,8 +37,7 @@ export function readInvoiceXml(xml: string): {
   percentages: Record<string, number>;
 } {
   const root = rootOf(xml);
-  const transaction = at(root, 'SupplyChainTradeTransaction');
-  const settlement = at(transaction, 'ApplicableHeaderTradeSettlement');
+  const { transaction, settlement } = partsOf(root);
   const currency = text(settlement, 'InvoiceCurrencyCode');
   const lines = all(transaction, 'IncludedSupplyChainTradeLineItem').map((item) => lineOf(item, currency));
   const { discounts, charges, contradictions, percentages } = adjustmentsOf(
@@ -133,7 +132,9 @@ function adjustmentsOf(settlement: Node, lines: ReturnType<typeof line>[], curre
     const vatCategory = category(entry, 'CategoryTradeTax', 'CategoryCode');
     // Without any category (BR-32) there is no rate either, and no VAT group is guessed.
     const vatRate = rateOf(entry, vatCategory, 'CategoryTradeTax', 'RateApplicablePercent');
-    const amounts = lines.filter((l) => l.vatCategory === vatCategory && l.vatRate === vatRate).map((l) => l.netAmount);
+    const amounts = lines
+      .filter((item) => item.vatCategory === vatCategory && item.vatRate === vatRate)
+      .map((item) => item.netAmount);
     const ownBase = amounts.every((amount) => amount !== undefined) ? exactSum(amounts) : undefined;
     if (stated.contradicts) read.contradictions.push(`${path}.percent`);
     else if (stated.percent !== undefined && !stated.agrees(ownBase)) read.percentages[path] = stated.percent;
@@ -201,15 +202,7 @@ interface ReadBefore {
 
 /** The invoice data of the XML, around its lines and its discounts and charges on the whole invoice. */
 function invoiceOf(root: Node, { lines, discounts, charges }: ReadBefore): InvoiceDraft {
-  const document = at(root, 'ExchangedDocument');
-  const transaction = at(root, 'SupplyChainTradeTransaction');
-  const delivery = at(transaction, 'ApplicableHeaderTradeDelivery');
-  const agreement = at(transaction, 'ApplicableHeaderTradeAgreement');
-  const settlement = at(transaction, 'ApplicableHeaderTradeSettlement');
-  const means = at(settlement, 'SpecifiedTradeSettlementPaymentMeans');
-  const terms = at(settlement, 'SpecifiedTradePaymentTerms');
-  const preceding = at(settlement, 'InvoiceReferencedDocument');
-  const sums = at(settlement, 'SpecifiedTradeSettlementHeaderMonetarySummation');
+  const { document, delivery, agreement, settlement, means, terms, preceding, sums } = partsOf(root);
   const currency = text(settlement, 'InvoiceCurrencyCode');
   const notes = all(document, 'IncludedNote').map((note) => text(note, 'Content'));
   return {
@@ -230,10 +223,7 @@ function invoiceOf(root: Node, { lines, discounts, charges }: ReadBefore): Invoi
     paymentTerms: text(terms, 'Description'),
     iban: text(means, 'PayeePartyCreditorFinancialAccount', 'IBANID'),
     bic: text(means, 'PayeeSpecifiedCreditorFinancialInstitution', 'BICID'),
-    // EN 16931 accepts the reason as text (BT-120) or as a code (BT-121).
-    vatExemptionReason: all(settlement, 'ApplicableTradeTax')
-      .map((tax) => text(tax, 'ExemptionReason') ?? text(tax, 'ExemptionReasonCode'))
-      .find(Boolean),
+    vatExemptionReason: exemptionReasonOf(settlement),
     prepaidAmount: number(sums, 'TotalPrepaidAmount'),
     seller: party(at(agreement, 'SellerTradeParty'), 'seller'),
     buyer: party(at(agreement, 'BuyerTradeParty'), 'buyer'),
@@ -242,6 +232,30 @@ function invoiceOf(root: Node, { lines, discounts, charges }: ReadBefore): Invoi
     ...(charges.length ? { charges } : {}),
     totals: statedTotals(sums, currency),
   };
+}
+
+/** The elements of a Cross Industry Invoice the data is read from. */
+function partsOf(root: Node) {
+  const transaction = at(root, 'SupplyChainTradeTransaction');
+  const settlement = at(transaction, 'ApplicableHeaderTradeSettlement');
+  return {
+    document: at(root, 'ExchangedDocument'),
+    transaction,
+    delivery: at(transaction, 'ApplicableHeaderTradeDelivery'),
+    agreement: at(transaction, 'ApplicableHeaderTradeAgreement'),
+    settlement,
+    means: at(settlement, 'SpecifiedTradeSettlementPaymentMeans'),
+    terms: at(settlement, 'SpecifiedTradePaymentTerms'),
+    preceding: at(settlement, 'InvoiceReferencedDocument'),
+    sums: at(settlement, 'SpecifiedTradeSettlementHeaderMonetarySummation'),
+  };
+}
+
+/** Why no VAT is charged. EN 16931 accepts the reason as text (BT-120) or as a code (BT-121). */
+function exemptionReasonOf(settlement: Node): string | undefined {
+  return all(settlement, 'ApplicableTradeTax')
+    .map((tax) => text(tax, 'ExemptionReason') ?? text(tax, 'ExemptionReasonCode'))
+    .find(Boolean);
 }
 
 function party(node: Node, who: 'seller' | 'buyer') {
@@ -261,7 +275,7 @@ function party(node: Node, who: 'seller' | 'buyer') {
     country: text(address, 'CountryID'),
     // Without any tax registration, the plain identifier of the seller is its tax ID (see BR-O-02 in ubl.ts).
     vatId: taxId('VA') ?? (isVatId(plainId) ? plainId : undefined),
-    taxNumber: taxId('FC') ?? (/^\d[\d/ -]{7,}$/.test(plainId ?? '') ? plainId : undefined),
+    taxNumber: taxId('FC') ?? (isTaxNumber(plainId?.replace(/\s+/g, '')) ? plainId : undefined),
     email:
       text(contact, 'EmailURIUniversalCommunication', 'URIID') ??
       (attribute(endpoint, 'schemeID') === 'EM' ? text(endpoint) : undefined),
@@ -295,7 +309,7 @@ function all(node: Node, name: string): Node[] {
 
 /** Follows element names down from a node; where an element repeats, the first one counts. */
 function at(node: Node, ...path: string[]): Node {
-  return path.reduce<Node>((n, name) => all(n, name)[0], node);
+  return path.reduce<Node>((found, name) => all(found, name)[0], node);
 }
 
 /** The text of an element, whether or not it carries attributes. Empty counts as absent. */

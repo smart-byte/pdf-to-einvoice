@@ -1,7 +1,9 @@
-// The English text of every finding the library reports and of every InvoiceError, in one place. A key is the code of
-// the finding and, where one code has several texts, a variant after a dot: `format.date` is a finding with the code
-// `format`. Amounts and lists come formatted; the texts only put them in place. The web app has a German text for every
-// code (site/shared/i18n.ts, `e.<code>`), and test/site/i18n.test.ts compares the two tables.
+// The English text of every finding of this layer: what `check` and `calculate` say about invoice data. A key is the
+// code of the finding and, where one code has several texts, a variant after a dot: `format.date` is a finding with
+// the code `format`. Amounts and lists come formatted; the texts only put them in place. The layers that read and
+// write files have catalogs of their own (generate/messages.ts, inspect/messages.ts). The web app has a German text
+// for every code (site/shared/i18n.ts, `e.<code>`), and test/site/i18n.test.ts compares the tables.
+import { catalog } from './finding.js';
 import { INVOICE_TYPES, VAT_CATEGORIES } from './model.js';
 
 const oneOf = (codes: object) => Object.keys(codes).join(', ');
@@ -13,6 +15,7 @@ export const MESSAGES = {
   'required.line-name': () => 'The line needs a description.',
   'required.line-value': ({ what }: { what: string }) => `The line needs a ${what}.`,
   'format.number': () => 'Not a number.',
+  'format.text': () => 'Not a text. Write it in quotes.',
   'format.date': () => 'Not a valid date. Use YYYY-MM-DD.',
   'format.country': () => 'Use the two-letter country code, e.g. DE.',
   'format.currency': () => 'Use the three-letter currency code, e.g. EUR.',
@@ -144,50 +147,11 @@ export const MESSAGES = {
     'XRechnung does not list the prepayment invoice (type 386) among its invoice types. A recipient may not accept it.',
   'xrechnung-phone': () => 'XRechnung expects a phone number here, with three digits at least.',
   'xrechnung-email': () => 'XRechnung expects an e-mail address of the form name@example.org here.',
-
-  // Writing the e-invoice (create)
-  'invalid-invoice': ({ errors }: { errors: string[] }) =>
-    `The invoice data has ${errors.length} error(s): ${errors.join(' ')}`,
-  'invalid-pdf': ({ reason }: { reason: string }) => `The file could not be read as a PDF: ${reason}`,
-  'already-einvoice': () => 'This PDF already carries an e-invoice.',
-  generator: ({ reason }: { reason: string }) => `The e-invoice could not be written: ${reason}`,
-  'generator.no-xml': () => 'The e-invoice was written without its XML.',
-  /** What the library that writes the XML warns about, as it says it. */
-  'generator.library': ({ text }: { text: string }) => text,
-  'not-written': ({ value }: { value: string }) =>
-    `"${value}" could not be written into the XML. Do not send this file; please report it at https://github.com/smart-byte/pdf-to-einvoice/issues.`,
-  'pdf-fonts.create': ({ fonts }: { fonts: string }) =>
-    `The PDF does not embed these fonts: ${fonts}. The XML is not affected, but the file is not a strict PDF/A-3. Export the PDF again with fonts embedded (or as PDF/A) to fix this.`,
-  'pdf-actions.create': ({ actions }: { actions: string }) =>
-    `The PDF carried what PDF/A forbids a file to run: ${actions}. It was left out of the e-invoice; the pages are unchanged.`,
-
-  // Checking an existing e-invoice (validate)
-  'no-xml': () =>
-    'This PDF carries no invoice XML (factur-x.xml, zugferd-invoice.xml or xrechnung.xml): it is a plain PDF, not an e-invoice. Ask the issuer for an e-invoice, or create one if the invoice is yours.',
-  'xml-syntax': ({ reason }: { reason: string }) =>
-    `${reason} The invoice data cannot be read: ask the issuer for a ZUGFeRD 2 / Factur-X e-invoice.`,
-  profile: ({ declared, expected }: { declared: string; expected: string }) =>
-    `The XML declares ${declared}, not one built on EN 16931 (${expected}...). MINIMUM and BASIC WL files do not count as e-invoices under EN 16931 and German VAT law. Ask the issuer for the profile EN 16931 (COMFORT), EXTENDED or XRECHNUNG.`,
-  'pdf-a': ({ declared }: { declared: string }) =>
-    `The metadata of the PDF ${declared}; ZUGFeRD / Factur-X asks for PDF/A-3. The XML can be read all the same, but a strict recipient may reject the file. Have it exported again as PDF/A-3.`,
-  'pdf-fonts': ({ fonts }: { fonts: string }) =>
-    `The PDF does not embed these fonts: ${fonts}. The XML is not affected, but the file is not a strict PDF/A-3. Have the PDF exported again with fonts embedded (or as PDF/A) and the e-invoice created from that.`,
-  'pdf-actions': ({ actions }: { actions: string }) =>
-    `The file carries what PDF/A forbids a file to run: ${actions}. It is not a strict PDF/A-3, and software may refuse it or warn about it.`,
-  'xml-charge': () =>
-    'The XML states a percentage, a base and an amount for this charge that do not agree. Ask the issuer for a corrected e-invoice.',
-  'xml-discount': () =>
-    'The XML states a percentage, a base and an amount for this discount that do not agree. Ask the issuer for a corrected e-invoice.',
 };
 
 export type MessageKey = keyof typeof MESSAGES;
 /** What the text of a key needs filled in: nothing, or one object. */
 export type MessageParams<K extends MessageKey> = Parameters<(typeof MESSAGES)[K]>;
 
-/** The code a key stands for: what comes before its variant. `format.date` is the code `format`. */
-export const codeOf = (key: MessageKey): string => key.split('.')[0]!;
-
-/** The text of a key with its values filled in. */
-export function message<K extends MessageKey>(key: K, ...params: MessageParams<K>): string {
-  return (MESSAGES[key] as (...args: MessageParams<K>) => string)(...params);
-}
+/** A finding of this layer at a path, with the code and the text of its key, and the text of a key alone. */
+export const { error, warning, message } = catalog(MESSAGES);

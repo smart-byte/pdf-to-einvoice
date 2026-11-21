@@ -17,9 +17,22 @@ All notable changes to this project are documented here. The format follows
   its category asks for.
 - The comparison of a language model's answer with the PDF drops an e-mail address that `check` would reject, such as
   one that took the full stop of its sentence along.
+- `check` and the comparison of a language model's answer with the PDF ask the same of a value the page is said to
+  show. `check` no longer takes a part of a longer number or word for the value: "49" is not shown by "249,50", "10 %"
+  not by "110 %", "Stadt" not by "Musterstadt". The comparison of a model's answer finds an amount whose thousands are
+  grouped by a space that does not break, and a rate printed as "7,50 %".
+
+- `check` words a total that contradicts the lines as what the XML states when the data was read from an existing
+  e-invoice (`adjustedLines` given), and the `params` of that finding name the `stated` total. `validateEInvoice`
+  replaced the text afterwards, so the values of the finding no longer matched it.
+- The web app shows what the check of an existing e-invoice found when it was opened and does not check its data a
+  second time. An e-invoice whose XML cannot be read is told so, without every field of the empty form reported as
+  missing.
 
 ### Fixed
 
+- `check` reports a text that is given as a number, a list or an object, such as a postal code written as `1234`
+  without quotes, instead of returning it as part of the invoice.
 - The comparison of a language model's answer with the PDF keeps a service period printed as "März 2026" or
   "Mär. 2026"; month names with an umlaut were never found.
 

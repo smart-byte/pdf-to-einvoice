@@ -1,7 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { check } from '../../src/domain/check.js';
-import { percentSpellings } from '../../src/domain/spellings.js';
 import type { InvoiceDraft } from '../../src/domain/model.js';
 
 const sample = (): InvoiceDraft =>
@@ -69,6 +68,45 @@ describe('check', () => {
         'prepaidAmount',
       ),
     ).toEqual(['error:format']);
+  });
+
+  it('reports a text that is not one instead of passing it on as part of the invoice', () => {
+    // As JSON gives it where the quotes were left out: a postal code as the number 1234 has lost its leading zero.
+    const odd = withChange((d) => {
+      Object.assign(d, { number: 123, note: { text: 'Danke' }, iban: 5 });
+      Object.assign(d.seller, { name: 42, postalCode: 1234 });
+      d.buyer.street = ['Hauptstraße 1'];
+      Object.assign(d.lines[0], { name: { de: 'Beratung' }, unit: 7, discount: { percent: 10, reason: 5 } });
+      d.charges = [{ amount: 5, reason: 7, vatCategory: 'S', vatRate: 19 }];
+      delete d.totals;
+    });
+    const result = check(odd);
+    const wrong = [
+      'number',
+      'note',
+      'iban',
+      'seller.name',
+      'seller.postalCode',
+      'buyer.street',
+      'lines.0.name',
+      'lines.0.unit',
+      'lines.0.discount.reason',
+      'charges.0.reason',
+    ];
+    expect(result.findings.filter((f) => f.code === 'format').map((f) => `${f.severity}:${f.path}`)).toEqual(
+      wrong.map((path) => `error:${path}`),
+    );
+    expect(result.invoice).toBeUndefined();
+  });
+
+  it('leaves a value with a form of its own to the check of that form', () => {
+    // A date or a code that is not a text is reported once, as what it should be.
+    const odd = withChange((d) => Object.assign(d, { issueDate: 20261005, currency: 978, deliveryCountry: 1 }));
+    expect(check(odd).findings.map((f) => `${f.path}:${f.message}`)).toEqual([
+      'issueDate:Not a valid date. Use YYYY-MM-DD.',
+      'currency:Use the three-letter currency code, e.g. EUR.',
+      'deliveryCountry:Use the two-letter country code, e.g. DE.',
+    ]);
   });
 
   it('wants a line total to be quantity times price, two cents apart at most', () => {
@@ -193,9 +231,20 @@ describe('check', () => {
     expect(at(0, 5)).toEqual([]);
   });
 
-  it('spells a percentage the ways a page prints it', () => {
-    expect(percentSpellings(10)).toEqual(expect.arrayContaining(['10%', '10,00%', '10.0%']));
-    expect(percentSpellings(12.345)).toEqual(expect.arrayContaining(['12,345%', '12.345%']));
+  it.each(['10%', '10 %', '10,00 %', '10.0%'])('finds the percentage of a discount printed as %s', (printed) => {
+    const draft = withChange((d) => {
+      d.lines[1].discount = { percent: 10 };
+      delete d.totals;
+    });
+    expect(codesAt(draft, 'lines.1.discount.percent', { pdfText: `Rabatt ${printed}` })).toEqual([]);
+  });
+
+  it.each(['12,345 %', '12.345%'])('finds a percentage with decimals printed as %s', (printed) => {
+    const draft = withChange((d) => {
+      d.lines[1].discount = { percent: 12.345 };
+      delete d.totals;
+    });
+    expect(codesAt(draft, 'lines.1.discount.percent', { pdfText: `Rabatt ${printed}` })).toEqual([]);
   });
 
   it('looks for the percentage of a discount on the page, never for the amount derived from it', () => {
@@ -561,6 +610,18 @@ describe('check', () => {
     expect(codesAt(draft, 'totals.gross')).toEqual(['error:totals-mismatch']);
   });
 
+  it('words a total that contradicts the lines for the XML the data was read from', () => {
+    // With `adjustedLines` the data comes from an existing e-invoice: both sides of the contradiction are in its XML.
+    const draft = withChange((d) => (d.totals.gross = 1800));
+    const [finding] = check(draft, { adjustedLines: [] }).findings.filter((f) => f.path === 'totals.gross');
+    expect(finding).toMatchObject({
+      code: 'totals-mismatch',
+      severity: 'error',
+      params: { stated: '1800.00', calculated: '1783.81', adjusted: false },
+    });
+    expect(finding!.message).toMatch(/^The XML states a total of 1800\.00, but its lines add up to 1783\.81\./);
+  });
+
   it('warns when an address is incomplete', () => {
     expect(
       codesAt(
@@ -669,6 +730,39 @@ describe('check against the PDF text', () => {
       delete d.totals;
     });
     expect(codesAt(draft, 'lines.1.unitPrice', { pdfText })).toEqual(['warning:not-in-pdf']);
+  });
+
+  it('does not take a part of a longer number for an amount', () => {
+    // "49" stands in "249,50" and in "499,00", but nowhere on its own.
+    const draft = withChange((d) => {
+      d.lines[1].unitPrice = 49;
+      delete d.totals;
+    });
+    expect(codesAt(draft, 'lines.1.unitPrice', { pdfText })).toEqual(['warning:not-in-pdf']);
+    expect(codesAt(draft, 'lines.1.unitPrice', { pdfText: `${pdfText}\nje 49 €` })).toEqual([]);
+  });
+
+  it('does not take a part of a longer number for a percentage', () => {
+    const draft = withChange((d) => {
+      d.lines[1].discount = { percent: 10 };
+      delete d.totals;
+    });
+    expect(codesAt(draft, 'lines.1.discount.percent', { pdfText: `${pdfText}\nRabatt 110 %` })).toEqual([
+      'warning:not-in-pdf',
+    ]);
+    expect(codesAt(draft, 'lines.1.discount.percent', { pdfText: `${pdfText}\nRabatt 10,00 %` })).toEqual([]);
+  });
+
+  it('does not take a part of a longer word for a word of a name', () => {
+    // "Muster" stands in "Musterstadt", "Stadt" only there.
+    const city = (name: string) =>
+      codesAt(
+        withChange((d) => (d.seller.city = name)),
+        'seller.city',
+        { pdfText },
+      );
+    expect(city('Stadt')).toEqual(['warning:not-in-pdf']);
+    expect(city('Musterstadt')).toEqual([]);
   });
 
   it('finds a unit price with more decimals than cents, as the PDF prints it', () => {

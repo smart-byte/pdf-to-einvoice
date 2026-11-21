@@ -1,5 +1,13 @@
 // The totals of an invoice, following the EN 16931 calculation rules, in exact cents.
-import { adjustmentOf, lineParts, resolveAdjustments, sumByGroup, type Adjustment, type Entry } from './adjustments.js';
+import {
+  adjustmentOf,
+  lineParts,
+  resolveAdjustments,
+  sumByGroup,
+  type Adjustment,
+  type Entry,
+  type Group,
+} from './adjustments.js';
 import type { Finding } from './finding.js';
 import type { Invoice, Line, VatCategory } from './model.js';
 import { baseCents, divRound, fromCents, micro, percentCents, toCents } from './money.js';
@@ -33,6 +41,30 @@ export interface Totals {
   due: number;
 }
 
+/**
+ * Derives every total from the lines and the discounts and charges on the whole invoice, following the EN 16931
+ * calculation rules: VAT is calculated per category and rate on the summed base (BR-CO-17), not per line. Throws if a
+ * discount or charge on the whole invoice cannot be placed in a VAT group (see `tryCalculate`).
+ */
+export function calculate(invoice: Invoice): Totals {
+  const { totals, problems } = tryCalculate(invoice);
+  if (!totals) {
+    throw new Error(problems.flatMap((problem) => (problem.severity === 'error' ? [problem.message] : [])).join(' '));
+  }
+  return totals;
+}
+
+/**
+ * `calculate` for data that may not allow it: the totals, where every discount and charge on the whole invoice could
+ * be placed in a VAT group, and what is wrong with these entries. Never throws, but expects the numbers of every line;
+ * without them `checkAdjustments` says what it can.
+ */
+export function tryCalculate(invoice: Invoice): { totals?: Totals; problems: Finding[] } {
+  const inCents = linesInCents(invoice.lines);
+  const { entries, problems, resolved } = resolveAdjustments(invoice, inCents.lineCents);
+  return resolved ? { totals: totalsOf(invoice, inCents, entries), problems } : { problems };
+}
+
 /** Each line in cents, and its discount with the base it was taken from. Expects the numbers of every line. */
 function linesInCents(lines: Line[]) {
   const discounts = lines.map((line) => {
@@ -50,69 +82,65 @@ function linesInCents(lines: Line[]) {
   return { discounts, lineCents };
 }
 
-/**
- * `calculate` for data that may not allow it: the totals, where every discount and charge on the whole invoice could
- * be placed in a VAT group, and what is wrong with these entries. Never throws, but expects the numbers of every line;
- * without them `checkAdjustments` says what it can.
- */
-export function tryCalculate(invoice: Invoice): { totals?: Totals; problems: Finding[] } {
-  const inCents = linesInCents(invoice.lines);
-  const { entries, problems, resolved } = resolveAdjustments(invoice, inCents.lineCents);
-  return resolved ? { totals: totalsOf(invoice, inCents, entries), problems } : { problems };
-}
-
-/**
- * Derives every total from the lines and the discounts and charges on the whole invoice, following the EN 16931
- * calculation rules: VAT is calculated per category and rate on the summed base (BR-CO-17), not per line. Throws if a
- * discount or charge on the whole invoice cannot be placed in a VAT group (see `tryCalculate`).
- */
-export function calculate(invoice: Invoice): Totals {
-  const { totals, problems } = tryCalculate(invoice);
-  if (!totals) throw new Error(problems.flatMap((p) => (p.severity === 'error' ? [p.message] : [])).join(' '));
-  return totals;
-}
-
 function totalsOf(
   invoice: Invoice,
   { discounts, lineCents }: ReturnType<typeof linesInCents>,
   entries: Entry[],
 ): Totals {
-  const breakdown = sumByGroup([
-    ...lineParts(invoice.lines, lineCents),
-    ...entries.map((entry) => ({
-      category: entry.category,
-      rate: entry.rate,
-      cents: entry.list === 'charges' ? entry.cents : -entry.cents,
-    })),
-  ]).map((g) => ({ ...g, tax: divRound(g.cents * micro(g.rate), 10n ** 8n) }));
-
-  const sum = (amounts: bigint[]) => amounts.reduce((a, b) => a + b, 0n);
+  const breakdown = vatGroupsOf(invoice.lines, lineCents, entries);
   const lineTotal = sum(lineCents);
-  const allowances = sum(entries.filter((entry) => entry.list === 'discounts').map((entry) => entry.cents));
-  const charges = sum(entries.filter((entry) => entry.list === 'charges').map((entry) => entry.cents));
+  const allowances = sum(centsOf(entries, 'discounts'));
+  const charges = sum(centsOf(entries, 'charges'));
   const net = lineTotal - allowances + charges;
-  const vat = breakdown.reduce((a, g) => a + g.tax, 0n);
+  const vat = sum(breakdown.map((group) => group.tax));
   const prepaid = toCents(invoice.prepaidAmount ?? 0);
 
   return {
     lineNet: lineCents.map(fromCents),
-    lineDiscounts: discounts.map(
-      (discount) => discount && { base: fromCents(discount.base), amount: fromCents(discount.amount) },
-    ),
+    lineDiscounts: discounts.map((discount) => discount && centsToNumbers(discount)),
     lineTotal: fromCents(lineTotal),
     allowances: fromCents(allowances),
     charges: fromCents(charges),
     adjustments: entries.map(adjustmentOf),
-    vatBreakdown: breakdown.map((g) => ({
-      category: g.category,
-      rate: g.rate,
-      taxable: fromCents(g.cents),
-      tax: fromCents(g.tax),
-    })),
+    vatBreakdown: breakdown.map(vatGroupOf),
     net: fromCents(net),
     vat: fromCents(vat),
     gross: fromCents(net + vat),
     prepaid: fromCents(prepaid),
     due: fromCents(net + vat - prepaid),
   };
+}
+
+/**
+ * The VAT groups of the lines with the discounts taken off and the charges added, each with its VAT on its summed
+ * base (BR-CO-17).
+ */
+function vatGroupsOf(lines: Line[], lineCents: bigint[], entries: Entry[]): (Group & { tax: bigint })[] {
+  return sumByGroup([
+    ...lineParts(lines, lineCents),
+    ...entries.map((entry) => ({
+      category: entry.category,
+      rate: entry.rate,
+      cents: entry.list === 'charges' ? entry.cents : -entry.cents,
+    })),
+  ]).map((group) => ({ ...group, tax: divRound(group.cents * micro(group.rate), 10n ** 8n) }));
+}
+
+/** A discount of a line, from cents into numbers. */
+function centsToNumbers({ base, amount }: { base: bigint; amount: bigint }): { base: number; amount: number } {
+  return { base: fromCents(base), amount: fromCents(amount) };
+}
+
+/** A VAT group as the totals state it: its base and its VAT, from cents into numbers. */
+function vatGroupOf(group: Group & { tax: bigint }): VatGroup {
+  return { category: group.category, rate: group.rate, taxable: fromCents(group.cents), tax: fromCents(group.tax) };
+}
+
+/** The amounts of the discounts or of the charges on the whole invoice. */
+function centsOf(entries: Entry[], list: Entry['list']): bigint[] {
+  return entries.filter((entry) => entry.list === list).map((entry) => entry.cents);
+}
+
+function sum(amounts: bigint[]): bigint {
+  return amounts.reduce((total, amount) => total + amount, 0n);
 }

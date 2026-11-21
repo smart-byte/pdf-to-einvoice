@@ -34,17 +34,32 @@ export const SEPARATOR = '^\\s*[:#.]?\\s*';
 // Dates.
 
 /** The day a match of `DATE` names, as YYYY-MM-DD. */
-export function toIsoDate(m: RegExpExecArray, dayFirst: boolean): string | undefined {
-  const g = m.groups ?? {};
-  if (g.isoYear) return `${g.isoYear}-${g.isoMonth}-${g.isoDay}`;
-  if (g.dotDay && g.dotMonth && g.dotYear) return `${century(g.dotYear)}-${pad(g.dotMonth)}-${pad(g.dotDay)}`;
-  if (g.textDay && g.textMonth) return `${g.textYear}-${pad(monthNumber(g.textMonth))}-${pad(g.textDay)}`;
-  if (g.usMonth && g.usDay) return `${g.usYear}-${pad(monthNumber(g.usMonth))}-${pad(g.usDay)}`;
-  if (!g.slashYear) return undefined;
-  // With slashes, day and month can be told apart when one is above 12, or when a German or French label says who wrote it.
-  const [a, b] = [Number(g.slashFirst), Number(g.slashSecond)];
-  if (b > 12 && a <= 12) return `${century(g.slashYear)}-${pad(a)}-${pad(b)}`;
-  if ((a > 12 || dayFirst) && b <= 12) return `${century(g.slashYear)}-${pad(b)}-${pad(a)}`;
+export function toIsoDate(match: RegExpExecArray, dayFirst: boolean): string | undefined {
+  const groups = match.groups ?? {};
+  return writtenDate(groups) ?? slashedDate(groups, dayFirst);
+}
+
+/** A date in one of the notations that can be read in one way only: ISO, with dots, or with the name of its month. */
+function writtenDate(groups: Record<string, string | undefined>): string | undefined {
+  if (groups.isoYear) return `${groups.isoYear}-${groups.isoMonth}-${groups.isoDay}`;
+  if (groups.dotDay && groups.dotMonth && groups.dotYear)
+    return `${century(groups.dotYear)}-${pad(groups.dotMonth)}-${pad(groups.dotDay)}`;
+  if (groups.textDay && groups.textMonth)
+    return `${groups.textYear}-${pad(monthNumber(groups.textMonth))}-${pad(groups.textDay)}`;
+  if (groups.usMonth && groups.usDay)
+    return `${groups.usYear}-${pad(monthNumber(groups.usMonth))}-${pad(groups.usDay)}`;
+  return undefined;
+}
+
+/**
+ * A date with slashes. Day and month can be told apart when one is above 12, or when a German or French label says
+ * who wrote it (`dayFirst`).
+ */
+function slashedDate(groups: Record<string, string | undefined>, dayFirst: boolean): string | undefined {
+  if (!groups.slashYear) return undefined;
+  const [first, second] = [Number(groups.slashFirst), Number(groups.slashSecond)];
+  if (second > 12 && first <= 12) return `${century(groups.slashYear)}-${pad(first)}-${pad(second)}`;
+  if ((first > 12 || dayFirst) && second <= 12) return `${century(groups.slashYear)}-${pad(second)}-${pad(first)}`;
   return undefined;
 }
 
@@ -62,8 +77,8 @@ export function monthAs(name: string): string {
   return `(?<${name}>${MONTHS.flat().join('|')})[a-zä]*\\.?`;
 }
 
-export function pad(n: string | number): string {
-  return String(n).padStart(2, '0');
+export function pad(value: string | number): string {
+  return String(value).padStart(2, '0');
 }
 
 function century(year: string): string {
@@ -83,18 +98,6 @@ export const DATE = new RegExp(
 );
 
 // Amounts.
-
-/**
- * "1.499,00" and "1,499.00" both mean 1499: the last separator is the decimal one. Three digits behind the only
- * separator are thousands ("1.000 Stk"), unless a zero stands in front ("0.025").
- */
-export function toNumber(printed: string): number {
-  const digits = printed.replace(/[^\d.,-]/g, '');
-  const last = Math.max(digits.lastIndexOf(','), digits.lastIndexOf('.'));
-  if (last < 0) return Number(digits);
-  const [whole, fraction] = [digits.slice(0, last).replace(/[.,]/g, ''), digits.slice(last + 1)];
-  return Number(fraction.length === 3 && Number(whole) !== 0 ? whole + fraction : `${whole}.${fraction}`);
-}
 
 export const MONEY = "(-?\\d{1,3}(?:[.,' ]\\d{3})*[.,]\\d{2}|-?\\d+[.,]\\d{2})";
 export const CURRENCY = '(?:€|EUR|US\\$|\\$|USD|£|GBP|CHF)';
@@ -175,20 +178,3 @@ export function anyOf(...alternatives: RegExp[]): string {
 export function lastIndex<T>(items: T[], test: (item: T) => unknown): number {
   return items.reduce((last, item, i) => (test(item) ? i : last), -1);
 }
-
-/** How a country is written on a page, in lower case. */
-export const COUNTRY_NAMES: Record<string, string[]> = {
-  DE: ['deutschland', 'germany'],
-  AT: ['österreich', 'austria'],
-  CH: ['schweiz', 'switzerland', 'suisse'],
-  FR: ['frankreich', 'france'],
-  IT: ['italien', 'italy', 'italia'],
-  NL: ['niederlande', 'netherlands', 'nederland'],
-  BE: ['belgien', 'belgium', 'belgique'],
-  LU: ['luxemburg', 'luxembourg'],
-  PL: ['polen', 'poland', 'polska'],
-  ES: ['spanien', 'spain', 'españa'],
-  IE: ['irland', 'ireland'],
-  GB: ['großbritannien', 'vereinigtes königreich', 'united kingdom', 'great britain'],
-  US: ['usa', 'united states', 'vereinigte staaten'],
-};

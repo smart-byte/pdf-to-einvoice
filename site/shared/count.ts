@@ -47,23 +47,30 @@ function send(name?: string, data?: Record<string, string>): void {
     method: 'POST',
     keepalive: true,
     credentials: 'omit',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-umami-website-id': COUNTER_WEBSITE_ID,
-      'x-umami-hostname': location.hostname,
-      ...(session === undefined ? {} : { 'x-umami-cache': session }),
-    },
+    headers: headers(),
     body: JSON.stringify({ type: 'event', payload }),
   })
     .then((response) => response.json())
-    .then((answer: { cache?: string; disabled?: boolean } | null) => {
-      // The server hands back a token that ties the requests of one visit together, and may say that it does not count.
-      session = answer?.cache;
-      refused = Boolean(answer?.disabled);
-    })
+    .then(remember)
     .catch(() => {
       // The counter is not reachable: the page works all the same.
     });
+}
+
+/** Which website and host a visit is counted for, and the token of this visit once the server has handed one back. */
+function headers(): Record<string, string> {
+  return {
+    'Content-Type': 'application/json',
+    'x-umami-website-id': COUNTER_WEBSITE_ID,
+    'x-umami-hostname': location.hostname,
+    ...(session === undefined ? {} : { 'x-umami-cache': session }),
+  };
+}
+
+/** The server hands back a token that ties the requests of one visit together, and may say that it does not count. */
+function remember(answer: { cache?: string; disabled?: boolean } | null): void {
+  session = answer?.cache;
+  refused = Boolean(answer?.disabled);
 }
 
 /**

@@ -107,7 +107,7 @@ async function openModel() {
   await page.goto(server.resolvedUrls.local[0]);
   // The function runs in the page: it gets the text and the model as arguments, since it sees nothing of this script.
   const inPage = async ([words, modelId]) =>
-    (await import('/app/model/llm.ts')).readWithBrowserModel(words, modelId, () => {});
+    (await import('/app/model/llm.ts')).readWithBrowserModel(words, modelId, { onProgress: () => {} });
   const read = (pageText) => page.evaluate(inPage, [pageText, model]);
   return { read, close: () => context.close().then(() => server.close()) };
 }
@@ -120,41 +120,55 @@ const browser = model ? await openModel() : undefined;
 const taken = {};
 const skipped = [];
 let [read, unusable, seconds] = [0, 0, 0];
+
+/** The text and layout of a PDF, what the reader guesses from it, and its embedded XML as the answer key. */
+async function answerKey(file) {
+  const pdf = new Uint8Array(readFileSync(file));
+  const xml = await lib.readEmbeddedXml(pdf);
+  if (xml === null) throw new Error('no embedded XML');
+  const truth = lib.readInvoiceXml(xml).invoice;
+  const layout = lib.extractLayout ? await lib.extractLayout(pdf) : { text: await lib.extractText(pdf) };
+  if (!layout.text.trim()) throw new Error('no text layer');
+  // Some samples carry the XML of another invoice than the page shows: no answer key for that page.
+  if (!id(layout.text).includes(id(truth.number)))
+    throw new Error('the page does not show the invoice number of its XML');
+  return { layout, truth, guess: lib.guessFromText(layout.text, layout) };
+}
+
+/** Counts how the reader did on each field; returns the marks of the fields it did not read right. */
+function tallyRules(guess, truth) {
+  const marks = [];
+  for (const [field, verdict] of verdicts(guess, truth)) {
+    tally[field][verdict]++;
+    ways.rules[verdict]++;
+    if (verdict !== 'correct') marks.push(`${verdict === 'wrong' ? '✗' : '–'}${field}`);
+  }
+  return marks;
+}
+
+/** Asks the model, counts how it did alone and with the reader, and returns how long it took. */
+async function tallyModel(layout, guess, truth) {
+  const started = Date.now();
+  // An answer that cannot be used counts as nothing read: every field is missing.
+  const answer = await browser.read(layout.text).catch(() => (unusable++, {}));
+  // The first invoice waits for the model to load; it is left out of the time per invoice.
+  if (read > 1) seconds += (Date.now() - started) / 1000;
+  const shown = lib.keepWhatThePdfShows(answer, layout.text);
+  for (const [, verdict] of verdicts(shown, truth)) ways.model[verdict]++;
+  for (const [, verdict] of verdicts(fill(guess, shown), truth)) ways['rules + model'][verdict]++;
+  return `, ${Math.round((Date.now() - started) / 1000)} s`;
+}
+
 for (const file of walk(root)) {
   const name = relative(root, file);
   const folder = name.split(sep)[0];
   if (taken[folder] >= sample) continue;
   try {
-    const pdf = new Uint8Array(readFileSync(file));
-    const xml = await lib.readEmbeddedXml(pdf);
-    if (xml === null) throw new Error('no embedded XML');
-    const truth = lib.readInvoiceXml(xml).invoice;
-    const layout = lib.extractLayout ? await lib.extractLayout(pdf) : { text: await lib.extractText(pdf) };
-    if (!layout.text.trim()) throw new Error('no text layer');
-    // Some samples carry the XML of another invoice than the page shows: no answer key for that page.
-    if (!id(layout.text).includes(id(truth.number)))
-      throw new Error('the page does not show the invoice number of its XML');
-    const guess = lib.guessFromText(layout.text, layout);
+    const { layout, truth, guess } = await answerKey(file);
     read++;
     taken[folder] = (taken[folder] ?? 0) + 1;
-    const marks = [];
-    for (const [field, verdict] of verdicts(guess, truth)) {
-      tally[field][verdict]++;
-      ways.rules[verdict]++;
-      if (verdict !== 'correct') marks.push(`${verdict === 'wrong' ? '✗' : '–'}${field}`);
-    }
-    let took = '';
-    if (browser) {
-      const started = Date.now();
-      // An answer that cannot be used counts as nothing read: every field is missing.
-      const answer = await browser.read(layout.text).catch(() => (unusable++, {}));
-      // The first invoice waits for the model to load; it is left out of the time per invoice.
-      if (read > 1) seconds += (Date.now() - started) / 1000;
-      took = `, ${Math.round((Date.now() - started) / 1000)} s`;
-      const shown = lib.keepWhatThePdfShows(answer, layout.text);
-      for (const [, verdict] of verdicts(shown, truth)) ways.model[verdict]++;
-      for (const [, verdict] of verdicts(fill(guess, shown), truth)) ways['rules + model'][verdict]++;
-    }
+    const marks = tallyRules(guess, truth);
+    const took = browser ? await tallyModel(layout, guess, truth) : '';
     if (flags.includes('--files') || browser) console.log(`${name}: ${marks.join(' ') || 'all read'}${took}`);
   } catch (error) {
     skipped.push(`${name}: ${error.message.slice(0, 80)}`);

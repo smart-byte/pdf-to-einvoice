@@ -1,7 +1,7 @@
 import type { Party } from '../../domain/model.js';
 import { TITLE } from './head.js';
 import { DATE_OR_AMOUNT, type Found, type Role, roleOf, senderOf } from './parties.js';
-import { cells } from './rows.js';
+import { cells, GAP } from '../../util/rows.js';
 import { after, CUSTOMER, SEPARATOR } from './values.js';
 
 // Contact data. A contact is read for a party only where a heading, a label or the party's recognised address
@@ -70,7 +70,7 @@ function labelled(page: Searched, label: RegExp, value: RegExp, key: (found: str
 function before(text: string, at: number): string {
   return text
     .slice(text.lastIndexOf('\n', at - 1) + 1, at)
-    .split(/\s{3,}/)
+    .split(new RegExp(GAP))
     .at(-1)!;
 }
 

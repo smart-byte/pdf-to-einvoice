@@ -12,9 +12,6 @@ import {
   type PDFObject,
 } from '@cantoo/pdf-lib';
 
-/** Attachment names used by Factur-X, ZUGFeRD 1/2 and the XRECHNUNG profile. */
-const INVOICE_XML_NAMES = ['factur-x.xml', 'zugferd-invoice.xml', 'xrechnung.xml'];
-
 export interface PdfInfo {
   pages: number;
   /** Fonts the PDF refers to without carrying them; PDF/A requires every font to be embedded. */
@@ -25,147 +22,6 @@ export interface PdfInfo {
   embeddedXml: string | null;
   /** The PDF/A part the XMP metadata declares (`pdfaid:part`), "3" for a ZUGFeRD / Factur-X file; null if it declares none. */
   pdfaPart: string | null;
-}
-
-/** Loads a PDF, or throws the reason it cannot be used. */
-async function load(pdf: Uint8Array): Promise<PDFDocument> {
-  return PDFDocument.load(pdf, { updateMetadata: false });
-}
-
-const name = (dict: PDFDict, key: string) => dict.lookupMaybe(PDFName.of(key), PDFName)?.decodeText();
-
-function unembeddedFonts(doc: PDFDocument): string[] {
-  const missing = new Set<string>();
-  for (const [, object] of doc.context.enumerateIndirectObjects()) {
-    if (!(object instanceof PDFDict) || name(object, 'Type') !== 'Font') continue;
-    // A Type0 font delegates to a descendant font, which is checked on its own; a Type3 font draws its glyphs itself.
-    if (['Type0', 'Type3'].includes(name(object, 'Subtype') ?? '')) continue;
-    const descriptor = object.lookupMaybe(PDFName.of('FontDescriptor'), PDFDict);
-    const embedded =
-      descriptor && ['FontFile', 'FontFile2', 'FontFile3'].some((key) => descriptor.has(PDFName.of(key)));
-    if (!embedded) missing.add(name(object, 'BaseFont') ?? 'unnamed font');
-  }
-  return [...missing].sort();
-}
-
-/**
- * The actions PDF/A forbids (ISO 19005-3, 6.5.1): they run a script, start a program, play media or change what a
- * reader shows. A named action is allowed only where it turns a page.
- */
-const FORBIDDEN_ACTIONS = new Set([
-  'JavaScript',
-  'Launch',
-  'Sound',
-  'Movie',
-  'ResetForm',
-  'ImportData',
-  'Hide',
-  'SetOCGState',
-  'Rendition',
-  'Trans',
-  'GoTo3DView',
-  'SetState',
-  'NoOp',
-]);
-const PAGE_TURNS = new Set(['NextPage', 'PrevPage', 'FirstPage', 'LastPage']);
-
-/**
- * Finds what a PDF would run although PDF/A forbids it, wherever it hangs: the document, a page, a link, a form
- * field or a bookmark, the list of scripts of the document, and actions that follow another. With `remove` it is
- * taken out, and an action that is an object of its own leaves the file with its script. Returns the kinds, sorted.
- */
-function forbiddenActions(doc: PDFDocument, remove = false): string[] {
-  const found = new Set<string>();
-  const gone = new Set<PDFRef>();
-  const resolved = (value: PDFObject | undefined) => (value instanceof PDFRef ? doc.context.lookup(value) : value);
-  /** The kind of a forbidden action, also behind a reference or in a list of actions; undefined for what is allowed. */
-  const kindOf = (value: PDFObject | undefined): string | undefined => {
-    const action = resolved(value);
-    if (action instanceof PDFArray) return action.asArray().map(kindOf).find(Boolean);
-    if (!(action instanceof PDFDict)) return undefined;
-    const kind = name(action, 'S') ?? '';
-    return FORBIDDEN_ACTIONS.has(kind) || (kind === 'Named' && !PAGE_TURNS.has(name(action, 'N') ?? ''))
-      ? kind
-      : undefined;
-  };
-  /** Marks an action, its script, what follows it and the nodes of a list of scripts for leaving the file. */
-  const forget = (value: PDFObject | undefined): void => {
-    if (value instanceof PDFRef) {
-      if (gone.has(value)) return;
-      gone.add(value);
-    }
-    const object = resolved(value);
-    if (object instanceof PDFArray) object.asArray().forEach(forget);
-    else if (object instanceof PDFDict)
-      for (const key of ['JS', 'Next', 'Kids', 'Names']) forget(object.get(PDFName.of(key)));
-  };
-  const visit = (object: PDFObject): void => {
-    const dict = object instanceof PDFRawStream ? object.dict : object;
-    if (dict instanceof PDFArray) return dict.asArray().forEach(visit);
-    if (!(dict instanceof PDFDict)) return;
-    const drop = (key: string, kinds: (string | undefined)[], values: (PDFObject | undefined)[]) => {
-      for (const kind of kinds) if (kind) found.add(kind);
-      if (!remove) return;
-      values.forEach(forget);
-      dict.delete(PDFName.of(key));
-    };
-    // Additional actions are forbidden whatever they do (6.5.2); a list of scripts holds nothing else.
-    const more = resolved(dict.get(PDFName.of('AA')));
-    if (more instanceof PDFDict)
-      drop('AA', more.values().some(kindOf) ? more.values().map(kindOf) : ['additional actions'], [
-        dict.get(PDFName.of('AA')),
-        ...more.values(),
-      ]);
-    if (dict.has(PDFName.of('JavaScript'))) drop('JavaScript', ['JavaScript'], [dict.get(PDFName.of('JavaScript'))]);
-    for (const key of ['OpenAction', 'A', 'Next']) {
-      const kind = kindOf(dict.get(PDFName.of(key)));
-      if (kind) drop(key, [kind], [dict.get(PDFName.of(key))]);
-    }
-    for (const value of dict.values()) if (value instanceof PDFDict || value instanceof PDFArray) visit(value);
-  };
-  for (const [, object] of doc.context.enumerateIndirectObjects()) visit(object);
-  for (const ref of gone) doc.context.delete(ref);
-  return [...found].sort();
-}
-
-/** Walks the name tree of embedded files and returns the invoice XML, if one is attached. */
-function findInvoiceXml(doc: PDFDocument): string | null {
-  const names = doc.catalog.lookupMaybe(PDFName.of('Names'), PDFDict);
-  const root = names?.lookupMaybe(PDFName.of('EmbeddedFiles'), PDFDict);
-  const visit = (node: PDFDict | undefined): string | null => {
-    if (!node) return null;
-    const entries = node.lookupMaybe(PDFName.of('Names'), PDFArray);
-    for (let i = 0; entries && i + 1 < entries.size(); i += 2) {
-      const key = entries.lookup(i);
-      const filename = key instanceof PDFString || key instanceof PDFHexString ? key.decodeText() : '';
-      if (!INVOICE_XML_NAMES.includes(filename.toLowerCase())) continue;
-      const stream = entries
-        .lookupMaybe(i + 1, PDFDict)
-        ?.lookupMaybe(PDFName.of('EF'), PDFDict)
-        ?.lookup(PDFName.of('F'));
-      if (stream instanceof PDFRawStream) return new TextDecoder().decode(decodePDFRawStream(stream).decode());
-    }
-    const kids = node.lookupMaybe(PDFName.of('Kids'), PDFArray);
-    for (let i = 0; kids && i < kids.size(); i++) {
-      const found = visit(kids.lookupMaybe(i, PDFDict));
-      if (found) return found;
-    }
-    return null;
-  };
-  return visit(root);
-}
-
-/** Reads `pdfaid:part` from the XMP metadata of the catalog, where it is an element or an attribute. */
-function pdfaPart(doc: PDFDocument): string | null {
-  const metadata = doc.catalog.lookup(PDFName.of('Metadata'));
-  if (!(metadata instanceof PDFRawStream)) return null;
-  try {
-    const xmp = new TextDecoder().decode(decodePDFRawStream(metadata).decode());
-    return /pdfaid:part\s*(?:>|=\s*["'])\s*(\d+)/.exec(xmp)?.[1] ?? null;
-  } catch {
-    // Metadata in an encoding that cannot be decoded declares nothing readable; it must not stop the inspection.
-    return null;
-  }
 }
 
 /** Looks at a PDF without changing it. Throws if the file cannot be read as a PDF. */
@@ -192,15 +48,200 @@ export async function readEmbeddedXml(pdf: Uint8Array): Promise<string | null> {
  */
 export async function repairForPdfA(pdf: Uint8Array): Promise<Uint8Array> {
   const doc = await load(pdf);
+  const smoothed = stopSmoothing(doc);
+  const ran = forbiddenActions(doc, true).length > 0;
+  return smoothed || ran ? doc.save() : pdf;
+}
+
+/** Loads a PDF, or throws the reason it cannot be used. */
+async function load(pdf: Uint8Array): Promise<PDFDocument> {
+  return PDFDocument.load(pdf, { updateMetadata: false });
+}
+
+function unembeddedFonts(doc: PDFDocument): string[] {
+  const missing = new Set<string>();
+  for (const [, object] of doc.context.enumerateIndirectObjects()) {
+    if (!(object instanceof PDFDict) || name(object, 'Type') !== 'Font') continue;
+    // A Type0 font delegates to a descendant font, which is checked on its own; a Type3 font draws its glyphs itself.
+    if (['Type0', 'Type3'].includes(name(object, 'Subtype') ?? '')) continue;
+    const descriptor = object.lookupMaybe(PDFName.of('FontDescriptor'), PDFDict);
+    const embedded =
+      descriptor && ['FontFile', 'FontFile2', 'FontFile3'].some((key) => descriptor.has(PDFName.of(key)));
+    if (!embedded) missing.add(name(object, 'BaseFont') ?? 'unnamed font');
+  }
+  return [...missing].sort();
+}
+
+/** Turns off `/Interpolate true` on every image; true where one had it. */
+function stopSmoothing(doc: PDFDocument): boolean {
   const key = PDFName.of('Interpolate');
-  let repaired = false;
+  let stopped = false;
   for (const [, object] of doc.context.enumerateIndirectObjects()) {
     const dict = object instanceof PDFRawStream ? object.dict : object;
     if (dict instanceof PDFDict && name(dict, 'Subtype') === 'Image' && dict.get(key) === PDFBool.True) {
       dict.set(key, PDFBool.False);
-      repaired = true;
+      stopped = true;
     }
   }
-  if (forbiddenActions(doc, true).length) repaired = true;
-  return repaired ? doc.save() : pdf;
+  return stopped;
 }
+
+/** Looking through a PDF for forbidden actions: what was found, and with `remove` what leaves the file. */
+interface Scan {
+  doc: PDFDocument;
+  remove: boolean;
+  found: Set<string>;
+  gone: Set<PDFRef>;
+}
+
+/**
+ * Finds what a PDF would run although PDF/A forbids it, wherever it hangs: the document, a page, a link, a form
+ * field or a bookmark, the list of scripts of the document, and actions that follow another. With `remove` it is
+ * taken out, and an action that is an object of its own leaves the file with its script. Returns the kinds, sorted.
+ */
+function forbiddenActions(doc: PDFDocument, remove = false): string[] {
+  const scan: Scan = { doc, remove, found: new Set(), gone: new Set() };
+  for (const [, object] of doc.context.enumerateIndirectObjects()) visit(scan, object);
+  for (const ref of scan.gone) doc.context.delete(ref);
+  return [...scan.found].sort();
+}
+
+/** Notes, and with `remove` takes out, the forbidden actions of an object and of everything it holds directly. */
+function visit(scan: Scan, object: PDFObject): void {
+  const dict = object instanceof PDFRawStream ? object.dict : object;
+  if (dict instanceof PDFArray) return dict.asArray().forEach((item) => visit(scan, item));
+  if (!(dict instanceof PDFDict)) return;
+  for (const { key, kinds, values } of actionsIn(scan.doc, dict)) {
+    for (const kind of kinds) if (kind) scan.found.add(kind);
+    if (!scan.remove) continue;
+    values.forEach((value) => forget(scan, value));
+    dict.delete(PDFName.of(key));
+  }
+  for (const value of dict.values()) if (value instanceof PDFDict || value instanceof PDFArray) visit(scan, value);
+}
+
+/** A forbidden entry of a dictionary: its key, the kinds of action it holds, and what leaves the file with it. */
+interface Held {
+  key: string;
+  kinds: (string | undefined)[];
+  values: (PDFObject | undefined)[];
+}
+
+/** The entries of a dictionary that hold forbidden actions. */
+function actionsIn(doc: PDFDocument, dict: PDFDict): Held[] {
+  const held: Held[] = [];
+  const at = (key: string) => dict.get(PDFName.of(key));
+  const kindOfIn = (value: PDFObject | undefined) => kindOf(doc, value);
+  // Additional actions are forbidden whatever they do (6.5.2); a list of scripts holds nothing else.
+  const more = resolved(doc, at('AA'));
+  if (more instanceof PDFDict) {
+    const kinds = more.values().some(kindOfIn) ? more.values().map(kindOfIn) : ['additional actions'];
+    held.push({ key: 'AA', kinds, values: [at('AA'), ...more.values()] });
+  }
+  if (dict.has(PDFName.of('JavaScript')))
+    held.push({ key: 'JavaScript', kinds: ['JavaScript'], values: [at('JavaScript')] });
+  for (const key of ['OpenAction', 'A', 'Next']) {
+    const kind = kindOf(doc, at(key));
+    if (kind) held.push({ key, kinds: [kind], values: [at(key)] });
+  }
+  return held;
+}
+
+/** The kind of a forbidden action, also behind a reference or in a list of actions; undefined for what is allowed. */
+function kindOf(doc: PDFDocument, value: PDFObject | undefined): string | undefined {
+  const action = resolved(doc, value);
+  if (action instanceof PDFArray)
+    return action
+      .asArray()
+      .map((item) => kindOf(doc, item))
+      .find(Boolean);
+  if (!(action instanceof PDFDict)) return undefined;
+  const kind = name(action, 'S') ?? '';
+  const forbidden = FORBIDDEN_ACTIONS.has(kind) || (kind === 'Named' && !PAGE_TURNS.has(name(action, 'N') ?? ''));
+  return forbidden ? kind : undefined;
+}
+
+/** Marks an action, its script, what follows it and the nodes of a list of scripts for leaving the file. */
+function forget(scan: Scan, value: PDFObject | undefined): void {
+  if (value instanceof PDFRef) {
+    if (scan.gone.has(value)) return;
+    scan.gone.add(value);
+  }
+  const object = resolved(scan.doc, value);
+  if (object instanceof PDFArray) object.asArray().forEach((item) => forget(scan, item));
+  else if (object instanceof PDFDict)
+    for (const key of ['JS', 'Next', 'Kids', 'Names']) forget(scan, object.get(PDFName.of(key)));
+}
+
+function resolved(doc: PDFDocument, value: PDFObject | undefined): PDFObject | undefined {
+  return value instanceof PDFRef ? doc.context.lookup(value) : value;
+}
+
+/** Walks the name tree of embedded files and returns the invoice XML, if one is attached. */
+function findInvoiceXml(doc: PDFDocument): string | null {
+  const names = doc.catalog.lookupMaybe(PDFName.of('Names'), PDFDict);
+  return invoiceXmlIn(names?.lookupMaybe(PDFName.of('EmbeddedFiles'), PDFDict));
+}
+
+/** The invoice XML among the files of a node of the name tree, or of the nodes below it. */
+function invoiceXmlIn(node: PDFDict | undefined): string | null {
+  if (!node) return null;
+  const entries = node.lookupMaybe(PDFName.of('Names'), PDFArray);
+  for (let i = 0; entries && i + 1 < entries.size(); i += 2) {
+    const key = entries.lookup(i);
+    const filename = key instanceof PDFString || key instanceof PDFHexString ? key.decodeText() : '';
+    if (!INVOICE_XML_NAMES.includes(filename.toLowerCase())) continue;
+    const stream = entries
+      .lookupMaybe(i + 1, PDFDict)
+      ?.lookupMaybe(PDFName.of('EF'), PDFDict)
+      ?.lookup(PDFName.of('F'));
+    if (stream instanceof PDFRawStream) return new TextDecoder().decode(decodePDFRawStream(stream).decode());
+  }
+  const kids = node.lookupMaybe(PDFName.of('Kids'), PDFArray);
+  for (let i = 0; kids && i < kids.size(); i++) {
+    const found = invoiceXmlIn(kids.lookupMaybe(i, PDFDict));
+    if (found) return found;
+  }
+  return null;
+}
+
+/** Reads `pdfaid:part` from the XMP metadata of the catalog, where it is an element or an attribute. */
+function pdfaPart(doc: PDFDocument): string | null {
+  const metadata = doc.catalog.lookup(PDFName.of('Metadata'));
+  if (!(metadata instanceof PDFRawStream)) return null;
+  try {
+    const xmp = new TextDecoder().decode(decodePDFRawStream(metadata).decode());
+    return /pdfaid:part\s*(?:>|=\s*["'])\s*(\d+)/.exec(xmp)?.[1] ?? null;
+  } catch {
+    // Metadata in an encoding that cannot be decoded declares nothing readable; it must not stop the inspection.
+    return null;
+  }
+}
+
+function name(dict: PDFDict, key: string): string | undefined {
+  return dict.lookupMaybe(PDFName.of(key), PDFName)?.decodeText();
+}
+
+/** Attachment names used by Factur-X, ZUGFeRD 1/2 and the XRECHNUNG profile. */
+const INVOICE_XML_NAMES = ['factur-x.xml', 'zugferd-invoice.xml', 'xrechnung.xml'];
+
+/**
+ * The actions PDF/A forbids (ISO 19005-3, 6.5.1): they run a script, start a program, play media or change what a
+ * reader shows. A named action is allowed only where it turns a page.
+ */
+const FORBIDDEN_ACTIONS = new Set([
+  'JavaScript',
+  'Launch',
+  'Sound',
+  'Movie',
+  'ResetForm',
+  'ImportData',
+  'Hide',
+  'SetOCGState',
+  'Rendition',
+  'Trans',
+  'GoTo3DView',
+  'SetState',
+  'NoOp',
+]);
+const PAGE_TURNS = new Set(['NextPage', 'PrevPage', 'FirstPage', 'LastPage']);

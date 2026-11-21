@@ -28,7 +28,8 @@ flowchart LR
 ```
 
 1. **Read the page.** `extractLayout()` returns the text of the PDF row by row, and its blocks: the columns as the page
-   sets them. Nothing about invoices is known at this point.
+   sets them. Nothing about invoices is known at this point. A row is one line of text with three spaces between its
+   columns; `util/rows.ts` writes it for `pdf/` and takes it apart for the reader, since neither may use the other.
 2. **Read the invoice from it**, in one of two ways. `guessFromText()` finds values by pattern, without a model: three
    amounts with net + VAT = gross, rows that add up to them, a party under its label. A language model reads more, but
    may invent; `keepWhatThePdfShows()` drops every value it returned that the text of the page does not show. Either
@@ -67,15 +68,19 @@ this tool writes.
 other,
 however indirectly.
 
-| layer           | holds                                                                                       | may import        |
-| --------------- | ------------------------------------------------------------------------------------------- | ----------------- |
-| `src/adapters/` | command line, MCP server, and the work with files on disk both share                        | all other layers  |
-| `src/inspect/`  | reading and checking an existing e-invoice                                                  | domain, pdf, util |
-| `src/generate/` | the UBL document and the e-invoice file                                                     | domain, pdf, util |
-| `src/extract/`  | invoice data from the text of a PDF                                                         | domain, util      |
-| `src/pdf/`      | the text, the layout and the structure of a PDF; knows nothing of invoices                  | util              |
-| `src/domain/`   | the data model, the rules, the totals, the findings and their texts; knows nothing of files | util              |
-| `src/util/`     | small helpers without a subject of their own                                                | nothing           |
+| layer           | holds                                                                                   | may import        |
+| --------------- | --------------------------------------------------------------------------------------- | ----------------- |
+| `src/adapters/` | command line, MCP server, and the work with files on disk both share                    | all other layers  |
+| `src/inspect/`  | reading and checking an existing e-invoice                                              | domain, pdf, util |
+| `src/generate/` | the UBL document and the e-invoice file                                                 | domain, pdf, util |
+| `src/extract/`  | invoice data from the text of a PDF                                                     | domain, util      |
+| `src/pdf/`      | the text, the layout and the structure of a PDF; knows nothing of invoices              | util              |
+| `src/domain/`   | the data model, the rules, the totals, the findings on the data; knows nothing of files | util              |
+| `src/util/`     | small helpers without a subject of their own                                            | nothing           |
+
+A file that has grown parts keeps them in a folder of its name, as `extract/guess.ts` does in `extract/guess/`. Only
+that file and the parts themselves import them; what another file or the web app needs of them belongs to a layer
+both may use, as `toNumber()` belongs to `domain/spellings.ts`. The same test enforces it.
 
 `src/index.ts` is the public API of the package: what it exports is all a user of the library can import
 (`package.json` exports no other entry; the command line is its `bin`). The adapters are not part of it, since they
@@ -94,7 +99,8 @@ not through its inner parts, so a layer can be rebuilt inside without changing i
 **A module is the unit of encapsulation.** TypeScript has no package-private: what a file exports, any file may import,
 and what it does not export, no other file can reach. Where Java has a class with private methods, this code has a file
 with exported and unexported functions. Variables that hold state, as in the web app, are not exported; other modules
-change them through a function of their owner.
+change them through a function of their owner. What the start page knows of its invoice (`site/app/state.ts`) is
+exported to be read, and changed only by the functions beside it.
 
 **Imports name the `.js` file.** `import { check } from './check.js'` refers to `check.ts`. TypeScript does not rewrite
 paths when it compiles, and Node needs the name of the file that exists at run time.
@@ -108,9 +114,11 @@ like); after `check()` it is an `Invoice` whose types hold.
 zero; `domain/calculate.ts` sums the totals with it, `domain/adjustments.ts` the discounts and charges on the whole
 invoice. Other code formats amounts and compares them in cents with `cents()`, it does not calculate with them.
 
-**A finding has a code and a text from the catalog.** `error(path, key, values)` and `warning(...)` in
-`domain/finding.ts` take both from `domain/messages.ts`. The code is stable: the web app shows a German text for it from
-`site/shared/i18n.ts`, and other front ends may do the same.
+**A finding has a code and a text from a catalog.** Each layer that reports findings has one, its `messages.ts`:
+`domain/` for what is wrong with invoice data, `generate/` and `inspect/` for what they say about a file.
+`catalog()` in `domain/finding.ts` makes the `error(path, key, values)` and `warning(...)` of a catalog, which take
+code and text from it. The code is stable: the web app shows a German text for it from `site/shared/i18n.ts`, and
+other front ends may do the same.
 
 **A reader does not guess.** `guessFromText()` believes a value for what it fits to, not for where it stands, and
 leaves out what does not fit. A missing value is filled in by a person; a wrong one may go unnoticed. A change to the

@@ -87,6 +87,21 @@ describe('the layers of src/', () => {
     expect(wrong).toEqual([]);
   });
 
+  it('leaves the parts of a file to that file', () => {
+    // `guess.ts` has its parts in `guess/`. What stands in such a folder is imported by the file of its name and by
+    // the parts beside it, and by nothing else: not by another file of the layer, and not by the web app.
+    const partsOf = (target: string) => {
+      const folder = dirname(target);
+      return files.includes(`${folder}.ts`) ? folder : undefined;
+    };
+    const wrong = [...files, ...sources('site')].flatMap((file) =>
+      importsOf(file)
+        .filter((target) => partsOf(target) && file !== `${partsOf(target)}.ts` && dirname(file) !== partsOf(target))
+        .map((target) => `${relative(root, file)} -> ${relative(root, target)}`),
+    );
+    expect(wrong).toEqual([]);
+  });
+
   it('imports no entry point', () => {
     const wrong = files.flatMap((file) =>
       importsOf(file)
@@ -148,6 +163,21 @@ describe('the parts of site/', () => {
       .map((file) => relative(site, file))
       .filter((path) => !(path in SITE_CONFIG) && !((path.split('/')[0] ?? '') in SITE_PARTS));
     expect(stray).toEqual([]);
+  });
+
+  it('changes what the start page knows of its invoice in state.ts only', () => {
+    // The type of `state` forbids replacing one of its fields, or adding to its set and its map. It cannot forbid
+    // reaching into the draft, so that is looked for here.
+    const WRITE =
+      /\bstate\.draft\b[\w.[\]?!]*\s*(?:\?\?=|\|\|=|=(?!=))|\b(?:setPath|merge|Object\.assign)\(\s*state\b|\bdelete\s+state\./;
+    const wrong = files
+      .filter((file) => partOf(file) === 'app' && !file.endsWith('/state.ts'))
+      .flatMap((file) =>
+        readFileSync(file, 'utf8')
+          .split('\n')
+          .flatMap((line, i) => (WRITE.test(line) ? [`${relative(site, file)}:${i + 1}: ${line.trim()}`] : [])),
+      );
+    expect(wrong).toEqual([]);
   });
 
   it('imports only from the parts each part may use', () => {
