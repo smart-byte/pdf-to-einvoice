@@ -87,6 +87,7 @@ export async function createEInvoice(options: CreateOptions): Promise<CreateResu
   const before = { ...data, findings: [...data.findings, ...fileWarnings(info)] };
   const { file: pdf, warnings } = await write<Uint8Array>(before, {
     format: xrechnung ? 'Factur-X-XRechnung' : 'Factur-X-EN16931',
+    xrechnung,
     lang: options.lang,
     pdf: options.pdf,
   });
@@ -105,6 +106,7 @@ export async function createXRechnung(options: XRechnungOptions): Promise<XRechn
   const data = checked(options.invoice, 'xrechnung');
   const { file: xml, warnings } = await write<string>(data, {
     format: options.syntax === 'cii' ? 'XRECHNUNG-CII' : 'XRECHNUNG-UBL',
+    xrechnung: true,
     lang: options.lang,
   });
   return { xml, findings: [...data.findings, ...warnings, ...notWritten(data.invoice, xml)], totals: data.totals };
@@ -142,6 +144,15 @@ function fileWarnings(info: PdfInfo): Finding[] {
   ];
 }
 
+/** What a file is written as: a format of @e-invoice-eu/core, and whether its XML has to meet the XRechnung rules. */
+interface Target {
+  format: string;
+  xrechnung: boolean;
+  lang?: string;
+  /** The PDF the XML goes into; without one the XML is the file. */
+  pdf?: Uint8Array;
+}
+
 /**
  * Has @e-invoice-eu/core write the checked invoice in one of its formats, into `pdf` where one is given. What the
  * library warns about is returned beside the file. When it fails, the error carries the findings of the check and
@@ -149,13 +160,13 @@ function fileWarnings(info: PdfInfo): Finding[] {
  */
 async function write<File extends string | Uint8Array>(
   { findings, invoice, totals }: Checked,
-  { format, lang = 'en', pdf }: { format: string; lang?: string; pdf?: Uint8Array },
+  { format, xrechnung, lang = 'en', pdf }: Target,
 ): Promise<{ file: File; warnings: Finding[] }> {
   const warnings: Finding[] = [];
   const note = (text: unknown) => warnings.push(warning('', 'generator.library', { text: String(text) }));
   try {
     const service = new InvoiceService({ log: () => {}, warn: note, error: note });
-    const file = await service.generate(toUbl(invoice, totals, /xrechnung/i.test(format)), {
+    const file = await service.generate(toUbl(invoice, totals, xrechnung), {
       format,
       lang,
       // The file names this tool as its producer; the library that writes it is credited in the README.

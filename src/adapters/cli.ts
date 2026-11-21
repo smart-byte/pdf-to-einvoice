@@ -3,14 +3,13 @@ import { realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import type { Totals } from '../domain/calculate.js';
-import { check } from '../domain/check.js';
 import type { Finding } from '../domain/finding.js';
 import { invoiceJsonSchema } from '../domain/model.js';
 import { createXRechnung, InvoiceError } from '../generate/create.js';
 import { readEmbeddedXml } from '../pdf/file.js';
-import { extractText } from '../pdf/text.js';
 import { messageOf } from '../util/errors.js';
 import {
+  checkFile,
   CHOICES,
   createFile,
   createXRechnungFile,
@@ -145,8 +144,7 @@ const COMMANDS: Record<string, Command> = {
   }),
   check: defineCommand(1, async ([dataPath], values, io) => {
     const data = await readJson(dataPath);
-    const pdfText = values.pdf === undefined ? undefined : await extractText(await readPdf(values.pdf));
-    const { findings, totals } = check(data, { pdfText, rules: values.rules });
+    const { findings, totals } = await checkFile(data, { pdfPath: values.pdf, rules: values.rules });
     if (values.json) io.stdout(`${JSON.stringify({ findings, totals }, null, 2)}\n`);
     else printFindings({ findings, totals }, io);
     return findings.some((finding) => finding.severity === 'error') ? 1 : 0;
@@ -230,11 +228,8 @@ Exit codes: 0 done, 1 failed or the data has errors, 2 used wrongly.`;
 
 // Run only as the program, not when imported. Both sides go through realpath because npm starts the bin via a symlink.
 if (process.argv[1] && realpathSync.native(process.argv[1]) === realpathSync.native(fileURLToPath(import.meta.url))) {
-  // No top-level await: `mcp` imports a module that imports this one, which must have finished loading by then.
-  void run(process.argv.slice(2), {
+  process.exitCode = await run(process.argv.slice(2), {
     stdout: (text) => process.stdout.write(text),
     stderr: (text) => process.stderr.write(text),
-  }).then((code) => {
-    process.exitCode = code;
   });
 }

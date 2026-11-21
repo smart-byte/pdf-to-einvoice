@@ -5,7 +5,7 @@ import { readContact } from './guess/contact.js';
 import { readBuyerReference, readNumber, readPaymentTerms, readPeriod, readType } from './guess/head.js';
 import { NOTE_CATEGORIES, readItems, readVatNote } from './guess/items.js';
 import { believed, countryOfVatId, EU, type Found, ISSUER_OR_BANK, readParties } from './guess/parties.js';
-import { findCurrency, readTotals, type Totals } from './guess/totals.js';
+import { findCurrency, readTotals, type ReadTotals } from './guess/totals.js';
 import { after, anyOf, DATE, findIban, SEPARATOR, toIsoDate, vatIdsIn } from './guess/values.js';
 import { cells, rowOf } from '../util/rows.js';
 
@@ -107,7 +107,7 @@ function vatIdsOf(searched: string, units: string[], found: { seller?: Found; bu
  */
 function withVatTreatment(
   rows: string[],
-  totals: Totals,
+  totals: ReadTotals,
   lines: Partial<Line>[] | undefined,
   countries: { seller?: string; buyer?: string },
 ): { lines?: Partial<Line>[]; reason?: string } {
@@ -124,7 +124,7 @@ function withVatTreatment(
  */
 function withoutVat(
   rows: string[],
-  totals: Totals,
+  totals: ReadTotals,
   lines: Partial<Line>[],
   countries: { seller?: string; buyer?: string },
 ): { vatCategory?: VatCategory; reason?: string } {

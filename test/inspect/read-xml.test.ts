@@ -347,6 +347,27 @@ describe('readInvoiceXml', () => {
     expect(invoice.seller?.taxNumber).toBeUndefined();
   });
 
+  it.each([
+    ['12/345/67890', '12/345/67890'],
+    ['12 345 67890', '12 345 67890'],
+    ['LIEF-0042', undefined],
+    ['4711', undefined],
+  ])('reads the identifier %s of a seller without a tax registration as the tax number %s', async (id, taxNumber) => {
+    // The shape of a tax number is the one `check` and the comparison with the page know (domain/formats.ts).
+    const notSubjectToVat = sample((d) => {
+      for (const line of d.lines) Object.assign(line, { vatCategory: 'O', vatRate: 0 });
+      d.vatExemptionReason = 'Nicht steuerbar.';
+      delete d.seller.vatId;
+      delete d.buyer.vatId;
+      d.seller.taxNumber = '12/345/67890';
+    });
+    const xml = (await xmlOf(notSubjectToVat))
+      .replace(/(<ram:SellerTradeParty>\s*)<ram:ID>[^<]*<\/ram:ID>/, `$1<ram:ID>${id}</ram:ID>`)
+      .replace(/<ram:SpecifiedTaxRegistration>[\s\S]*?<\/ram:SpecifiedTaxRegistration>/g, '');
+    expect(xml).toContain(`<ram:ID>${id}</ram:ID>`);
+    expect(readInvoiceXml(xml).invoice.seller?.taxNumber).toBe(taxNumber);
+  });
+
   it('takes the reason code of a line discount where no reason is written out', async () => {
     const { invoice } = readInvoiceXml(await xmlOf(sample((d) => (d.lines[0].discount = { percent: 10 }))));
     expect(invoice.lines?.[0]?.discount?.reason).toBe('95');

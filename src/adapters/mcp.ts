@@ -2,9 +2,9 @@ import { isAbsolute } from 'node:path';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ErrorCode, ListToolsRequestSchema, McpError } from '@modelcontextprotocol/sdk/types.js';
-import { check } from '../domain/check.js';
 import { messageOf } from '../util/errors.js';
 import {
+  checkFile,
   CHOICES,
   createFile,
   createXRechnungFile,
@@ -17,7 +17,6 @@ import {
 import { InvoiceError } from '../generate/create.js';
 import { invoiceJsonSchema, type InvoiceDraft } from '../domain/model.js';
 import { readEmbeddedXml } from '../pdf/file.js';
-import { extractText } from '../pdf/text.js';
 
 /** The MCP server, not yet connected to a transport. */
 export function createServer(): Server {
@@ -67,9 +66,8 @@ const HANDLERS: Record<string, (args: Args) => Promise<object | string>> = {
 
   async check_invoice(args) {
     const rules = choiceArg(args, 'rules');
-    const pdfText =
-      args.pdf_path === undefined ? undefined : await extractText(await readPdf(pathArg(args, 'pdf_path')));
-    const { findings, totals, invoice } = check(invoiceArg(args), { pdfText, rules });
+    const pdfPath = args.pdf_path === undefined ? undefined : pathArg(args, 'pdf_path');
+    const { findings, totals, invoice } = await checkFile(invoiceArg(args), { pdfPath, rules });
     return { ok: invoice !== undefined, findings, totals };
   },
 

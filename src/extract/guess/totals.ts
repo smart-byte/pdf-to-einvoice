@@ -1,17 +1,19 @@
+import type { PrintedTotals } from '../../domain/model.js';
 import { cents } from '../../domain/money.js';
 import { toNumber } from '../../domain/spellings.js';
 import { after, AMOUNT, anyOf, MONEY, SEPARATOR } from './values.js';
 
 // Totals: three printed amounts with net + VAT = gross, picked by their labels where several fit.
 
-export type Totals = { net?: number; vat?: number; gross?: number };
+/** The totals a page prints, as far as the reader found them. */
+export type ReadTotals = Pick<PrintedTotals, 'net' | 'vat' | 'gross'>;
 
 /**
  * The totals: three printed amounts with net + VAT = gross. Labels say which three when several fit, and nothing
  * else: an amount after a label is not believed against the sum. One or two labelled amounts are kept when no
  * three amounts fit, as on an invoice without VAT.
  */
-export function readTotals(searched: string, text: string): Totals {
+export function readTotals(searched: string, text: string): ReadTotals {
   const labelled = labelledIn(searched);
   return labelledSum(labelled) ?? sumOnPage(text, labelled) ?? labelledAlone(labelled);
 }
@@ -25,7 +27,7 @@ function labelledIn(searched: string): Labelled {
 }
 
 /** The first amount after each label, where they add up: net + VAT = gross, or net = gross and no VAT. */
-function labelledSum({ net: [net], vat: [vat], gross: [gross] }: Labelled): Totals | undefined {
+function labelledSum({ net: [net], vat: [vat], gross: [gross] }: Labelled): ReadTotals | undefined {
   if (net !== undefined && vat !== undefined && net + vat === gross) {
     return { net: euros(net), vat: euros(vat), gross: euros(gross) };
   }
@@ -39,7 +41,7 @@ function labelledSum({ net: [net], vat: [vat], gross: [gross] }: Labelled): Tota
  * best is believed when no other scores as high; where the page labels no amount at all, when it is the only one
  * that charges VAT.
  */
-function sumOnPage(text: string, labelled: Labelled): Totals | undefined {
+function sumOnPage(text: string, labelled: Labelled): ReadTotals | undefined {
   const printed = new Set(centsOf([...text.matchAll(PRINTED_AMOUNT)].map((match) => match[1]!)));
   // VAT of nothing is believed when a label says so; "0,00" alone may be anything.
   const fits = (net: number, vat: number) =>
@@ -67,7 +69,7 @@ function sumOnPage(text: string, labelled: Labelled): Totals | undefined {
  * together are not believed either. Net and gross may: the VAT between them is printed in parts where an invoice has
  * several rates.
  */
-function labelledAlone({ net: [net], vat: [vat], gross: [gross] }: Labelled): Totals {
+function labelledAlone({ net: [net], vat: [vat], gross: [gross] }: Labelled): ReadTotals {
   if (net !== undefined && gross !== undefined) {
     return share(gross - net, net) ? { net: euros(net), gross: euros(gross) } : {};
   }

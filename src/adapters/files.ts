@@ -4,6 +4,7 @@ import { existsSync, readFileSync, statSync } from 'node:fs';
 import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import type { Totals } from '../domain/calculate.js';
+import { check, type CheckOptions, type CheckResult } from '../domain/check.js';
 import type { Finding } from '../domain/finding.js';
 import type { InvoiceDraft } from '../domain/model.js';
 import { guessFromText } from '../extract/guess.js';
@@ -89,6 +90,15 @@ function writeOutput(output: string, data: string | Uint8Array, overwrite: boole
  */
 export function outputExists(e: unknown): boolean {
   return e instanceof Error && 'code' in e && e.code === 'EEXIST';
+}
+
+/** Checks invoice data, and compares it with the text of the PDF at `pdfPath` where one is named. */
+export async function checkFile(
+  invoice: InvoiceDraft,
+  { pdfPath, rules }: { pdfPath?: string; rules?: CheckOptions['rules'] } = {},
+): Promise<CheckResult> {
+  const pdfText = pdfPath === undefined ? undefined : await extractText(await readPdf(pdfPath));
+  return check(invoice, { pdfText, rules });
 }
 
 /**
