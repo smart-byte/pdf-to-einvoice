@@ -36,6 +36,11 @@ export const SEPARATOR = '^\\s*[:#.]?\\s*';
 /** The day a match of `DATE` names, as YYYY-MM-DD. */
 export function toIsoDate(match: RegExpExecArray, dayFirst: boolean): string | undefined {
   const groups = match.groups ?? {};
+  return writtenDate(groups) ?? slashedDate(groups, dayFirst);
+}
+
+/** A date in one of the notations that can be read in one way only: ISO, with dots, or with the name of its month. */
+function writtenDate(groups: Record<string, string | undefined>): string | undefined {
   if (groups.isoYear) return `${groups.isoYear}-${groups.isoMonth}-${groups.isoDay}`;
   if (groups.dotDay && groups.dotMonth && groups.dotYear)
     return `${century(groups.dotYear)}-${pad(groups.dotMonth)}-${pad(groups.dotDay)}`;
@@ -43,8 +48,15 @@ export function toIsoDate(match: RegExpExecArray, dayFirst: boolean): string | u
     return `${groups.textYear}-${pad(monthNumber(groups.textMonth))}-${pad(groups.textDay)}`;
   if (groups.usMonth && groups.usDay)
     return `${groups.usYear}-${pad(monthNumber(groups.usMonth))}-${pad(groups.usDay)}`;
+  return undefined;
+}
+
+/**
+ * A date with slashes. Day and month can be told apart when one is above 12, or when a German or French label says
+ * who wrote it (`dayFirst`).
+ */
+function slashedDate(groups: Record<string, string | undefined>, dayFirst: boolean): string | undefined {
   if (!groups.slashYear) return undefined;
-  // With slashes, day and month can be told apart when one is above 12, or when a German or French label says who wrote it.
   const [first, second] = [Number(groups.slashFirst), Number(groups.slashSecond)];
   if (second > 12 && first <= 12) return `${century(groups.slashYear)}-${pad(first)}-${pad(second)}`;
   if ((first > 12 || dayFirst) && second <= 12) return `${century(groups.slashYear)}-${pad(second)}-${pad(first)}`;
