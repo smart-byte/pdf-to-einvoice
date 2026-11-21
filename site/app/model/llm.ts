@@ -162,7 +162,6 @@ function parse(json: string | null | undefined): InvoiceDraft {
   return JSON.parse(json.slice(start, json.lastIndexOf('}') + 1));
 }
 
-// Fields a model is not asked for: nothing on the page lets the answer be verified, so a person fills them in.
 function prompt(text: string): string {
   return `${RULES}\n\nInvoice text:\n"""\n${text.slice(0, MAX_TEXT)}\n"""`;
 }

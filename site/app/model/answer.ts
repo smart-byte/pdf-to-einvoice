@@ -1,28 +1,6 @@
 // What a language model is asked for and how far its answer has come. Nothing here touches the browser.
 import { invoiceJsonSchema } from '../../../src/domain/model.js';
 
-const NOT_ASKED = new Set([
-  'typeCode',
-  // No PDF states a country of delivery as such, and nothing is assumed about the delivery.
-  'deliveryCountry',
-  'buyerReference',
-  'orderReference',
-  'precedingInvoiceNumber',
-  'precedingInvoiceDate',
-  'note',
-  'prepaidAmount',
-  'periodStart',
-  'periodEnd',
-  'contactName',
-  'phone',
-  'description',
-  'netAmount',
-  // keepWhatThePdfShows has no rule for these yet, so what a model reads of them would be dropped.
-  'discount',
-  'discounts',
-  'charges',
-]);
-
 /** The invoice schema as a grammar for the model: every key present, every value nullable, nothing a small grammar engine may not know. */
 export function extractionSchema(schema: any = invoiceJsonSchema): any {
   if (schema.type === 'object') {
@@ -36,20 +14,6 @@ export function extractionSchema(schema: any = invoiceJsonSchema): any {
   if (schema.type === 'array') return { type: 'array', items: extractionSchema(schema.items) };
   return schema.enum ? { enum: [...schema.enum, null] } : { type: [schema.type, 'null'] };
 }
-
-/** The keys of the answer: those before the line items (with `lines` itself), those of one line item, and those after. */
-const KEYS = (() => {
-  const count = (schema: any): number =>
-    schema.type === 'object'
-      ? Object.values(schema.properties).reduce((n: number, value) => n + 1 + count(value), 0)
-      : 0;
-  const { lines, ...rest } = extractionSchema().properties;
-  const names = Object.keys(rest);
-  const split = Object.keys(extractionSchema().properties).indexOf('lines');
-  const part = (keys: string[]) => keys.reduce((n, key) => n + 1 + count(rest[key]), 0);
-  return { before: part(names.slice(0, split)) + 1, line: count(lines.items), after: part(names.slice(split)) };
-})();
-const KEY = /"[A-Za-z]+"\s*:/g;
 
 /**
  * How far an answer that is still being written has come. The grammar makes the model name every key of the schema
@@ -73,3 +37,45 @@ export function progressOf(answer: string): { fraction: number; line: number } {
   const line = Math.ceil((keys - KEYS.before) / KEYS.line);
   return { fraction: 0.6 + 0.3 * (1 - 0.7 ** line), line };
 }
+
+// What the two read. `KEYS` is counted when the module loads, from the schema without what `NOT_ASKED` names, so
+// `NOT_ASKED` stands above it.
+
+/** Fields a model is not asked for: nothing on the page lets the answer be verified, so a person fills them in. */
+const NOT_ASKED = new Set([
+  'typeCode',
+  // No PDF states a country of delivery as such, and nothing is assumed about the delivery.
+  'deliveryCountry',
+  'buyerReference',
+  'orderReference',
+  'precedingInvoiceNumber',
+  'precedingInvoiceDate',
+  'note',
+  'prepaidAmount',
+  'periodStart',
+  'periodEnd',
+  'contactName',
+  'phone',
+  'description',
+  'netAmount',
+  // keepWhatThePdfShows has no rule for these yet, so what a model reads of them would be dropped.
+  'discount',
+  'discounts',
+  'charges',
+]);
+
+/** The keys of the answer: those before the line items (with `lines` itself), those of one line item, and those after. */
+const KEYS = (() => {
+  const count = (schema: any): number =>
+    schema.type === 'object'
+      ? Object.values(schema.properties).reduce((n: number, value) => n + 1 + count(value), 0)
+      : 0;
+  const { lines, ...rest } = extractionSchema().properties;
+  const names = Object.keys(rest);
+  const split = Object.keys(extractionSchema().properties).indexOf('lines');
+  const part = (keys: string[]) => keys.reduce((n, key) => n + 1 + count(rest[key]), 0);
+  return { before: part(names.slice(0, split)) + 1, line: count(lines.items), after: part(names.slice(split)) };
+})();
+
+/** A key of the answer as the model writes it. */
+const KEY = /"[A-Za-z]+"\s*:/g;
