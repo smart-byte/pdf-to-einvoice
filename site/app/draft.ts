@@ -15,42 +15,44 @@ export interface Target {
  * was filled in: the paths of the fields, and one path per line item ("lines.2") where the lines were taken over.
  */
 export function merge(target: Target, extra: object, { onlyEmpty = false } = {}): string[] {
-  const merging: Merging = { target, onlyEmpty, filled: [] };
-  copyInto(merging, extra, '');
-  return merging.filled;
+  return copyInto({ target, onlyEmpty }, extra, '');
 }
 
-/** A merge under way: where it goes, whether it fills empty fields only, and what it has filled in so far. */
+/** A merge under way: where it goes, and whether it fills empty fields only. */
 interface Merging {
   target: Target;
   onlyEmpty: boolean;
-  filled: string[];
 }
 
-/** Copies the values of an object of `extra`, found at `prefix`, into the draft. */
-function copyInto(merging: Merging, from: object, prefix: string): void {
-  for (const [key, value] of Object.entries(from)) {
+/** Copies the values of an object of `extra`, found at `prefix`, into the draft. Returns the paths it filled in. */
+function copyInto(merging: Merging, from: object, prefix: string): string[] {
+  return Object.entries(from).flatMap(([key, value]) => {
     const path = prefix ? `${prefix}.${key}` : key;
-    if (isEmpty(value)) continue;
-    if (key === 'lines' && Array.isArray(value)) takeLines(merging, value);
-    else if (typeof value === 'object') copyInto(merging, value, path);
-    else takeValue(merging, path, value);
-  }
+    if (isEmpty(value)) return [];
+    if (key === 'lines' && Array.isArray(value)) return takeLines(merging, value);
+    return typeof value === 'object' ? copyInto(merging, value, path) : takeValue(merging, path, value);
+  });
 }
 
-/** The line items are taken over as a whole, unless the user has typed into one, or there are some and only empty fields are filled. */
-function takeLines({ target, onlyEmpty, filled }: Merging, lines: unknown[]): void {
+/**
+ * The line items are taken over as a whole, unless the user has typed into one, or there are some and only empty
+ * fields are filled. Returns one path per line item taken over.
+ */
+function takeLines({ target, onlyEmpty }: Merging, lines: unknown[]): string[] {
   const typed = [...target.touched].some((path) => path.startsWith('lines.'));
-  if (typed || (onlyEmpty && hasContent(target.draft.lines)) || !hasContent(lines)) return;
+  if (typed || (onlyEmpty && hasContent(target.draft.lines)) || !hasContent(lines)) return [];
   target.draft.lines = lines.map(normalise) as InvoiceDraft['lines'];
-  filled.push(...lines.map((_, i) => `lines.${i}`));
+  return lines.map((_, i) => `lines.${i}`);
 }
 
-/** A value is taken over unless the user has typed into its field, or the field holds one and only empty fields are filled. */
-function takeValue({ target, onlyEmpty, filled }: Merging, path: string, value: unknown): void {
-  if (target.touched.has(path) || (onlyEmpty && !isEmpty(valueAt(target.draft, path)))) return;
+/**
+ * A value is taken over unless the user has typed into its field, or the field holds one and only empty fields are
+ * filled. Returns its path where it was.
+ */
+function takeValue({ target, onlyEmpty }: Merging, path: string, value: unknown): string[] {
+  if (target.touched.has(path) || (onlyEmpty && !isEmpty(valueAt(target.draft, path)))) return [];
   setPath(target.draft, path, isNumberField(path) ? numberOf(value) : value);
-  filled.push(path);
+  return [path];
 }
 
 /** Writes a value at a path, making the objects and lists on the way; an empty value removes the field. */

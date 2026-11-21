@@ -32,10 +32,9 @@ export function guessFromText(text: string, options: GuessOptions = {}): Invoice
 
   const found = readParties(rows, options.blocks ?? [rows.map((row) => cells(row)[0]!)]);
   const totals = readTotals(searched, text);
-  const lines = readItems(rows, totals, options.blocks);
-  const { seller, buyer } = partiesOf({ rows, searched, blocks: options.blocks }, found, lines);
-
-  const reason = markWithoutVat(rows, totals, lines, { seller: seller.country, buyer: buyer.country });
+  const items = readItems(rows, totals, options.blocks);
+  const { seller, buyer } = partiesOf({ rows, searched, blocks: options.blocks }, found, items);
+  const { lines, reason } = withVatTreatment(rows, totals, items, { seller: seller.country, buyer: buyer.country });
 
   const { number, dated, beside } = readNumber(searched, rows);
   const iban = findIban(text);
@@ -103,19 +102,19 @@ function vatIdsOf(searched: string, units: string[], found: { seller?: Found; bu
 }
 
 /**
- * An invoice that shows no VAT at all charges none: its lines get the category `withoutVat` names, with a rate of 0.
- * Returns the reason printed for it.
+ * The lines as they were read, unless the invoice shows no VAT at all. Then it charges none: its lines are given with
+ * the category `withoutVat` names and a rate of 0, beside the reason printed for it.
  */
-function markWithoutVat(
+function withVatTreatment(
   rows: string[],
   totals: Totals,
   lines: Partial<Line>[] | undefined,
   countries: { seller?: string; buyer?: string },
-): string | undefined {
-  if (!lines) return undefined;
+): { lines?: Partial<Line>[]; reason?: string } {
+  if (!lines) return {};
   const { vatCategory, reason } = withoutVat(rows, totals, lines, countries);
-  if (vatCategory) for (const line of lines) Object.assign(line, { vatCategory, vatRate: 0 });
-  return reason;
+  if (!vatCategory) return { lines };
+  return { lines: lines.map((line) => ({ ...line, vatCategory, vatRate: 0 })), reason };
 }
 
 /**

@@ -194,9 +194,9 @@ function placePercent(entry: Checked & { percent: number }, matching: Group[], n
     const field = entry.vatRate !== undefined ? 'vatRate' : 'vatCategory';
     return unplaced(error(pathOf(list, index, field), 'adjustment-group.percent', { group: named }));
   }
-  const parts = matching.map((g) => ({ g, cents: percentCents(g.cents, percent) }));
-  const problems = entry.amount === undefined ? [] : statedAgainst(entry, entry.amount, parts, slack);
-  const entries = parts.map((p) => ({
+  const computed = matching.map((g) => ({ g, cents: percentCents(g.cents, percent) }));
+  const problems = entry.amount === undefined ? [] : statedAgainst(entry, entry.amount, computed, slack);
+  const entries = withStated(computed, entry.amount).map((p) => ({
     list,
     index,
     category: p.g.category,
@@ -210,13 +210,28 @@ function placePercent(entry: Checked & { percent: number }, matching: Group[], n
 }
 
 /**
- * The amount stated beside a percentage, against the parts it comes to. On one group it has to agree within R040 and
- * then takes the place of the part, as the amount written on a line does; on several it has to be their sum.
+ * The parts a percentage comes to, with the amount stated beside it. On one group that amount takes the place of the
+ * part, as the amount written on a line does; on several the parts stay, and the amount has to be their sum.
+ */
+function withStated(computed: Part[], amount: number | undefined): Part[] {
+  const [part] = computed;
+  return part && computed.length === 1 && amount !== undefined ? [{ g: part.g, cents: toCents(amount) }] : computed;
+}
+
+/** What a percentage comes to in one VAT group. */
+interface Part {
+  g: Group;
+  cents: bigint;
+}
+
+/**
+ * What is wrong with the amount stated beside a percentage, against the parts the percentage comes to. On one group
+ * it has to agree within R040; on several it has to be their sum.
  */
 function statedAgainst(
   { list, index, percent }: Checked & { percent: number },
   amount: number,
-  parts: { g: Group; cents: bigint }[],
+  parts: Part[],
   slack: number,
 ): Finding[] {
   const what = WHAT[list];
@@ -225,10 +240,8 @@ function statedAgainst(
   const [part] = parts;
   if (part && parts.length === 1) {
     const agrees = percentAgrees(fromCents(part.g.cents), percent, fromCents(stated), slack);
-    const expected = formatCents(part.cents);
-    part.cents = stated;
     if (agrees) return [];
-    const base = formatCents(part.g.cents);
+    const [base, expected] = [formatCents(part.g.cents), formatCents(part.cents)];
     return [error(at, 'adjustment-mismatch', { percent, base, expected, what, stated: formatCents(stated) })];
   }
   const sum = parts.reduce((a, p) => a + p.cents, 0n);
