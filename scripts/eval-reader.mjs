@@ -107,7 +107,7 @@ async function openModel() {
   await page.goto(server.resolvedUrls.local[0]);
   // The function runs in the page: it gets the text and the model as arguments, since it sees nothing of this script.
   const inPage = async ([words, modelId]) =>
-    (await import('/app/model/llm.ts')).readWithBrowserModel(words, modelId, () => {});
+    (await import('/app/model/llm.ts')).readWithBrowserModel(words, modelId, { onProgress: () => {} });
   const read = (pageText) => page.evaluate(inPage, [pageText, model]);
   return { read, close: () => context.close().then(() => server.close()) };
 }
