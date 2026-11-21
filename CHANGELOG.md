@@ -17,6 +17,10 @@ All notable changes to this project are documented here. The format follows
   its category asks for.
 - The comparison of a language model's answer with the PDF drops an e-mail address that `check` would reject, such as
   one that took the full stop of its sentence along.
+- `check` and the comparison of a language model's answer with the PDF ask the same of a value the page is said to
+  show. `check` no longer takes a part of a longer number or word for the value: "49" is not shown by "249,50", "10 %"
+  not by "110 %", "Stadt" not by "Musterstadt". The comparison of a model's answer finds an amount whose thousands are
+  grouped by a space that does not break, and a rate printed as "7,50 %".
 
 ### Fixed
 

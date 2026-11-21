@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { pageTextOf, showsAmount } from '../../src/domain/shown.js';
 import { locate, pageToShow, type Piece } from '../../site/app/locate.js';
 
 /** A piece of text: 10 high and, unless told otherwise, 10 wide per character. `y` is its upper edge. */
@@ -154,5 +155,23 @@ describe('pageToShow', () => {
 
   it('names no page for a value that is printed nowhere', () => {
     expect(pageToShow(pages, 2, has('RE-9'))).toBeUndefined();
+  });
+});
+
+describe('locate and the comparison with the page', () => {
+  // The check warns about an amount the page does not show (domain/shown.ts), and the preview marks where it stands.
+  // Both have to take the same for an amount on its own: a warning beside a mark would contradict itself.
+  it.each([
+    ['249,50 €', 49],
+    ['1.000,00 €', 100],
+    ['03.11.2026', 3.11],
+    ['je 49 €', 49],
+    ['100,- €', 100],
+    ['1\u00a0783,81 €', 1783.81],
+    ['EUR 1.783,81', 1783.81],
+    ['Pos. 5 Beratung', 5],
+  ])('agree on whether "%s" shows %d', (printed, amount) => {
+    const marked = locate([piece(printed, 0, 0)], amount).length > 0;
+    expect(marked).toBe(showsAmount(pageTextOf(printed), amount));
   });
 });

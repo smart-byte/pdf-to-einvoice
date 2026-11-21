@@ -6,7 +6,8 @@ import { error, warning, type Finding } from './finding.js';
 import { isCountryCode, isCurrencyCode, isDate, isEmail, isIban } from './formats.js';
 import type { MessageKey, MessageParams } from './messages.js';
 import { cents, lineAgrees, lineBase, percentAgrees, percentOf, slackOf } from './money.js';
-import { amountSpellings, dateSpellings, percentSpellings } from './spellings.js';
+import { pageTextOf, showsAmount, showsPercent, showsSpelling, showsWords, type PageText } from './shown.js';
+import { dateSpellings } from './spellings.js';
 import {
   invoiceJsonSchema,
   isInvoiceType,
@@ -514,17 +515,17 @@ function xrechnungRecommended(draft: Prepared): Finding[] {
   return findings;
 }
 
-/** A value the page should show: one of its spellings, or with `words` every word of it in any order. */
+/** A value the page should show: `on` tells whether a page does, in the way a value of its kind is printed. */
 interface Expected {
   path: string;
-  spellings: string[];
   shown: unknown;
-  words?: boolean;
+  on: (page: PageText) => boolean;
 }
 
 /**
- * Reports values that the text of the PDF does not contain. Known limit: it tells whether a value stands in the text,
- * not where. An address entered for the wrong party passes, because each of its words stands somewhere on the page.
+ * Reports values that the text of the PDF does not show (see shown.ts). Known limit: it tells whether a value stands
+ * in the text, not where. An address entered for the wrong party passes, because each of its words stands somewhere
+ * on the page.
  */
 function compareWithPdf(
   draft: Prepared,
@@ -532,92 +533,80 @@ function compareWithPdf(
   pdfText: string,
   percentages: Record<string, number> = {},
 ): Finding[] {
-  const haystack = pdfText.replace(/\s+/g, '').toLowerCase();
-  if (!haystack) {
+  if (!pdfText.trim()) {
     return [warning('', 'no-pdf-text')];
   }
+  const page = pageTextOf(pdfText);
   return [
     ...expectedInHead(draft),
     ...expectedInLines(draft),
     ...expectedInAdjustments(draft, percentages),
     ...expectedInTotals(totals),
   ]
-    .filter((expected) => !shownIn(haystack, expected))
+    .filter((expected) => !expected.on(page))
     .map(({ path, shown }) => warning(path, 'not-in-pdf', { value: String(shown) }));
-}
-
-function shownIn(haystack: string, { spellings, words }: Expected): boolean {
-  if (words && spellings[0]!.split(/\s+/).every((word) => haystack.includes(word.toLowerCase()))) return true;
-  return spellings.some((spelling) => haystack.includes(spelling.replace(/\s+/g, '').toLowerCase()));
 }
 
 /** The identifiers, the parties and the dates of the invoice. */
 function expectedInHead(draft: Prepared): Expected[] {
-  const ids = ['number', 'seller.vatId', 'seller.taxNumber', 'buyer.vatId', 'iban'].flatMap((path) => {
+  const ids = ['number', 'seller.vatId', 'seller.taxNumber', 'buyer.vatId', 'iban'].flatMap((path): Expected[] => {
     const value = valueAt(draft, path);
-    return typeof value === 'string' ? [{ path, spellings: [value], shown: value }] : [];
+    return typeof value === 'string' ? [{ path, shown: value, on: (page) => showsSpelling(page, [value]) }] : [];
   });
   const parties = ['seller', 'buyer'].flatMap((who) =>
     ['name', 'street', 'postalCode', 'city'].flatMap((part) =>
       wordsOf(`${who}.${part}`, valueAt(draft, `${who}.${part}`)),
     ),
   );
-  const dates = ['issueDate', 'dueDate', 'deliveryDate'].flatMap((path) => {
+  const dates = ['issueDate', 'dueDate', 'deliveryDate'].flatMap((path): Expected[] => {
     const value = valueAt(draft, path);
-    return isDate(value) ? [{ path, spellings: dateSpellings(value), shown: value }] : [];
+    return isDate(value) ? [{ path, shown: value, on: (page) => showsSpelling(page, dateSpellings(value)) }] : [];
   });
   return [...ids, ...parties, ...dates];
 }
 
 /** The name and price of each line, and what a page prints of its discount: its percentage, or else its amount. */
 function expectedInLines(draft: Prepared): Expected[] {
-  return draft.lines.flatMap((line, i) => {
-    const expected = wordsOf(`lines.${i}.name`, line.name);
-    if (isNumber(line.unitPrice)) {
-      expected.push({
-        path: `lines.${i}.unitPrice`,
-        spellings: amountSpellings(line.unitPrice),
-        shown: line.unitPrice,
-      });
-    }
-    const discount = line.discount;
-    if (isNumber(discount?.percent)) {
-      const percent = discount.percent;
-      expected.push({
-        path: `lines.${i}.discount.percent`,
-        spellings: percentSpellings(percent),
-        shown: `${percent} %`,
-      });
-    } else if (isNumber(discount?.amount)) {
-      const amount = discount.amount;
-      expected.push({ path: `lines.${i}.discount.amount`, spellings: amountSpellings(amount), shown: amount });
-    }
-    return expected;
-  });
+  return draft.lines.flatMap((line, i) => [
+    ...wordsOf(`lines.${i}.name`, line.name),
+    ...(isNumber(line.unitPrice) ? [amountOf(`lines.${i}.unitPrice`, line.unitPrice)] : []),
+    ...percentOrAmount(`lines.${i}.discount`, line.discount?.percent, line.discount?.amount),
+  ]);
 }
 
 /** Of a discount or charge on the whole invoice, too: never what is derived from it, such as its amount in each VAT group. */
 function expectedInAdjustments(draft: Prepared, percentages: Record<string, number>): Expected[] {
-  return adjustmentsOf(draft).flatMap(([path, entry]): Expected[] => {
-    const percent = isNumber(entry?.percent) ? entry.percent : percentages[path];
-    if (percent !== undefined)
-      return [{ path: `${path}.percent`, spellings: percentSpellings(percent), shown: `${percent} %` }];
-    if (isNumber(entry?.amount))
-      return [{ path: `${path}.amount`, spellings: amountSpellings(entry.amount), shown: entry.amount }];
-    return [];
-  });
+  return adjustmentsOf(draft).flatMap(([path, entry]) =>
+    percentOrAmount(path, isNumber(entry?.percent) ? entry.percent : percentages[path], entry?.amount),
+  );
 }
 
 function expectedInTotals(totals: Totals | undefined): Expected[] {
   if (!totals) return [];
   return (['net', 'vat', 'gross'] as const)
     .filter((key) => totals[key] !== 0)
-    .map((key) => ({ path: `totals.${key}`, spellings: amountSpellings(totals[key]), shown: totals[key].toFixed(2) }));
+    .map((key) => ({ ...amountOf(`totals.${key}`, totals[key]), shown: totals[key].toFixed(2) }));
 }
 
-/** A name may wrap, and in a table its rows mix with other columns: every word has to be there, in any order. */
+/** What a page prints of a discount or charge at `path`: its percentage, or else its amount. */
+function percentOrAmount(path: string, percent: unknown, amount: unknown): Expected[] {
+  if (isNumber(percent))
+    return [{ path: `${path}.percent`, shown: `${percent} %`, on: (page) => showsPercent(page, percent) }];
+  return isNumber(amount) ? [amountOf(`${path}.amount`, amount)] : [];
+}
+
+function amountOf(path: string, amount: number): Expected {
+  return { path, shown: amount, on: (page) => showsAmount(page, amount) };
+}
+
+/**
+ * A name may wrap, and in a table its rows mix with other columns: every word has to be there, in any order. A PDF
+ * may also hold the words of a name without the spaces between them: then the name as a whole counts.
+ */
 function wordsOf(path: string, value: unknown): Expected[] {
-  return typeof value === 'string' ? [{ path, spellings: [value], shown: value, words: true }] : [];
+  if (typeof value !== 'string') return [];
+  const joined = (page: PageText) => /\s/.test(value) && showsSpelling(page, [value]);
+  return [{ path, shown: value, on: (page) => showsWords(page, value) || joined(page) }];
 }
 
 /** What may have a VAT category, with its path: each line, then each discount and charge on the whole invoice. */

@@ -1,5 +1,5 @@
-// How a value is printed on a page: the spellings of a date, an amount and a percentage, to look for in the text of a
-// PDF, and the names of the months.
+// How a value is printed on a page: the spellings of a date and of an amount, to look for in the text of a PDF, and
+// the names of the months.
 
 /** The names of the months, as German and English invoices print them, in lower case. */
 export const MONTHS = [
@@ -59,13 +59,6 @@ export function amountSpellings(amount: number): string[] {
     `${grouped(',')}.${frac}`,
     `${grouped("'")}.${frac}`,
   ];
-  // Known limit: a whole number matches any occurrence of its digits ("100" in "1000"); tighten with word boundaries if that hides real mismatches.
+  // A whole amount is also printed without its decimals; shown.ts and the web app's locate.ts take it only where it stands on its own.
   return frac === '00' ? [...spellings, int, grouped('.'), grouped(',')] : spellings;
-}
-
-/** The ways a percentage is commonly printed, without whitespace: "10%", "10,0%", "10.00%", "12,345%". */
-export function percentSpellings(percent: number): string[] {
-  const own = String(percent).split('.')[1]?.length ?? 0;
-  const forms = [own, 1, 2].filter((decimals) => decimals >= own).map((decimals) => percent.toFixed(decimals));
-  return [...new Set(forms.flatMap((form) => [`${form}%`, `${form.replace('.', ',')}%`]))];
 }

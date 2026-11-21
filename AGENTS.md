@@ -36,8 +36,8 @@ through them). A layer imports only the layers listed beside it;
 |                      | (`calculate.ts`) with the discounts and charges on the whole invoice (`adjustments.ts`), the rules |                  |
 |                      | the data has to meet (`check.ts`), the one rule for a VAT rate both use (`vat.ts`), the shape of a |                  |
 |                      | date, an IBAN, an ID or an e-mail address (`formats.ts`), how a date or an amount is printed       |                  |
-|                      | (`spellings.ts`), `Finding`, what all of them report (`finding.ts`), and the English text of every |                  |
-|                      | finding (`messages.ts`)                                                                            |                  |
+|                      | (`spellings.ts`), whether the text of a page shows a value (`shown.ts`), `Finding`, what all of    |                  |
+|                      | them report (`finding.ts`), and the English text of every finding (`messages.ts`)                  |                  |
 | `src/pdf/`           | text and layout of a PDF (`text.ts`), its structure, embedded XML and PDF/A repair (`file.ts`)     | nothing else     |
 | `src/extract/`       | reading an invoice from the text without a model (`guess.ts`, parts in `guess/`), dropping         | domain           |
 |                      | what a language model returned but the PDF does not show (`ground.ts`)                             |                  |

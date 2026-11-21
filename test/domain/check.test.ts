@@ -1,7 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { check } from '../../src/domain/check.js';
-import { percentSpellings } from '../../src/domain/spellings.js';
 import type { InvoiceDraft } from '../../src/domain/model.js';
 
 const sample = (): InvoiceDraft =>
@@ -232,9 +231,20 @@ describe('check', () => {
     expect(at(0, 5)).toEqual([]);
   });
 
-  it('spells a percentage the ways a page prints it', () => {
-    expect(percentSpellings(10)).toEqual(expect.arrayContaining(['10%', '10,00%', '10.0%']));
-    expect(percentSpellings(12.345)).toEqual(expect.arrayContaining(['12,345%', '12.345%']));
+  it.each(['10%', '10 %', '10,00 %', '10.0%'])('finds the percentage of a discount printed as %s', (printed) => {
+    const draft = withChange((d) => {
+      d.lines[1].discount = { percent: 10 };
+      delete d.totals;
+    });
+    expect(codesAt(draft, 'lines.1.discount.percent', { pdfText: `Rabatt ${printed}` })).toEqual([]);
+  });
+
+  it.each(['12,345 %', '12.345%'])('finds a percentage with decimals printed as %s', (printed) => {
+    const draft = withChange((d) => {
+      d.lines[1].discount = { percent: 12.345 };
+      delete d.totals;
+    });
+    expect(codesAt(draft, 'lines.1.discount.percent', { pdfText: `Rabatt ${printed}` })).toEqual([]);
   });
 
   it('looks for the percentage of a discount on the page, never for the amount derived from it', () => {
@@ -708,6 +718,39 @@ describe('check against the PDF text', () => {
       delete d.totals;
     });
     expect(codesAt(draft, 'lines.1.unitPrice', { pdfText })).toEqual(['warning:not-in-pdf']);
+  });
+
+  it('does not take a part of a longer number for an amount', () => {
+    // "49" stands in "249,50" and in "499,00", but nowhere on its own.
+    const draft = withChange((d) => {
+      d.lines[1].unitPrice = 49;
+      delete d.totals;
+    });
+    expect(codesAt(draft, 'lines.1.unitPrice', { pdfText })).toEqual(['warning:not-in-pdf']);
+    expect(codesAt(draft, 'lines.1.unitPrice', { pdfText: `${pdfText}\nje 49 €` })).toEqual([]);
+  });
+
+  it('does not take a part of a longer number for a percentage', () => {
+    const draft = withChange((d) => {
+      d.lines[1].discount = { percent: 10 };
+      delete d.totals;
+    });
+    expect(codesAt(draft, 'lines.1.discount.percent', { pdfText: `${pdfText}\nRabatt 110 %` })).toEqual([
+      'warning:not-in-pdf',
+    ]);
+    expect(codesAt(draft, 'lines.1.discount.percent', { pdfText: `${pdfText}\nRabatt 10,00 %` })).toEqual([]);
+  });
+
+  it('does not take a part of a longer word for a word of a name', () => {
+    // "Muster" stands in "Musterstadt", "Stadt" only there.
+    const city = (name: string) =>
+      codesAt(
+        withChange((d) => (d.seller.city = name)),
+        'seller.city',
+        { pdfText },
+      );
+    expect(city('Stadt')).toEqual(['warning:not-in-pdf']);
+    expect(city('Musterstadt')).toEqual([]);
   });
 
   it('finds a unit price with more decimals than cents, as the PDF prints it', () => {
