@@ -201,14 +201,8 @@ function checkLines(draft: Prepared): { findings: Finding[]; calculable: boolean
 type At = (field: string) => string;
 
 function checkLine(line: Unchecked<Line>, i: number): { findings: Finding[]; calculable: boolean } {
-  const findings: Finding[] = [];
   const at: At = (field) => `lines.${i}.${field}`;
-
-  if (line.name === undefined) findings.push(error(at('name'), 'required.line-name'));
-  for (const [field, what] of LINE_NUMBERS) {
-    if (line[field] === undefined) findings.push(error(at(field), 'required.line-value', { what }));
-    else if (!isNumber(line[field])) findings.push(error(at(field), 'format.number'));
-  }
+  const findings = checkLineValues(line, at);
   let calculable = isNumber(line.quantity) && isNumber(line.unitPrice) && isNumber(line.vatRate);
   if (line.netAmount !== undefined && !isNumber(line.netAmount)) {
     findings.push(error(at('netAmount'), 'format.number'));
@@ -221,6 +215,17 @@ function checkLine(line: Unchecked<Line>, i: number): { findings: Finding[]; cal
   }
   findings.push(...checkLineVat(line, at));
   return { findings, calculable: calculable && (discount?.calculable ?? true) };
+}
+
+/** A line has a name, and a quantity, a unit price and a VAT rate that are numbers. */
+function checkLineValues(line: Unchecked<Line>, at: At): Finding[] {
+  const findings: Finding[] = [];
+  if (line.name === undefined) findings.push(error(at('name'), 'required.line-name'));
+  for (const [field, what] of LINE_NUMBERS) {
+    if (line[field] === undefined) findings.push(error(at(field), 'required.line-value', { what }));
+    else if (!isNumber(line[field])) findings.push(error(at(field), 'format.number'));
+  }
+  return findings;
 }
 
 /** A discount on a line states a percentage or an amount, both numbers, the percentage not below 0. */
