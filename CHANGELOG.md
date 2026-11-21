@@ -20,6 +20,8 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- `check` reports a text that is given as a number, a list or an object, such as a postal code written as `1234`
+  without quotes, instead of returning it as part of the invoice.
 - The comparison of a language model's answer with the PDF keeps a service period printed as "März 2026" or
   "Mär. 2026"; month names with an umlaut were never found.
 

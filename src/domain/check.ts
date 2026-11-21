@@ -8,6 +8,7 @@ import type { MessageKey, MessageParams } from './messages.js';
 import { cents, lineAgrees, lineBase, percentAgrees, percentOf, slackOf } from './money.js';
 import { amountSpellings, dateSpellings, percentSpellings } from './spellings.js';
 import {
+  invoiceJsonSchema,
   isInvoiceType,
   isVatCategory,
   type DocumentAllowance,
@@ -64,6 +65,7 @@ export function check(input: InvoiceDraft, options: CheckOptions = {}): CheckRes
 
   const findings = [
     ...checkHeader(draft),
+    ...checkTexts(draft),
     ...lines.findings,
     ...problems,
     ...checkVatTreatment(draft, options),
@@ -174,11 +176,39 @@ function checkFormats(draft: Prepared): Finding[] {
   }
   if (!isInvoiceType(draft.typeCode)) findings.push(error('typeCode', 'format.type'));
   if (!isCurrencyCode(draft.currency)) findings.push(error('currency', 'format.currency'));
-  if (draft.iban !== undefined && !(typeof draft.iban === 'string' && isIban(draft.iban)))
-    findings.push(error('iban', 'format.iban'));
+  if (typeof draft.iban === 'string' && !isIban(draft.iban)) findings.push(error('iban', 'format.iban'));
   if (draft.prepaidAmount !== undefined && !isNumber(draft.prepaidAmount))
     findings.push(error('prepaidAmount', 'format.number'));
   return findings;
+}
+
+/**
+ * Every value the schema holds as free text is one. A number, a list or an object in its place would go into the XML
+ * as it is, and a postal code given as the number 1234 has lost its leading zero. A text with a form of its own, a
+ * date or a code, is reported where that form is checked.
+ */
+function checkTexts(draft: Prepared): Finding[] {
+  return notTexts(invoiceJsonSchema, draft, '').map((path) => error(path, 'format.text'));
+}
+
+/** A part of the JSON Schema of the invoice, as far as it is walked here. */
+interface SchemaPart {
+  type?: string;
+  pattern?: string;
+  enum?: readonly string[];
+  properties?: Record<string, SchemaPart>;
+  items?: SchemaPart;
+}
+
+/** The paths below `path` where the schema holds free text and `value` holds something else. */
+function notTexts(part: SchemaPart, value: unknown, path: string): string[] {
+  if (value === undefined || value === null) return [];
+  if (part.type === 'string') return part.pattern || part.enum || typeof value === 'string' ? [] : [path];
+  const at = (key: string | number) => (path ? `${path}.${key}` : String(key));
+  if (part.items) return Array.isArray(value) ? value.flatMap((item, i) => notTexts(part.items!, item, at(i))) : [];
+  return Object.entries(part.properties ?? {}).flatMap(([key, child]) =>
+    notTexts(child, (value as Record<string, unknown>)[key], at(key)),
+  );
 }
 
 /**

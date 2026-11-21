@@ -71,6 +71,45 @@ describe('check', () => {
     ).toEqual(['error:format']);
   });
 
+  it('reports a text that is not one instead of passing it on as part of the invoice', () => {
+    // As JSON gives it where the quotes were left out: a postal code as the number 1234 has lost its leading zero.
+    const odd = withChange((d) => {
+      Object.assign(d, { number: 123, note: { text: 'Danke' }, iban: 5 });
+      Object.assign(d.seller, { name: 42, postalCode: 1234 });
+      d.buyer.street = ['Hauptstraße 1'];
+      Object.assign(d.lines[0], { name: { de: 'Beratung' }, unit: 7, discount: { percent: 10, reason: 5 } });
+      d.charges = [{ amount: 5, reason: 7, vatCategory: 'S', vatRate: 19 }];
+      delete d.totals;
+    });
+    const result = check(odd);
+    const wrong = [
+      'number',
+      'note',
+      'iban',
+      'seller.name',
+      'seller.postalCode',
+      'buyer.street',
+      'lines.0.name',
+      'lines.0.unit',
+      'lines.0.discount.reason',
+      'charges.0.reason',
+    ];
+    expect(result.findings.filter((f) => f.code === 'format').map((f) => `${f.severity}:${f.path}`)).toEqual(
+      wrong.map((path) => `error:${path}`),
+    );
+    expect(result.invoice).toBeUndefined();
+  });
+
+  it('leaves a value with a form of its own to the check of that form', () => {
+    // A date or a code that is not a text is reported once, as what it should be.
+    const odd = withChange((d) => Object.assign(d, { issueDate: 20261005, currency: 978, deliveryCountry: 1 }));
+    expect(check(odd).findings.map((f) => `${f.path}:${f.message}`)).toEqual([
+      'issueDate:Not a valid date. Use YYYY-MM-DD.',
+      'currency:Use the three-letter currency code, e.g. EUR.',
+      'deliveryCountry:Use the two-letter country code, e.g. DE.',
+    ]);
+  });
+
   it('wants a line total to be quantity times price, two cents apart at most', () => {
     const lineTotal = (netAmount: number, currency = 'EUR') =>
       codesAt(

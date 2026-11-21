@@ -13,6 +13,7 @@ export const MESSAGES = {
   'required.line-name': () => 'The line needs a description.',
   'required.line-value': ({ what }: { what: string }) => `The line needs a ${what}.`,
   'format.number': () => 'Not a number.',
+  'format.text': () => 'Not a text. Write it in quotes.',
   'format.date': () => 'Not a valid date. Use YYYY-MM-DD.',
   'format.country': () => 'Use the two-letter country code, e.g. DE.',
   'format.currency': () => 'Use the three-letter currency code, e.g. EUR.',
