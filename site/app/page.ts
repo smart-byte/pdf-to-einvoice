@@ -59,45 +59,58 @@ function placesOf(path: string, on: Piece[]): Rect[] {
 
 /** Marks on the page that is shown, where the values of the form are printed there. A value that stands on another page gets its mark when that page is shown. */
 export function renderMarks(): void {
-  marks.replaceChildren();
-  const taken = new Set<string>();
-  const placed: { mark: HTMLElement; rect: Rect }[] = [];
-  const place = (path: string, label: string, rects: Rect[]) => {
-    for (const rect of rects) {
-      const box = { left: `${rect.x}%`, top: `${rect.y}%`, width: `${rect.width}%`, height: `${rect.height}%` };
-      const twin = taken.size === taken.add(Object.values(box).join()).size;
-      const mark = el('button', {
-        type: 'button',
-        className: `mark${twin ? ' mark--twin' : ''}`,
-        tabIndex: -1,
-        title: t('mark.title', { f: label }),
-      });
-      mark.dataset.for = path;
-      Object.assign(mark.style, box);
-      // How far down the page the mark is: the band of light uncovers it when it gets there.
-      mark.style.setProperty('--y', String(rect.y / 100));
-      marks.append(mark);
-      placed.push({ mark, rect });
-    }
-  };
   const on = opened?.pieces[opened.shown] ?? [];
   // Dropdowns hold codes, which are not printed; everything else is looked for.
-  for (const input of $('#form').querySelectorAll<HTMLElement>('[data-path]:not(select)')) {
+  const fields = [...$('#form').querySelectorAll<HTMLElement>('[data-path]:not(select)')].map((input) => {
     const path = input.dataset.path!;
-    place(path, fieldLabel(path), placesOf(path, on));
-  }
-  for (const key of ['net', 'vat', 'gross'] as const)
-    place(`totals.${key}`, t(`t.${key}`), placesOf(`totals.${key}`, on));
-  // A value printed inside another one, such as the due date in the sentence of the payment terms, lies on top of it:
-  // both marks can be pointed at.
-  const inside = (inner: Rect, outer: Rect) =>
-    inner.width * inner.height < outer.width * outer.height &&
-    Math.abs(inner.x + inner.width / 2 - outer.x - outer.width / 2) < outer.width / 2 &&
-    Math.abs(inner.y + inner.height / 2 - outer.y - outer.height / 2) < outer.height / 2;
-  for (const { mark, rect } of placed) if (placed.some((other) => inside(rect, other.rect))) mark.style.zIndex = '1';
+    return { path, label: fieldLabel(path) };
+  });
+  const totals = (['net', 'vat', 'gross'] as const).map((key) => ({ path: `totals.${key}`, label: t(`t.${key}`) }));
+  const spots = [...fields, ...totals].flatMap(({ path, label }) =>
+    placesOf(path, on).map((rect) => ({ path, label, rect })),
+  );
+  raiseInner(markAll(spots));
   $('#marks-note').hidden = marks.children.length === 0;
   renderPager();
   highlight(pointed ?? focusedPath());
+}
+
+/** A mark for each place a value stands, in their order. A mark on the very place of one before it is its twin. */
+function markAll(spots: { path: string; label: string; rect: Rect }[]): { mark: HTMLElement; rect: Rect }[] {
+  marks.replaceChildren();
+  const taken = new Set<string>();
+  return spots.map(({ path, label, rect }) => {
+    const box = { left: `${rect.x}%`, top: `${rect.y}%`, width: `${rect.width}%`, height: `${rect.height}%` };
+    const twin = taken.size === taken.add(Object.values(box).join()).size;
+    const mark = el('button', {
+      type: 'button',
+      className: `mark${twin ? ' mark--twin' : ''}`,
+      tabIndex: -1,
+      title: t('mark.title', { f: label }),
+    });
+    mark.dataset.for = path;
+    Object.assign(mark.style, box);
+    // How far down the page the mark is: the band of light uncovers it when it gets there.
+    mark.style.setProperty('--y', String(rect.y / 100));
+    marks.append(mark);
+    return { mark, rect };
+  });
+}
+
+/**
+ * A value printed inside another one, such as the due date in the sentence of the payment terms, lies on top of it:
+ * both marks can be pointed at.
+ */
+function raiseInner(placed: { mark: HTMLElement; rect: Rect }[]): void {
+  for (const { mark, rect } of placed) if (placed.some((other) => inside(rect, other.rect))) mark.style.zIndex = '1';
+}
+
+function inside(inner: Rect, outer: Rect): boolean {
+  return (
+    inner.width * inner.height < outer.width * outer.height &&
+    Math.abs(inner.x + inner.width / 2 - outer.x - outer.width / 2) < outer.width / 2 &&
+    Math.abs(inner.y + inner.height / 2 - outer.y - outer.height / 2) < outer.height / 2
+  );
 }
 
 /** Turns the preview to the page a value stands on, unless the page that is shown has it too. */
