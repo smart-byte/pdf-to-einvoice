@@ -1,22 +1,6 @@
 // How a value is printed on a page: the spellings of a date and of an amount, to look for in the text of a PDF, the
 // number a printed amount stands for, and the names of the months and of the countries.
 
-/** The names of the months, as German and English invoices print them, in lower case. */
-export const MONTHS = [
-  ['januar', 'january', 'jan'],
-  ['februar', 'february', 'feb'],
-  ['märz', 'march', 'mar', 'mär'],
-  ['april', 'apr'],
-  ['mai', 'may'],
-  ['juni', 'june', 'jun'],
-  ['juli', 'july', 'jul'],
-  ['august', 'aug'],
-  ['september', 'sep'],
-  ['oktober', 'october', 'oct', 'okt'],
-  ['november', 'nov'],
-  ['dezember', 'december', 'dec', 'dez'],
-];
-
 /** The ways a date is commonly printed, without whitespace, lower case. */
 export function dateSpellings(iso: string): string[] {
   const [y, m, d] = iso.split('-') as [string, string, string];
@@ -74,6 +58,24 @@ export function toNumber(printed: string): number {
   const [whole, fraction] = [digits.slice(0, last).replace(/[.,]/g, ''), digits.slice(last + 1)];
   return Number(fraction.length === 3 && Number(whole) !== 0 ? whole + fraction : `${whole}.${fraction}`);
 }
+
+// The names a page prints. The functions above read them only when they are called, so they may stand below them.
+
+/** The names of the months, as German and English invoices print them, in lower case. */
+export const MONTHS = [
+  ['januar', 'january', 'jan'],
+  ['februar', 'february', 'feb'],
+  ['märz', 'march', 'mar', 'mär'],
+  ['april', 'apr'],
+  ['mai', 'may'],
+  ['juni', 'june', 'jun'],
+  ['juli', 'july', 'jul'],
+  ['august', 'aug'],
+  ['september', 'sep'],
+  ['oktober', 'october', 'oct', 'okt'],
+  ['november', 'nov'],
+  ['dezember', 'december', 'dec', 'dez'],
+];
 
 /** How a country is written on a page, in lower case. */
 export const COUNTRY_NAMES: Record<string, string[]> = {
