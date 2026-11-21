@@ -66,136 +66,6 @@ export class InvoiceError extends Error {
   }
 }
 
-/** The data, cleaned and with its totals, and what the check found; throws what is wrong with it. */
-interface Checked {
-  findings: Finding[];
-  invoice: Invoice;
-  totals: Totals;
-}
-
-function checked(draft: InvoiceDraft, rules?: 'xrechnung', pdfText?: string): Checked {
-  const { findings, invoice, totals } = check(draft, { rules, pdfText });
-  if (!invoice || !totals) {
-    const errors = findings.filter((f) => f.severity === 'error');
-    throw new InvoiceError(
-      'invalid-invoice',
-      message('invalid-invoice', { errors: errors.map((f) => f.message) }),
-      findings,
-    );
-  }
-  return { findings, invoice, totals };
-}
-
-/** An element of the XML as the library holds it before writing: its children by name, a repeated one as a list. */
-type Element = Record<string, unknown>;
-
-const isElement = (node: unknown): node is Element => typeof node === 'object' && node !== null;
-
-/** Follows element names down from a node, where each is there. */
-function childAt(node: unknown, ...path: string[]): Element | undefined {
-  let at = isElement(node) ? node : undefined;
-  for (const name of path) {
-    const next = at?.[name];
-    at = isElement(next) ? next : undefined;
-  }
-  return at;
-}
-
-/**
- * @e-invoice-eu/core 3.4 writes the purchase order number (BT-13) for the EXTENDED profile only, although EN 16931 has
- * it. It is the last element of the trade agreement in everything `write` writes.
- */
-function addOrderReference(xml: unknown, orderReference: string | undefined): void {
-  const agreement = childAt(
-    xml,
-    'rsm:CrossIndustryInvoice',
-    'rsm:SupplyChainTradeTransaction',
-    'ram:ApplicableHeaderTradeAgreement',
-  );
-  if (orderReference && agreement && !agreement['ram:BuyerOrderReferencedDocument']) {
-    agreement['ram:BuyerOrderReferencedDocument'] = { 'ram:IssuerAssignedID': orderReference };
-  }
-}
-
-/** A UBL credit note states the due date (BT-9) with the payment means, right after their code. The library leaves it out. */
-function addCreditNoteDueDate(xml: unknown, dueDate: string | undefined): void {
-  const means = childAt(xml, 'CreditNote')?.['cac:PaymentMeans'];
-  if (!dueDate || !Array.isArray(means) || !isElement(means[0])) return;
-  const { 'cbc:PaymentMeansCode': code, ...rest } = means[0];
-  means[0] = { 'cbc:PaymentMeansCode': code, 'cbc:PaymentDueDate': dueDate, ...rest };
-}
-
-/**
- * Has @e-invoice-eu/core write the checked invoice in one of its formats, into `pdf` where one is given. What the
- * library warns about is returned beside the file. When it fails, the error carries the findings of the check and
- * those warnings.
- */
-async function write<File extends string | Uint8Array>(
-  { findings, invoice, totals }: Checked,
-  { format, lang = 'en', pdf }: { format: string; lang?: string; pdf?: Uint8Array },
-): Promise<{ file: File; warnings: Finding[] }> {
-  const warnings: Finding[] = [];
-  const note = (text: unknown) => warnings.push(warning('', 'generator.library', { text: String(text) }));
-  try {
-    const service = new InvoiceService({ log: () => {}, warn: note, error: note });
-    const file = await service.generate(toUbl(invoice, totals, /xrechnung/i.test(format)), {
-      format,
-      lang,
-      // The file names this tool as its producer; the library that writes it is credited in the README.
-      customMetadata: { producer: 'pdf-to-einvoice' },
-      pdf: pdf && { buffer: await repairForPdfA(pdf), filename: 'invoice.pdf', mimetype: 'application/pdf' },
-      postProcessor: async (xml: unknown) => {
-        addOrderReference(xml, invoice.orderReference);
-        addCreditNoteDueDate(xml, invoice.dueDate);
-      },
-    });
-    // The format decides what the library returns: a PDF for Factur-X, XML for XRechnung.
-    return { file: file as File, warnings };
-  } catch (e) {
-    throw new InvoiceError('generator', message('generator', { reason: messageOf(e) }), [...findings, ...warnings]);
-  }
-}
-
-/** The XML is the binding part: a value that was given but did not make it there must not go unnoticed. */
-function notWritten(invoice: Invoice, xml: string): Finding[] {
-  const escaped = (value: string) => value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  const {
-    lines,
-    seller,
-    buyer,
-    discounts = [],
-    charges = [],
-    totals: _printed,
-    typeCode: _type,
-    currency: _currency,
-    ...head
-  } = invoice;
-  const given = [
-    ...[head, seller, buyer, ...lines.map(({ name, description }) => ({ name, description }))].flatMap((part) =>
-      Object.entries(part),
-    ),
-    ...discounts.map((entry, i) => [`discounts.${i}.reason`, entry.reason] as const),
-    ...charges.map((entry, i) => [`charges.${i}.reason`, entry.reason] as const),
-  ];
-  return given.flatMap(([field, value]) =>
-    typeof value === 'string' && !/^\d{4}-\d{2}-\d{2}$/.test(value) && !xml.includes(escaped(value))
-      ? [warning(field, 'not-written', { value })]
-      : [],
-  );
-}
-
-/** What PDF/A-3 asks of the file and the PDF does not meet: it is written all the same, and the user is told. */
-function fileWarnings(info: PdfInfo): Finding[] {
-  return [
-    ...(info.unembeddedFonts.length
-      ? [warning('', 'pdf-fonts.create', { fonts: info.unembeddedFonts.join(', ') })]
-      : []),
-    ...(info.forbiddenActions.length
-      ? [warning('', 'pdf-actions.create', { actions: info.forbiddenActions.join(', ') })]
-      : []),
-  ];
-}
-
 /**
  * Turns an invoice PDF into an EN 16931 e-invoice (ZUGFeRD / Factur-X): the
  * data is written as XML and attached to the PDF, which becomes a PDF/A-3.
@@ -238,4 +108,136 @@ export async function createXRechnung(options: XRechnungOptions): Promise<XRechn
     lang: options.lang,
   });
   return { xml, findings: [...data.findings, ...warnings, ...notWritten(data.invoice, xml)], totals: data.totals };
+}
+
+/** The data, cleaned and with its totals, and what the check found; throws what is wrong with it. */
+interface Checked {
+  findings: Finding[];
+  invoice: Invoice;
+  totals: Totals;
+}
+
+function checked(draft: InvoiceDraft, rules?: 'xrechnung', pdfText?: string): Checked {
+  const { findings, invoice, totals } = check(draft, { rules, pdfText });
+  if (!invoice || !totals) {
+    const errors = findings.filter((f) => f.severity === 'error');
+    throw new InvoiceError(
+      'invalid-invoice',
+      message('invalid-invoice', { errors: errors.map((f) => f.message) }),
+      findings,
+    );
+  }
+  return { findings, invoice, totals };
+}
+
+/** What PDF/A-3 asks of the file and the PDF does not meet: it is written all the same, and the user is told. */
+function fileWarnings(info: PdfInfo): Finding[] {
+  return [
+    ...(info.unembeddedFonts.length
+      ? [warning('', 'pdf-fonts.create', { fonts: info.unembeddedFonts.join(', ') })]
+      : []),
+    ...(info.forbiddenActions.length
+      ? [warning('', 'pdf-actions.create', { actions: info.forbiddenActions.join(', ') })]
+      : []),
+  ];
+}
+
+/**
+ * Has @e-invoice-eu/core write the checked invoice in one of its formats, into `pdf` where one is given. What the
+ * library warns about is returned beside the file. When it fails, the error carries the findings of the check and
+ * those warnings.
+ */
+async function write<File extends string | Uint8Array>(
+  { findings, invoice, totals }: Checked,
+  { format, lang = 'en', pdf }: { format: string; lang?: string; pdf?: Uint8Array },
+): Promise<{ file: File; warnings: Finding[] }> {
+  const warnings: Finding[] = [];
+  const note = (text: unknown) => warnings.push(warning('', 'generator.library', { text: String(text) }));
+  try {
+    const service = new InvoiceService({ log: () => {}, warn: note, error: note });
+    const file = await service.generate(toUbl(invoice, totals, /xrechnung/i.test(format)), {
+      format,
+      lang,
+      // The file names this tool as its producer; the library that writes it is credited in the README.
+      customMetadata: { producer: 'pdf-to-einvoice' },
+      pdf: pdf && { buffer: await repairForPdfA(pdf), filename: 'invoice.pdf', mimetype: 'application/pdf' },
+      postProcessor: async (xml: unknown) => {
+        addOrderReference(xml, invoice.orderReference);
+        addCreditNoteDueDate(xml, invoice.dueDate);
+      },
+    });
+    // The format decides what the library returns: a PDF for Factur-X, XML for XRechnung.
+    return { file: file as File, warnings };
+  } catch (e) {
+    throw new InvoiceError('generator', message('generator', { reason: messageOf(e) }), [...findings, ...warnings]);
+  }
+}
+
+/**
+ * @e-invoice-eu/core 3.4 writes the purchase order number (BT-13) for the EXTENDED profile only, although EN 16931 has
+ * it. It is the last element of the trade agreement in everything `write` writes.
+ */
+function addOrderReference(xml: unknown, orderReference: string | undefined): void {
+  const agreement = childAt(
+    xml,
+    'rsm:CrossIndustryInvoice',
+    'rsm:SupplyChainTradeTransaction',
+    'ram:ApplicableHeaderTradeAgreement',
+  );
+  if (orderReference && agreement && !agreement['ram:BuyerOrderReferencedDocument']) {
+    agreement['ram:BuyerOrderReferencedDocument'] = { 'ram:IssuerAssignedID': orderReference };
+  }
+}
+
+/** A UBL credit note states the due date (BT-9) with the payment means, right after their code. The library leaves it out. */
+function addCreditNoteDueDate(xml: unknown, dueDate: string | undefined): void {
+  const means = childAt(xml, 'CreditNote')?.['cac:PaymentMeans'];
+  if (!dueDate || !Array.isArray(means) || !isElement(means[0])) return;
+  const { 'cbc:PaymentMeansCode': code, ...rest } = means[0];
+  means[0] = { 'cbc:PaymentMeansCode': code, 'cbc:PaymentDueDate': dueDate, ...rest };
+}
+
+/** An element of the XML as the library holds it before writing: its children by name, a repeated one as a list. */
+type Element = Record<string, unknown>;
+
+/** Follows element names down from a node, where each is there. */
+function childAt(node: unknown, ...path: string[]): Element | undefined {
+  let at = isElement(node) ? node : undefined;
+  for (const name of path) {
+    const next = at?.[name];
+    at = isElement(next) ? next : undefined;
+  }
+  return at;
+}
+
+function isElement(node: unknown): node is Element {
+  return typeof node === 'object' && node !== null;
+}
+
+/** The XML is the binding part: a value that was given but did not make it there must not go unnoticed. */
+function notWritten(invoice: Invoice, xml: string): Finding[] {
+  const escaped = (value: string) => value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const {
+    lines,
+    seller,
+    buyer,
+    discounts = [],
+    charges = [],
+    totals: _printed,
+    typeCode: _type,
+    currency: _currency,
+    ...head
+  } = invoice;
+  const given = [
+    ...[head, seller, buyer, ...lines.map(({ name, description }) => ({ name, description }))].flatMap((part) =>
+      Object.entries(part),
+    ),
+    ...discounts.map((entry, i) => [`discounts.${i}.reason`, entry.reason] as const),
+    ...charges.map((entry, i) => [`charges.${i}.reason`, entry.reason] as const),
+  ];
+  return given.flatMap(([field, value]) =>
+    typeof value === 'string' && !/^\d{4}-\d{2}-\d{2}$/.test(value) && !xml.includes(escaped(value))
+      ? [warning(field, 'not-written', { value })]
+      : [],
+  );
 }
