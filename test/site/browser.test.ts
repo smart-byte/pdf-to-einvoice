@@ -1,5 +1,6 @@
 // The web app in a real browser: the built site, with its Content-Security-Policy, served the way the host serves it.
 // `npm run test:browser` builds the site and runs this file; it needs Chrome. `npm test` leaves it out.
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { PDFDocument, PDFName, PDFString, StandardFonts } from '@cantoo/pdf-lib';
@@ -19,6 +20,14 @@ const samplePdf = () => new Uint8Array(file('sample-invoice.pdf'));
 const sampleData = (): InvoiceDraft => JSON.parse(file('sample-invoice.json').toString());
 const upload = (name: string, bytes: Uint8Array) => ({ name, mimeType: 'application/pdf', buffer: Buffer.from(bytes) });
 const bytesOf = async (download: Download) => new Uint8Array(readFileSync(await download.path()));
+const sha256 = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
+/** Which file the finished page offers first, and the checksum it shows for it. */
+const offered = (page: Page) =>
+  page.evaluate(() => ({
+    first: document.querySelector('#download-pdf')?.parentElement?.firstElementChild?.id,
+    file: document.querySelector('#checksum-file')?.textContent,
+    checksum: document.querySelector('#checksum')?.textContent,
+  }));
 
 describe.skipIf(!asked)('the web app in a browser', () => {
   let server: PreviewServer;
@@ -121,6 +130,11 @@ describe.skipIf(!asked)('the web app in a browser', () => {
     expect(await page.$eval('#done .stamp', (stamp) => (stamp as HTMLElement).hidden)).toBe(false);
     const pdf = await download(page, '#download-pdf');
     expect(pdf.suggestedFilename()).toBe('sample-invoice.einvoice.pdf');
+    expect(await offered(page)).toEqual({
+      first: 'download-pdf',
+      file: 'sample-invoice.einvoice.pdf',
+      checksum: sha256(await bytesOf(pdf)),
+    });
     const result = await validateEInvoice(await bytesOf(pdf));
     expect(result).toMatchObject({ isEInvoice: true, findings: [] });
     expect(result.xml).toBe(shown);
@@ -272,7 +286,14 @@ describe.skipIf(!asked)('the web app in a browser', () => {
     await page.fill('[data-path="buyer.email"]', 'einkauf@beispiel.example');
     expect(await said(page, '#summary li.error')).toEqual([]);
     await create(page);
-    const xml = Buffer.from(await bytesOf(await download(page, '#download-xml'))).toString('utf8');
+    const plain = await bytesOf(await download(page, '#download-xml'));
+    // The XRechnung is the main file: it is offered first, and the checksum is its own.
+    expect(await offered(page)).toEqual({
+      first: 'download-xml',
+      file: 'sample-invoice.xrechnung.xml',
+      checksum: sha256(plain),
+    });
+    const xml = Buffer.from(plain).toString('utf8');
     expect(xml).toContain('urn:xeinkauf.de:kosit:xrechnung_3.0');
     expect(xml).toContain('<cbc:BuyerReference>12345678-0001-14</cbc:BuyerReference>');
     expect(await validateEInvoice(await bytesOf(await download(page, '#download-pdf')))).toMatchObject({
