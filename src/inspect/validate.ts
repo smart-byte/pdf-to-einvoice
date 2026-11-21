@@ -27,9 +27,6 @@ export interface ValidationResult {
   findings: Finding[];
 }
 
-/** EN 16931 itself and everything built on it: Factur-X BASIC and EXTENDED, XRECHNUNG. MINIMUM and BASIC WL carry other identifiers. */
-const EN16931 = 'urn:cen.eu:en16931:2017';
-
 /**
  * Checks an existing e-invoice PDF (ZUGFeRD / Factur-X): does it carry invoice XML in an EN 16931 profile, is the
  * data in that XML complete, does it add up, does the file declare PDF/A-3 with its fonts embedded and, when
@@ -117,3 +114,6 @@ function pdfFindings(info: PdfInfo): Finding[] {
 function contradictionFindings(paths: string[]): Finding[] {
   return paths.map((path) => (path.startsWith('charges.') ? error(path, 'xml-charge') : error(path, 'xml-discount')));
 }
+
+/** EN 16931 itself and everything built on it: Factur-X BASIC and EXTENDED, XRECHNUNG. MINIMUM and BASIC WL carry other identifiers. */
+const EN16931 = 'urn:cen.eu:en16931:2017';
