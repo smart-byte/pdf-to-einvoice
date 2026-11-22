@@ -3,6 +3,7 @@ import { messageOf } from '../../src/util/errors.js';
 import { isNumber } from '../../src/util/numbers.js';
 import { valueAt } from '../../src/util/objects.js';
 import { escapeRegExp } from '../../src/util/regexp.js';
+import { cells, COLUMN_GAP, rowOf } from '../../src/util/rows.js';
 
 describe('the helpers every layer may use', () => {
   it('escapes what a regular expression would read as syntax', () => {
@@ -23,6 +24,18 @@ describe('the helpers every layer may use', () => {
     expect(valueAt(data, 'buyer.name')).toBeUndefined();
     expect(valueAt('text', 'length.x')).toBeUndefined();
     expect(valueAt(undefined, 'seller')).toBeUndefined();
+  });
+
+  it('writes a row from its cells and takes it apart again', () => {
+    // What pdf/text.ts writes, the reader in extract/guess/ reads: both go through here.
+    const row = rowOf(['1', 'Beratung E-Rechnung', '10 Std.', '100,00 €']);
+    expect(row).toBe(`1${COLUMN_GAP}Beratung E-Rechnung${COLUMN_GAP}10 Std.${COLUMN_GAP}100,00 €`);
+    expect(cells(row)).toEqual(['1', 'Beratung E-Rechnung', '10 Std.', '100,00 €']);
+  });
+
+  it('takes a wider gap for one gap, and keeps a value behind its colon with its label', () => {
+    expect(cells('Menge      Preis')).toEqual(['Menge', 'Preis']);
+    expect(cells('Nummer   : 77   Datum: 03.11.2026')).toEqual(['Nummer   : 77', 'Datum: 03.11.2026']);
   });
 
   it('gives the text of an error, or of whatever else was thrown', () => {

@@ -1,5 +1,6 @@
 // The web app in a real browser: the built site, with its Content-Security-Policy, served the way the host serves it.
 // `npm run test:browser` builds the site and runs this file; it needs Chrome. `npm test` leaves it out.
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { PDFDocument, PDFName, PDFString, StandardFonts } from '@cantoo/pdf-lib';
@@ -19,6 +20,29 @@ const samplePdf = () => new Uint8Array(file('sample-invoice.pdf'));
 const sampleData = (): InvoiceDraft => JSON.parse(file('sample-invoice.json').toString());
 const upload = (name: string, bytes: Uint8Array) => ({ name, mimeType: 'application/pdf', buffer: Buffer.from(bytes) });
 const bytesOf = async (download: Download) => new Uint8Array(readFileSync(await download.path()));
+/** What a model answers for the sample: every key of the schema in its order, with the one value the patterns do not read. */
+const modelAnswer = () => {
+  const filled = (schema: any, key = ''): unknown => {
+    if (schema.type === 'object')
+      return Object.fromEntries(Object.entries(schema.properties).map(([name, value]) => [name, filled(value, name)]));
+    if (schema.type === 'array') return [filled(schema.items), filled(schema.items)];
+    return key === 'email' ? 'rechnung@muster-software.example' : null;
+  };
+  return filled(extractionSchema());
+};
+const sha256 = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
+/** The rows of the XML section: a value as the form shows it, and the element of the XML that holds it. */
+const xmlRows = (page: Page) =>
+  page.$$eval('#xml-pair tbody tr', (rows) =>
+    (rows as HTMLTableRowElement[]).map((row) => [...row.cells].map((cell) => cell.textContent)),
+  );
+/** Which file the finished page offers first, and the checksum it shows for it. */
+const offered = (page: Page) =>
+  page.evaluate(() => ({
+    first: document.querySelector('#download-pdf')?.parentElement?.firstElementChild?.id,
+    file: document.querySelector('#checksum-file')?.textContent,
+    checksum: document.querySelector('#checksum')?.textContent,
+  }));
 
 describe.skipIf(!asked)('the web app in a browser', () => {
   let server: PreviewServer;
@@ -115,12 +139,24 @@ describe.skipIf(!asked)('the web app in a browser', () => {
     expect(await page.$$eval('#marks .mark', (marks) => marks.length)).toBeGreaterThan(20);
     await page.click('#xml > summary');
     await page.waitForSelector('#xml-pair:not([hidden])');
+    expect(await xmlRows(page)).toEqual([
+      ['Rechnungsnummer RE-2026-0042', '<ram:ID>RE-2026-0042</ram:ID>'],
+      ['Rechnungsdatum 03.11.2026', '<udt:DateTimeString format="102">20261103</udt:DateTimeString>'],
+      ['Rechnungssteller Muster Software GmbH', '<ram:Name>Muster Software GmbH</ram:Name>'],
+      ['Umsatzsteuer 284,81\u00a0€', '<ram:TaxTotalAmount currencyID="EUR">284.81</ram:TaxTotalAmount>'],
+      ['Gesamt 1.783,81\u00a0€', '<ram:GrandTotalAmount>1783.81</ram:GrandTotalAmount>'],
+    ]);
     await page.click('#xml-whole > summary');
     const shown = await page.textContent('#xml-code');
     await create(page);
     expect(await page.$eval('#done .stamp', (stamp) => (stamp as HTMLElement).hidden)).toBe(false);
     const pdf = await download(page, '#download-pdf');
     expect(pdf.suggestedFilename()).toBe('sample-invoice.einvoice.pdf');
+    expect(await offered(page)).toEqual({
+      first: 'download-pdf',
+      file: 'sample-invoice.einvoice.pdf',
+      checksum: sha256(await bytesOf(pdf)),
+    });
     const result = await validateEInvoice(await bytesOf(pdf));
     expect(result).toMatchObject({ isEInvoice: true, findings: [] });
     expect(result.xml).toBe(shown);
@@ -271,8 +307,25 @@ describe.skipIf(!asked)('the web app in a browser', () => {
     await page.fill('[data-path="seller.email"]', 'rechnung@muster-software.example');
     await page.fill('[data-path="buyer.email"]', 'einkauf@beispiel.example');
     expect(await said(page, '#summary li.error')).toEqual([]);
+    await page.click('#xml > summary');
+    await page.waitForFunction(() => document.querySelector('#xml-code')?.textContent?.includes('cbc:'));
+    // For an XRechnung the section shows the file of its own, in UBL.
+    expect(await xmlRows(page)).toEqual([
+      ['Rechnungsnummer RE-2026-0042', '<cbc:ID>RE-2026-0042</cbc:ID>'],
+      ['Rechnungsdatum 03.11.2026', '<cbc:IssueDate>2026-11-03</cbc:IssueDate>'],
+      ['Rechnungssteller Muster Software GmbH', '<cbc:RegistrationName>Muster Software GmbH</cbc:RegistrationName>'],
+      ['Umsatzsteuer 284,81\u00a0€', '<cbc:TaxAmount currencyID="EUR">284.81</cbc:TaxAmount>'],
+      ['Gesamt 1.783,81\u00a0€', '<cbc:TaxInclusiveAmount currencyID="EUR">1783.81</cbc:TaxInclusiveAmount>'],
+    ]);
     await create(page);
-    const xml = Buffer.from(await bytesOf(await download(page, '#download-xml'))).toString('utf8');
+    const plain = await bytesOf(await download(page, '#download-xml'));
+    // The XRechnung is the main file: it is offered first, and the checksum is its own.
+    expect(await offered(page)).toEqual({
+      first: 'download-xml',
+      file: 'sample-invoice.xrechnung.xml',
+      checksum: sha256(plain),
+    });
+    const xml = Buffer.from(plain).toString('utf8');
     expect(xml).toContain('urn:xeinkauf.de:kosit:xrechnung_3.0');
     expect(xml).toContain('<cbc:BuyerReference>12345678-0001-14</cbc:BuyerReference>');
     expect(await validateEInvoice(await bytesOf(await download(page, '#download-pdf')))).toMatchObject({
@@ -549,18 +602,9 @@ describe.skipIf(!asked)('the web app in a browser', () => {
   }, 120_000);
 
   it('shows how far a language model has come with its answer', async () => {
-    // What a model answers for the sample: every key of the schema in its order, with the one value the patterns do not read.
-    const filled = (schema: any, key = ''): unknown => {
-      if (schema.type === 'object')
-        return Object.fromEntries(
-          Object.entries(schema.properties).map(([name, value]) => [name, filled(value, name)]),
-        );
-      if (schema.type === 'array') return [filled(schema.items), filled(schema.items)];
-      return key === 'email' ? 'rechnung@muster-software.example' : null;
-    };
     // Stands in for the library that runs the model: no model is loaded, and the answer comes piece by piece.
     const library = `
-      const answer = ${JSON.stringify(JSON.stringify(filled(extractionSchema())))};
+      const answer = ${JSON.stringify(JSON.stringify(modelAnswer()))};
       export async function CreateWebWorkerMLCEngine(worker, id, { initProgressCallback }) {
         initProgressCallback({ progress: 1 });
         const pieces = async function* () {
@@ -602,6 +646,39 @@ describe.skipIf(!asked)('the web app in a browser', () => {
     expect(writing.at(-1)![1]).toBeGreaterThan(0.9);
     expect(await page.textContent('#ai-status')).toBe('Fertig. Die KI hat 1 Angabe ergänzt: Bitte prüfen Sie sie.');
     expect(await page.isVisible('#ai-loading')).toBe(false);
+  }, 120_000);
+
+  it('reads with a service of your own, and asks for its full address first', async () => {
+    const page = await open();
+    await read(page);
+    if (!(await page.isVisible('#ai-run'))) await page.click('.reader summary');
+    await page.selectOption('#ai-model', 'endpoint');
+    await page.click('#ai-run');
+    expect(await page.textContent('#ai-status')).toBe(
+      'Bitte geben Sie die Adresse Ihres Dienstes vollständig ein, mit http:// oder https:// am Anfang.',
+    );
+    expect(await page.evaluate(() => document.activeElement?.id)).toBe('ai-url');
+    // Stands in for the service.
+    let request: { model?: string } = {};
+    await page.route(/\/own-service\/v1\/chat\/completions$/, (route) => {
+      request = route.request().postDataJSON();
+      return route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({ choices: [{ message: { content: JSON.stringify(modelAnswer()) } }] }),
+      });
+    });
+    await page.fill('#ai-url', `${base}own-service/v1/`);
+    await page.fill('#ai-name', 'some-model');
+    await page.click('#ai-run');
+    await page.waitForFunction(() => document.querySelector('#ai-status')!.textContent!.startsWith('Fertig'), null, {
+      timeout: 30_000,
+    });
+    expect(request.model).toBe('some-model');
+    expect(await page.textContent('#ai-status')).toBe('Fertig. Die KI hat 1 Angabe ergänzt: Bitte prüfen Sie sie.');
+    expect(await page.isDisabled('#ai-run')).toBe(false);
+    // The text of the PDF goes to the service the user named, and nowhere else.
+    expect(problems).toEqual([`POST with data to ${base}own-service/v1/chat/completions`]);
+    problems = [];
   }, 120_000);
 
   it('has no page counter in a build that is not given one, and says so', async () => {

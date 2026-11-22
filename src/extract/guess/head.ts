@@ -1,6 +1,7 @@
 import type { InvoiceType } from '../../domain/model.js';
 import { escapeRegExp } from '../../util/regexp.js';
-import { cells, KEY_VALUE, MAX_WRAPPED } from './rows.js';
+import { cells } from '../../util/rows.js';
+import { KEY_VALUE, MAX_WRAPPED } from './rows.js';
 import { after, anyOf, DATE, monthAs, monthNumber, pad, SEPARATOR, toIsoDate } from './values.js';
 
 // The head of the invoice: its number and type, its dates, the service period, the payment terms and the reference
@@ -28,7 +29,10 @@ function datedAfter(searched: string, number: string): RegExpExecArray | undefin
   return after(searched, dated, DATE)[0]?.hit;
 }
 
-const isoDate = (hit: RegExpExecArray | null | undefined) => (hit ? toIsoDate(hit, false) : undefined);
+/** The date a match of `DATE` holds, read with the month first where it is written with slashes. */
+function isoDate(hit: RegExpExecArray | null | undefined): string | undefined {
+  return hit ? toIsoDate(hit, false) : undefined;
+}
 
 /** The kind of invoice the title names: the first cell that is a title, alone or with the number. */
 export function readType(rows: string[]): InvoiceType | undefined {
@@ -72,29 +76,29 @@ export function readPeriod(text: string, rows: string[]): { periodStart?: string
 }
 
 /** The months a match of `MONTH_RANGE` names: from the first day of the one to the last day of the other. */
-function monthRangeOf(g: Record<string, string | undefined>): Period | undefined {
-  if (!g.fromYear || !g.fromMonth || !g.toYear || !g.toMonth) return undefined;
-  const from = month(g.fromYear, monthNumber(g.fromMonth));
-  const to = month(g.toYear, monthNumber(g.toMonth));
+function monthRangeOf(groups: Record<string, string | undefined>): Period | undefined {
+  if (!groups.fromYear || !groups.fromMonth || !groups.toYear || !groups.toMonth) return undefined;
+  const from = month(groups.fromYear, monthNumber(groups.fromMonth));
+  const to = month(groups.toYear, monthNumber(groups.toMonth));
   return from && to && from.periodStart < to.periodEnd
     ? { periodStart: from.periodStart, periodEnd: to.periodEnd }
     : undefined;
 }
 
 /** The period one alternative of `PERIOD` matched: a quarter, two dates, a month by its name or by its number. */
-function periodOf(g: Record<string, string | undefined>): Period | undefined {
-  const quarter = Number(g.quarter ?? g.quartal);
-  const quarterYear = g.quarterYear ?? g.quartalYear;
+function periodOf(groups: Record<string, string | undefined>): Period | undefined {
+  const quarter = Number(groups.quarter ?? groups.quartal);
+  const quarterYear = groups.quarterYear ?? groups.quartalYear;
   if (quarter && quarterYear) return months(quarterYear, quarter * 3 - 2, quarter * 3);
-  if (g.fromDay && g.fromMonth && g.toDay && g.toMonth) {
+  if (groups.fromDay && groups.fromMonth && groups.toDay && groups.toMonth) {
     return {
-      periodStart: `${g.fromYear}-${pad(g.fromMonth)}-${pad(g.fromDay)}`,
-      periodEnd: `${g.toYear}-${pad(g.toMonth)}-${pad(g.toDay)}`,
+      periodStart: `${groups.fromYear}-${pad(groups.fromMonth)}-${pad(groups.fromDay)}`,
+      periodEnd: `${groups.toYear}-${pad(groups.toMonth)}-${pad(groups.toDay)}`,
     };
   }
-  if (g.month && g.monthYear) return month(g.monthYear, monthNumber(g.month));
-  if (g.numberedMonth && g.numberedYear) return month(g.numberedYear, Number(g.numberedMonth));
-  return g.isoYear ? month(g.isoYear, Number(g.isoMonth)) : undefined;
+  if (groups.month && groups.monthYear) return month(groups.monthYear, monthNumber(groups.month));
+  if (groups.numberedMonth && groups.numberedYear) return month(groups.numberedYear, Number(groups.numberedMonth));
+  return groups.isoYear ? month(groups.isoYear, Number(groups.isoMonth)) : undefined;
 }
 
 /** A row that holds nothing but a month, or the month the title names in its own row or the next. */
@@ -217,8 +221,6 @@ const PERIOD_LABEL = new RegExp(
     /period/,
   ),
 );
-/** A date written with dots, "01.10.2026", its parts in the groups `${end}Day`, `${end}Month` and `${end}Year`. */
-const dotted = (end: 'from' | 'to') => `(?<${end}Day>\\d{1,2})\\.(?<${end}Month>\\d{1,2})\\.(?<${end}Year>\\d{4})`;
 const PERIOD = new RegExp(
   `${SEPARATOR}(?:${[
     // A quarter: "Q3 2026", "3. Quartal 2026".
@@ -233,6 +235,13 @@ const PERIOD = new RegExp(
   ].join('|')})`,
   'i',
 );
+/**
+ * A date written with dots, "01.10.2026", its parts in the groups `${end}Day`, `${end}Month` and `${end}Year`. `PERIOD`
+ * is built with it when the module loads; it is a function declaration, so it may stand below.
+ */
+function dotted(end: 'from' | 'to'): string {
+  return `(?<${end}Day>\\d{1,2})\\.(?<${end}Month>\\d{1,2})\\.(?<${end}Year>\\d{4})`;
+}
 const UNTIL = '(?:-|–|bis|to|until)';
 const MONTH_RANGE = new RegExp(
   `${SEPARATOR}${monthAs('fromMonth')}\\s+(?<fromYear>\\d{4})\\s*${UNTIL}\\s*${monthAs('toMonth')}\\s+(?<toYear>\\d{4})`,

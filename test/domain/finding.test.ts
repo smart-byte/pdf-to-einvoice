@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { error, warning } from '../../src/domain/finding.js';
+import { error, warning } from '../../src/domain/messages.js';
 
 describe('a finding', () => {
   it('carries the values its text was filled with, so that another language can word them', () => {

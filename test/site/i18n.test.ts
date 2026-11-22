@@ -1,11 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import { check } from '../../src/domain/check.js';
-import { codeOf, MESSAGES, type MessageKey } from '../../src/domain/messages.js';
+import { allKeys } from '../domain/catalogs.js';
+import { codeOf } from '../../src/domain/finding.js';
 import type { InvoiceDraft } from '../../src/domain/model.js';
 
-/** Every code the library can put on a finding or an `InvoiceError`: the catalog of its texts lists each one. */
-const libraryCodes = () => new Set(Object.keys(MESSAGES).map((key) => codeOf(key as MessageKey)));
+/** Every code the library can put on a finding or an `InvoiceError`: the catalogs of its texts list each one. */
+const libraryCodes = () => new Set(allKeys().map(codeOf));
 
 const sample = (): InvoiceDraft =>
   JSON.parse(readFileSync(new URL('../../examples/sample-invoice.json', import.meta.url), 'utf8'));

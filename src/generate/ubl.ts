@@ -6,32 +6,6 @@ import type { Invoice, Line, Party, VatCategory } from '../domain/model.js';
 /** A part of the UBL document as @e-invoice-eu/core takes it: element names as keys, `name@attribute` for attributes. */
 type UblElement = Record<string, unknown>;
 
-const amount = (n: number) => n.toFixed(2);
-/** Quantities and prices keep their precision; no exponent, no trailing zeros. */
-const decimal = (n: number) => n.toFixed(6).replace(/\.?0+$/, '');
-/** A unit price may be finer than a cent: two decimals at least, six at most. */
-const price = (n: number) => n.toFixed(6).replace(/0{1,4}$/, '');
-const VAT = { 'cbc:ID': 'VAT' };
-
-/** Removes keys whose value is undefined, so optional elements simply do not appear. */
-function compact<T extends UblElement>(object: T): T {
-  return Object.fromEntries(Object.entries(object).filter(([, v]) => v !== undefined)) as T;
-}
-
-function address(p: Party): UblElement {
-  return compact({
-    'cbc:StreetName': p.street,
-    'cbc:CityName': p.city,
-    'cbc:PostalZone': p.postalCode,
-    'cac:Country': { 'cbc:IdentificationCode': p.country },
-  });
-}
-
-function contact(p: Party): UblElement | undefined {
-  if (!p.contactName && !p.phone && !p.email) return undefined;
-  return compact({ 'cbc:Name': p.contactName, 'cbc:Telephone': p.phone, 'cbc:ElectronicMail': p.email });
-}
-
 /** What every part of the document needs: the invoice, its totals, and what follows from them. */
 interface Context {
   invoice: Invoice;
@@ -43,12 +17,6 @@ interface Context {
   vatIdsAllowed: boolean;
 }
 
-/** An amount with its currency, as two keys: the element and its attribute. */
-const amountElement = (ctx: Context, key: string, n: number) => ({
-  [key]: amount(n),
-  [`${key}@currencyID`]: ctx.invoice.currency,
-});
-
 /**
  * Maps the invoice to the input format of @e-invoice-eu/core (UBL element
  * names as JSON keys), which writes the XML. Amounts come from `totals`;
@@ -57,13 +25,8 @@ const amountElement = (ctx: Context, key: string, n: number) => ({
  * reports. The keys stand in the order UBL wants the elements.
  */
 export function toUbl(invoice: Invoice, totals: Totals, xrechnung = false): EInvoiceEuInvoice {
-  const categories = new Set([
-    ...invoice.lines.map((l) => l.vatCategory),
-    ...totals.adjustments.map((a) => a.category),
-  ]);
-  const ctx: Context = { invoice, totals, xrechnung, categories, vatIdsAllowed: !categories.has('O') };
+  const ctx = contextOf(invoice, totals, xrechnung);
   const delivery = deliveryOf(ctx);
-
   const document = compact({
     'cbc:ID': invoice.number,
     'cbc:IssueDate': invoice.issueDate,
@@ -72,6 +35,33 @@ export function toUbl(invoice: Invoice, totals: Totals, xrechnung = false): EInv
     'cbc:Note': invoice.note,
     'cbc:DocumentCurrencyCode': invoice.currency,
     'cbc:BuyerReference': invoice.buyerReference,
+    ...references(invoice),
+    'cac:AccountingSupplierParty': { 'cac:Party': supplierParty(ctx) },
+    'cac:AccountingCustomerParty': { 'cac:Party': customerParty(ctx) },
+    'cac:Delivery': Object.keys(delivery).length ? delivery : undefined,
+    'cac:PaymentMeans': paymentMeans(ctx),
+    'cac:PaymentTerms': paymentTerms(ctx),
+    'cac:AllowanceCharge': ctx.totals.adjustments.length
+      ? ctx.totals.adjustments.map((adjustment) => documentAllowance(ctx, adjustment))
+      : undefined,
+    'cac:TaxTotal': [taxTotal(ctx)],
+    'cac:LegalMonetaryTotal': monetaryTotal(ctx),
+    'cac:InvoiceLine': invoice.lines.map((line, i) => invoiceLine(ctx, line, i)),
+  });
+  return { 'ubl:Invoice': document } as unknown as EInvoiceEuInvoice;
+}
+
+function contextOf(invoice: Invoice, totals: Totals, xrechnung: boolean): Context {
+  const categories = new Set([
+    ...invoice.lines.map((line) => line.vatCategory),
+    ...totals.adjustments.map((adjustment) => adjustment.category),
+  ]);
+  return { invoice, totals, xrechnung, categories, vatIdsAllowed: !categories.has('O') };
+}
+
+/** The period of the invoice, the order it answers and the invoice it corrects, where the data has them. */
+function references(invoice: Invoice): UblElement {
+  return {
     'cac:InvoicePeriod':
       invoice.periodStart || invoice.periodEnd
         ? compact({ 'cbc:StartDate': invoice.periodStart, 'cbc:EndDate': invoice.periodEnd })
@@ -87,31 +77,7 @@ export function toUbl(invoice: Invoice, totals: Totals, xrechnung = false): EInv
           },
         ]
       : undefined,
-    'cac:AccountingSupplierParty': { 'cac:Party': supplierParty(ctx) },
-    'cac:AccountingCustomerParty': { 'cac:Party': customerParty(ctx) },
-    'cac:Delivery': Object.keys(delivery).length ? delivery : undefined,
-    'cac:PaymentMeans': paymentMeans(ctx),
-    'cac:PaymentTerms': paymentTerms(ctx),
-    'cac:AllowanceCharge': ctx.totals.adjustments.length
-      ? ctx.totals.adjustments.map((a) => documentAllowance(ctx, a))
-      : undefined,
-    'cac:TaxTotal': [taxTotal(ctx)],
-    'cac:LegalMonetaryTotal': monetaryTotal(ctx),
-    'cac:InvoiceLine': invoice.lines.map((line, i) => invoiceLine(ctx, line, i)),
-  });
-
-  return { 'ubl:Invoice': document } as unknown as EInvoiceEuInvoice;
-}
-
-function taxCategory(ctx: Context, category: string, rate: number, breakdown: boolean): UblElement {
-  return compact({
-    'cbc:ID': category,
-    // BR-O-05: no rate at all where VAT does not apply. XRechnung wants one in every VAT breakdown all the same (BR-DE-14).
-    'cbc:Percent': category === 'O' && !(ctx.xrechnung && breakdown) ? undefined : decimal(rate),
-    'cbc:TaxExemptionReason':
-      breakdown && category !== 'S' && category !== 'Z' ? ctx.invoice.vatExemptionReason : undefined,
-    'cac:TaxScheme': VAT,
-  });
+  };
 }
 
 function supplierParty({ invoice: { seller }, vatIdsAllowed }: Context): UblElement {
@@ -143,6 +109,20 @@ function customerParty({ invoice: { buyer }, vatIdsAllowed }: Context): UblEleme
     'cac:PartyLegalEntity': { 'cbc:RegistrationName': buyer.name },
     'cac:Contact': contact(buyer),
   });
+}
+
+function address(party: Party): UblElement {
+  return compact({
+    'cbc:StreetName': party.street,
+    'cbc:CityName': party.city,
+    'cbc:PostalZone': party.postalCode,
+    'cac:Country': { 'cbc:IdentificationCode': party.country },
+  });
+}
+
+function contact(party: Party): UblElement | undefined {
+  if (!party.contactName && !party.phone && !party.email) return undefined;
+  return compact({ 'cbc:Name': party.contactName, 'cbc:Telephone': party.phone, 'cbc:ElectronicMail': party.email });
 }
 
 /**
@@ -190,15 +170,15 @@ function paymentTerms({ invoice: { paymentTerms: terms }, xrechnung }: Context):
 }
 
 /** One for each VAT group a discount or charge on the whole invoice goes into. A reason in words stands alone, as on a line. */
-function documentAllowance(ctx: Context, a: Adjustment): UblElement {
+function documentAllowance(ctx: Context, adjustment: Adjustment): UblElement {
   return compact({
-    'cbc:ChargeIndicator': String(a.list === 'charges'),
-    'cbc:AllowanceChargeReasonCode': a.reason || a.list === 'charges' ? undefined : '95',
-    'cbc:AllowanceChargeReason': a.reason,
-    'cbc:MultiplierFactorNumeric': a.percent !== undefined ? decimal(a.percent) : undefined,
-    ...amountElement(ctx, 'cbc:Amount', a.amount),
-    ...(a.base !== undefined ? amountElement(ctx, 'cbc:BaseAmount', a.base) : {}),
-    'cac:TaxCategory': taxCategory(ctx, a.category, a.rate, false),
+    'cbc:ChargeIndicator': String(adjustment.list === 'charges'),
+    'cbc:AllowanceChargeReasonCode': adjustment.reason || adjustment.list === 'charges' ? undefined : '95',
+    'cbc:AllowanceChargeReason': adjustment.reason,
+    'cbc:MultiplierFactorNumeric': adjustment.percent !== undefined ? decimal(adjustment.percent) : undefined,
+    ...amountElement(ctx, 'cbc:Amount', adjustment.amount),
+    ...(adjustment.base !== undefined ? amountElement(ctx, 'cbc:BaseAmount', adjustment.base) : {}),
+    'cac:TaxCategory': taxCategory(ctx, adjustment.category, adjustment.rate, false),
   });
 }
 
@@ -220,10 +200,10 @@ function monetaryTotal(ctx: Context): UblElement {
     ...amountElement(ctx, 'cbc:TaxExclusiveAmount', totals.net),
     ...amountElement(ctx, 'cbc:TaxInclusiveAmount', totals.gross),
     // Written whenever there is a discount or charge, even at 0.00 (BR-CO-11, BR-CO-12).
-    ...(totals.adjustments.some((a) => a.list === 'discounts')
+    ...(totals.adjustments.some((adjustment) => adjustment.list === 'discounts')
       ? amountElement(ctx, 'cbc:AllowanceTotalAmount', totals.allowances)
       : {}),
-    ...(totals.adjustments.some((a) => a.list === 'charges')
+    ...(totals.adjustments.some((adjustment) => adjustment.list === 'charges')
       ? amountElement(ctx, 'cbc:ChargeTotalAmount', totals.charges)
       : {}),
     ...(totals.prepaid ? amountElement(ctx, 'cbc:PrepaidAmount', totals.prepaid) : {}),
@@ -259,3 +239,40 @@ function lineDiscount(ctx: Context, discount: NonNullable<Line['discount']>, i: 
     ...(discount.percent !== undefined ? amountElement(ctx, 'cbc:BaseAmount', calculated.base) : {}),
   });
 }
+
+function taxCategory(ctx: Context, category: string, rate: number, breakdown: boolean): UblElement {
+  return compact({
+    'cbc:ID': category,
+    // BR-O-05: no rate at all where VAT does not apply. XRechnung wants one in every VAT breakdown all the same (BR-DE-14).
+    'cbc:Percent': category === 'O' && !(ctx.xrechnung && breakdown) ? undefined : decimal(rate),
+    'cbc:TaxExemptionReason':
+      breakdown && category !== 'S' && category !== 'Z' ? ctx.invoice.vatExemptionReason : undefined,
+    'cac:TaxScheme': VAT,
+  });
+}
+
+/** An amount with its currency, as two keys: the element and its attribute. */
+function amountElement(ctx: Context, key: string, value: number): UblElement {
+  return { [key]: amount(value), [`${key}@currencyID`]: ctx.invoice.currency };
+}
+
+/** Removes keys whose value is undefined, so optional elements simply do not appear. */
+function compact<T extends UblElement>(object: T): T {
+  return Object.fromEntries(Object.entries(object).filter(([, v]) => v !== undefined)) as T;
+}
+
+function amount(value: number): string {
+  return value.toFixed(2);
+}
+
+/** Quantities and prices keep their precision; no exponent, no trailing zeros. */
+function decimal(value: number): string {
+  return value.toFixed(6).replace(/\.?0+$/, '');
+}
+
+/** A unit price may be finer than a cent: two decimals at least, six at most. */
+function price(value: number): string {
+  return value.toFixed(6).replace(/0{1,4}$/, '');
+}
+
+const VAT = { 'cbc:ID': 'VAT' };

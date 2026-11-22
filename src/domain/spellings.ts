@@ -1,21 +1,5 @@
-// How a value is printed on a page: the spellings of a date, an amount and a percentage, to look for in the text of a
-// PDF, and the names of the months.
-
-/** The names of the months, as German and English invoices print them, in lower case. */
-export const MONTHS = [
-  ['januar', 'january', 'jan'],
-  ['februar', 'february', 'feb'],
-  ['märz', 'march', 'mar', 'mär'],
-  ['april', 'apr'],
-  ['mai', 'may'],
-  ['juni', 'june', 'jun'],
-  ['juli', 'july', 'jul'],
-  ['august', 'aug'],
-  ['september', 'sep'],
-  ['oktober', 'october', 'oct', 'okt'],
-  ['november', 'nov'],
-  ['dezember', 'december', 'dec', 'dez'],
-];
+// How a value is printed on a page: the spellings of a date and of an amount, to look for in the text of a PDF, the
+// number a printed amount stands for, and the names of the months and of the countries.
 
 /** The ways a date is commonly printed, without whitespace, lower case. */
 export function dateSpellings(iso: string): string[] {
@@ -47,10 +31,10 @@ export function dateSpellings(iso: string): string[] {
 }
 
 /** The ways an amount is commonly printed, without whitespace. */
-export function amountSpellings(n: number): string[] {
+export function amountSpellings(amount: number): string[] {
   // A price may be finer than a cent ("0,4995 €"): it keeps its decimals, two at least.
-  const decimals = Math.min(Math.max(2, String(n).split('.')[1]?.length ?? 0), 6);
-  const [int, frac] = Math.abs(n).toFixed(decimals).split('.') as [string, string];
+  const decimals = Math.min(Math.max(2, String(amount).split('.')[1]?.length ?? 0), 6);
+  const [int, frac] = Math.abs(amount).toFixed(decimals).split('.') as [string, string];
   const grouped = (sep: string) => int.replace(/\B(?=(\d{3})+(?!\d))/g, sep);
   const spellings = [
     `${int},${frac}`,
@@ -59,13 +43,53 @@ export function amountSpellings(n: number): string[] {
     `${grouped(',')}.${frac}`,
     `${grouped("'")}.${frac}`,
   ];
-  // Known limit: a whole number matches any occurrence of its digits ("100" in "1000"); tighten with word boundaries if that hides real mismatches.
+  // A whole amount is also printed without its decimals; shown.ts and the web app's locate.ts take it only where it stands on its own.
   return frac === '00' ? [...spellings, int, grouped('.'), grouped(',')] : spellings;
 }
 
-/** The ways a percentage is commonly printed, without whitespace: "10%", "10,0%", "10.00%", "12,345%". */
-export function percentSpellings(p: number): string[] {
-  const own = String(p).split('.')[1]?.length ?? 0;
-  const forms = [own, 1, 2].filter((decimals) => decimals >= own).map((decimals) => p.toFixed(decimals));
-  return [...new Set(forms.flatMap((form) => [`${form}%`, `${form.replace('.', ',')}%`]))];
+/**
+ * "1.499,00" and "1,499.00" both mean 1499: the last separator is the decimal one. Three digits behind the only
+ * separator are thousands ("1.000 Stk"), unless a zero stands in front ("0.025").
+ */
+export function toNumber(printed: string): number {
+  const digits = printed.replace(/[^\d.,-]/g, '');
+  const last = Math.max(digits.lastIndexOf(','), digits.lastIndexOf('.'));
+  if (last < 0) return Number(digits);
+  const [whole, fraction] = [digits.slice(0, last).replace(/[.,]/g, ''), digits.slice(last + 1)];
+  return Number(fraction.length === 3 && Number(whole) !== 0 ? whole + fraction : `${whole}.${fraction}`);
 }
+
+// The names a page prints. The functions above read them only when they are called, so they may stand below them.
+
+/** The names of the months, as German and English invoices print them, in lower case. */
+export const MONTHS = [
+  ['januar', 'january', 'jan'],
+  ['februar', 'february', 'feb'],
+  ['märz', 'march', 'mar', 'mär'],
+  ['april', 'apr'],
+  ['mai', 'may'],
+  ['juni', 'june', 'jun'],
+  ['juli', 'july', 'jul'],
+  ['august', 'aug'],
+  ['september', 'sep'],
+  ['oktober', 'october', 'oct', 'okt'],
+  ['november', 'nov'],
+  ['dezember', 'december', 'dec', 'dez'],
+];
+
+/** How a country is written on a page, in lower case. */
+export const COUNTRY_NAMES: Record<string, string[]> = {
+  DE: ['deutschland', 'germany'],
+  AT: ['österreich', 'austria'],
+  CH: ['schweiz', 'switzerland', 'suisse'],
+  FR: ['frankreich', 'france'],
+  IT: ['italien', 'italy', 'italia'],
+  NL: ['niederlande', 'netherlands', 'nederland'],
+  BE: ['belgien', 'belgium', 'belgique'],
+  LU: ['luxemburg', 'luxembourg'],
+  PL: ['polen', 'poland', 'polska'],
+  ES: ['spanien', 'spain', 'españa'],
+  IE: ['irland', 'ireland'],
+  GB: ['großbritannien', 'vereinigtes königreich', 'united kingdom', 'great britain'],
+  US: ['usa', 'united states', 'vereinigte staaten'],
+};

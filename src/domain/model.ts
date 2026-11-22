@@ -4,99 +4,6 @@
  * EN 16931-1.
  */
 
-/** VAT category codes (UNTDID 5305 subset used by EN 16931). */
-export const VAT_CATEGORIES = {
-  S: 'Standard rate',
-  Z: 'Zero rated',
-  E: 'Exempt from VAT',
-  AE: 'Reverse charge',
-  K: 'Intra-community supply',
-  G: 'Export outside the EU',
-  O: 'Not subject to VAT',
-} as const;
-export type VatCategory = keyof typeof VAT_CATEGORIES;
-/** Whether a value is one of the codes above, not merely a key every object inherits ("toString"). */
-export const isVatCategory = (v: unknown): v is VatCategory =>
-  typeof v === 'string' && Object.hasOwn(VAT_CATEGORIES, v);
-
-/** Invoice type codes (UNTDID 1001 subset). */
-export const INVOICE_TYPES = {
-  '380': 'Invoice',
-  '381': 'Credit note',
-  '384': 'Corrected invoice',
-  '389': 'Self-billed invoice',
-  '326': 'Partial invoice',
-  '386': 'Prepayment invoice',
-} as const;
-export type InvoiceType = keyof typeof INVOICE_TYPES;
-/** Whether a value is one of the codes above, not merely a key every object inherits. */
-export const isInvoiceType = (v: unknown): v is InvoiceType => typeof v === 'string' && Object.hasOwn(INVOICE_TYPES, v);
-
-export interface Party {
-  /** Full legal name (seller BT-27, buyer BT-44). */
-  name: string;
-  street?: string;
-  postalCode?: string;
-  city?: string;
-  /** ISO 3166-1 alpha-2 country code, e.g. "DE" (BT-40 / BT-55). */
-  country: string;
-  /** VAT identifier with country prefix, e.g. "DE123456789" (BT-31 / BT-48). */
-  vatId?: string;
-  /** Local tax number, seller only (BT-32). */
-  taxNumber?: string;
-  email?: string;
-  phone?: string;
-  contactName?: string;
-}
-
-/** A discount or charge: a percentage of its base, an amount, or both. */
-export interface Allowance {
-  /** Percentage of the base, e.g. 10 (BT-138, BT-94, BT-101). Not negative. */
-  percent?: number;
-  /** Amount (BT-136, BT-92, BT-99), signed as in the standard: on a negative base it is negative too. */
-  amount?: number;
-  /** Reason as printed, e.g. "Treuerabatt" or "Fracht" (BT-139, BT-97, BT-104). */
-  reason?: string;
-}
-
-/**
- * A discount or charge on the whole invoice (BG-20, BG-21). Its base is the sum of the lines in its VAT category and
- * rate; where these are left out, the lines decide (see `calculate`).
- */
-export interface DocumentAllowance extends Allowance {
-  /** BT-95, BT-102. */
-  vatCategory?: VatCategory;
-  /** VAT rate in percent (BT-96, BT-103). A rate above 0 without a category means S. */
-  vatRate?: number;
-}
-
-export interface Line {
-  /** What was sold (BT-153). */
-  name: string;
-  description?: string;
-  /** Invoiced quantity (BT-129). Negative on credit notes. */
-  quantity: number;
-  /** UN/ECE Rec. 20 unit code (BT-130): C62 = piece, HUR = hour, DAY = day. */
-  unit: string;
-  /** Net price per unit, without VAT (BT-146). Never negative. */
-  unitPrice: number;
-  /** Net line total (BT-131). Defaults to quantity x unitPrice less the discount. */
-  netAmount?: number;
-  /** Discount on the line (BG-27); its base is quantity x unitPrice. */
-  discount?: Allowance;
-  vatCategory: VatCategory;
-  /** VAT rate in percent, e.g. 19 (BT-152). 0 for every category except S. */
-  vatRate: number;
-}
-
-/** The amounts printed on the PDF. Used only to detect contradictions. */
-export interface PrintedTotals {
-  net?: number;
-  vat?: number;
-  gross?: number;
-  due?: number;
-}
-
 export interface Invoice {
   /** Invoice number (BT-1). */
   number: string;
@@ -139,6 +46,75 @@ export interface Invoice {
   totals?: PrintedTotals;
 }
 
+export interface Party {
+  /** Full legal name (seller BT-27, buyer BT-44). */
+  name: string;
+  street?: string;
+  postalCode?: string;
+  city?: string;
+  /** ISO 3166-1 alpha-2 country code, e.g. "DE" (BT-40 / BT-55). */
+  country: string;
+  /** VAT identifier with country prefix, e.g. "DE123456789" (BT-31 / BT-48). */
+  vatId?: string;
+  /** Local tax number, seller only (BT-32). */
+  taxNumber?: string;
+  email?: string;
+  phone?: string;
+  contactName?: string;
+}
+
+export interface Line {
+  /** What was sold (BT-153). */
+  name: string;
+  description?: string;
+  /** Invoiced quantity (BT-129). Negative on credit notes. */
+  quantity: number;
+  /** UN/ECE Rec. 20 unit code (BT-130): C62 = piece, HUR = hour, DAY = day. */
+  unit: string;
+  /** Net price per unit, without VAT (BT-146). Never negative. */
+  unitPrice: number;
+  /** Net line total (BT-131). Defaults to quantity x unitPrice less the discount. */
+  netAmount?: number;
+  /** Discount on the line (BG-27); its base is quantity x unitPrice. */
+  discount?: Allowance;
+  vatCategory: VatCategory;
+  /** VAT rate in percent, e.g. 19 (BT-152). 0 for every category except S. */
+  vatRate: number;
+}
+
+/** A discount or charge: a percentage of its base, an amount, or both. */
+export interface Allowance {
+  /** Percentage of the base, e.g. 10 (BT-138, BT-94, BT-101). Not negative. */
+  percent?: number;
+  /** Amount (BT-136, BT-92, BT-99), signed as in the standard: on a negative base it is negative too. */
+  amount?: number;
+  /** Reason as printed, e.g. "Treuerabatt" or "Fracht" (BT-139, BT-97, BT-104). */
+  reason?: string;
+}
+
+/**
+ * A discount or charge on the whole invoice (BG-20, BG-21). Its base is the sum of the lines in its VAT category and
+ * rate; where these are left out, the lines decide (see `calculate`).
+ */
+export interface DocumentAllowance extends Allowance {
+  /** BT-95, BT-102. */
+  vatCategory?: VatCategory;
+  /** VAT rate in percent (BT-96, BT-103). A rate above 0 without a category means S. */
+  vatRate?: number;
+}
+
+/** The amounts printed on the PDF. Used only to detect contradictions. */
+export interface PrintedTotals {
+  net?: number;
+  vat?: number;
+  gross?: number;
+  due?: number;
+}
+
+/** Invoice data that may still be incomplete, e.g. straight from an extraction. */
+export type InvoiceDraft = Draft<Invoice>;
+
+/** `T` with every field left out or null at will, at any depth. */
 type Draft<T> = T extends (infer U)[] ? Draft<U>[] : T extends object ? { [K in keyof T]?: Draft<T[K]> | null } : T;
 
 /**
@@ -155,55 +131,38 @@ export type Unchecked<T = Invoice> = {
       : unknown;
 };
 
-/** Invoice data that may still be incomplete, e.g. straight from an extraction. */
-export type InvoiceDraft = Draft<Invoice>;
+// The codes a category and a type may take. The schema lists them when the module loads, so they stand above it.
 
-const date = (description: string) => ({
-  type: 'string',
-  pattern: '^\\d{4}-\\d{2}-\\d{2}$',
-  description: `${description} Format YYYY-MM-DD.`,
-});
-const text = (description: string) => ({ type: 'string', description });
-const amount = (description: string) => ({ type: 'number', description });
-const vatCategory = (description: string) => ({ type: 'string', enum: Object.keys(VAT_CATEGORIES), description });
+/** VAT category codes (UNTDID 5305 subset used by EN 16931). */
+export const VAT_CATEGORIES = {
+  S: 'Standard rate',
+  Z: 'Zero rated',
+  E: 'Exempt from VAT',
+  AE: 'Reverse charge',
+  K: 'Intra-community supply',
+  G: 'Export outside the EU',
+  O: 'Not subject to VAT',
+} as const;
+export type VatCategory = keyof typeof VAT_CATEGORIES;
+/** Whether a value is one of the codes above, not merely a key every object inherits ("toString"). */
+export function isVatCategory(v: unknown): v is VatCategory {
+  return typeof v === 'string' && Object.hasOwn(VAT_CATEGORIES, v);
+}
 
-const adjustments = (what: string, reason: string) => ({
-  type: 'array',
-  description: `${what} on the whole invoice as printed, below the lines.`,
-  items: {
-    type: 'object',
-    additionalProperties: false,
-    properties: {
-      percent: amount('Percentage of the lines it applies to, e.g. 5.'),
-      amount: amount('Amount. Negative where the lines it applies to add up to a negative amount.'),
-      reason: text(reason),
-      vatCategory: vatCategory('VAT category it is charged at. Leave out to follow the lines.'),
-      vatRate: amount('VAT rate in percent it is charged at, e.g. 19. Leave out to follow the lines.'),
-    },
-  },
-});
-
-const party = (who: string, extra: Record<string, unknown> = {}) => ({
-  type: 'object',
-  additionalProperties: false,
-  required: ['name', 'country'],
-  properties: {
-    name: text(`Full legal name of the ${who}.`),
-    street: text('Street and house number.'),
-    postalCode: text('Postal code.'),
-    city: text('City.'),
-    country: {
-      type: 'string',
-      pattern: '^[A-Z]{2}$',
-      description: 'ISO 3166-1 alpha-2 country code, e.g. DE, AT, FR.',
-    },
-    vatId: text(`VAT identification number of the ${who} with country prefix, e.g. DE123456789.`),
-    ...extra,
-    email: text('E-mail address.'),
-    phone: text('Phone number.'),
-    contactName: text('Contact person.'),
-  },
-});
+/** Invoice type codes (UNTDID 1001 subset). */
+export const INVOICE_TYPES = {
+  '380': 'Invoice',
+  '381': 'Credit note',
+  '384': 'Corrected invoice',
+  '389': 'Self-billed invoice',
+  '326': 'Partial invoice',
+  '386': 'Prepayment invoice',
+} as const;
+export type InvoiceType = keyof typeof INVOICE_TYPES;
+/** Whether a value is one of the codes above, not merely a key every object inherits. */
+export function isInvoiceType(v: unknown): v is InvoiceType {
+  return typeof v === 'string' && Object.hasOwn(INVOICE_TYPES, v);
+}
 
 /**
  * JSON Schema of {@link Invoice}. Handed to language models (structured
@@ -303,3 +262,64 @@ export const invoiceJsonSchema = {
     },
   },
 } as const;
+
+// What the schema is put together from, in the order it first asks for each. They are function declarations, so they
+// may stand below it.
+
+function text(description: string) {
+  return { type: 'string', description };
+}
+
+function date(description: string) {
+  return { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$', description: `${description} Format YYYY-MM-DD.` };
+}
+
+function amount(description: string) {
+  return { type: 'number', description };
+}
+
+function party(who: string, extra: Record<string, unknown> = {}) {
+  return {
+    type: 'object',
+    additionalProperties: false,
+    required: ['name', 'country'],
+    properties: {
+      name: text(`Full legal name of the ${who}.`),
+      street: text('Street and house number.'),
+      postalCode: text('Postal code.'),
+      city: text('City.'),
+      country: {
+        type: 'string',
+        pattern: '^[A-Z]{2}$',
+        description: 'ISO 3166-1 alpha-2 country code, e.g. DE, AT, FR.',
+      },
+      vatId: text(`VAT identification number of the ${who} with country prefix, e.g. DE123456789.`),
+      ...extra,
+      email: text('E-mail address.'),
+      phone: text('Phone number.'),
+      contactName: text('Contact person.'),
+    },
+  };
+}
+
+function vatCategory(description: string) {
+  return { type: 'string', enum: Object.keys(VAT_CATEGORIES), description };
+}
+
+function adjustments(what: string, reason: string) {
+  return {
+    type: 'array',
+    description: `${what} on the whole invoice as printed, below the lines.`,
+    items: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        percent: amount('Percentage of the lines it applies to, e.g. 5.'),
+        amount: amount('Amount. Negative where the lines it applies to add up to a negative amount.'),
+        reason: text(reason),
+        vatCategory: vatCategory('VAT category it is charged at. Leave out to follow the lines.'),
+        vatRate: amount('VAT rate in percent it is charged at, e.g. 19. Leave out to follow the lines.'),
+      },
+    },
+  };
+}

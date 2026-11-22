@@ -1,10 +1,10 @@
 import type { Totals } from '../domain/calculate.js';
 import { check } from '../domain/check.js';
-import { error, warning, type Finding } from '../domain/finding.js';
-import { message } from '../domain/messages.js';
+import type { Finding } from '../domain/finding.js';
 import type { InvoiceDraft } from '../domain/model.js';
 import { inspectPdf, type PdfInfo } from '../pdf/file.js';
 import { messageOf } from '../util/errors.js';
+import { error, warning } from './messages.js';
 import { readInvoiceXml } from './read-xml.js';
 
 export interface ValidationResult {
@@ -26,9 +26,6 @@ export interface ValidationResult {
   totals?: Totals;
   findings: Finding[];
 }
-
-/** EN 16931 itself and everything built on it: Factur-X BASIC and EXTENDED, XRECHNUNG. MINIMUM and BASIC WL carry other identifiers. */
-const EN16931 = 'urn:cen.eu:en16931:2017';
 
 /**
  * Checks an existing e-invoice PDF (ZUGFeRD / Factur-X): does it carry invoice XML in an EN 16931 profile, is the
@@ -57,12 +54,9 @@ export async function validateEInvoice(pdf: Uint8Array, options: { pdfText?: str
   const { invoice, profile, adjustedLines, contradictions, percentages } = read;
   findings.push(...contradictionFindings(contradictions));
   // A line may state what `check` knows nothing of, a surcharge for one: its total is then explained, see `adjustedLines`.
+  // With them `check` also knows that the data comes from an XML, and words what contradicts itself there so.
   const checked = check(invoice, { ...options, adjustedLines, percentages });
-  findings.push(
-    ...checked.findings.map((finding) =>
-      finding.code === 'totals-mismatch' ? reworded(finding, invoice, checked.totals) : finding,
-    ),
-  );
+  findings.push(...checked.findings);
   return {
     isEInvoice,
     profile,
@@ -121,13 +115,5 @@ function contradictionFindings(paths: string[]): Finding[] {
   return paths.map((path) => (path.startsWith('charges.') ? error(path, 'xml-charge') : error(path, 'xml-discount')));
 }
 
-/** check() words a totals mismatch for data typed in from a PDF; here both sides of the contradiction are in the XML. */
-function reworded(finding: Finding, invoice: InvoiceDraft, totals: Totals | undefined): Finding {
-  const key = finding.path.replace('totals.', '') as 'net' | 'vat' | 'gross' | 'due';
-  const text = message('totals-mismatch.xml', {
-    stated: `${invoice.totals?.[key]?.toFixed(2)}`,
-    calculated: `${totals?.[key].toFixed(2)}`,
-    adjusted: Boolean(totals?.adjustments.length),
-  });
-  return { ...finding, message: text };
-}
+/** EN 16931 itself and everything built on it: Factur-X BASIC and EXTENDED, XRECHNUNG. MINIMUM and BASIC WL carry other identifiers. */
+const EN16931 = 'urn:cen.eu:en16931:2017';

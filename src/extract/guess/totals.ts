@@ -1,16 +1,19 @@
+import type { PrintedTotals } from '../../domain/model.js';
 import { cents } from '../../domain/money.js';
-import { after, AMOUNT, anyOf, MONEY, SEPARATOR, toNumber } from './values.js';
+import { toNumber } from '../../domain/spellings.js';
+import { after, AMOUNT, anyOf, MONEY, SEPARATOR } from './values.js';
 
 // Totals: three printed amounts with net + VAT = gross, picked by their labels where several fit.
 
-export type Totals = { net?: number; vat?: number; gross?: number };
+/** The totals a page prints, as far as the reader found them. */
+export type ReadTotals = Pick<PrintedTotals, 'net' | 'vat' | 'gross'>;
 
 /**
  * The totals: three printed amounts with net + VAT = gross. Labels say which three when several fit, and nothing
  * else: an amount after a label is not believed against the sum. One or two labelled amounts are kept when no
  * three amounts fit, as on an invoice without VAT.
  */
-export function readTotals(searched: string, text: string): Totals {
+export function readTotals(searched: string, text: string): ReadTotals {
   const labelled = labelledIn(searched);
   return labelledSum(labelled) ?? sumOnPage(text, labelled) ?? labelledAlone(labelled);
 }
@@ -24,7 +27,7 @@ function labelledIn(searched: string): Labelled {
 }
 
 /** The first amount after each label, where they add up: net + VAT = gross, or net = gross and no VAT. */
-function labelledSum({ net: [net], vat: [vat], gross: [gross] }: Labelled): Totals | undefined {
+function labelledSum({ net: [net], vat: [vat], gross: [gross] }: Labelled): ReadTotals | undefined {
   if (net !== undefined && vat !== undefined && net + vat === gross) {
     return { net: euros(net), vat: euros(vat), gross: euros(gross) };
   }
@@ -38,20 +41,20 @@ function labelledSum({ net: [net], vat: [vat], gross: [gross] }: Labelled): Tota
  * best is believed when no other scores as high; where the page labels no amount at all, when it is the only one
  * that charges VAT.
  */
-function sumOnPage(text: string, labelled: Labelled): Totals | undefined {
+function sumOnPage(text: string, labelled: Labelled): ReadTotals | undefined {
   const printed = new Set(centsOf([...text.matchAll(PRINTED_AMOUNT)].map((match) => match[1]!)));
   // VAT of nothing is believed when a label says so; "0,00" alone may be anything.
-  const fits = (n: number, v: number) =>
-    n !== 0 && printed.has(n + v) && share(v, n) && (v !== 0 || labelled.vat.includes(0));
+  const fits = (net: number, vat: number) =>
+    net !== 0 && printed.has(net + vat) && share(vat, net) && (vat !== 0 || labelled.vat.includes(0));
   const sums: { net: number; vat: number; gross: number; score: number }[] = [];
-  for (const n of printed) {
-    for (const v of printed) {
-      if (!fits(n, v)) continue;
+  for (const net of printed) {
+    for (const vat of printed) {
+      if (!fits(net, vat)) continue;
       sums.push({
-        net: n / 100,
-        vat: v / 100,
-        gross: (n + v) / 100,
-        score: +labelled.net.includes(n) + +labelled.vat.includes(v) + +labelled.gross.includes(n + v),
+        net: net / 100,
+        vat: vat / 100,
+        gross: (net + vat) / 100,
+        score: +labelled.net.includes(net) + +labelled.vat.includes(vat) + +labelled.gross.includes(net + vat),
       });
     }
   }
@@ -66,7 +69,7 @@ function sumOnPage(text: string, labelled: Labelled): Totals | undefined {
  * together are not believed either. Net and gross may: the VAT between them is printed in parts where an invoice has
  * several rates.
  */
-function labelledAlone({ net: [net], vat: [vat], gross: [gross] }: Labelled): Totals {
+function labelledAlone({ net: [net], vat: [vat], gross: [gross] }: Labelled): ReadTotals {
   if (net !== undefined && gross !== undefined) {
     return share(gross - net, net) ? { net: euros(net), gross: euros(gross) } : {};
   }
@@ -83,11 +86,11 @@ function share(part: number, whole: number): boolean {
 
 /** Printed amounts in cents. An amount too large to calculate with is none. */
 function centsOf(printed: string[]): number[] {
-  return printed.map((amount) => cents(toNumber(amount))).filter((c) => !Number.isNaN(c));
+  return printed.map((amount) => cents(toNumber(amount))).filter((inCents) => !Number.isNaN(inCents));
 }
 
-function euros(c: number | undefined): number | undefined {
-  return c === undefined ? undefined : c / 100;
+function euros(inCents: number | undefined): number | undefined {
+  return inCents === undefined ? undefined : inCents / 100;
 }
 
 /**

@@ -2,6 +2,61 @@ export type Lang = 'de' | 'en';
 
 type Entry = { de: string; en: string };
 
+/** The language of the page: chosen when the module loads, changed by `setLang`. */
+let current: Lang = chosen();
+
+/** The language the page is shown in; `setLang` changes it. */
+export function lang(): Lang {
+  return current;
+}
+
+export function t(key: string, values: Record<string, string | number> = {}): string {
+  const text = STRINGS[key]?.[current] || STRINGS[key]?.en || key;
+  return text.replace(/\{(\w+)\}/g, (_, name: string) => String(values[name] ?? ''));
+}
+
+/** Translates every element that carries `data-i18n`, and remembers the choice. */
+export function setLang(next: Lang): void {
+  current = next;
+  try {
+    localStorage.setItem('lang', next);
+  } catch {
+    // Private mode: the choice simply lasts for this visit.
+  }
+  // The address follows the switch, so that a copied link opens what was shown.
+  const route = routeLang();
+  if (route && route !== next) history.replaceState(null, '', next);
+  document.documentElement.lang = next;
+  for (const el of document.querySelectorAll<HTMLElement>('[data-i18n]')) el.textContent = t(el.dataset.i18n!);
+  for (const el of document.querySelectorAll<HTMLElement>('[data-i18n-label]'))
+    el.setAttribute('aria-label', t(el.dataset.i18nLabel!));
+}
+
+/**
+ * The language a page starts in: the one its address asks for, else the one of its route, else the one chosen on an
+ * earlier visit, else the language of the browser. German for German, English for everything else.
+ */
+function chosen(): Lang {
+  const wanted = new URLSearchParams(location.search).get('lang') ?? routeLang() ?? stored() ?? navigator.language;
+  return wanted.toLowerCase().startsWith('de') ? 'de' : 'en';
+}
+
+/** The start page of one language: /de or /en. Its language wins over a choice made before. */
+function routeLang(): string | undefined {
+  return /^\/(de|en)\b/.exec(location.pathname)?.[1];
+}
+
+/** The language chosen on an earlier visit, where the browser lets the page remember one. */
+function stored(): string | null {
+  try {
+    return localStorage.getItem('lang');
+  } catch {
+    return null;
+  }
+}
+
+// The texts. The functions above read them only when a page asks for one, so they may stand below them.
+
 /** Every text of the page. Keys starting with `f.` label form fields, `e.` explain findings. */
 export const STRINGS: Record<string, Entry> = {
   'doc.title': {
@@ -695,44 +750,3 @@ export const STRINGS: Record<string, Entry> = {
   'foot.privacy': { de: 'Datenschutz', en: 'Privacy' },
   'foot.third': { de: 'Lizenzen Dritter', en: 'Third-party licences' },
 };
-
-const stored = () => {
-  try {
-    return localStorage.getItem('lang');
-  } catch {
-    return null;
-  }
-};
-
-/** The start page of one language: /de or /en. Its language wins over a choice made before. */
-const routeLang = () => /^\/(de|en)\b/.exec(location.pathname)?.[1];
-
-let current: Lang = (() => {
-  const wanted = new URLSearchParams(location.search).get('lang') ?? routeLang() ?? stored() ?? navigator.language;
-  return wanted.toLowerCase().startsWith('de') ? 'de' : 'en';
-})();
-
-/** The language the page is shown in; `setLang` changes it. */
-export const lang = (): Lang => current;
-
-export function t(key: string, values: Record<string, string | number> = {}): string {
-  const text = STRINGS[key]?.[current] || STRINGS[key]?.en || key;
-  return text.replace(/\{(\w+)\}/g, (_, name: string) => String(values[name] ?? ''));
-}
-
-/** Translates every element that carries `data-i18n`, and remembers the choice. */
-export function setLang(next: Lang): void {
-  current = next;
-  try {
-    localStorage.setItem('lang', next);
-  } catch {
-    // Private mode: the choice simply lasts for this visit.
-  }
-  // The address follows the switch, so that a copied link opens what was shown.
-  const route = routeLang();
-  if (route && route !== next) history.replaceState(null, '', next);
-  document.documentElement.lang = next;
-  for (const el of document.querySelectorAll<HTMLElement>('[data-i18n]')) el.textContent = t(el.dataset.i18n!);
-  for (const el of document.querySelectorAll<HTMLElement>('[data-i18n-label]'))
-    el.setAttribute('aria-label', t(el.dataset.i18nLabel!));
-}

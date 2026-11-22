@@ -126,12 +126,12 @@ describe('calculate', () => {
   });
 
   it('compares a line total with quantity times price less the discount before rounding', () => {
-    expect(lineAgrees(10, 49.9, 0, 499.02, 0.02)).toBe(true);
-    expect(lineAgrees(10, 49.9, 0, 499.03, 0.02)).toBe(false);
-    expect(lineAgrees(1, 1.005, 0.02, 0.985, 0)).toBe(true);
-    expect(lineAgrees(-2, 50, -10, -90, 0.02)).toBe(true);
-    expect(lineAgrees(1, 500, 0, 499.5, slackOf('HUF'))).toBe(true);
-    expect(lineAgrees(1, 500, 0, 499.49, slackOf('HUF'))).toBe(false);
+    expect(lineAgrees({ quantity: 10, unitPrice: 49.9 }, 0, 499.02, 0.02)).toBe(true);
+    expect(lineAgrees({ quantity: 10, unitPrice: 49.9 }, 0, 499.03, 0.02)).toBe(false);
+    expect(lineAgrees({ quantity: 1, unitPrice: 1.005 }, 0.02, 0.985, 0)).toBe(true);
+    expect(lineAgrees({ quantity: -2, unitPrice: 50 }, -10, -90, 0.02)).toBe(true);
+    expect(lineAgrees({ quantity: 1, unitPrice: 500 }, 0, 499.5, slackOf('HUF'))).toBe(true);
+    expect(lineAgrees({ quantity: 1, unitPrice: 500 }, 0, 499.49, slackOf('HUF'))).toBe(false);
   });
 
   it('prefers the printed line total to the discount, and leaves lines without one alone', () => {

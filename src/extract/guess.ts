@@ -5,9 +5,9 @@ import { readContact } from './guess/contact.js';
 import { readBuyerReference, readNumber, readPaymentTerms, readPeriod, readType } from './guess/head.js';
 import { NOTE_CATEGORIES, readItems, readVatNote } from './guess/items.js';
 import { believed, countryOfVatId, EU, type Found, ISSUER_OR_BANK, readParties } from './guess/parties.js';
-import { cells } from './guess/rows.js';
-import { findCurrency, readTotals, type Totals } from './guess/totals.js';
+import { findCurrency, readTotals, type ReadTotals } from './guess/totals.js';
 import { after, anyOf, DATE, findIban, SEPARATOR, toIsoDate, vatIdsIn } from './guess/values.js';
+import { cells, rowOf } from '../util/rows.js';
 
 // Known limit: patterns for German, English and French invoices, no model. A value is believed for what it fits to, not
 // for where it stands: the totals are three printed amounts with net + VAT = gross, the items are rows that add up to
@@ -32,14 +32,9 @@ export function guessFromText(text: string, options: GuessOptions = {}): Invoice
 
   const found = readParties(rows, options.blocks ?? [rows.map((row) => cells(row)[0]!)]);
   const totals = readTotals(searched, text);
-  const lines = readItems(rows, totals, options.blocks);
-  const { seller, buyer } = partiesOf({ rows, searched, blocks: options.blocks }, found, lines);
-
-  // An invoice that shows no VAT at all charges none.
-  const { vatCategory, reason } = lines
-    ? withoutVat(rows, totals, lines, { seller: seller.country, buyer: buyer.country })
-    : {};
-  if (lines && vatCategory) for (const line of lines) Object.assign(line, { vatCategory, vatRate: 0 });
+  const items = readItems(rows, totals, options.blocks);
+  const { seller, buyer } = partiesOf({ rows, searched, blocks: options.blocks }, found, items);
+  const { lines, reason } = withVatTreatment(rows, totals, items, { seller: seller.country, buyer: buyer.country });
 
   const { number, dated, beside } = readNumber(searched, rows);
   const iban = findIban(text);
@@ -58,13 +53,7 @@ export function guessFromText(text: string, options: GuessOptions = {}): Invoice
     // A BIC belongs to an IBAN; with another kind of account it has no place in the invoice data.
     bic: iban ? firstAfter(searched, BIC_LABEL, BIC_VALUE) : undefined,
     vatExemptionReason: reason,
-    seller: {
-      ...seller,
-      taxNumber: firstAfter(searched, TAX_NUMBER_LABEL, TAX_NUMBER),
-      ...contact.seller,
-      // A contact named by its label counts before the person an address names in its second line.
-      contactName: contact.seller.contactName ?? seller.contactName,
-    },
+    seller: sellerWith(seller, searched, contact.seller),
     buyer: { ...buyer, ...contact.buyer },
     lines,
     totals,
@@ -84,7 +73,7 @@ function partiesOf(
   found: { seller?: Found; buyer?: Found },
   lines: Partial<Line>[] | undefined,
 ): { seller: Partial<Party>; buyer: Partial<Party> } {
-  const units = [...rows, ...(blocks ?? []).map((block) => block.join('   '))];
+  const units = [...rows, ...(blocks ?? []).map(rowOf)];
   const vatIds = vatIdsOf(searched, units, found);
   const buyer: Partial<Party> = { ...believed(found.buyer), vatId: vatIds.buyer };
   const seller: Partial<Party> = { ...believed(found.seller), vatId: vatIds.seller };
@@ -113,13 +102,29 @@ function vatIdsOf(searched: string, units: string[], found: { seller?: Found; bu
 }
 
 /**
+ * The lines as they were read, unless the invoice shows no VAT at all. Then it charges none: its lines are given with
+ * the category `withoutVat` names and a rate of 0, beside the reason printed for it.
+ */
+function withVatTreatment(
+  rows: string[],
+  totals: ReadTotals,
+  lines: Partial<Line>[] | undefined,
+  countries: { seller?: string; buyer?: string },
+): { lines?: Partial<Line>[]; reason?: string } {
+  if (!lines) return {};
+  const { vatCategory, reason } = withoutVat(rows, totals, lines, countries);
+  if (!vatCategory) return { lines };
+  return { lines: lines.map((line) => ({ ...line, vatCategory, vatRate: 0 })), reason };
+}
+
+/**
  * The VAT category of an invoice that shows no VAT at all, and the reason printed for it. Why, the printed reason says,
  * or else the country of the buyer: outside the EU the sale is not subject to VAT, elsewhere in the EU the buyer owes
  * it, at home the seller is exempt. A person confirms this.
  */
 function withoutVat(
   rows: string[],
-  totals: Totals,
+  totals: ReadTotals,
   lines: Partial<Line>[],
   countries: { seller?: string; buyer?: string },
 ): { vatCategory?: VatCategory; reason?: string } {
@@ -138,6 +143,19 @@ function categoryByCountry(seller: string | undefined, buyer: string | undefined
   if (!buyer) return undefined;
   if (!EU.has(buyer)) return 'O';
   return buyer === seller ? 'E' : 'AE';
+}
+
+/**
+ * The seller as its address gives it, with its tax number and the contact data the page labels. A contact named by its
+ * label counts before the person an address names in its second line.
+ */
+function sellerWith(seller: Partial<Party>, searched: string, contact: Partial<Party>): Partial<Party> {
+  return {
+    ...seller,
+    taxNumber: firstAfter(searched, TAX_NUMBER_LABEL, TAX_NUMBER),
+    ...contact,
+    contactName: contact.contactName ?? seller.contactName,
+  };
 }
 
 /** The first date after a label. A German or French label says the day comes first in "08/10/2026". */

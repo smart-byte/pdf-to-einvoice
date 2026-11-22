@@ -1,9 +1,11 @@
 import { cents, lineBase, netOfGross, percentOf, perUnit } from '../../domain/money.js';
 import type { Line, VatCategory } from '../../domain/model.js';
+import { toNumber } from '../../domain/spellings.js';
 import { senderOf } from './parties.js';
-import { cells, KEY_VALUE, MAX_WRAPPED } from './rows.js';
-import { rateOf, type Totals, TOTALS_CELL, TOTALS_ROW } from './totals.js';
-import { anyOf, CURRENCY, lastIndex, MONEY, toNumber } from './values.js';
+import { cells } from '../../util/rows.js';
+import { KEY_VALUE, MAX_WRAPPED } from './rows.js';
+import { rateOf, type ReadTotals, TOTALS_CELL, TOTALS_ROW } from './totals.js';
+import { anyOf, CURRENCY, lastIndex, MONEY } from './values.js';
 
 // Items: the rows of the table that add up to the totals, with quantity, unit, price and VAT rate, and the note that
 // says why no VAT is charged.
@@ -34,7 +36,11 @@ interface Item {
  * next, and the head of the table stands there once more. Such rows end a table on a single page, so they are read
  * as part of one table only where the rows do not add up otherwise.
  */
-export function readItems(rows: string[], totals: Totals, blocks: string[][] | undefined): Partial<Line>[] | undefined {
+export function readItems(
+  rows: string[],
+  totals: ReadTotals,
+  blocks: string[][] | undefined,
+): Partial<Line>[] | undefined {
   // Without VAT the rows add up to the total itself.
   const net = totals.net ?? (totals.vat === undefined ? totals.gross : undefined);
   const itemsOf = (span: Span) => {
@@ -286,7 +292,7 @@ function placesOf(cell: string, blocks: string[][]): { block: string[]; i: numbe
 /** The items that add up to the net total, or to the gross total where prices include VAT (`inclusive`). */
 function runThatAddsUp(
   items: Item[],
-  totals: Totals,
+  totals: ReadTotals,
   net: number | undefined,
 ): { run: Item[]; inclusive: boolean } | undefined {
   const run = runOf(items, net);
