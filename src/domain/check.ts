@@ -3,7 +3,7 @@ import { isEmptyObject, isObject, pathOf, valueAt } from '../util/objects.js';
 import { checkAdjustments } from './adjustments.js';
 import { tryCalculate, type Totals } from './calculate.js';
 import type { Finding } from './finding.js';
-import { isCountryCode, isCurrencyCode, isDate, isEmail, isIban } from './formats.js';
+import { compactCode, isCountryCode, isCurrencyCode, isDate, isEmail, isIban } from './formats.js';
 import { error, warning, type MessageKey, type MessageParams } from './messages.js';
 import { cents, lineAgrees, lineBase, percentAgrees, percentOf, slackOf } from './money.js';
 import { pageTextOf, showsAmount, showsPercent, showsSpelling, showsWords, type PageText } from './shown.js';
@@ -133,7 +133,7 @@ function upper(value: unknown): unknown {
 }
 
 function compact(value: unknown): unknown {
-  return typeof value === 'string' ? value.replace(/\s+/g, '').toUpperCase() : value;
+  return typeof value === 'string' ? compactCode(value) : value;
 }
 
 /** The head of the invoice: its number and date, both parties, the formats of dates and codes, the seller's tax ID. */

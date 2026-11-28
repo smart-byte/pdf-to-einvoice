@@ -1,4 +1,4 @@
-import { isBic, isDate, isEmail, isIban, isTaxNumber, isVatId } from '../domain/formats.js';
+import { compactCode, isBic, isDate, isEmail, isIban, isTaxNumber, isVatId } from '../domain/formats.js';
 import {
   pageTextOf,
   showsAmount,
@@ -169,7 +169,7 @@ function currency(value: unknown, page: PageText): boolean {
 }
 
 function iban(value: unknown, page: PageText): boolean {
-  return typeof value === 'string' && isIban(value.replace(/\s+/g, '').toUpperCase()) && showsSpelling(page, [value]);
+  return typeof value === 'string' && isIban(compactCode(value)) && showsSpelling(page, [value]);
 }
 
 const CURRENCY_SIGNS: Record<string, string> = { EUR: '€', USD: '$', GBP: '£' };

@@ -8,7 +8,12 @@ export function isDate(value: unknown): value is string {
   return !Number.isNaN(parsed.getTime()) && parsed.toISOString().startsWith(value);
 }
 
-/** An IBAN without spaces, in capitals, whose ISO 13616 mod-97 checksum holds. */
+/** An IBAN, a BIC or a VAT ID as it is compared and written: without whitespace, in capitals. */
+export function compactCode(code: string): string {
+  return code.replace(/\s+/g, '').toUpperCase();
+}
+
+/** An IBAN without spaces, in capitals (`compactCode`), whose ISO 13616 mod-97 checksum holds. */
 export function isIban(iban: string): boolean {
   if (!/^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$/.test(iban)) return false;
   const digits = (iban.slice(4) + iban.slice(0, 4)).replace(/[A-Z]/g, (letter) => String(letter.charCodeAt(0) - 55));

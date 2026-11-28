@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   BIC,
+  compactCode,
   isBic,
   isCountryCode,
   isCurrencyCode,
@@ -49,5 +50,10 @@ describe('formats', () => {
     expect(isCurrencyCode('EUR')).toBe(true);
     expect(isCurrencyCode('€')).toBe(false);
     expect(isCurrencyCode(undefined)).toBe(false);
+  });
+
+  it('writes an IBAN, a BIC or a VAT ID as it is compared: without whitespace, in capitals', () => {
+    expect(compactCode(' de02 1203 0000\t0000 2020 51 ')).toBe('DE02120300000000202051');
+    expect(compactCode('atu12345678')).toBe('ATU12345678');
   });
 });
