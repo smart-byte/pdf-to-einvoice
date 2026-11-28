@@ -38,35 +38,48 @@ export type Entry = Omit<Adjustment, 'amount' | 'base'> & { cents: bigint; base?
  * the lines alone, so the order of the entries does not matter. Without `lineCents` only what an entry needs by
  * itself is checked, and nothing is placed.
  */
-export function resolveAdjustments(invoice: Adjustable, lineCents?: bigint[]) {
-  const groups = lineCents ? sumByGroup(lineParts(invoice.lines, lineCents)) : [];
-  const slack = slackOf(invoice.currency);
-  const entries: Entry[] = [];
-  const problems: Finding[] = [];
-  let resolved = lineCents !== undefined;
+export function resolveAdjustments(invoice: Adjustable, lineCents?: bigint[]): Resolved {
+  const placing = lineCents && {
+    groups: sumByGroup(lineParts(invoice.lines, lineCents)),
+    slack: slackOf(invoice.currency),
+  };
+  const { entries, problems, resolved } = merged(LISTS.map((list) => resolveList(list, invoice[list], placing)));
+  return { entries, problems, resolved: resolved && placing !== undefined };
+}
 
-  for (const list of LISTS) {
-    const given: unknown = invoice[list];
-    if (given === undefined) continue;
-    if (!Array.isArray(given)) {
-      problems.push(error(list, 'format.list', { what: WHAT[list] }));
-      resolved = false;
-      continue;
-    }
-    for (const [index, raw] of given.entries()) {
-      const { checked, problems: own } = checkEntry(raw, list, index);
-      problems.push(...own);
-      if (!checked || !lineCents) {
-        resolved = false;
-        continue;
-      }
-      const placed = place(checked, groups, slack);
-      entries.push(...placed.entries);
-      problems.push(...placed.problems);
-      resolved &&= placed.placed;
-    }
+/** What resolving gave: the parts in the VAT groups, what is wrong, and whether every entry found its groups. */
+interface Resolved {
+  entries: Entry[];
+  problems: Finding[];
+  resolved: boolean;
+}
+
+/** The VAT groups of the lines to place entries into, and the rounding allowed; none without the lines. */
+type Placing = { groups: Group[]; slack: number } | undefined;
+
+/** One list of the invoice, `discounts` or `charges`: absent, not a list, or each of its entries. */
+function resolveList(list: List, given: unknown, placing: Placing): Resolved {
+  if (given === undefined) return { entries: [], problems: [], resolved: true };
+  if (!Array.isArray(given)) {
+    return { entries: [], problems: [error(list, 'format.list', { what: WHAT[list] })], resolved: false };
   }
-  return { entries, problems, resolved };
+  return merged(given.map((raw, index) => resolveEntry(raw, list, index, placing)));
+}
+
+/** One entry: checked by itself, then placed into the VAT groups where it can be used and the lines are known. */
+function resolveEntry(raw: unknown, list: List, index: number, placing: Placing): Resolved {
+  const { checked, problems } = checkEntry(raw, list, index);
+  if (!checked || !placing) return { entries: [], problems, resolved: false };
+  const placed = place(checked, placing.groups, placing.slack);
+  return { entries: placed.entries, problems: [...problems, ...placed.problems], resolved: placed.placed };
+}
+
+function merged(parts: Resolved[]): Resolved {
+  return {
+    entries: parts.flatMap((part) => part.entries),
+    problems: parts.flatMap((part) => part.problems),
+    resolved: parts.every((part) => part.resolved),
+  };
 }
 
 /**
@@ -112,27 +125,40 @@ type At = (field?: string) => string;
  */
 function checkEntry(raw: unknown, list: List, index: number): { checked?: Checked; problems: Finding[] } {
   const at: At = (field) => pathOf(list, index, field);
-  const entry: Unchecked<DocumentAllowance> = raw && typeof raw === 'object' ? raw : {};
+  const entry = entryOf(raw);
   const numbers = numbersRefused(entry, list, at);
-  const reason = list === 'charges' && entry.reason === undefined ? [error(at('reason'), 'charge-reason')] : [];
   const vat = vatOf(entry, at);
-  const problems = [...numbers, ...reason, ...vat.problems];
+  const problems = [...numbers, ...reasonMissing(entry, list, at), ...vat.problems];
   if (numbers.length || vat.problems.length) return { problems };
 
   const vatRate = isNumber(entry.vatRate) ? entry.vatRate : undefined;
   const { category } = vat;
-  const rate = category !== undefined && category !== 'S' ? 0 : vatRate;
   const checked = {
     list,
     index,
     category,
-    rate,
+    rate: groupRate(category, vatRate),
     vatRate,
     percent: entry.percent,
     amount: entry.amount,
     reason: entry.reason,
   } as Checked;
   return { checked, problems };
+}
+
+/** An entry as an object; anything else holds none of its fields. */
+function entryOf(raw: unknown): Unchecked<DocumentAllowance> {
+  return raw && typeof raw === 'object' ? raw : {};
+}
+
+/** A charge needs its reason; a discount may go without. */
+function reasonMissing(entry: Unchecked<DocumentAllowance>, list: List, at: At): Finding[] {
+  return list === 'charges' && entry.reason === undefined ? [error(at('reason'), 'charge-reason')] : [];
+}
+
+/** The rate of the group an entry goes into: 0 for every category but S, otherwise the rate it states. */
+function groupRate(category: VatCategory | undefined, vatRate: number | undefined): number | undefined {
+  return category === undefined || category === 'S' ? vatRate : 0;
 }
 
 /** What keeps the numbers of an entry from being used: one that is no number, neither percentage nor amount, or a negative percentage. */
@@ -271,17 +297,29 @@ function placeAmount(entry: Checked & { amount: number }, matching: Group[], nam
     const groups = matching.map((g) => `${g.category} ${g.rate} %`).join(', ');
     return unplaced(error(where, 'adjustment-group.several', { groups, what }));
   }
-  const group =
-    matching[0] ?? (category !== undefined && rate !== undefined ? { category, rate, cents: 0n } : undefined);
+  const group = matching[0] ?? groupOfItsOwn(category, rate);
   if (!group) return unplaced(error(where, 'adjustment-group.none', { group: named || 'it names', what }));
 
   const stated = toCents(entry.amount);
-  const signs = group.cents !== 0n && stated !== 0n && group.cents < 0n !== stated < 0n;
   return {
     entries: [{ list, index, category: group.category, rate: group.rate, cents: stated, reason: entry.reason }],
-    problems: signs ? [warning(pathOf(list, index, 'amount'), 'adjustment-sign', { what })] : [],
+    problems: signsDiffer(group.cents, stated)
+      ? [warning(pathOf(list, index, 'amount'), 'adjustment-sign', { what })]
+      : [],
     placed: true,
   };
+}
+
+/** An empty group for an amount that matches none of the lines, where its category and rate are both known. */
+function groupOfItsOwn(category: VatCategory | undefined, rate: number | undefined): Group | undefined {
+  if (category === undefined || rate === undefined) return undefined;
+  return { category, rate, cents: 0n };
+}
+
+/** A 0 has no sign; otherwise one amount is below 0 and the other is not. */
+function signsDiffer(a: bigint, b: bigint): boolean {
+  if (a === 0n || b === 0n) return false;
+  return a < 0n !== b < 0n;
 }
 
 /** An entry that found no group to go into. */
