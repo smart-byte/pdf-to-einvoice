@@ -1,5 +1,5 @@
 import type { PrintedTotals } from '../../domain/model.js';
-import { cents } from '../../domain/money.js';
+import { cents, fromCents } from '../../domain/money.js';
 import { toNumber } from '../../domain/spellings.js';
 import { after, AMOUNT, anyOf, MONEY, SEPARATOR } from './values.js';
 
@@ -66,7 +66,7 @@ function fits(net: number, vat: number, printed: Set<number>, labelled: Labelled
 /** Net, VAT and gross in euros, and how many of the three stand after their label. */
 function scored(net: number, vat: number, labelled: Labelled) {
   const score = +labelled.net.includes(net) + +labelled.vat.includes(vat) + +labelled.gross.includes(net + vat);
-  return { net: net / 100, vat: vat / 100, gross: (net + vat) / 100, score };
+  return { net: fromCents(net), vat: fromCents(vat), gross: fromCents(net + vat), score };
 }
 
 /**
@@ -95,7 +95,7 @@ function centsOf(printed: string[]): number[] {
 }
 
 function euros(inCents: number | undefined): number | undefined {
-  return inCents === undefined ? undefined : inCents / 100;
+  return inCents === undefined ? undefined : fromCents(inCents);
 }
 
 /**

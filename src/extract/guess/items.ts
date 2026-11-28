@@ -1,4 +1,4 @@
-import { cents, lineBase, netOfGross, percentOf, perUnit } from '../../domain/money.js';
+import { cents, fromCents, lineBase, netOfGross, percentOf, perUnit } from '../../domain/money.js';
 import type { Line, VatCategory } from '../../domain/model.js';
 import { toNumber } from '../../domain/spellings.js';
 import { senderOf } from './parties.js';
@@ -399,7 +399,7 @@ function toNet(lines: Counted[], net: number): boolean {
   for (const line of lines) {
     if (line.vatRate === undefined || !line.quantity) return false;
     line.net = cents(netOfGross(line.total, line.vatRate));
-    line.unitPrice = perUnit(line.net / 100, line.quantity);
+    line.unitPrice = perUnit(fromCents(line.net), line.quantity);
     if (cents(lineBase(line.quantity, line.unitPrice)) !== line.net) return false;
   }
   return lines.reduce((sum, line) => sum + line.net, 0) === cents(net);
@@ -410,7 +410,7 @@ function ratesGiveVat(lines: Counted[], vat: number | undefined): boolean {
   const taxable = new Map<number | undefined, number>();
   for (const line of lines) taxable.set(line.vatRate, (taxable.get(line.vatRate) ?? 0) + line.net);
   const tax = [...taxable].reduce(
-    (sum, [rate, base]) => sum + (rate === undefined ? NaN : cents(percentOf(base / 100, rate))),
+    (sum, [rate, base]) => sum + (rate === undefined ? NaN : cents(percentOf(fromCents(base), rate))),
     0,
   );
   return vat === undefined || Math.abs(tax - cents(vat)) <= taxable.size;

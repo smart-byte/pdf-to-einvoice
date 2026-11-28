@@ -10,6 +10,11 @@ export function cents(n: number): number {
   return Number.isFinite(n * 1e6) ? Number(toCents(n)) : NaN;
 }
 
+/** Whole cents as an amount, from a number or from BigInt: 101 is 1.01. */
+export function fromCents(c: number | bigint): number {
+  return Number(c) / 100;
+}
+
 /** The sum of amounts as given, not rounded: summed in millionths, where 0.1 + 0.2 is 0.3. */
 export function exactSum(amounts: number[]): number {
   return Number(amounts.reduce((sum, n) => sum + micro(n), 0n)) / 1e6;
@@ -77,10 +82,6 @@ export function divRound(n: bigint, d: bigint): bigint {
 
 export function toCents(n: number): bigint {
   return divRound(micro(n), 10_000n);
-}
-
-export function fromCents(c: bigint): number {
-  return Number(c) / 100;
 }
 
 export function baseCents(quantity: number, unitPrice: number): bigint {
