@@ -1,5 +1,6 @@
 // Reading the invoice with a language model, in the browser or at an endpoint the user names.
 import { keepWhatThePdfShows } from '../../src/extract/ground.js';
+import { messageOf } from '../../src/util/errors.js';
 import { $, el } from './dom.js';
 import { normaliseDraft } from './draft.js';
 import { renderForm } from './form.js';
@@ -44,8 +45,12 @@ function showModel(): void {
 
 /** Reads the PDF with the chosen model and fills in what it found and the PDF shows, while the form is still empty there. */
 async function readWithModel(): Promise<void> {
-  const status = $('#ai-status');
-  const [button, cancel] = [$<HTMLButtonElement>('#ai-run'), $<HTMLButtonElement>('#ai-cancel')];
+  const controls = {
+    status: $('#ai-status'),
+    button: $<HTMLButtonElement>('#ai-run'),
+    cancel: $<HTMLButtonElement>('#ai-cancel'),
+  };
+  const { status, button, cancel } = controls;
   const viaEndpoint = modelSelect.value === 'endpoint';
   const refusal = refusalOf(viaEndpoint);
   if (refusal) return void (status.textContent = refusal);
@@ -60,19 +65,30 @@ async function readWithModel(): Promise<void> {
     if (focused) cancel.focus();
     const answer = await askModel(viaEndpoint, abort.signal);
     // Another PDF was opened, or the reading was cancelled, while the model read: the answer is not taken over.
-    if (state.pdf !== pdf || run !== reads || abort.signal.aborted) return;
+    if (isOutdated(pdf, run, abort.signal)) return;
     status.textContent = takeOver(answer);
   } catch (error) {
-    status.textContent = abort.signal.aborted
-      ? t('ai.cancelled')
-      : t('ai.failed', { m: error instanceof Error ? error.message : String(error) });
+    status.textContent = abort.signal.aborted ? t('ai.cancelled') : t('ai.failed', { m: messageOf(error) });
   } finally {
-    const refocus = document.activeElement === cancel;
-    reading();
-    button.disabled = false;
-    if (refocus) button.focus();
-    if (state.pdf !== pdf) status.textContent = '';
+    endReading(controls, pdf);
   }
+}
+
+/** Whether another PDF was opened, another reading started, or this one was cancelled while the model read. */
+function isOutdated(pdf: typeof state.pdf, run: number, signal: AbortSignal): boolean {
+  return state.pdf !== pdf || run !== reads || signal.aborted;
+}
+
+/** The buttons as before the reading, the focus back on the one that starts it, and no status for a PDF that is gone. */
+function endReading(
+  { status, button, cancel }: { status: HTMLElement; button: HTMLButtonElement; cancel: HTMLButtonElement },
+  pdf: typeof state.pdf,
+): void {
+  const refocus = document.activeElement === cancel;
+  reading();
+  button.disabled = false;
+  if (refocus) button.focus();
+  if (state.pdf !== pdf) status.textContent = '';
 }
 
 /** Why reading cannot start: no WebGPU for a model in the browser, or no full address of an own service, which then gets the focus. */
