@@ -12,7 +12,7 @@ import {
   type VatCategory,
 } from './model.js';
 import { formatCents, fromCents, percentAgrees, percentCents, slackOf, toCents } from './money.js';
-import { vatRateError } from './vat.js';
+import { categoryOf, vatRateError } from './vat.js';
 
 /** A discount or charge on the whole invoice as it goes into one VAT group: one entry of BG-20 or BG-21. */
 export interface Adjustment {
@@ -180,7 +180,7 @@ function vatOf(entry: Unchecked<DocumentAllowance>, at: At): { category?: VatCat
     return { problems: [error(at('vatCategory'), 'format.category')] };
   }
   if (!isNumber(entry.vatRate)) return { category: stated, problems: [] };
-  const category = stated ?? (entry.vatRate > 0 ? 'S' : undefined);
+  const category = categoryOf(stated, entry.vatRate);
   const rateError = vatRateError(at('vatRate'), category, entry.vatRate);
   return { category, problems: rateError ? [rateError] : [] };
 }

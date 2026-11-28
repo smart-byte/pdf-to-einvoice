@@ -20,7 +20,7 @@ import {
   type Unchecked,
   type VatCategory,
 } from './model.js';
-import { vatRateError } from './vat.js';
+import { categoryOf, vatRateError } from './vat.js';
 
 export interface CheckResult {
   findings: Finding[];
@@ -347,7 +347,7 @@ function hasAny(categories: Set<VatCategory>, wanted: readonly VatCategory[]): b
 /** What has a VAT category: each line, and each discount or charge that states one (a rate above 0 alone means S). */
 function categoriesOf(draft: Prepared): { path: string; category: VatCategory }[] {
   return taxedOf(draft).flatMap(([path, item]) => {
-    const category = item?.vatCategory ?? (isNumber(item?.vatRate) && item.vatRate > 0 ? 'S' : undefined);
+    const category = categoryOf(item?.vatCategory, item?.vatRate);
     return isVatCategory(category) ? [{ path: `${path}.vatCategory`, category }] : [];
   });
 }
