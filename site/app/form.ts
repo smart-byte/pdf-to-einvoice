@@ -176,19 +176,7 @@ function control(field: Field, path: string): HTMLElement {
   // An empty choice shows what will be used, not whichever option happens to come first.
   const value = valueAt(state.draft, path) ?? (field.blank ? '' : SELECT_DEFAULTS[field.path]) ?? '';
   const id = `in-${path.replace(/\./g, '-')}`;
-  let input: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
-  if (field.type === 'select') {
-    input = el('select', { id });
-    if (field.blank) input.append(el('option', { value: '', selected: value === '' }, t(field.blank)));
-    for (const [code, label] of field.options!)
-      input.append(el('option', { value: code, selected: String(value) === code }, t(label)));
-  } else if (field.type === 'textarea') {
-    // A sentence wraps and the field grows with it, where one line would cut it off on a phone.
-    input = el('textarea', { id, rows: field.rows ?? 2, value: String(value) });
-  } else {
-    input = el('input', { id, type: field.type ?? 'text', value: String(value), autocomplete: 'off' });
-    if (field.type === 'number') (input as HTMLInputElement).step = 'any';
-  }
+  const input = inputOf(field, id, value);
   input.dataset.path = path;
   input.setAttribute('aria-describedby', field.help ? `${id}-help ${id}-hint` : `${id}-hint`);
   return el(
@@ -199,6 +187,24 @@ function control(field: Field, path: string): HTMLElement {
     ...(field.help ? [el('p', { className: 'hint', id: `${id}-help` }, t(field.help))] : []),
     el('p', { className: 'hint', id: `${id}-hint`, dataset: { hint: path } }),
   );
+}
+
+/** The input of a field, holding `value`: a choice, a text that wraps, or a line. */
+function inputOf(field: Field, id: string, value: unknown): HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement {
+  if (field.type === 'select') return selectOf(field, id, value);
+  // A sentence wraps and the field grows with it, where one line would cut it off on a phone.
+  if (field.type === 'textarea') return el('textarea', { id, rows: field.rows ?? 2, value: String(value) });
+  const input = el('input', { id, type: field.type ?? 'text', value: String(value), autocomplete: 'off' });
+  if (field.type === 'number') input.step = 'any';
+  return input;
+}
+
+function selectOf(field: Field, id: string, value: unknown): HTMLSelectElement {
+  const select = el('select', { id });
+  if (field.blank) select.append(el('option', { value: '', selected: value === '' }, t(field.blank)));
+  for (const [code, label] of field.options!)
+    select.append(el('option', { value: code, selected: String(value) === code }, t(label)));
+  return select;
 }
 
 /** The value of a field as the data holds it: a number field as a number, or nothing while it is empty. */
