@@ -1,5 +1,5 @@
 import { isMalformedNumber, isNegative, isNumber, signsDiffer } from '../util/numbers.js';
-import { isEmptyObject, isObject, valueAt } from '../util/objects.js';
+import { isEmptyObject, isObject, pathOf, valueAt } from '../util/objects.js';
 import { checkAdjustments } from './adjustments.js';
 import { tryCalculate, type Totals } from './calculate.js';
 import type { Finding } from './finding.js';
@@ -219,20 +219,16 @@ function notTexts(part: SchemaPart, value: unknown, path: string): string[] {
   if (part.type === 'string') return isTextOrHasForm(part, value) ? [] : [path];
   if (part.items) {
     const items = part.items;
-    return Array.isArray(value) ? value.flatMap((item, i) => notTexts(items, item, pathBelow(path, i))) : [];
+    return Array.isArray(value) ? value.flatMap((item, i) => notTexts(items, item, pathOf(path, i))) : [];
   }
   return Object.entries(part.properties ?? {}).flatMap(([key, child]) =>
-    notTexts(child, (value as Record<string, unknown>)[key], pathBelow(path, key)),
+    notTexts(child, (value as Record<string, unknown>)[key], pathOf(path, key)),
   );
 }
 
 /** A value with a form of its own, a pattern or a list of codes, has that form checked elsewhere. */
 function isTextOrHasForm(part: SchemaPart, value: unknown): boolean {
   return Boolean(part.pattern || part.enum) || typeof value === 'string';
-}
-
-function pathBelow(path: string, key: string | number): string {
-  return path ? `${path}.${key}` : String(key);
 }
 
 /**

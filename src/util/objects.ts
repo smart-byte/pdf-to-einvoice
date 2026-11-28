@@ -1,3 +1,8 @@
+/** A path of keys and indices, such as `lines.0.unitPrice`; a key that is missing or empty is left out. */
+export function pathOf(...keys: (string | number | undefined)[]): string {
+  return keys.filter((key) => key !== undefined && key !== '').join('.');
+}
+
 /** The value at a path of keys and indices, such as `lines.0.unitPrice`; undefined where the path leads nowhere. */
 export const valueAt = (data: unknown, path: string): unknown =>
   path

@@ -1,7 +1,7 @@
 // Discounts and charges on the whole invoice (BG-20, BG-21): what each needs by itself, and how it goes into the VAT
 // groups of the lines, by percentage or by amount, with what is wrong with it.
 import { isMalformedNumber, isNegative, isNumber, signsDiffer } from '../util/numbers.js';
-import { recordOf } from '../util/objects.js';
+import { pathOf, recordOf } from '../util/objects.js';
 import type { Finding } from './finding.js';
 import { error, warning } from './messages.js';
 import {
@@ -332,10 +332,6 @@ export function sumByGroup(parts: Group[]): Group[] {
 /** Each line as a part of its VAT group. */
 export function lineParts(lines: Line[], lineCents: bigint[]): Group[] {
   return lines.map((line, i) => ({ category: line.vatCategory, rate: line.vatRate, cents: lineCents[i]! }));
-}
-
-function pathOf(list: List, index: number, field?: string): string {
-  return field ? `${list}.${index}.${field}` : `${list}.${index}`;
 }
 
 type List = Adjustment['list'];
