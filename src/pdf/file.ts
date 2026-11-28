@@ -77,13 +77,22 @@ function stopSmoothing(doc: PDFDocument): boolean {
   const key = PDFName.of('Interpolate');
   let stopped = false;
   for (const [, object] of doc.context.enumerateIndirectObjects()) {
-    const dict = object instanceof PDFRawStream ? object.dict : object;
-    if (dict instanceof PDFDict && name(dict, 'Subtype') === 'Image' && dict.get(key) === PDFBool.True) {
+    const dict = dictOf(object);
+    if (isSmoothedImage(dict, key)) {
       dict.set(key, PDFBool.False);
       stopped = true;
     }
   }
   return stopped;
+}
+
+function isSmoothedImage(dict: PDFObject, key: PDFName): dict is PDFDict {
+  return dict instanceof PDFDict && name(dict, 'Subtype') === 'Image' && dict.get(key) === PDFBool.True;
+}
+
+/** The dictionary of a stream; any other object as it is. */
+function dictOf(object: PDFObject): PDFObject {
+  return object instanceof PDFRawStream ? object.dict : object;
 }
 
 /** Looking through a PDF for forbidden actions: what was found, and with `remove` what leaves the file. */
@@ -108,16 +117,19 @@ function forbiddenActions(doc: PDFDocument, remove = false): string[] {
 
 /** Notes, and with `remove` takes out, the forbidden actions of an object and of everything it holds directly. */
 function visit(scan: Scan, object: PDFObject): void {
-  const dict = object instanceof PDFRawStream ? object.dict : object;
+  const dict = dictOf(object);
   if (dict instanceof PDFArray) return dict.asArray().forEach((item) => visit(scan, item));
   if (!(dict instanceof PDFDict)) return;
-  for (const { key, kinds, values } of actionsIn(scan.doc, dict)) {
-    for (const kind of kinds) if (kind) scan.found.add(kind);
-    if (!scan.remove) continue;
-    values.forEach((value) => forget(scan, value));
-    dict.delete(PDFName.of(key));
-  }
+  for (const held of actionsIn(scan.doc, dict)) note(scan, dict, held);
   for (const value of dict.values()) if (value instanceof PDFDict || value instanceof PDFArray) visit(scan, value);
+}
+
+/** Notes the kinds of one forbidden entry of `dict`, and with `remove` takes it out with what leaves the file with it. */
+function note(scan: Scan, dict: PDFDict, { key, kinds, values }: Held): void {
+  for (const kind of kinds) if (kind) scan.found.add(kind);
+  if (!scan.remove) return;
+  values.forEach((value) => forget(scan, value));
+  dict.delete(PDFName.of(key));
 }
 
 /** A forbidden entry of a dictionary: its key, the kinds of action it holds, and what leaves the file with it. */
@@ -186,18 +198,32 @@ function findInvoiceXml(doc: PDFDocument): string | null {
 /** The invoice XML among the files of a node of the name tree, or of the nodes below it. */
 function invoiceXmlIn(node: PDFDict | undefined): string | null {
   if (!node) return null;
-  const entries = node.lookupMaybe(PDFName.of('Names'), PDFArray);
+  return (
+    invoiceXmlAmong(node.lookupMaybe(PDFName.of('Names'), PDFArray)) ??
+    invoiceXmlBelow(node.lookupMaybe(PDFName.of('Kids'), PDFArray))
+  );
+}
+
+/** The invoice XML among the pairs of file name and file specification of a node. */
+function invoiceXmlAmong(entries: PDFArray | undefined): string | null {
   for (let i = 0; entries && i + 1 < entries.size(); i += 2) {
-    const key = entries.lookup(i);
-    const filename = key instanceof PDFString || key instanceof PDFHexString ? key.decodeText() : '';
-    if (!INVOICE_XML_NAMES.includes(filename.toLowerCase())) continue;
+    if (!isInvoiceXmlName(entries.lookup(i))) continue;
     const stream = entries
       .lookupMaybe(i + 1, PDFDict)
       ?.lookupMaybe(PDFName.of('EF'), PDFDict)
       ?.lookup(PDFName.of('F'));
     if (stream instanceof PDFRawStream) return new TextDecoder().decode(decodePDFRawStream(stream).decode());
   }
-  const kids = node.lookupMaybe(PDFName.of('Kids'), PDFArray);
+  return null;
+}
+
+function isInvoiceXmlName(key: PDFObject | undefined): boolean {
+  const filename = key instanceof PDFString || key instanceof PDFHexString ? key.decodeText() : '';
+  return INVOICE_XML_NAMES.includes(filename.toLowerCase());
+}
+
+/** The invoice XML in the first of the nodes below that holds one. */
+function invoiceXmlBelow(kids: PDFArray | undefined): string | null {
   for (let i = 0; kids && i < kids.size(); i++) {
     const found = invoiceXmlIn(kids.lookupMaybe(i, PDFDict));
     if (found) return found;
