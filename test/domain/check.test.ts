@@ -152,6 +152,15 @@ describe('check', () => {
     expect(printedNet(1.004)).toEqual(['error:totals-mismatch']);
   });
 
+  it('words a printed total as the cents it was compared as, not as floating point rounds it', () => {
+    const draft = withChange((d) => {
+      d.lines = [{ name: 'Item', quantity: 1, unitPrice: 1.01, vatCategory: 'S', vatRate: 19 }];
+      d.totals = { net: 1.015 };
+    });
+    const [finding] = check(draft).findings.filter((f) => f.path === 'totals.net');
+    expect(finding).toMatchObject({ code: 'totals-mismatch', params: { printed: '1.02', calculated: '1.01' } });
+  });
+
   it('checks a line total against quantity times price less the discount', () => {
     const at = (netAmount: number) =>
       codesAt(
@@ -177,6 +186,8 @@ describe('check', () => {
     expect(at({ reason: 'Treuerabatt' }, 'lines.1.discount')).toEqual(['error:discount']);
     expect(at({ percent: -5 }, 'lines.1.discount.percent')).toEqual(['error:discount']);
     expect(at({ percent: '10 %' }, 'lines.1.discount.percent')).toEqual(['error:format']);
+    // A list is no discount, also an empty one.
+    expect(at([], 'lines.1.discount')).toEqual(['error:discount']);
   });
 
   it('ignores a discount whose fields were all left empty', () => {

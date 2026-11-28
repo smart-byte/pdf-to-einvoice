@@ -28,11 +28,12 @@ export async function createFile(
     overwrite = false,
     profile,
   }: { outputPath?: string; overwrite?: boolean; profile?: CreateOptions['profile'] } = {},
-): Promise<{ outputPath: string; findings: Finding[]; totals: Totals }> {
-  const output = outputFor(outputPath, { path: pdfPath, what: 'the input PDF' }, overwrite);
-  const result = await createEInvoice({ pdf: await readPdf(pdfPath), invoice, profile });
-  await writeOutput(output, result.pdf, overwrite);
-  return { outputPath: output, findings: result.findings, totals: result.totals };
+): Promise<CreatedFile> {
+  const target = { outputPath, input: { path: pdfPath, what: 'the input PDF' }, overwrite };
+  return writeCreated(target, async () => {
+    const { pdf, ...result } = await createEInvoice({ pdf: await readPdf(pdfPath), invoice, profile });
+    return { ...result, content: pdf };
+  });
 }
 
 /**
@@ -47,18 +48,41 @@ export async function createXRechnungFile(
     overwrite = false,
     syntax,
   }: { dataPath?: string; overwrite?: boolean; syntax?: XRechnungOptions['syntax'] } = {},
-): Promise<{ outputPath: string; findings: Finding[]; totals: Totals }> {
-  const output = outputFor(outputPath, { path: dataPath, what: 'the data file' }, overwrite);
-  const result = await createXRechnung({ invoice, syntax });
-  await writeOutput(output, result.xml, overwrite);
-  return { outputPath: output, findings: result.findings, totals: result.totals };
+): Promise<CreatedFile> {
+  const target = { outputPath, input: { path: dataPath, what: 'the data file' }, overwrite };
+  return writeCreated(target, async () => {
+    const { xml, ...result } = await createXRechnung({ invoice, syntax });
+    return { ...result, content: xml };
+  });
 }
 
-/**
- * The output path, resolved, after making sure it may be written: never the input, `input` (`what` says which one
- * it is), and an existing file only with `overwrite`.
- */
-function outputFor(outputPath: string, input: { path?: string; what: string }, overwrite: boolean): string {
+/** A file written to disk, and what creating it found. */
+interface CreatedFile {
+  outputPath: string;
+  findings: Finding[];
+  totals: Totals;
+}
+
+/** Where a created file goes: the path, the input it must not replace (`what` says which one it is), and `overwrite`. */
+interface Target {
+  outputPath: string;
+  input: { path?: string; what: string };
+  overwrite: boolean;
+}
+
+/** Makes sure the output may be written before `create` runs, then writes what it created. */
+async function writeCreated(
+  target: Target,
+  create: () => Promise<{ content: string | Uint8Array; findings: Finding[]; totals: Totals }>,
+): Promise<CreatedFile> {
+  const output = outputFor(target);
+  const { content, findings, totals } = await create();
+  await writeOutput(output, content, target.overwrite);
+  return { outputPath: output, findings, totals };
+}
+
+/** The output path, resolved, after making sure it may be written: never the input, and an existing file only with `overwrite`. */
+function outputFor({ outputPath, input, overwrite }: Target): string {
   const output = resolve(outputPath);
   if (input.path !== undefined && sameFile(output, input.path))
     throw new Error(`The output path is ${input.what}. Choose another output path; the input is never overwritten.`);

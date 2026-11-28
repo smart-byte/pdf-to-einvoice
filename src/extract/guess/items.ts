@@ -1,4 +1,4 @@
-import { cents, lineBase, netOfGross, percentOf, perUnit } from '../../domain/money.js';
+import { cents, fromCents, lineBase, netOfGross, percentOf, perUnit } from '../../domain/money.js';
 import type { Line, VatCategory } from '../../domain/model.js';
 import { toNumber } from '../../domain/spellings.js';
 import { senderOf } from './parties.js';
@@ -137,10 +137,13 @@ function otherRow(reading: Reading, row: string, all: string[], span: Span): voi
   // Another row ends the description above it, and a row of headings starts another table.
   reading.loose = [];
   reading.open = undefined;
-  if (all.length >= 3 && !/\d/.test(row)) {
-    if (!(span === 'pages' && reading.heads.has(row))) reading.table++;
-    reading.heads.add(row);
-  }
+  if (all.length >= 3 && !/\d/.test(row)) noteHeadings(reading, row, span);
+}
+
+/** A row of headings starts another table, but not where a table that goes on over pages repeats them. */
+function noteHeadings(reading: Reading, row: string, span: Span): void {
+  if (!(span === 'pages' && reading.heads.has(row))) reading.table++;
+  reading.heads.add(row);
 }
 
 /** The loose rows go on the description of the open item, where they are few enough. */
@@ -164,36 +167,52 @@ interface Figure {
 function itemOf(parts: string[], table: number): Item {
   const numbered = /^\d{1,3}\.?$/.test(parts[0]!);
   const before = withUnits(parts.slice(numbered ? 1 : 0, -1));
-  const name = before.find((cell) => !RATE_CELL.test(cell) && !MONEY_CELL.test(cell) && !QUANTITY_CELL.test(cell));
+  const name = before.find(isNameCell);
   const figures = figuresIn(before.filter((cell) => cell !== name && /^\(?[€$£]?\s*-?\d/.test(cell)));
-  const item: Item = { name, cell: name, total: toNumber(MONEY_CELL.exec(parts.at(-1)!)![1]!), table, below: [] };
-
   const rates = figures.filter((figure) => figure.mark === '%');
-  if (rates.length === 1) item.vatRate = rates[0]!.value;
-  let others = figures.filter((figure) => figure.mark !== '%');
+  const others = figures.filter((figure) => figure.mark !== '%');
+  const printed = toNumber(MONEY_CELL.exec(parts.at(-1)!)![1]!);
   // "10,00 €   1,90 €   11,90 €": net, VAT and gross of the row.
-  const [net, vat] = others.filter((figure) => figure.money).slice(-2);
-  if (
-    net &&
-    vat &&
-    cents(net.value) + cents(vat.value) === cents(item.total) &&
-    rateOf(net.value, vat.value) !== undefined
-  ) {
-    item.total = net.value;
-    others = others.filter((figure) => figure !== net && figure !== vat);
-  }
-  return { ...item, ...quantityAndPrice(others, item.total) };
+  const taxed = netAndVatOf(others, printed);
+  const total = taxed ? taxed.net.value : printed;
+  const item: Item = {
+    name,
+    cell: name,
+    total,
+    table,
+    below: [],
+    ...(rates.length === 1 ? { vatRate: rates[0]!.value } : {}),
+  };
+  const rest = taxed ? others.filter((figure) => figure !== taxed.net && figure !== taxed.vat) : others;
+  return { ...item, ...quantityAndPrice(rest, total) };
+}
+
+/** A cell that is no rate, no amount and no quantity. */
+function isNameCell(cell: string): boolean {
+  return !RATE_CELL.test(cell) && !MONEY_CELL.test(cell) && !QUANTITY_CELL.test(cell);
+}
+
+/** The last two amounts of a row as its net and VAT, where they add up to its total at a rate there is. */
+function netAndVatOf(figures: Figure[], total: number): { net: Figure; vat: Figure } | undefined {
+  const [net, vat] = figures.filter((figure) => figure.money).slice(-2);
+  if (!net || !vat) return undefined;
+  const addsUp = cents(net.value) + cents(vat.value) === cents(total);
+  return addsUp && rateOf(net.value, vat.value) !== undefined ? { net, vat } : undefined;
 }
 
 /** A unit in a column of its own belongs to the quantity before it: "8   Std.". */
 function withUnits(row: string[]): string[] {
   return row.reduce<string[]>((joined, cell) => {
     const last = joined.at(-1);
-    if (last !== undefined && /^-?\d+(?:[.,]\d+)?$/.test(last) && UNITS.some(([pattern]) => pattern.test(cell)))
-      joined[joined.length - 1] = `${last} ${cell}`;
+    if (isUnitOf(last, cell)) joined[joined.length - 1] = `${last} ${cell}`;
     else joined.push(cell);
     return joined;
   }, []);
+}
+
+/** Whether `cell` is a unit and `last`, the cell before it, a number. */
+function isUnitOf(last: string | undefined, cell: string): boolean {
+  return last !== undefined && /^-?\d+(?:[.,]\d+)?$/.test(last) && UNITS.some(([pattern]) => pattern.test(cell));
 }
 
 /** The numbers of cells, each with the sign or word behind it. */
@@ -212,20 +231,28 @@ function quantityAndPrice(figures: Figure[], total: number): Pick<Item, 'quantit
   // Nothing but the total, or the total once more: one unit at that price.
   if (figures.every((figure) => cents(figure.value) === cents(total)))
     return { quantity: 1, unit: 'C62', unitPrice: total };
-  for (const [i, a] of figures.entries()) {
-    for (const b of figures.slice(i + 1)) {
-      if (cents(lineBase(a.value, b.value)) !== cents(total)) continue;
-      // Known limit: where neither a currency nor a unit nor a whole number tells, the quantity is taken to come first.
-      const swap =
-        isPrice(a) ||
-        hasUnit(b) ||
-        (!hasUnit(a) && !isPrice(b) && !Number.isInteger(a.value) && Number.isInteger(b.value));
-      const [quantity, price] = swap ? [b, a] : [a, b];
-      return { quantity: quantity.value, unit: unitOf(quantity.mark), unitPrice: price.value };
-    }
-  }
+  const factors = factorsOf(figures, total);
   // No two numbers give the total, e.g. because of a discount or a rounded quantity: both stay open.
-  return {};
+  if (!factors) return {};
+  const [quantity, price] = inOrder(...factors);
+  return { quantity: quantity.value, unit: unitOf(quantity.mark), unitPrice: price.value };
+}
+
+/** The first two figures that multiply to the total. */
+function factorsOf(figures: Figure[], total: number): [Figure, Figure] | undefined {
+  for (const [i, a] of figures.entries()) {
+    const b = figures.slice(i + 1).find((other) => cents(lineBase(a.value, other.value)) === cents(total));
+    if (b) return [a, b];
+  }
+  return undefined;
+}
+
+/** Two factors as quantity and price: a currency marks the price, a unit the quantity, or else a whole number. */
+function inOrder(a: Figure, b: Figure): [quantity: Figure, price: Figure] {
+  if (isPrice(a) || hasUnit(b)) return [b, a];
+  if (hasUnit(a) || isPrice(b)) return [a, b];
+  // Known limit: where neither a currency nor a unit nor a whole number tells, the quantity is taken to come first.
+  return !Number.isInteger(a.value) && Number.isInteger(b.value) ? [b, a] : [a, b];
 }
 
 function isPrice(figure: Figure): boolean {
@@ -274,14 +301,19 @@ function nameFromBlocks(items: Item[], blocks: string[][]): void {
     seen.set(item.cell, nth + 1);
     const place = placesOf(item.cell, blocks)[nth];
     // Where the block of the name is known, it says what the name is: text below it in another column is none of it.
-    if (!place) continue;
-    const more: string[] = [];
-    for (let k = place.i + 1; more.length < MAX_WRAPPED; k++) {
-      if (!item.below.includes(place.block[k]!) || KEY_VALUE.test(place.block[k]!)) break;
-      more.push(place.block[k]!);
-    }
-    item.name = unwrap([item.cell, ...more]);
+    if (place) item.name = unwrap([item.cell, ...linesBelow(item, place)]);
   }
+}
+
+/** The lines of a block below the first one of a name, as far as they stand in the rows of its item. */
+function linesBelow(item: Item, { block, i }: { block: string[]; i: number }): string[] {
+  const more: string[] = [];
+  for (let k = i + 1; more.length < MAX_WRAPPED; k++) {
+    const line = block[k]!;
+    if (!item.below.includes(line) || KEY_VALUE.test(line)) break;
+    more.push(line);
+  }
+  return more;
 }
 
 /** Every line of the blocks that is `cell`, with its block. */
@@ -304,25 +336,46 @@ function runThatAddsUp(
 /** The longest run of consecutive items of one table that adds up to the total, with the rows of nothing around it. */
 function runOf(items: Item[], total: number | undefined): Item[] | undefined {
   if (total === undefined) return undefined;
-  const weight = (run: Item[]) => run.filter((item) => cents(item.total) !== 0).length;
   let best: Item[] | undefined;
-  for (const [i, start] of items.entries()) {
-    const inTable = (item: Item | undefined): item is Item => item?.table === start.table;
-    const isZero = (item: Item | undefined) => inTable(item) && cents(item.total) === 0;
-    if (isZero(start)) continue;
-    let sum = 0;
-    for (let j = i; inTable(items[j]); j++) {
-      sum += cents(items[j]!.total);
-      if (sum !== cents(total)) continue;
-      let [from, to] = [i, j];
-      while (isZero(items[from - 1])) from--;
-      while (isZero(items[to + 1])) to++;
-      const run = items.slice(from, to + 1);
-      if (!best || weight(run) > weight(best)) best = run;
-      break;
-    }
+  for (const i of items.keys()) {
+    const run = runFrom(items, i, cents(total));
+    if (run && outweighs(run, best)) best = run;
   }
   return best;
+}
+
+/**
+ * The run that starts at item `i` and, within its table, first adds up to `total` cents, with the rows of nothing
+ * around it; none where item `i` is one of nothing itself.
+ */
+function runFrom(items: Item[], i: number, total: number): Item[] | undefined {
+  const table = items[i]!.table;
+  const inTable = (item: Item | undefined): item is Item => item?.table === table;
+  const isZero = (item: Item | undefined) => inTable(item) && cents(item.total) === 0;
+  if (isZero(items[i])) return undefined;
+  let sum = 0;
+  for (let j = i; inTable(items[j]); j++) {
+    sum += cents(items[j]!.total);
+    if (sum === total) return withZerosAround(items, [i, j], isZero);
+  }
+  return undefined;
+}
+
+/** Items `first` to `last`, with the rows of nothing right before and after them. */
+function withZerosAround(items: Item[], [first, last]: [number, number], isZero: (item?: Item) => boolean): Item[] {
+  let [from, to] = [first, last];
+  while (isZero(items[from - 1])) from--;
+  while (isZero(items[to + 1])) to++;
+  return items.slice(from, to + 1);
+}
+
+/** Whether a run counts more items that are not nothing than the best so far. */
+function outweighs(run: Item[], best: Item[] | undefined): boolean {
+  return !best || weight(run) > weight(best);
+}
+
+function weight(run: Item[]): number {
+  return run.filter((item) => cents(item.total) !== 0).length;
 }
 
 /** The rate the totals name, if they name exactly one. */
@@ -346,7 +399,7 @@ function toNet(lines: Counted[], net: number): boolean {
   for (const line of lines) {
     if (line.vatRate === undefined || !line.quantity) return false;
     line.net = cents(netOfGross(line.total, line.vatRate));
-    line.unitPrice = perUnit(line.net / 100, line.quantity);
+    line.unitPrice = perUnit(fromCents(line.net), line.quantity);
     if (cents(lineBase(line.quantity, line.unitPrice)) !== line.net) return false;
   }
   return lines.reduce((sum, line) => sum + line.net, 0) === cents(net);
@@ -357,7 +410,7 @@ function ratesGiveVat(lines: Counted[], vat: number | undefined): boolean {
   const taxable = new Map<number | undefined, number>();
   for (const line of lines) taxable.set(line.vatRate, (taxable.get(line.vatRate) ?? 0) + line.net);
   const tax = [...taxable].reduce(
-    (sum, [rate, base]) => sum + (rate === undefined ? NaN : cents(percentOf(base / 100, rate))),
+    (sum, [rate, base]) => sum + (rate === undefined ? NaN : cents(percentOf(fromCents(base), rate))),
     0,
   );
   return vat === undefined || Math.abs(tax - cents(vat)) <= taxable.size;

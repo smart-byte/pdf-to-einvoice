@@ -1,5 +1,6 @@
 import { isIban } from '../../domain/formats.js';
 import { MONTHS } from '../../domain/spellings.js';
+import { twoDigits } from '../../util/numbers.js';
 
 // How values are recognised in the text: a value after its label, dates, amounts, IBANs and VAT IDs, by subject; each
 // with its functions first and its patterns below them. Last, small helpers the readers share.
@@ -43,11 +44,11 @@ export function toIsoDate(match: RegExpExecArray, dayFirst: boolean): string | u
 function writtenDate(groups: Record<string, string | undefined>): string | undefined {
   if (groups.isoYear) return `${groups.isoYear}-${groups.isoMonth}-${groups.isoDay}`;
   if (groups.dotDay && groups.dotMonth && groups.dotYear)
-    return `${century(groups.dotYear)}-${pad(groups.dotMonth)}-${pad(groups.dotDay)}`;
+    return `${century(groups.dotYear)}-${twoDigits(groups.dotMonth)}-${twoDigits(groups.dotDay)}`;
   if (groups.textDay && groups.textMonth)
-    return `${groups.textYear}-${pad(monthNumber(groups.textMonth))}-${pad(groups.textDay)}`;
+    return `${groups.textYear}-${twoDigits(monthNumber(groups.textMonth))}-${twoDigits(groups.textDay)}`;
   if (groups.usMonth && groups.usDay)
-    return `${groups.usYear}-${pad(monthNumber(groups.usMonth))}-${pad(groups.usDay)}`;
+    return `${groups.usYear}-${twoDigits(monthNumber(groups.usMonth))}-${twoDigits(groups.usDay)}`;
   return undefined;
 }
 
@@ -58,8 +59,9 @@ function writtenDate(groups: Record<string, string | undefined>): string | undef
 function slashedDate(groups: Record<string, string | undefined>, dayFirst: boolean): string | undefined {
   if (!groups.slashYear) return undefined;
   const [first, second] = [Number(groups.slashFirst), Number(groups.slashSecond)];
-  if (second > 12 && first <= 12) return `${century(groups.slashYear)}-${pad(first)}-${pad(second)}`;
-  if ((first > 12 || dayFirst) && second <= 12) return `${century(groups.slashYear)}-${pad(second)}-${pad(first)}`;
+  if (second > 12 && first <= 12) return `${century(groups.slashYear)}-${twoDigits(first)}-${twoDigits(second)}`;
+  if ((first > 12 || dayFirst) && second <= 12)
+    return `${century(groups.slashYear)}-${twoDigits(second)}-${twoDigits(first)}`;
   return undefined;
 }
 
@@ -75,10 +77,6 @@ export function monthNumber(name: string): number {
  */
 export function monthAs(name: string): string {
   return `(?<${name}>${MONTHS.flat().join('|')})[a-zä]*\\.?`;
-}
-
-export function pad(value: string | number): string {
-  return String(value).padStart(2, '0');
 }
 
 function century(year: string): string {

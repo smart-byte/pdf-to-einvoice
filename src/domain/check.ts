@@ -1,11 +1,11 @@
-import { isNumber } from '../util/numbers.js';
-import { valueAt } from '../util/objects.js';
+import { isMalformedNumber, isNegative, isNumber, signsDiffer } from '../util/numbers.js';
+import { isEmptyObject, isObject, pathOf, valueAt } from '../util/objects.js';
 import { checkAdjustments } from './adjustments.js';
 import { tryCalculate, type Totals } from './calculate.js';
 import type { Finding } from './finding.js';
-import { isCountryCode, isCurrencyCode, isDate, isEmail, isIban } from './formats.js';
+import { compactCode, isCountryCode, isCurrencyCode, isDate, isEmail, isIban } from './formats.js';
 import { error, warning, type MessageKey, type MessageParams } from './messages.js';
-import { cents, lineAgrees, lineBase, percentAgrees, percentOf, slackOf } from './money.js';
+import { cents, formatAmount, lineAgrees, lineBase, percentAgrees, percentOf, slackOf } from './money.js';
 import { pageTextOf, showsAmount, showsPercent, showsSpelling, showsWords, type PageText } from './shown.js';
 import { dateSpellings } from './spellings.js';
 import {
@@ -20,7 +20,7 @@ import {
   type Unchecked,
   type VatCategory,
 } from './model.js';
-import { vatRateError } from './vat.js';
+import { categoryOf, vatRateError } from './vat.js';
 
 export interface CheckResult {
   findings: Finding[];
@@ -104,21 +104,22 @@ function withDefaults(input: InvoiceDraft): Prepared {
     deliveryCountry: upper(draft.deliveryCountry),
     seller: party(draft.seller),
     buyer: party(draft.buyer),
-    lines: (Array.isArray(draft.lines) ? draft.lines : []).map((given: Unchecked<Line>) => {
-      const line: Unchecked<Line> = { unit: 'C62', vatCategory: 'S', ...given };
-      // A discount whose fields were all left empty is none.
-      if (line.discount && typeof line.discount === 'object' && Object.keys(line.discount).length === 0)
-        delete line.discount;
-      return line;
-    }),
+    lines: (Array.isArray(draft.lines) ? draft.lines : []).map(lineWithDefaults),
   };
+}
+
+function lineWithDefaults(given: Unchecked<Line>): Unchecked<Line> {
+  const line: Unchecked<Line> = { unit: 'C62', vatCategory: 'S', ...given };
+  // A discount whose fields were all left empty is none.
+  if (isEmptyObject(line.discount)) delete line.discount;
+  return line;
 }
 
 /** Drops null, undefined and blank strings; trims the rest. */
 function clean(value: unknown): unknown {
   if (typeof value === 'string') return value.trim() || undefined;
   if (Array.isArray(value)) return value.map((item) => clean(item) ?? {});
-  if (value && typeof value === 'object') {
+  if (isObject(value)) {
     const entries = Object.entries(value)
       .map(([key, item]) => [key, clean(item)] as const)
       .filter(([, item]) => item !== undefined);
@@ -132,7 +133,7 @@ function upper(value: unknown): unknown {
 }
 
 function compact(value: unknown): unknown {
-  return typeof value === 'string' ? value.replace(/\s+/g, '').toUpperCase() : value;
+  return typeof value === 'string' ? compactCode(value) : value;
 }
 
 /** The head of the invoice: its number and date, both parties, the formats of dates and codes, the seller's tax ID. */
@@ -170,17 +171,27 @@ function checkAddress(party: Unchecked<Party>, who: 'seller' | 'buyer'): Finding
 
 /** The formats of the dates, the type, the currency, the IBAN and the prepaid amount, and a period that runs backwards. */
 function checkFormats(draft: Prepared): Finding[] {
+  return [...checkDates(draft), ...checkCodes(draft)];
+}
+
+function checkDates(draft: Prepared): Finding[] {
   const findings = DATE_FIELDS.filter((field) => draft[field] !== undefined && !isDate(draft[field])).map((field) =>
     error(field, 'format.date'),
   );
-  if (isDate(draft.periodStart) && isDate(draft.periodEnd) && draft.periodEnd < draft.periodStart) {
-    findings.push(error('periodEnd', 'period-reversed'));
-  }
+  if (runsBackwards(draft)) findings.push(error('periodEnd', 'period-reversed'));
+  return findings;
+}
+
+function runsBackwards({ periodStart, periodEnd }: Prepared): boolean {
+  return isDate(periodStart) && isDate(periodEnd) && periodEnd < periodStart;
+}
+
+function checkCodes(draft: Prepared): Finding[] {
+  const findings: Finding[] = [];
   if (!isInvoiceType(draft.typeCode)) findings.push(error('typeCode', 'format.type'));
   if (!isCurrencyCode(draft.currency)) findings.push(error('currency', 'format.currency'));
   if (typeof draft.iban === 'string' && !isIban(draft.iban)) findings.push(error('iban', 'format.iban'));
-  if (draft.prepaidAmount !== undefined && !isNumber(draft.prepaidAmount))
-    findings.push(error('prepaidAmount', 'format.number'));
+  if (isMalformedNumber(draft.prepaidAmount)) findings.push(error('prepaidAmount', 'format.number'));
   return findings;
 }
 
@@ -205,12 +216,19 @@ interface SchemaPart {
 /** The paths below `path` where the schema holds free text and `value` holds something else. */
 function notTexts(part: SchemaPart, value: unknown, path: string): string[] {
   if (value === undefined || value === null) return [];
-  if (part.type === 'string') return part.pattern || part.enum || typeof value === 'string' ? [] : [path];
-  const at = (key: string | number) => (path ? `${path}.${key}` : String(key));
-  if (part.items) return Array.isArray(value) ? value.flatMap((item, i) => notTexts(part.items!, item, at(i))) : [];
+  if (part.type === 'string') return isTextOrHasForm(part, value) ? [] : [path];
+  if (part.items) {
+    const items = part.items;
+    return Array.isArray(value) ? value.flatMap((item, i) => notTexts(items, item, pathOf(path, i))) : [];
+  }
   return Object.entries(part.properties ?? {}).flatMap(([key, child]) =>
-    notTexts(child, (value as Record<string, unknown>)[key], at(key)),
+    notTexts(child, (value as Record<string, unknown>)[key], pathOf(path, key)),
   );
+}
+
+/** A value with a form of its own, a pattern or a list of codes, has that form checked elsewhere. */
+function isTextOrHasForm(part: SchemaPart, value: unknown): boolean {
+  return Boolean(part.pattern || part.enum) || typeof value === 'string';
 }
 
 /**
@@ -234,19 +252,23 @@ type At = (field: string) => string;
 
 function checkLine(line: Unchecked<Line>, i: number): { findings: Finding[]; calculable: boolean } {
   const at: At = (field) => `lines.${i}.${field}`;
-  const findings = checkLineValues(line, at);
-  let calculable = isNumber(line.quantity) && isNumber(line.unitPrice) && isNumber(line.vatRate);
-  if (line.netAmount !== undefined && !isNumber(line.netAmount)) {
-    findings.push(error(at('netAmount'), 'format.number'));
-    calculable = false;
-  }
-  const discount = line.discount === undefined ? undefined : checkDiscountFields(line.discount, at);
-  if (discount) findings.push(...discount.findings);
-  if (isNumber(line.unitPrice) && line.unitPrice < 0) {
-    findings.push(error(at('unitPrice'), 'negative-price'));
-  }
-  findings.push(...checkLineVat(line, at));
-  return { findings, calculable: calculable && (discount?.calculable ?? true) };
+  const discount = line.discount === undefined ? NO_DISCOUNT : checkDiscountFields(line.discount, at);
+  const findings = [
+    ...checkLineValues(line, at),
+    ...(isMalformedNumber(line.netAmount) ? [error(at('netAmount'), 'format.number')] : []),
+    ...discount.findings,
+    ...(isNegative(line.unitPrice) ? [error(at('unitPrice'), 'negative-price')] : []),
+    ...checkLineVat(line, at),
+  ];
+  return { findings, calculable: isLineCalculable(line) && discount.calculable };
+}
+
+/** What a line without a discount adds: nothing to report, nothing that keeps the totals from being calculated. */
+const NO_DISCOUNT = { findings: [], calculable: true } as const;
+
+/** The quantity, the unit price and the VAT rate are numbers, and so is a line total the line states. */
+function isLineCalculable(line: Unchecked<Line>): boolean {
+  return [line.quantity, line.unitPrice, line.vatRate].every(isNumber) && !isMalformedNumber(line.netAmount);
 }
 
 /** A line has a name, and a quantity, a unit price and a VAT rate that are numbers. */
@@ -271,12 +293,12 @@ function checkDiscountFields(
     findings.push(error(at('discount'), 'discount'));
   }
   for (const field of ['percent', 'amount'] as const) {
-    if (discount[field] !== undefined && !isNumber(discount[field])) {
+    if (isMalformedNumber(discount[field])) {
       findings.push(error(at(`discount.${field}`), 'format.number'));
       calculable = false;
     }
   }
-  if (isNumber(discount.percent) && discount.percent < 0) {
+  if (isNegative(discount.percent)) {
     findings.push(error(at('discount.percent'), 'discount.negative'));
   }
   return { findings, calculable };
@@ -301,19 +323,23 @@ function checkVatTreatment(draft: Prepared, options: CheckOptions): Finding[] {
   if (categories.has('O') && odd) {
     findings.push(error(odd.path, 'category-o'));
   }
-  if (NEEDS_REASON.some((category) => categories.has(category)) && draft.vatExemptionReason === undefined) {
+  if (hasAny(categories, NEEDS_REASON) && draft.vatExemptionReason === undefined) {
     findings.push(error('vatExemptionReason', 'exemption-reason'));
   }
-  if ((categories.has('AE') || categories.has('K')) && draft.buyer.vatId === undefined) {
+  if (hasAny(categories, ['AE', 'K']) && draft.buyer.vatId === undefined) {
     findings.push(error('buyer.vatId', 'buyer-vat-id'));
   }
   return [...findings, ...checkSupplyAbroad(draft, categories, options)];
 }
 
+function hasAny(categories: Set<VatCategory>, wanted: readonly VatCategory[]): boolean {
+  return wanted.some((category) => categories.has(category));
+}
+
 /** What has a VAT category: each line, and each discount or charge that states one (a rate above 0 alone means S). */
 function categoriesOf(draft: Prepared): { path: string; category: VatCategory }[] {
   return taxedOf(draft).flatMap(([path, item]) => {
-    const category = item?.vatCategory ?? (isNumber(item?.vatRate) && item.vatRate > 0 ? 'S' : undefined);
+    const category = categoryOf(item?.vatCategory, item?.vatRate);
     return isVatCategory(category) ? [{ path: `${path}.vatCategory`, category }] : [];
   });
 }
@@ -325,28 +351,30 @@ function checkSupplyAbroad(draft: Prepared, categories: Set<VatCategory>, option
     findings.push(error('deliveryCountry', 'format.country'));
   }
   // BR-IC-12 wants the country an intra-community supply went to. As an XRechnung it is refused anyway.
-  if (
-    categories.has('K') &&
-    draft.deliveryCountry === undefined &&
-    typeof draft.buyer.country === 'string' &&
-    options.rules !== 'xrechnung'
-  ) {
-    findings.push(warning('deliveryCountry', 'delivery-country', { country: draft.buyer.country }));
+  const country = options.rules === 'xrechnung' ? undefined : likelyDeliveryCountry(draft, categories);
+  if (country !== undefined) {
+    findings.push(warning('deliveryCountry', 'delivery-country', { country }));
   }
-  if (
-    (categories.has('K') || categories.has('G')) &&
-    draft.seller.vatId === undefined &&
-    draft.seller.taxNumber !== undefined
-  ) {
+  if (hasAny(categories, ['K', 'G']) && hasTaxNumberOnly(draft.seller)) {
     findings.push(error('seller.vatId', 'seller-tax-id.export'));
   }
   return findings;
 }
 
+/** The buyer's country, for an intra-community supply that does not name the country the goods went to. */
+function likelyDeliveryCountry(draft: Prepared, categories: Set<VatCategory>): string | undefined {
+  if (!categories.has('K') || draft.deliveryCountry !== undefined) return undefined;
+  return typeof draft.buyer.country === 'string' ? draft.buyer.country : undefined;
+}
+
+function hasTaxNumberOnly(party: Unchecked<Party>): boolean {
+  return party.vatId === undefined && party.taxNumber !== undefined;
+}
+
 /** The date of supply, and the invoice a correction refers to. */
 function checkSupply(draft: Prepared): Finding[] {
   const findings: Finding[] = [];
-  if (draft.deliveryDate === undefined && draft.periodStart === undefined && draft.periodEnd === undefined) {
+  if ([draft.deliveryDate, draft.periodStart, draft.periodEnd].every((date) => date === undefined)) {
     findings.push(warning('deliveryDate', 'delivery-date'));
   }
   if (['381', '384'].includes(draft.typeCode) && draft.precedingInvoiceNumber === undefined) {
@@ -366,7 +394,7 @@ interface LineContext {
 /** The calculated totals against what the data states: payment terms for an amount due, line totals, printed totals. */
 function checkTotals(draft: Prepared, totals: Totals, options: CheckOptions): Finding[] {
   const findings: Finding[] = [];
-  if (totals.due > 0 && draft.dueDate === undefined && draft.paymentTerms === undefined) {
+  if (totals.due > 0 && !saysWhenDue(draft)) {
     findings.push(error('dueDate', 'payment-terms'));
   }
   const context = { totals, slack: slackOf(String(draft.currency)), adjustedLines: options.adjustedLines };
@@ -376,40 +404,53 @@ function checkTotals(draft: Prepared, totals: Totals, options: CheckOptions): Fi
   return findings;
 }
 
+function saysWhenDue(draft: Prepared): boolean {
+  return draft.dueDate !== undefined || draft.paymentTerms !== undefined;
+}
+
 /** A discount with both a percentage and an amount has to agree with itself; one with an amount alone keeps its sign. */
 function checkDiscountAmount(line: Unchecked<Line>, i: number, { totals, slack }: LineContext): Finding[] {
   const discount = totals.lineDiscounts[i];
   if (!discount || line.discount?.amount === undefined) return [];
   // The amount as the XML gets it, in cents: a stated 9.995 is written as 10.00.
   const { percent } = line.discount;
-  const { amount } = discount;
-  if (isNumber(percent) && !percentAgrees(discount.base, percent, amount, slack)) {
-    return [
-      error(`lines.${i}.discount.amount`, 'discount-mismatch', {
-        percent,
-        base: discount.base.toFixed(2),
-        expected: percentOf(discount.base, percent).toFixed(2),
-        stated: amount.toFixed(2),
-      }),
-    ];
+  const { base, amount } = discount;
+  if (isNumber(percent)) {
+    return percentAgrees(base, percent, amount, slack) ? [] : [discountMismatch(i, { base, amount }, percent)];
   }
-  const signs = discount.base !== 0 && amount !== 0 && Math.sign(discount.base) !== Math.sign(amount);
-  return percent === undefined && signs ? [warning(`lines.${i}.discount.amount`, 'discount-sign')] : [];
+  return percent === undefined && signsDiffer(base, amount)
+    ? [warning(`lines.${i}.discount.amount`, 'discount-sign')]
+    : [];
+}
+
+function discountMismatch(i: number, { base, amount }: { base: number; amount: number }, percent: number): Finding {
+  return error(`lines.${i}.discount.amount`, 'discount-mismatch', {
+    percent,
+    base: formatAmount(base),
+    expected: formatAmount(percentOf(base, percent)),
+    stated: formatAmount(amount),
+  });
 }
 
 /** A line total is quantity times price less the discount, within the rounding allowed. */
 function checkLineNet(line: Unchecked<Line>, i: number, { totals, slack, adjustedLines }: LineContext): Finding[] {
   // With totals every line has its numbers; a line without a total of its own has nothing to compare.
-  if (!isNumber(line.netAmount) || !isNumber(line.quantity) || !isNumber(line.unitPrice)) return [];
+  const priced = pricedWithTotal(line);
+  if (!priced) return [];
   const discount = totals.lineDiscounts[i];
-  const priced = { quantity: line.quantity, unitPrice: line.unitPrice };
   if (lineAgrees(priced, discount?.amount ?? 0, totals.lineNet[i]!, slack)) return [];
   // In cents, as the XML has it: 1 x 1.005 is 1.01, not 1.005.
-  const expected = (lineBase(line.quantity, line.unitPrice) - (discount?.amount ?? 0)).toFixed(2);
-  const stated = totals.lineNet[i]!.toFixed(2);
+  const expected = formatAmount(lineBase(priced.quantity, priced.unitPrice) - (discount?.amount ?? 0));
+  const stated = formatAmount(totals.lineNet[i]!);
   const params = { discounted: Boolean(discount), expected, stated };
   if (!adjustedLines) return [error(`lines.${i}.netAmount`, 'line-net', params)];
   return adjustedLines.includes(i) ? [] : [warning(`lines.${i}.netAmount`, 'line-net.xml', params)];
+}
+
+/** The quantity and the unit price of a line that states a total of its own, where all three are numbers. */
+function pricedWithTotal({ netAmount, quantity, unitPrice }: Unchecked<Line>) {
+  if (!isNumber(netAmount)) return undefined;
+  return isNumber(quantity) && isNumber(unitPrice) ? { quantity, unitPrice } : undefined;
 }
 
 /**
@@ -424,11 +465,11 @@ function checkStatedTotals(draft: Prepared, totals: Totals, fromXml: boolean): F
     if (stated === undefined) continue;
     if (!isNumber(stated)) findings.push(error(`totals.${key}`, 'format.number'));
     else if (cents(stated) !== cents(totals[key])) {
-      const [calculated, adjusted] = [totals[key].toFixed(2), totals.adjustments.length > 0];
+      const [calculated, adjusted] = [formatAmount(totals[key]), totals.adjustments.length > 0];
       findings.push(
         fromXml
-          ? error(`totals.${key}`, 'totals-mismatch.xml', { stated: stated.toFixed(2), calculated, adjusted })
-          : error(`totals.${key}`, 'totals-mismatch', { printed: stated.toFixed(2), calculated, adjusted }),
+          ? error(`totals.${key}`, 'totals-mismatch.xml', { stated: formatAmount(stated), calculated, adjusted })
+          : error(`totals.${key}`, 'totals-mismatch', { printed: formatAmount(stated), calculated, adjusted }),
       );
     }
   }
@@ -589,7 +630,7 @@ function expectedInTotals(totals: Totals | undefined): Expected[] {
   if (!totals) return [];
   return (['net', 'vat', 'gross'] as const)
     .filter((key) => totals[key] !== 0)
-    .map((key) => ({ ...amountOf(`totals.${key}`, totals[key]), shown: totals[key].toFixed(2) }));
+    .map((key) => ({ ...amountOf(`totals.${key}`, totals[key]), shown: formatAmount(totals[key]) }));
 }
 
 /** What a page prints of a discount or charge at `path`: its percentage, or else its amount. */

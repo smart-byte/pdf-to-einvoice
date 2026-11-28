@@ -5,6 +5,7 @@ import { parseArgs } from 'node:util';
 import type { Totals } from '../domain/calculate.js';
 import type { Finding } from '../domain/finding.js';
 import { invoiceJsonSchema } from '../domain/model.js';
+import { formatAmount } from '../domain/money.js';
 import { createXRechnung, InvoiceError } from '../generate/create.js';
 import { readEmbeddedXml } from '../pdf/file.js';
 import { messageOf } from '../util/errors.js';
@@ -176,7 +177,7 @@ function printFindings({ findings, totals }: { findings: Finding[]; totals?: Tot
   io.stdout(findings.length ? `${findings.map(formatFinding).join('\n')}\n` : 'No findings.\n');
   if (totals)
     io.stdout(
-      `${(['net', 'vat', 'gross', 'due'] as const).map((key) => `${key} ${totals[key].toFixed(2)}`).join('\n')}\n`,
+      `${(['net', 'vat', 'gross', 'due'] as const).map((key) => `${key} ${formatAmount(totals[key])}`).join('\n')}\n`,
     );
 }
 

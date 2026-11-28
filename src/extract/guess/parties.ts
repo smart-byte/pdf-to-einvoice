@@ -73,20 +73,30 @@ function signsOf(found: Found, rows: string[]): number {
 
 /** The address under a buyer label, or else the one address under no label that is neither the seller's nor the issuer's. */
 function buyerOf(rows: string[], addresses: Found[], seller: Found | undefined): Found | undefined {
-  const isSellers = ({ party }: Found) =>
-    seller !== undefined &&
-    ([party.name, party.contactName, party.street].includes(seller.party.name) ||
-      (party.street !== undefined &&
-        party.street === seller.party.street &&
-        party.postalCode === seller.party.postalCode));
   const labelled = addresses.filter((found) => found.role === 'buyer');
-  // A name that stands beside a VAT ID, a tax number or a bank account, as in a footer, is the issuer's, even where
-  // nothing else makes it the seller.
-  const issuer = ({ party }: Found) => rows.some((row) => row.includes(party.name!) && IDENTIFIERS.test(row));
   const left = labelled.length
     ? labelled
-    : addresses.filter((found) => found.role === undefined && !isSellers(found) && !issuer(found));
+    : addresses.filter(
+        (found) => found.role === undefined && !isSellersAddress(found, seller) && !isIssuers(found, rows),
+      );
   return new Set(left.map((found) => found.party.name)).size === 1 ? left[0] : undefined;
+}
+
+/** Whether an address is the seller's: one of its lines names the seller, or it has the seller's street and postal code. */
+function isSellersAddress({ party }: Found, seller: Found | undefined): boolean {
+  if (seller === undefined) return false;
+  if ([party.name, party.contactName, party.street].includes(seller.party.name)) return true;
+  return (
+    party.street !== undefined && party.street === seller.party.street && party.postalCode === seller.party.postalCode
+  );
+}
+
+/**
+ * A name that stands beside a VAT ID, a tax number or a bank account, as in a footer, is the issuer's, even where
+ * nothing else makes it the seller.
+ */
+function isIssuers({ party }: Found, rows: string[]): boolean {
+  return rows.some((row) => row.includes(party.name!) && IDENTIFIERS.test(row));
 }
 
 /**
@@ -154,45 +164,54 @@ function addressAt(lines: string[], i: number): Found | undefined {
  * stand between heading and address.
  */
 function climb(lines: string[], i: number, through: boolean): { above: string[]; role?: Role } {
-  const above: string[] = [];
-  let j = i - 1;
-  // Under a heading an address may also name a person and a department; without one, more lines are anything.
-  for (; j >= 0 && above.length < (through ? 5 : 3); j--) {
-    if (through && KEY_VALUE.test(lines[j]!)) continue;
-    if (endsAddress(lines[j]!)) break;
-    above.unshift(lines[j]!);
-  }
-  for (let hops = 0; j >= 0 && hops < 3 && KEY_VALUE.test(lines[j]!); hops++) j--;
+  const { above, next } = linesAbove(lines, i, through);
+  const j = pastLabels(lines, next);
   return { above, role: j >= 0 ? roleOf(lines[j]!) : undefined };
+}
+
+/** The lines of an address above the place in line `i`, and the line above them, `next`. */
+function linesAbove(lines: string[], i: number, through: boolean): { above: string[]; next: number } {
+  const above: string[] = [];
+  // Under a heading an address may also name a person and a department; without one, more lines are anything.
+  const most = through ? 5 : 3;
+  let j = i - 1;
+  for (; j >= 0 && above.length < most; j--) {
+    const line = lines[j]!;
+    if (through && KEY_VALUE.test(line)) continue;
+    if (endsAddress(line)) break;
+    above.unshift(line);
+  }
+  return { above, next: j };
+}
+
+/** The line `j`, or the one above up to three labelled values there. */
+function pastLabels(lines: string[], j: number): number {
+  let k = j;
+  for (let hops = 0; hops < 3 && isLabelled(lines[k]); hops++) k--;
+  return k;
+}
+
+function isLabelled(line: string | undefined): boolean {
+  return line !== undefined && KEY_VALUE.test(line);
 }
 
 /** A line that is no part of an address above a place, and ends it. */
 function endsAddress(line: string): boolean {
-  return Boolean(
-    !line ||
-    /:/.test(line) ||
-    KEY_VALUE.test(line) ||
-    roleOf(line) ||
-    BUYER_START.test(line) ||
-    DATE_OR_AMOUNT.test(line) ||
-    TITLE.test(line) ||
-    placeOf(line) ||
-    senderOf(line),
-  );
+  return line === '' || ENDS_ADDRESS.some((ends) => ends(line));
 }
 
 /** Name, contact and street from the lines of an address above its place. */
 function namesOf(above: string[]): Partial<Party> {
   const [first, second] = above.length >= 3 ? above : [above[0]!];
+  const street = above.at(-1);
+  if (second === undefined) return { name: first, contactName: undefined, street };
   // "Herrn" above a name and a second line with the legal form belong to the name; another second line names a person.
-  const joined = second !== undefined && (SALUTATION.test(first!) || LEGAL_FORM.test(second));
+  if (SALUTATION.test(first!) || LEGAL_FORM.test(second)) {
+    return { name: `${first} ${second}`, contactName: undefined, street };
+  }
   // A person has no number: two lines with one are two streets, as when rows mix two addresses. Neither is believed.
-  const mixed = second !== undefined && !joined && /\d/.test(second);
-  return {
-    name: joined ? `${first} ${second}` : first,
-    contactName: joined || mixed ? undefined : second,
-    street: mixed ? undefined : above.at(-1),
-  };
+  const mixed = /\d/.test(second);
+  return { name: first, contactName: mixed ? undefined : second, street: mixed ? undefined : street };
 }
 
 /** The labelled lines from line `from` on, up to four, which may hold the VAT ID or the tax number of the address. */
@@ -341,3 +360,15 @@ const IDENTIFIERS = new RegExp(`${ISSUER_OR_BANK.source}|\\b(?:${VAT_ID_LABEL.so
 
 /** The words of an address. */
 const WORDS = ['name', 'contactName', 'street', 'city'] as const;
+
+/** What ends an address above its place, in the order it is looked for: a line that is a value, a heading or a place. */
+const ENDS_ADDRESS: ((line: string) => unknown)[] = [
+  (line) => line.includes(':'),
+  (line) => KEY_VALUE.test(line),
+  roleOf,
+  (line) => BUYER_START.test(line),
+  (line) => DATE_OR_AMOUNT.test(line),
+  (line) => TITLE.test(line),
+  placeOf,
+  senderOf,
+];

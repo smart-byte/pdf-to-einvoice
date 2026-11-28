@@ -1,4 +1,5 @@
 import { amountSpellings, dateSpellings } from '../../src/domain/spellings.js';
+import { isNumber } from '../../src/util/numbers.js';
 
 /** A rectangle on the page. `y` is its upper edge; the unit is up to the caller, as long as all pieces share it. */
 export interface Rect {
@@ -52,7 +53,7 @@ type Kind = 'number' | 'date' | 'text';
 
 /** What is looked for: the kind of a value and the ways it is printed; none for a value that is not printed. */
 function soughtOf(value: unknown): { kind: Kind; spellings: string[] } | undefined {
-  if (typeof value === 'number' && Number.isFinite(value)) {
+  if (isNumber(value)) {
     const plain = String(Math.abs(value));
     return { kind: 'number', spellings: [...amountSpellings(value), plain, plain.replace('.', ',')] };
   }
@@ -86,28 +87,48 @@ function rowsOf(pieces: Piece[]): Row[] {
   const rows: Piece[][] = [];
   for (const piece of pieces.filter((each) => each.text.trim()).sort((a, b) => bottom(a) - bottom(b))) {
     const row = rows.at(-1);
-    if (row && bottom(piece) - bottom(row[0]!) < 0.4 * Math.min(piece.height, row[0]!.height)) row.push(piece);
+    if (row && inRowOf(row[0]!, piece)) row.push(piece);
     else rows.push([piece]);
   }
-  return rows.map((row) => {
-    const chars: Row['chars'] = [];
-    let text = '';
-    for (const piece of row.sort((a, b) => a.x - b.x)) {
-      let gap = true;
-      for (let at = 0; at < piece.text.length; at++) {
-        if (/\s/.test(piece.text[at]!)) {
-          gap ||= !GROUPING.test(piece.text.slice(at - 1));
-          continue;
-        }
-        for (const letter of piece.text[at]!.toLowerCase()) {
-          text += letter;
-          chars.push({ piece, at, gap });
-          gap = false;
-        }
-      }
+  return rows.map(rowOf);
+}
+
+/** Whether the lower edge of `piece` is within 0.4 of the smaller letters of that of `first`. */
+function inRowOf(first: Piece, piece: Piece): boolean {
+  return bottom(piece) - bottom(first) < 0.4 * Math.min(piece.height, first.height);
+}
+
+/** The pieces of one row, from left to right, as one text. */
+function rowOf(row: Piece[]): Row {
+  const chars: Row['chars'] = [];
+  let text = '';
+  for (const piece of row.sort((a, b) => a.x - b.x)) {
+    for (const { letter, at, gap } of lettersOf(piece)) {
+      text += letter;
+      chars.push({ piece, at, gap });
     }
-    return { text, chars, top: Math.min(...row.map((piece) => piece.y)), bottom: Math.max(...row.map(bottom)) };
-  });
+  }
+  return { text, chars, top: Math.min(...row.map((piece) => piece.y)), bottom: Math.max(...row.map(bottom)) };
+}
+
+/**
+ * The letters of a piece in lower case, each with its position in the piece and whether a gap comes before it: the
+ * start of the piece, or whitespace other than that between the groups of digits of a number.
+ */
+function lettersOf(piece: Piece): { letter: string; at: number; gap: boolean }[] {
+  const letters: { letter: string; at: number; gap: boolean }[] = [];
+  let gap = true;
+  for (let at = 0; at < piece.text.length; at++) {
+    if (/\s/.test(piece.text[at]!)) {
+      gap ||= !GROUPING.test(piece.text.slice(at - 1));
+      continue;
+    }
+    for (const letter of piece.text[at]!.toLowerCase()) {
+      letters.push({ letter, at, gap });
+      gap = false;
+    }
+  }
+  return letters;
 }
 
 /** Every place in a row where `needle` stands: one rectangle around the parts of the pieces it covers. */
@@ -136,17 +157,31 @@ function hitsIn(row: Row, needle: string, kind: Kind, widthOf: (text: string) =>
  * found in "100,00", "3.11" not in "03.11.2026", "DE" not in "DE02 1203 …". A text may not continue as a word, a
  * number not as a number; what stands behind a space or in another piece does not continue anything.
  */
-function standsAlone({ text, chars }: Row, start: number, end: number, kind: Kind): boolean {
+function standsAlone(row: Row, start: number, end: number, kind: Kind): boolean {
+  if (kind === 'number' && row.chars.slice(start + 1, end).some((char) => char.gap)) return false;
   const part = kind === 'text' ? /[\p{L}\p{N}]/u : /\d/;
-  const before = (i: number) => (i >= 0 && !chars[i + 1]!.gap ? text[i]! : '');
-  const after = (i: number) => (i < text.length && !chars[i]!.gap ? text[i]! : '');
-  const [first, last] = [text[start]!, text[end - 1]!];
-  if (kind === 'number' && chars.slice(start + 1, end).some((char) => char.gap)) return false;
-  if (part.test(first) && part.test(before(start - 1))) return false;
-  if (part.test(last) && part.test(after(end))) return false;
-  if (/\d/.test(first) && SEPARATOR.test(before(start - 1)) && /\d/.test(before(start - 2))) return false;
-  if (/\d/.test(last) && SEPARATOR.test(after(end)) && /\d/.test(after(end + 1))) return false;
-  return true;
+  const front: Edge = [row.text[start]!, charBefore(row, start - 1), charBefore(row, start - 2)];
+  const back: Edge = [row.text[end - 1]!, charAfter(row, end), charAfter(row, end + 1)];
+  return !continues(front, part) && !continues(back, part);
+}
+
+/** A character at one end of a value, the one next to it outside, and the one beyond that. */
+type Edge = [end: string, next: string, beyond: string];
+
+/** The character at `i` where nothing comes between it and the next one; none otherwise. */
+function charBefore({ text, chars }: Row, i: number): string {
+  return i >= 0 && !chars[i + 1]!.gap ? text[i]! : '';
+}
+
+/** The character at `i` where nothing comes between it and the one before; none otherwise. */
+function charAfter({ text, chars }: Row, i: number): string {
+  return i < text.length && !chars[i]!.gap ? text[i]! : '';
+}
+
+/** Whether a value goes on past one of its ends: a part as a part, or a digit past a separator as a number. */
+function continues([end, next, beyond]: Edge, part: RegExp): boolean {
+  if (part.test(end) && part.test(next)) return true;
+  return /\d/.test(end) && SEPARATOR.test(next) && /\d/.test(beyond);
 }
 
 /**

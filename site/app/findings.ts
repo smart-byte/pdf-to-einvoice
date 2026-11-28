@@ -73,24 +73,41 @@ function findingsToShow(result: CheckResult, unchecked: Finding[]): Finding[] {
 
 /** At each field the worst of its findings, and for a value still to be checked a button to confirm it. */
 function renderHints(findings: Finding[], unchecked: Finding[]): void {
-  for (const hint of document.querySelectorAll<HTMLElement>('[data-hint]')) {
-    const path = hint.dataset.hint!;
-    const own = findings.filter((finding) => finding.path === path);
-    const worst = own.find((finding) => finding.severity === 'error') ?? own[0];
-    hint.textContent = worst ? describe(worst) : '';
-    hint.className = `hint${worst ? ` hint--${worst.severity}` : ''}`;
-    const input = document.querySelector<HTMLElement>(`[data-path="${path}"]`);
-    input?.toggleAttribute('aria-invalid', worst?.severity === 'error');
-    input?.classList.toggle('warned', worst?.severity === 'warning');
-    // The hint of a whole line item: its frame says so too.
-    if (hint.parentElement?.matches('.line'))
-      hint.parentElement.classList.toggle(
-        'line--check',
-        unchecked.some((finding) => finding.path === path),
-      );
-    // A value that is still to be checked can be ticked off where it stands, without typing it again.
-    if (worst && unchecked.includes(worst) && state.mode === 'create') hint.append(' ', confirmButton(path));
-  }
+  for (const hint of document.querySelectorAll<HTMLElement>('[data-hint]')) renderHint(hint, findings, unchecked);
+}
+
+function renderHint(hint: HTMLElement, findings: Finding[], unchecked: Finding[]): void {
+  const path = hint.dataset.hint!;
+  const worst = worstAt(findings, path);
+  hint.textContent = worst ? describe(worst) : '';
+  hint.className = worst ? `hint hint--${worst.severity}` : 'hint';
+  markField(path, worst?.severity);
+  // The hint of a whole line item: its frame says so too.
+  if (hint.parentElement?.matches('.line'))
+    hint.parentElement.classList.toggle(
+      'line--check',
+      unchecked.some((finding) => finding.path === path),
+    );
+  // A value that is still to be checked can be ticked off where it stands, without typing it again.
+  if (isConfirmable(worst, unchecked)) hint.append(' ', confirmButton(path));
+}
+
+/** Of the findings at a field, the first error, or else the first finding. */
+function worstAt(findings: Finding[], path: string): Finding | undefined {
+  const own = findings.filter((finding) => finding.path === path);
+  return own.find((finding) => finding.severity === 'error') ?? own[0];
+}
+
+/** The field at `path` as invalid for an error, as warned for a warning. */
+function markField(path: string, severity: Finding['severity'] | undefined): void {
+  const input = document.querySelector<HTMLElement>(`[data-path="${path}"]`);
+  input?.toggleAttribute('aria-invalid', severity === 'error');
+  input?.classList.toggle('warned', severity === 'warning');
+}
+
+/** A value still to be checked, while an e-invoice is being created. */
+function isConfirmable(worst: Finding | undefined, unchecked: Finding[]): boolean {
+  return worst !== undefined && unchecked.includes(worst) && state.mode === 'create';
 }
 
 /** The button that ticks off a value still to be checked, and goes back to its field. */

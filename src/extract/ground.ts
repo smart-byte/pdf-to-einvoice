@@ -1,4 +1,13 @@
-import { isBic, isDate, isEmail, isIban, isTaxNumber, isVatId } from '../domain/formats.js';
+import {
+  compactCode,
+  isBic,
+  isDate,
+  isEmail,
+  isIban,
+  isTaxNumber,
+  isVatId,
+  lastDayOfMonth,
+} from '../domain/formats.js';
 import {
   pageTextOf,
   showsAmount,
@@ -10,6 +19,8 @@ import {
 } from '../domain/shown.js';
 import { COUNTRY_NAMES, dateSpellings, MONTHS } from '../domain/spellings.js';
 import type { InvoiceDraft } from '../domain/model.js';
+import { twoDigits } from '../util/numbers.js';
+import { recordOf } from '../util/objects.js';
 import { escapeRegExp } from '../util/regexp.js';
 
 // Comparing what a language model read with the text of the PDF: a value stays only where the page shows it, in a
@@ -23,7 +34,7 @@ import { escapeRegExp } from '../util/regexp.js';
  */
 export function keepWhatThePdfShows(input: unknown, pdfText: string): InvoiceDraft {
   const page = pageTextOf(pdfText);
-  const draft = fieldsOf(input);
+  const draft = recordOf(input);
   const result = keep(draft, INVOICE, page);
   const [seller, buyer] = [keep(draft.seller, PARTY, page), keep(draft.buyer, PARTY, page)];
   for (const [key, kept] of Object.entries({ seller, buyer, totals: keep(draft.totals, TOTALS, page) })) {
@@ -86,14 +97,10 @@ const TOTALS: Record<string, Rule> = { net: amount, vat: amount, gross: amount, 
 
 /** The fields of `object` that have a rule and that the page shows. */
 function keep(object: unknown, rules: Record<string, Rule>, page: PageText): Fields {
-  const fields = fieldsOf(object);
+  const fields = recordOf(object);
   return Object.fromEntries(
     Object.entries(fields).filter(([key, value]) => value != null && rules[key]?.(value, page, fields)),
   );
-}
-
-function fieldsOf(object: unknown): Fields {
-  return object && typeof object === 'object' ? (object as Fields) : {};
 }
 
 // The rules, in the order the tables use them. What it takes for a page to show a value, domain/shown.ts says.
@@ -154,8 +161,8 @@ function month(which: 'first' | 'last'): Rule {
     if (date(value, page)) return true;
     if (typeof value !== 'string' || !isDate(value)) return false;
     const [y, m, d] = value.split('-').map(Number) as [number, number, number];
-    if (d !== (which === 'first' ? 1 : new Date(Date.UTC(y, m, 0)).getUTCDate())) return false;
-    const [mm, names] = [String(m).padStart(2, '0'), (MONTHS[m - 1] ?? []).map(escapeRegExp).join('|')];
+    if (d !== (which === 'first' ? 1 : lastDayOfMonth(y, m))) return false;
+    const [mm, names] = [twoDigits(m), (MONTHS[m - 1] ?? []).map(escapeRegExp).join('|')];
     // The month alone, not a day in it ("15. September 2026", "15.09.2026").
     return new RegExp(
       `(?<!\\d\\.?\\s*)\\b(?:${names})\\.?\\s*${y}\\b|(?<![\\d./-])${mm}[./]${y}(?!\\d)|(?<![\\d-])${y}-${mm}(?![-\\d])`,
@@ -171,7 +178,7 @@ function currency(value: unknown, page: PageText): boolean {
 }
 
 function iban(value: unknown, page: PageText): boolean {
-  return typeof value === 'string' && isIban(value.replace(/\s+/g, '').toUpperCase()) && showsSpelling(page, [value]);
+  return typeof value === 'string' && isIban(compactCode(value)) && showsSpelling(page, [value]);
 }
 
 const CURRENCY_SIGNS: Record<string, string> = { EUR: '€', USD: '$', GBP: '£' };

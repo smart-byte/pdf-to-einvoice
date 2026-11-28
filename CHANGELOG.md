@@ -13,6 +13,10 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- A finding words an amount as the cent it was compared as. A printed total of 1.015 was compared as 1.02 but worded
+  "1.01", as floating point rounds it, so that the message could name the same amount on both sides.
+- `check` reports a discount on a line given as a list, also an empty one, as a discount without a percentage or an
+  amount. It dropped an empty list as if it were a discount whose fields were all left empty.
 - A line with a negative VAT rate is told that a rate is never negative, as a discount or a charge is, instead of what
   its category asks for.
 - The comparison of a language model's answer with the PDF drops an e-mail address that `check` would reject, such as

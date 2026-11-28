@@ -6,6 +6,7 @@ import type { Invoice, InvoiceDraft } from '../domain/model.js';
 import { inspectPdf, readEmbeddedXml, repairForPdfA, type PdfInfo } from '../pdf/file.js';
 import { extractText } from '../pdf/text.js';
 import { messageOf } from '../util/errors.js';
+import { isObject } from '../util/objects.js';
 import { message, warning } from './messages.js';
 import { toUbl } from './ubl.js';
 
@@ -74,13 +75,7 @@ export class InvoiceError extends Error {
  */
 export async function createEInvoice(options: CreateOptions): Promise<CreateResult> {
   const xrechnung = options.profile === 'xrechnung';
-  let info: PdfInfo;
-  try {
-    info = await inspectPdf(options.pdf);
-  } catch (e) {
-    throw new InvoiceError('invalid-pdf', message('invalid-pdf', { reason: messageOf(e) }));
-  }
-  if (info.embeddedXml !== null) throw new InvoiceError('already-einvoice', message('already-einvoice'));
+  const info = await inspected(options.pdf);
   // A PDF whose text cannot be read is compared with no text: that is reported, and the file is written all the same.
   const pdfText = options.pdfText ?? (await extractText(options.pdf).catch(() => ''));
   const data = checked(options.invoice, xrechnung ? 'xrechnung' : undefined, pdfText);
@@ -95,6 +90,18 @@ export async function createEInvoice(options: CreateOptions): Promise<CreateResu
   const xml = await readEmbeddedXml(pdf);
   if (xml === null) throw new InvoiceError('generator', message('generator.no-xml'), findings);
   return { pdf, xml, findings: [...findings, ...notWritten(data.invoice, xml)], totals: data.totals };
+}
+
+/** What matters about the PDF to turn into an e-invoice. One that cannot be read, or is one already, is refused. */
+async function inspected(pdf: Uint8Array): Promise<PdfInfo> {
+  let info: PdfInfo;
+  try {
+    info = await inspectPdf(pdf);
+  } catch (e) {
+    throw new InvoiceError('invalid-pdf', message('invalid-pdf', { reason: messageOf(e) }));
+  }
+  if (info.embeddedXml !== null) throw new InvoiceError('already-einvoice', message('already-einvoice'));
+  return info;
 }
 
 /**
@@ -195,15 +202,17 @@ function addOrderReference(xml: unknown, orderReference: string | undefined): vo
     'rsm:SupplyChainTradeTransaction',
     'ram:ApplicableHeaderTradeAgreement',
   );
-  if (orderReference && agreement && !agreement['ram:BuyerOrderReferencedDocument']) {
+  if (!orderReference || !agreement) return;
+  if (!agreement['ram:BuyerOrderReferencedDocument']) {
     agreement['ram:BuyerOrderReferencedDocument'] = { 'ram:IssuerAssignedID': orderReference };
   }
 }
 
 /** A UBL credit note states the due date (BT-9) with the payment means, right after their code. The library leaves it out. */
 function addCreditNoteDueDate(xml: unknown, dueDate: string | undefined): void {
+  if (!dueDate) return;
   const means = childAt(xml, 'CreditNote')?.['cac:PaymentMeans'];
-  if (!dueDate || !Array.isArray(means) || !isElement(means[0])) return;
+  if (!Array.isArray(means) || !isObject(means[0])) return;
   const { 'cbc:PaymentMeansCode': code, ...rest } = means[0];
   means[0] = { 'cbc:PaymentMeansCode': code, 'cbc:PaymentDueDate': dueDate, ...rest };
 }
@@ -213,16 +222,12 @@ type Element = Record<string, unknown>;
 
 /** Follows element names down from a node, where each is there. */
 function childAt(node: unknown, ...path: string[]): Element | undefined {
-  let at = isElement(node) ? node : undefined;
+  let at = isObject(node) ? node : undefined;
   for (const name of path) {
     const next = at?.[name];
-    at = isElement(next) ? next : undefined;
+    at = isObject(next) ? next : undefined;
   }
   return at;
-}
-
-function isElement(node: unknown): node is Element {
-  return typeof node === 'object' && node !== null;
 }
 
 /** The XML is the binding part: a value that was given but did not make it there must not go unnoticed. */

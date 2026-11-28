@@ -10,6 +10,16 @@ export function cents(n: number): number {
   return Number.isFinite(n * 1e6) ? Number(toCents(n)) : NaN;
 }
 
+/** An amount with two decimals, rounded to the cent as `cents` rounds it: 1.015 is "1.02", where `toFixed(2)` gives "1.01". */
+export function formatAmount(n: number): string {
+  return formatCents(toCents(n));
+}
+
+/** Whole cents as an amount, from a number or from BigInt: 101 is 1.01. */
+export function fromCents(c: number | bigint): number {
+  return Number(c) / 100;
+}
+
 /** The sum of amounts as given, not rounded: summed in millionths, where 0.1 + 0.2 is 0.3. */
 export function exactSum(amounts: number[]): number {
   return Number(amounts.reduce((sum, n) => sum + micro(n), 0n)) / 1e6;
@@ -79,8 +89,9 @@ export function toCents(n: number): bigint {
   return divRound(micro(n), 10_000n);
 }
 
-export function fromCents(c: bigint): number {
-  return Number(c) / 100;
+/** The sum of whole cents. */
+export function sumCents(amounts: bigint[]): bigint {
+  return amounts.reduce((total, amount) => total + amount, 0n);
 }
 
 export function baseCents(quantity: number, unitPrice: number): bigint {

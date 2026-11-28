@@ -10,7 +10,7 @@ import {
 } from './adjustments.js';
 import type { Finding } from './finding.js';
 import type { Invoice, Line, VatCategory } from './model.js';
-import { baseCents, divRound, fromCents, micro, percentCents, toCents } from './money.js';
+import { baseCents, divRound, fromCents, micro, percentCents, sumCents, toCents } from './money.js';
 
 export interface VatGroup {
   category: VatCategory;
@@ -88,11 +88,11 @@ function totalsOf(
   entries: Entry[],
 ): Totals {
   const breakdown = vatGroupsOf(invoice.lines, lineCents, entries);
-  const lineTotal = sum(lineCents);
-  const allowances = sum(centsOf(entries, 'discounts'));
-  const charges = sum(centsOf(entries, 'charges'));
+  const lineTotal = sumCents(lineCents);
+  const allowances = sumCents(centsOf(entries, 'discounts'));
+  const charges = sumCents(centsOf(entries, 'charges'));
   const net = lineTotal - allowances + charges;
-  const vat = sum(breakdown.map((group) => group.tax));
+  const vat = sumCents(breakdown.map((group) => group.tax));
   const prepaid = toCents(invoice.prepaidAmount ?? 0);
 
   return {
@@ -139,8 +139,4 @@ function vatGroupOf(group: Group & { tax: bigint }): VatGroup {
 /** The amounts of the discounts or of the charges on the whole invoice. */
 function centsOf(entries: Entry[], list: Entry['list']): bigint[] {
   return entries.filter((entry) => entry.list === list).map((entry) => entry.cents);
-}
-
-function sum(amounts: bigint[]): bigint {
-  return amounts.reduce((total, amount) => total + amount, 0n);
 }

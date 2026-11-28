@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { messageOf } from '../../src/util/errors.js';
-import { isNumber } from '../../src/util/numbers.js';
-import { valueAt } from '../../src/util/objects.js';
+import { isMalformedNumber, isNegative, isNumber, signsDiffer, twoDigits } from '../../src/util/numbers.js';
+import { isEmptyObject, isObject, pathOf, recordOf, valueAt } from '../../src/util/objects.js';
 import { escapeRegExp } from '../../src/util/regexp.js';
 import { cells, COLUMN_GAP, rowOf } from '../../src/util/rows.js';
 
@@ -14,6 +14,50 @@ describe('the helpers every layer may use', () => {
   it('tells a finite number from everything else', () => {
     expect([1, 0, -2.5].every(isNumber)).toBe(true);
     expect([Number.NaN, Infinity, '1', null, undefined].some(isNumber)).toBe(false);
+  });
+
+  it('tells a value that is given but no number, and a negative number', () => {
+    expect([Number.NaN, '1', null, Infinity].every(isMalformedNumber)).toBe(true);
+    expect([undefined, 0, -2.5].some(isMalformedNumber)).toBe(false);
+    expect([-1, -0.01].every(isNegative)).toBe(true);
+    expect([0, 1, '-1', Number.NaN, -Infinity, undefined].some(isNegative)).toBe(false);
+  });
+
+  it('tells two amounts whose signs differ, as numbers or as BigInt; 0 has no sign', () => {
+    expect([signsDiffer(-1, 2), signsDiffer(3n, -1n), signsDiffer(0.5, -0.01)]).toEqual([true, true, true]);
+    expect([signsDiffer(1, 2), signsDiffer(-1n, -2n), signsDiffer(0, -1), signsDiffer(0n, 5n)]).toEqual([
+      false,
+      false,
+      false,
+      false,
+    ]);
+  });
+
+  it('writes a month or a day with two digits', () => {
+    expect([twoDigits(3), twoDigits('3'), twoDigits(10), twoDigits('31')]).toEqual(['03', '03', '10', '31']);
+  });
+
+  it('tells an object, also a list, from null and from what is no object', () => {
+    expect([{}, [], { a: 1 }].every(isObject)).toBe(true);
+    expect([null, undefined, 'x', 1].some(isObject)).toBe(false);
+  });
+
+  it('takes an object as it is, and anything else as an empty one', () => {
+    const given = { a: 1 };
+    expect(recordOf(given)).toBe(given);
+    expect([null, undefined, 'x', 0].map(recordOf)).toEqual([{}, {}, {}, {}]);
+  });
+
+  it('tells an empty object, but not an empty list', () => {
+    expect(isEmptyObject({})).toBe(true);
+    expect([[], { a: undefined }, null, undefined, ''].some(isEmptyObject)).toBe(false);
+  });
+
+  it('writes a path of keys and indices, leaving out a key that is missing or empty', () => {
+    expect(pathOf('lines', 0, 'unitPrice')).toBe('lines.0.unitPrice');
+    expect(pathOf('discounts', 1, undefined)).toBe('discounts.1');
+    expect(pathOf('', 'number')).toBe('number');
+    expect(pathOf('', 0)).toBe('0');
   });
 
   it('reads a value at a path of keys and indices, and nothing where the path leads nowhere', () => {

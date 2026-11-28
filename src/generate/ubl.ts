@@ -2,6 +2,7 @@ import type { Invoice as EInvoiceEuInvoice } from '@e-invoice-eu/core';
 import type { Adjustment } from '../domain/adjustments.js';
 import type { Totals } from '../domain/calculate.js';
 import type { Invoice, Line, Party, VatCategory } from '../domain/model.js';
+import { formatAmount } from '../domain/money.js';
 
 /** A part of the UBL document as @e-invoice-eu/core takes it: element names as keys, `name@attribute` for attributes. */
 type UblElement = Record<string, unknown>;
@@ -253,16 +254,12 @@ function taxCategory(ctx: Context, category: string, rate: number, breakdown: bo
 
 /** An amount with its currency, as two keys: the element and its attribute. */
 function amountElement(ctx: Context, key: string, value: number): UblElement {
-  return { [key]: amount(value), [`${key}@currencyID`]: ctx.invoice.currency };
+  return { [key]: formatAmount(value), [`${key}@currencyID`]: ctx.invoice.currency };
 }
 
 /** Removes keys whose value is undefined, so optional elements simply do not appear. */
 function compact<T extends UblElement>(object: T): T {
   return Object.fromEntries(Object.entries(object).filter(([, v]) => v !== undefined)) as T;
-}
-
-function amount(value: number): string {
-  return value.toFixed(2);
 }
 
 /** Quantities and prices keep their precision; no exponent, no trailing zeros. */
