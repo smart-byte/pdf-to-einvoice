@@ -75,13 +75,7 @@ export class InvoiceError extends Error {
  */
 export async function createEInvoice(options: CreateOptions): Promise<CreateResult> {
   const xrechnung = options.profile === 'xrechnung';
-  let info: PdfInfo;
-  try {
-    info = await inspectPdf(options.pdf);
-  } catch (e) {
-    throw new InvoiceError('invalid-pdf', message('invalid-pdf', { reason: messageOf(e) }));
-  }
-  if (info.embeddedXml !== null) throw new InvoiceError('already-einvoice', message('already-einvoice'));
+  const info = await inspected(options.pdf);
   // A PDF whose text cannot be read is compared with no text: that is reported, and the file is written all the same.
   const pdfText = options.pdfText ?? (await extractText(options.pdf).catch(() => ''));
   const data = checked(options.invoice, xrechnung ? 'xrechnung' : undefined, pdfText);
@@ -96,6 +90,18 @@ export async function createEInvoice(options: CreateOptions): Promise<CreateResu
   const xml = await readEmbeddedXml(pdf);
   if (xml === null) throw new InvoiceError('generator', message('generator.no-xml'), findings);
   return { pdf, xml, findings: [...findings, ...notWritten(data.invoice, xml)], totals: data.totals };
+}
+
+/** What matters about the PDF to turn into an e-invoice. One that cannot be read, or is one already, is refused. */
+async function inspected(pdf: Uint8Array): Promise<PdfInfo> {
+  let info: PdfInfo;
+  try {
+    info = await inspectPdf(pdf);
+  } catch (e) {
+    throw new InvoiceError('invalid-pdf', message('invalid-pdf', { reason: messageOf(e) }));
+  }
+  if (info.embeddedXml !== null) throw new InvoiceError('already-einvoice', message('already-einvoice'));
+  return info;
 }
 
 /**
@@ -196,15 +202,17 @@ function addOrderReference(xml: unknown, orderReference: string | undefined): vo
     'rsm:SupplyChainTradeTransaction',
     'ram:ApplicableHeaderTradeAgreement',
   );
-  if (orderReference && agreement && !agreement['ram:BuyerOrderReferencedDocument']) {
+  if (!orderReference || !agreement) return;
+  if (!agreement['ram:BuyerOrderReferencedDocument']) {
     agreement['ram:BuyerOrderReferencedDocument'] = { 'ram:IssuerAssignedID': orderReference };
   }
 }
 
 /** A UBL credit note states the due date (BT-9) with the payment means, right after their code. The library leaves it out. */
 function addCreditNoteDueDate(xml: unknown, dueDate: string | undefined): void {
+  if (!dueDate) return;
   const means = childAt(xml, 'CreditNote')?.['cac:PaymentMeans'];
-  if (!dueDate || !Array.isArray(means) || !isObject(means[0])) return;
+  if (!Array.isArray(means) || !isObject(means[0])) return;
   const { 'cbc:PaymentMeansCode': code, ...rest } = means[0];
   means[0] = { 'cbc:PaymentMeansCode': code, 'cbc:PaymentDueDate': dueDate, ...rest };
 }
