@@ -28,12 +28,12 @@ function labelledIn(searched: string): Labelled {
 
 /** The first amount after each label, where they add up: net + VAT = gross, or net = gross and no VAT. */
 function labelledSum({ net: [net], vat: [vat], gross: [gross] }: Labelled): ReadTotals | undefined {
-  if (net !== undefined && vat !== undefined && net + vat === gross) {
-    return { net: euros(net), vat: euros(vat), gross: euros(gross) };
+  if (net === undefined) return undefined;
+  if (vat === undefined) {
+    // The same amount as net and as gross, and no VAT: an invoice without VAT, whatever else adds up on the page.
+    return net === gross ? { net: euros(net), gross: euros(gross) } : undefined;
   }
-  // The same amount as net and as gross, and no VAT: an invoice without VAT, whatever else adds up on the page.
-  if (net !== undefined && net === gross && vat === undefined) return { net: euros(net), gross: euros(gross) };
-  return undefined;
+  return net + vat === gross ? { net: euros(net), vat: euros(vat), gross: euros(gross) } : undefined;
 }
 
 /**
@@ -43,25 +43,30 @@ function labelledSum({ net: [net], vat: [vat], gross: [gross] }: Labelled): Read
  */
 function sumOnPage(text: string, labelled: Labelled): ReadTotals | undefined {
   const printed = new Set(centsOf([...text.matchAll(PRINTED_AMOUNT)].map((match) => match[1]!)));
-  // VAT of nothing is believed when a label says so; "0,00" alone may be anything.
-  const fits = (net: number, vat: number) =>
-    net !== 0 && printed.has(net + vat) && share(vat, net) && (vat !== 0 || labelled.vat.includes(0));
-  const sums: { net: number; vat: number; gross: number; score: number }[] = [];
-  for (const net of printed) {
-    for (const vat of printed) {
-      if (!fits(net, vat)) continue;
-      sums.push({
-        net: net / 100,
-        vat: vat / 100,
-        gross: (net + vat) / 100,
-        score: +labelled.net.includes(net) + +labelled.vat.includes(vat) + +labelled.gross.includes(net + vat),
-      });
-    }
-  }
-  sums.sort((a, b) => b.score - a.score);
-  const unlabelled = !labelled.net.length && !labelled.vat.length && !labelled.gross.length;
+  const amounts = [...printed];
+  const sums = amounts
+    .flatMap((net) =>
+      amounts.filter((vat) => fits(net, vat, printed, labelled)).map((vat) => scored(net, vat, labelled)),
+    )
+    .sort((a, b) => b.score - a.score);
+  const unlabelled = Object.values(labelled).every((found) => found.length === 0);
   const [best, second] = sums[0]?.score ? sums : sums.filter((sum) => unlabelled && sum.vat !== 0);
   return best && best.score > (second?.score ?? -1) ? { net: best.net, vat: best.vat, gross: best.gross } : undefined;
+}
+
+/**
+ * Whether net and VAT, in cents, add up to a printed gross at a share there is. VAT of nothing is believed when a label
+ * says so; "0,00" alone may be anything.
+ */
+function fits(net: number, vat: number, printed: Set<number>, labelled: Labelled): boolean {
+  if (net === 0 || !printed.has(net + vat)) return false;
+  return share(vat, net) && (vat !== 0 || labelled.vat.includes(0));
+}
+
+/** Net, VAT and gross in euros, and how many of the three stand after their label. */
+function scored(net: number, vat: number, labelled: Labelled) {
+  const score = +labelled.net.includes(net) + +labelled.vat.includes(vat) + +labelled.gross.includes(net + vat);
+  return { net: net / 100, vat: vat / 100, gross: (net + vat) / 100, score };
 }
 
 /**
