@@ -8,3 +8,8 @@ export const valueAt = (data: unknown, path: string): unknown =>
 export function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
+
+/** An object as it is; anything else as an empty one, which holds none of the fields asked for. */
+export function recordOf(value: unknown): Record<string, unknown> {
+  return isObject(value) ? value : {};
+}

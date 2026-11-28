@@ -1,6 +1,7 @@
 // Discounts and charges on the whole invoice (BG-20, BG-21): what each needs by itself, and how it goes into the VAT
 // groups of the lines, by percentage or by amount, with what is wrong with it.
 import { isMalformedNumber, isNegative, isNumber } from '../util/numbers.js';
+import { recordOf } from '../util/objects.js';
 import type { Finding } from './finding.js';
 import { error, warning } from './messages.js';
 import {
@@ -125,7 +126,7 @@ type At = (field?: string) => string;
  */
 function checkEntry(raw: unknown, list: List, index: number): { checked?: Checked; problems: Finding[] } {
   const at: At = (field) => pathOf(list, index, field);
-  const entry = entryOf(raw);
+  const entry: Unchecked<DocumentAllowance> = recordOf(raw);
   const numbers = numbersRefused(entry, list, at);
   const vat = vatOf(entry, at);
   const problems = [...numbers, ...reasonMissing(entry, list, at), ...vat.problems];
@@ -144,11 +145,6 @@ function checkEntry(raw: unknown, list: List, index: number): { checked?: Checke
     reason: entry.reason,
   } as Checked;
   return { checked, problems };
-}
-
-/** An entry as an object; anything else holds none of its fields. */
-function entryOf(raw: unknown): Unchecked<DocumentAllowance> {
-  return raw && typeof raw === 'object' ? raw : {};
 }
 
 /** A charge needs its reason; a discount may go without. */

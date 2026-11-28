@@ -11,6 +11,7 @@ import {
 import { COUNTRY_NAMES, dateSpellings, MONTHS } from '../domain/spellings.js';
 import type { InvoiceDraft } from '../domain/model.js';
 import { twoDigits } from '../util/numbers.js';
+import { recordOf } from '../util/objects.js';
 import { escapeRegExp } from '../util/regexp.js';
 
 // Comparing what a language model read with the text of the PDF: a value stays only where the page shows it, in a
@@ -24,7 +25,7 @@ import { escapeRegExp } from '../util/regexp.js';
  */
 export function keepWhatThePdfShows(input: unknown, pdfText: string): InvoiceDraft {
   const page = pageTextOf(pdfText);
-  const draft = fieldsOf(input);
+  const draft = recordOf(input);
   const result = keep(draft, INVOICE, page);
   const [seller, buyer] = [keep(draft.seller, PARTY, page), keep(draft.buyer, PARTY, page)];
   for (const [key, kept] of Object.entries({ seller, buyer, totals: keep(draft.totals, TOTALS, page) })) {
@@ -87,14 +88,10 @@ const TOTALS: Record<string, Rule> = { net: amount, vat: amount, gross: amount, 
 
 /** The fields of `object` that have a rule and that the page shows. */
 function keep(object: unknown, rules: Record<string, Rule>, page: PageText): Fields {
-  const fields = fieldsOf(object);
+  const fields = recordOf(object);
   return Object.fromEntries(
     Object.entries(fields).filter(([key, value]) => value != null && rules[key]?.(value, page, fields)),
   );
-}
-
-function fieldsOf(object: unknown): Fields {
-  return object && typeof object === 'object' ? (object as Fields) : {};
 }
 
 // The rules, in the order the tables use them. What it takes for a page to show a value, domain/shown.ts says.
