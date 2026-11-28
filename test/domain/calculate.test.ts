@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { checkAdjustments } from '../../src/domain/adjustments.js';
 import { calculate, tryCalculate } from '../../src/domain/calculate.js';
-import { cents, exactSum, fromCents, lineAgrees, percentAgrees, slackOf } from '../../src/domain/money.js';
+import { cents, exactSum, fromCents, lineAgrees, percentAgrees, slackOf, sumCents } from '../../src/domain/money.js';
 import type { DocumentAllowance, Invoice, Line } from '../../src/domain/model.js';
 
 const line = (over: Partial<Line> = {}): Line => ({
@@ -121,6 +121,10 @@ describe('calculate', () => {
   it('turns whole cents back into an amount, as a number or as BigInt', () => {
     expect([fromCents(101), fromCents(-5), fromCents(101n), fromCents(0)]).toEqual([1.01, -0.05, 1.01, 0]);
     expect(fromCents(cents(1.005))).toBe(1.01);
+  });
+
+  it('sums whole cents in BigInt', () => {
+    expect([sumCents([1n, 2n, -3n]), sumCents([]), sumCents([178381n])]).toEqual([0n, 0n, 178381n]);
   });
 
   it('sums amounts without floating point error', () => {

@@ -84,6 +84,11 @@ export function toCents(n: number): bigint {
   return divRound(micro(n), 10_000n);
 }
 
+/** The sum of whole cents. */
+export function sumCents(amounts: bigint[]): bigint {
+  return amounts.reduce((total, amount) => total + amount, 0n);
+}
+
 export function baseCents(quantity: number, unitPrice: number): bigint {
   return divRound(micro(quantity) * micro(unitPrice), 10n ** 10n);
 }

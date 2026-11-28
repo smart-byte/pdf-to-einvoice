@@ -12,7 +12,7 @@ import {
   type Unchecked,
   type VatCategory,
 } from './model.js';
-import { formatCents, fromCents, percentAgrees, percentCents, slackOf, toCents } from './money.js';
+import { formatCents, fromCents, percentAgrees, percentCents, slackOf, sumCents, toCents } from './money.js';
 import { categoryOf, vatRateError } from './vat.js';
 
 /** A discount or charge on the whole invoice as it goes into one VAT group: one entry of BG-20 or BG-21. */
@@ -267,7 +267,7 @@ function statedAgainst(
     const [base, expected] = [formatCents(part.g.cents), formatCents(part.cents)];
     return [error(at, 'adjustment-mismatch', { percent, base, expected, what, stated: formatCents(stated) })];
   }
-  const sum = parts.reduce((a, p) => a + p.cents, 0n);
+  const sum = sumCents(parts.map((p) => p.cents));
   if (sum === stated) return [];
   const split = parts.map((p) => formatCents(p.cents)).join(' + ');
   return [
