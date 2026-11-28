@@ -159,10 +159,8 @@ async function tallyModel(layout, guess, truth) {
   return `, ${Math.round((Date.now() - started) / 1000)} s`;
 }
 
-for (const file of walk(root)) {
-  const name = relative(root, file);
-  const folder = name.split(sep)[0];
-  if (taken[folder] >= sample) continue;
+/** Reads one invoice and counts how the reader did; one that cannot be read is skipped, with the reason. */
+async function evaluate(file, name, folder) {
   try {
     const { layout, truth, guess } = await answerKey(file);
     read++;
@@ -173,6 +171,13 @@ for (const file of walk(root)) {
   } catch (error) {
     skipped.push(`${name}: ${error.message.slice(0, 80)}`);
   }
+}
+
+for (const file of walk(root)) {
+  const name = relative(root, file);
+  const folder = name.split(sep)[0];
+  if (taken[folder] >= sample) continue;
+  await evaluate(file, name, folder);
 }
 await browser?.close();
 

@@ -150,15 +150,22 @@ function months(year: string, from: number, to: number): Period | undefined {
  * the rows it wraps into. They are taken over word for word; when the due date is, is read separately.
  */
 export function readPaymentTerms(rows: string[]): string | undefined {
-  for (const [i, row] of rows.entries()) {
-    const all = cells(row);
-    for (const [k, cell] of all.entries()) {
-      // "Payment terms   Net 30": the label in one cell, the terms in the next.
-      const labelled = TERMS_LABEL.test(cell) ? cell.replace(TERMS_LABEL, '') || all[k + 1] : undefined;
-      if (labelled) return labelled;
-      // Alone in its row, the sentence may go on into the rows below.
-      if (TERMS_START.test(cell)) return all.length === 1 ? wrapped(rows, i, cell) : cell;
-    }
+  for (const i of rows.keys()) {
+    const terms = termsIn(rows, i);
+    if (terms !== undefined) return terms;
+  }
+  return undefined;
+}
+
+/** The payment terms in row `i`: after their label, or as a sentence that starts like them. */
+function termsIn(rows: string[], i: number): string | undefined {
+  const all = cells(rows[i]!);
+  for (const [k, cell] of all.entries()) {
+    // "Payment terms   Net 30": the label in one cell, the terms in the next.
+    const labelled = TERMS_LABEL.test(cell) ? cell.replace(TERMS_LABEL, '') || all[k + 1] : undefined;
+    if (labelled) return labelled;
+    // Alone in its row, the sentence may go on into the rows below.
+    if (TERMS_START.test(cell)) return all.length === 1 ? wrapped(rows, i, cell) : cell;
   }
   return undefined;
 }
