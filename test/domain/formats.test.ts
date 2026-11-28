@@ -10,6 +10,7 @@ import {
   isIban,
   isTaxNumber,
   isVatId,
+  lastDayOfMonth,
 } from '../../src/domain/formats.js';
 
 describe('formats', () => {
@@ -50,6 +51,15 @@ describe('formats', () => {
     expect(isCurrencyCode('EUR')).toBe(true);
     expect(isCurrencyCode('€')).toBe(false);
     expect(isCurrencyCode(undefined)).toBe(false);
+  });
+
+  it('knows the last day of a month, also in a leap year', () => {
+    expect([
+      lastDayOfMonth(2026, 2),
+      lastDayOfMonth(2028, 2),
+      lastDayOfMonth(2026, 4),
+      lastDayOfMonth(2026, 12),
+    ]).toEqual([28, 29, 30, 31]);
   });
 
   it('writes an IBAN, a BIC or a VAT ID as it is compared: without whitespace, in capitals', () => {

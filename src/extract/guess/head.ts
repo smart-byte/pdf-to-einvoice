@@ -1,3 +1,4 @@
+import { lastDayOfMonth } from '../../domain/formats.js';
 import type { InvoiceType } from '../../domain/model.js';
 import { twoDigits } from '../../util/numbers.js';
 import { escapeRegExp } from '../../util/regexp.js';
@@ -142,7 +143,7 @@ function months(year: string, from: number, to: number): Period | undefined {
   if (from < 1 || to > 12) return undefined;
   return {
     periodStart: `${year}-${twoDigits(from)}-01`,
-    periodEnd: `${year}-${twoDigits(to)}-${new Date(Date.UTC(Number(year), to, 0)).getUTCDate()}`,
+    periodEnd: `${year}-${twoDigits(to)}-${lastDayOfMonth(Number(year), to)}`,
   };
 }
 

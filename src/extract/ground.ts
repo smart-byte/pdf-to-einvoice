@@ -1,4 +1,13 @@
-import { compactCode, isBic, isDate, isEmail, isIban, isTaxNumber, isVatId } from '../domain/formats.js';
+import {
+  compactCode,
+  isBic,
+  isDate,
+  isEmail,
+  isIban,
+  isTaxNumber,
+  isVatId,
+  lastDayOfMonth,
+} from '../domain/formats.js';
 import {
   pageTextOf,
   showsAmount,
@@ -152,7 +161,7 @@ function month(which: 'first' | 'last'): Rule {
     if (date(value, page)) return true;
     if (typeof value !== 'string' || !isDate(value)) return false;
     const [y, m, d] = value.split('-').map(Number) as [number, number, number];
-    if (d !== (which === 'first' ? 1 : new Date(Date.UTC(y, m, 0)).getUTCDate())) return false;
+    if (d !== (which === 'first' ? 1 : lastDayOfMonth(y, m))) return false;
     const [mm, names] = [twoDigits(m), (MONTHS[m - 1] ?? []).map(escapeRegExp).join('|')];
     // The month alone, not a day in it ("15. September 2026", "15.09.2026").
     return new RegExp(

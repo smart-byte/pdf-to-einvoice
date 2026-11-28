@@ -8,6 +8,11 @@ export function isDate(value: unknown): value is string {
   return !Number.isNaN(parsed.getTime()) && parsed.toISOString().startsWith(value);
 }
 
+/** The last day of a month, 1 to 12, of a year: 28 or 29 for February. */
+export function lastDayOfMonth(year: number, month: number): number {
+  return new Date(Date.UTC(year, month, 0)).getUTCDate();
+}
+
 /** An IBAN, a BIC or a VAT ID as it is compared and written: without whitespace, in capitals. */
 export function compactCode(code: string): string {
   return code.replace(/\s+/g, '').toUpperCase();
