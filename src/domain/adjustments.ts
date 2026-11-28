@@ -1,6 +1,6 @@
 // Discounts and charges on the whole invoice (BG-20, BG-21): what each needs by itself, and how it goes into the VAT
 // groups of the lines, by percentage or by amount, with what is wrong with it.
-import { isNumber } from '../util/numbers.js';
+import { isMalformedNumber, isNegative, isNumber } from '../util/numbers.js';
 import type { Finding } from './finding.js';
 import { error, warning } from './messages.js';
 import {
@@ -164,12 +164,12 @@ function groupRate(category: VatCategory | undefined, vatRate: number | undefine
 /** What keeps the numbers of an entry from being used: one that is no number, neither percentage nor amount, or a negative percentage. */
 function numbersRefused(entry: Unchecked<DocumentAllowance>, list: List, at: At): Finding[] {
   const problems = (['percent', 'amount', 'vatRate'] as const)
-    .filter((field) => entry[field] !== undefined && !isNumber(entry[field]))
+    .filter((field) => isMalformedNumber(entry[field]))
     .map((field) => error(at(field), 'format.number'));
   if (entry.percent === undefined && entry.amount === undefined) {
     problems.push(error(at(), 'adjustment', { what: WHAT[list] }));
   }
-  if (isNumber(entry.percent) && entry.percent < 0) problems.push(error(at('percent'), 'adjustment.negative'));
+  if (isNegative(entry.percent)) problems.push(error(at('percent'), 'adjustment.negative'));
   return problems;
 }
 

@@ -1,4 +1,4 @@
-import { isNumber } from '../util/numbers.js';
+import { isMalformedNumber, isNegative, isNumber } from '../util/numbers.js';
 import { valueAt } from '../util/objects.js';
 import { checkAdjustments } from './adjustments.js';
 import { tryCalculate, type Totals } from './calculate.js';
@@ -675,15 +675,6 @@ function adjustmentsOf(draft: Unchecked): (readonly [path: string, entry: Unchec
       (entry: Unchecked<DocumentAllowance>, i: number) => [`${list}.${i}`, entry] as const,
     );
   });
-}
-
-/** A value that is given and is not a number. */
-function isMalformedNumber(value: unknown): boolean {
-  return value !== undefined && !isNumber(value);
-}
-
-function isNegative(value: unknown): boolean {
-  return isNumber(value) && value < 0;
 }
 
 const NEEDS_REASON: VatCategory[] = ['E', 'AE', 'K', 'G', 'O'];

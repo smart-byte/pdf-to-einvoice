@@ -1,4 +1,5 @@
 import { amountSpellings, dateSpellings } from '../../src/domain/spellings.js';
+import { isNumber } from '../../src/util/numbers.js';
 
 /** A rectangle on the page. `y` is its upper edge; the unit is up to the caller, as long as all pieces share it. */
 export interface Rect {
@@ -52,7 +53,7 @@ type Kind = 'number' | 'date' | 'text';
 
 /** What is looked for: the kind of a value and the ways it is printed; none for a value that is not printed. */
 function soughtOf(value: unknown): { kind: Kind; spellings: string[] } | undefined {
-  if (typeof value === 'number' && Number.isFinite(value)) {
+  if (isNumber(value)) {
     const plain = String(Math.abs(value));
     return { kind: 'number', spellings: [...amountSpellings(value), plain, plain.replace('.', ',')] };
   }

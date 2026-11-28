@@ -1,8 +1,9 @@
 import type { InvoiceType } from '../../domain/model.js';
+import { twoDigits } from '../../util/numbers.js';
 import { escapeRegExp } from '../../util/regexp.js';
 import { cells } from '../../util/rows.js';
 import { KEY_VALUE, MAX_WRAPPED } from './rows.js';
-import { after, anyOf, DATE, monthAs, monthNumber, pad, SEPARATOR, toIsoDate } from './values.js';
+import { after, anyOf, DATE, monthAs, monthNumber, SEPARATOR, toIsoDate } from './values.js';
 
 // The head of the invoice: its number and type, its dates, the service period, the payment terms and the reference
 // of the buyer.
@@ -107,8 +108,8 @@ function daysOf(
   [fromDay, fromMonth, toDay, toMonth]: readonly [string, string, string, string],
 ): Period {
   return {
-    periodStart: `${groups.fromYear}-${pad(fromMonth)}-${pad(fromDay)}`,
-    periodEnd: `${groups.toYear}-${pad(toMonth)}-${pad(toDay)}`,
+    periodStart: `${groups.fromYear}-${twoDigits(fromMonth)}-${twoDigits(fromDay)}`,
+    periodEnd: `${groups.toYear}-${twoDigits(toMonth)}-${twoDigits(toDay)}`,
   };
 }
 
@@ -140,8 +141,8 @@ function month(year: string, number: number): Period | undefined {
 function months(year: string, from: number, to: number): Period | undefined {
   if (from < 1 || to > 12) return undefined;
   return {
-    periodStart: `${year}-${pad(from)}-01`,
-    periodEnd: `${year}-${pad(to)}-${new Date(Date.UTC(Number(year), to, 0)).getUTCDate()}`,
+    periodStart: `${year}-${twoDigits(from)}-01`,
+    periodEnd: `${year}-${twoDigits(to)}-${new Date(Date.UTC(Number(year), to, 0)).getUTCDate()}`,
   };
 }
 

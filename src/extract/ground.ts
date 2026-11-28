@@ -10,6 +10,7 @@ import {
 } from '../domain/shown.js';
 import { COUNTRY_NAMES, dateSpellings, MONTHS } from '../domain/spellings.js';
 import type { InvoiceDraft } from '../domain/model.js';
+import { twoDigits } from '../util/numbers.js';
 import { escapeRegExp } from '../util/regexp.js';
 
 // Comparing what a language model read with the text of the PDF: a value stays only where the page shows it, in a
@@ -155,7 +156,7 @@ function month(which: 'first' | 'last'): Rule {
     if (typeof value !== 'string' || !isDate(value)) return false;
     const [y, m, d] = value.split('-').map(Number) as [number, number, number];
     if (d !== (which === 'first' ? 1 : new Date(Date.UTC(y, m, 0)).getUTCDate())) return false;
-    const [mm, names] = [String(m).padStart(2, '0'), (MONTHS[m - 1] ?? []).map(escapeRegExp).join('|')];
+    const [mm, names] = [twoDigits(m), (MONTHS[m - 1] ?? []).map(escapeRegExp).join('|')];
     // The month alone, not a day in it ("15. September 2026", "15.09.2026").
     return new RegExp(
       `(?<!\\d\\.?\\s*)\\b(?:${names})\\.?\\s*${y}\\b|(?<![\\d./-])${mm}[./]${y}(?!\\d)|(?<![\\d-])${y}-${mm}(?![-\\d])`,
