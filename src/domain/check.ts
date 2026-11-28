@@ -1,5 +1,5 @@
 import { isMalformedNumber, isNegative, isNumber } from '../util/numbers.js';
-import { isObject, valueAt } from '../util/objects.js';
+import { isEmptyObject, isObject, valueAt } from '../util/objects.js';
 import { checkAdjustments } from './adjustments.js';
 import { tryCalculate, type Totals } from './calculate.js';
 import type { Finding } from './finding.js';
@@ -113,10 +113,6 @@ function lineWithDefaults(given: Unchecked<Line>): Unchecked<Line> {
   // A discount whose fields were all left empty is none.
   if (isEmptyObject(line.discount)) delete line.discount;
   return line;
-}
-
-function isEmptyObject(value: unknown): boolean {
-  return typeof value === 'object' && value !== null && Object.keys(value).length === 0;
 }
 
 /** Drops null, undefined and blank strings; trims the rest. */

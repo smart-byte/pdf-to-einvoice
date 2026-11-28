@@ -13,3 +13,8 @@ export function isObject(value: unknown): value is Record<string, unknown> {
 export function recordOf(value: unknown): Record<string, unknown> {
   return isObject(value) ? value : {};
 }
+
+/** Whether a value is an object without a single key. A list is none, also an empty one. */
+export function isEmptyObject(value: unknown): boolean {
+  return isObject(value) && !Array.isArray(value) && Object.keys(value).length === 0;
+}

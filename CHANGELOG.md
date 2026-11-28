@@ -13,6 +13,8 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- `check` reports a discount on a line given as a list, also an empty one, as a discount without a percentage or an
+  amount. It dropped an empty list as if it were a discount whose fields were all left empty.
 - A line with a negative VAT rate is told that a rate is never negative, as a discount or a charge is, instead of what
   its category asks for.
 - The comparison of a language model's answer with the PDF drops an e-mail address that `check` would reject, such as

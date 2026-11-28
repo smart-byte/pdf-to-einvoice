@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { messageOf } from '../../src/util/errors.js';
 import { isMalformedNumber, isNegative, isNumber, twoDigits } from '../../src/util/numbers.js';
-import { isObject, recordOf, valueAt } from '../../src/util/objects.js';
+import { isEmptyObject, isObject, recordOf, valueAt } from '../../src/util/objects.js';
 import { escapeRegExp } from '../../src/util/regexp.js';
 import { cells, COLUMN_GAP, rowOf } from '../../src/util/rows.js';
 
@@ -36,6 +36,11 @@ describe('the helpers every layer may use', () => {
     const given = { a: 1 };
     expect(recordOf(given)).toBe(given);
     expect([null, undefined, 'x', 0].map(recordOf)).toEqual([{}, {}, {}, {}]);
+  });
+
+  it('tells an empty object, but not an empty list', () => {
+    expect(isEmptyObject({})).toBe(true);
+    expect([[], { a: undefined }, null, undefined, ''].some(isEmptyObject)).toBe(false);
   });
 
   it('reads a value at a path of keys and indices, and nothing where the path leads nowhere', () => {

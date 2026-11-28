@@ -177,6 +177,8 @@ describe('check', () => {
     expect(at({ reason: 'Treuerabatt' }, 'lines.1.discount')).toEqual(['error:discount']);
     expect(at({ percent: -5 }, 'lines.1.discount.percent')).toEqual(['error:discount']);
     expect(at({ percent: '10 %' }, 'lines.1.discount.percent')).toEqual(['error:format']);
+    // A list is no discount, also an empty one.
+    expect(at([], 'lines.1.discount')).toEqual(['error:discount']);
   });
 
   it('ignores a discount whose fields were all left empty', () => {
