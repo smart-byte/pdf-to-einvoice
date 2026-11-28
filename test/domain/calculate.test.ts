@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { checkAdjustments } from '../../src/domain/adjustments.js';
 import { calculate, tryCalculate } from '../../src/domain/calculate.js';
-import { cents, exactSum, fromCents, lineAgrees, percentAgrees, slackOf, sumCents } from '../../src/domain/money.js';
+import {
+  cents,
+  exactSum,
+  formatAmount,
+  fromCents,
+  lineAgrees,
+  percentAgrees,
+  slackOf,
+  sumCents,
+} from '../../src/domain/money.js';
 import type { DocumentAllowance, Invoice, Line } from '../../src/domain/model.js';
 
 const line = (over: Partial<Line> = {}): Line => ({
@@ -125,6 +134,16 @@ describe('calculate', () => {
 
   it('sums whole cents in BigInt', () => {
     expect([sumCents([1n, 2n, -3n]), sumCents([]), sumCents([178381n])]).toEqual([0n, 0n, 178381n]);
+  });
+
+  it('writes an amount with two decimals, rounded to the cent half away from zero', () => {
+    // In floating point 1.015 is 1.01499999…; toFixed(2) gives 1.01, the cent it is compared as is 1.02.
+    expect([formatAmount(1.015), formatAmount(-1.015), formatAmount(10), formatAmount(0.1 + 0.2)]).toEqual([
+      '1.02',
+      '-1.02',
+      '10.00',
+      '0.30',
+    ]);
   });
 
   it('sums amounts without floating point error', () => {

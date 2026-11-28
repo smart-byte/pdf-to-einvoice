@@ -10,6 +10,11 @@ export function cents(n: number): number {
   return Number.isFinite(n * 1e6) ? Number(toCents(n)) : NaN;
 }
 
+/** An amount with two decimals, rounded to the cent as `cents` rounds it: 1.015 is "1.02", where `toFixed(2)` gives "1.01". */
+export function formatAmount(n: number): string {
+  return formatCents(toCents(n));
+}
+
 /** Whole cents as an amount, from a number or from BigInt: 101 is 1.01. */
 export function fromCents(c: number | bigint): number {
   return Number(c) / 100;

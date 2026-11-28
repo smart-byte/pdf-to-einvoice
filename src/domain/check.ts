@@ -5,7 +5,7 @@ import { tryCalculate, type Totals } from './calculate.js';
 import type { Finding } from './finding.js';
 import { compactCode, isCountryCode, isCurrencyCode, isDate, isEmail, isIban } from './formats.js';
 import { error, warning, type MessageKey, type MessageParams } from './messages.js';
-import { cents, lineAgrees, lineBase, percentAgrees, percentOf, slackOf } from './money.js';
+import { cents, formatAmount, lineAgrees, lineBase, percentAgrees, percentOf, slackOf } from './money.js';
 import { pageTextOf, showsAmount, showsPercent, showsSpelling, showsWords, type PageText } from './shown.js';
 import { dateSpellings } from './spellings.js';
 import {
@@ -426,9 +426,9 @@ function checkDiscountAmount(line: Unchecked<Line>, i: number, { totals, slack }
 function discountMismatch(i: number, { base, amount }: { base: number; amount: number }, percent: number): Finding {
   return error(`lines.${i}.discount.amount`, 'discount-mismatch', {
     percent,
-    base: base.toFixed(2),
-    expected: percentOf(base, percent).toFixed(2),
-    stated: amount.toFixed(2),
+    base: formatAmount(base),
+    expected: formatAmount(percentOf(base, percent)),
+    stated: formatAmount(amount),
   });
 }
 
@@ -440,8 +440,8 @@ function checkLineNet(line: Unchecked<Line>, i: number, { totals, slack, adjuste
   const discount = totals.lineDiscounts[i];
   if (lineAgrees(priced, discount?.amount ?? 0, totals.lineNet[i]!, slack)) return [];
   // In cents, as the XML has it: 1 x 1.005 is 1.01, not 1.005.
-  const expected = (lineBase(priced.quantity, priced.unitPrice) - (discount?.amount ?? 0)).toFixed(2);
-  const stated = totals.lineNet[i]!.toFixed(2);
+  const expected = formatAmount(lineBase(priced.quantity, priced.unitPrice) - (discount?.amount ?? 0));
+  const stated = formatAmount(totals.lineNet[i]!);
   const params = { discounted: Boolean(discount), expected, stated };
   if (!adjustedLines) return [error(`lines.${i}.netAmount`, 'line-net', params)];
   return adjustedLines.includes(i) ? [] : [warning(`lines.${i}.netAmount`, 'line-net.xml', params)];
@@ -465,11 +465,11 @@ function checkStatedTotals(draft: Prepared, totals: Totals, fromXml: boolean): F
     if (stated === undefined) continue;
     if (!isNumber(stated)) findings.push(error(`totals.${key}`, 'format.number'));
     else if (cents(stated) !== cents(totals[key])) {
-      const [calculated, adjusted] = [totals[key].toFixed(2), totals.adjustments.length > 0];
+      const [calculated, adjusted] = [formatAmount(totals[key]), totals.adjustments.length > 0];
       findings.push(
         fromXml
-          ? error(`totals.${key}`, 'totals-mismatch.xml', { stated: stated.toFixed(2), calculated, adjusted })
-          : error(`totals.${key}`, 'totals-mismatch', { printed: stated.toFixed(2), calculated, adjusted }),
+          ? error(`totals.${key}`, 'totals-mismatch.xml', { stated: formatAmount(stated), calculated, adjusted })
+          : error(`totals.${key}`, 'totals-mismatch', { printed: formatAmount(stated), calculated, adjusted }),
       );
     }
   }
@@ -630,7 +630,7 @@ function expectedInTotals(totals: Totals | undefined): Expected[] {
   if (!totals) return [];
   return (['net', 'vat', 'gross'] as const)
     .filter((key) => totals[key] !== 0)
-    .map((key) => ({ ...amountOf(`totals.${key}`, totals[key]), shown: totals[key].toFixed(2) }));
+    .map((key) => ({ ...amountOf(`totals.${key}`, totals[key]), shown: formatAmount(totals[key]) }));
 }
 
 /** What a page prints of a discount or charge at `path`: its percentage, or else its amount. */
