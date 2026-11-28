@@ -10,6 +10,11 @@ export function isNegative(value: unknown): boolean {
   return isNumber(value) && value < 0;
 }
 
+/** Whether one amount is below 0 and the other above it; 0 has no sign. As numbers or as BigInt. */
+export function signsDiffer(a: number | bigint, b: number | bigint): boolean {
+  return Math.sign(Number(a)) * Math.sign(Number(b)) < 0;
+}
+
 /** A month or a day with two digits, as a date writes it: 3 is "03". */
 export function twoDigits(value: string | number): string {
   return String(value).padStart(2, '0');

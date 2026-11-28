@@ -1,4 +1,4 @@
-import { isMalformedNumber, isNegative, isNumber } from '../util/numbers.js';
+import { isMalformedNumber, isNegative, isNumber, signsDiffer } from '../util/numbers.js';
 import { isEmptyObject, isObject, valueAt } from '../util/objects.js';
 import { checkAdjustments } from './adjustments.js';
 import { tryCalculate, type Totals } from './calculate.js';
@@ -422,9 +422,9 @@ function checkDiscountAmount(line: Unchecked<Line>, i: number, { totals, slack }
   if (isNumber(percent)) {
     return percentAgrees(base, percent, amount, slack) ? [] : [discountMismatch(i, { base, amount }, percent)];
   }
-  // A 0 has no sign; two that differ multiply to a negative number.
-  const signsDiffer = Math.sign(base) * Math.sign(amount) < 0;
-  return percent === undefined && signsDiffer ? [warning(`lines.${i}.discount.amount`, 'discount-sign')] : [];
+  return percent === undefined && signsDiffer(base, amount)
+    ? [warning(`lines.${i}.discount.amount`, 'discount-sign')]
+    : [];
 }
 
 function discountMismatch(i: number, { base, amount }: { base: number; amount: number }, percent: number): Finding {

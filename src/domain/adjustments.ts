@@ -1,6 +1,6 @@
 // Discounts and charges on the whole invoice (BG-20, BG-21): what each needs by itself, and how it goes into the VAT
 // groups of the lines, by percentage or by amount, with what is wrong with it.
-import { isMalformedNumber, isNegative, isNumber } from '../util/numbers.js';
+import { isMalformedNumber, isNegative, isNumber, signsDiffer } from '../util/numbers.js';
 import { recordOf } from '../util/objects.js';
 import type { Finding } from './finding.js';
 import { error, warning } from './messages.js';
@@ -310,12 +310,6 @@ function placeAmount(entry: Checked & { amount: number }, matching: Group[], nam
 function groupOfItsOwn(category: VatCategory | undefined, rate: number | undefined): Group | undefined {
   if (category === undefined || rate === undefined) return undefined;
   return { category, rate, cents: 0n };
-}
-
-/** A 0 has no sign; otherwise one amount is below 0 and the other is not. */
-function signsDiffer(a: bigint, b: bigint): boolean {
-  if (a === 0n || b === 0n) return false;
-  return a < 0n !== b < 0n;
 }
 
 /** An entry that found no group to go into. */

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { messageOf } from '../../src/util/errors.js';
-import { isMalformedNumber, isNegative, isNumber, twoDigits } from '../../src/util/numbers.js';
+import { isMalformedNumber, isNegative, isNumber, signsDiffer, twoDigits } from '../../src/util/numbers.js';
 import { isEmptyObject, isObject, recordOf, valueAt } from '../../src/util/objects.js';
 import { escapeRegExp } from '../../src/util/regexp.js';
 import { cells, COLUMN_GAP, rowOf } from '../../src/util/rows.js';
@@ -21,6 +21,16 @@ describe('the helpers every layer may use', () => {
     expect([undefined, 0, -2.5].some(isMalformedNumber)).toBe(false);
     expect([-1, -0.01].every(isNegative)).toBe(true);
     expect([0, 1, '-1', Number.NaN, -Infinity, undefined].some(isNegative)).toBe(false);
+  });
+
+  it('tells two amounts whose signs differ, as numbers or as BigInt; 0 has no sign', () => {
+    expect([signsDiffer(-1, 2), signsDiffer(3n, -1n), signsDiffer(0.5, -0.01)]).toEqual([true, true, true]);
+    expect([signsDiffer(1, 2), signsDiffer(-1n, -2n), signsDiffer(0, -1), signsDiffer(0n, 5n)]).toEqual([
+      false,
+      false,
+      false,
+      false,
+    ]);
   });
 
   it('writes a month or a day with two digits', () => {
