@@ -76,29 +76,49 @@ export function readPeriod(text: string, rows: string[]): { periodStart?: string
 }
 
 /** The months a match of `MONTH_RANGE` names: from the first day of the one to the last day of the other. */
-function monthRangeOf(groups: Record<string, string | undefined>): Period | undefined {
-  if (!groups.fromYear || !groups.fromMonth || !groups.toYear || !groups.toMonth) return undefined;
-  const from = month(groups.fromYear, monthNumber(groups.fromMonth));
-  const to = month(groups.toYear, monthNumber(groups.toMonth));
+function monthRangeOf(groups: Groups): Period | undefined {
+  const range = allOf(groups, ['fromYear', 'fromMonth', 'toYear', 'toMonth']);
+  if (!range) return undefined;
+  const [fromYear, fromMonth, toYear, toMonth] = range;
+  const from = month(fromYear, monthNumber(fromMonth));
+  const to = month(toYear, monthNumber(toMonth));
   return from && to && from.periodStart < to.periodEnd
     ? { periodStart: from.periodStart, periodEnd: to.periodEnd }
     : undefined;
 }
 
 /** The period one alternative of `PERIOD` matched: a quarter, two dates, a month by its name or by its number. */
-function periodOf(groups: Record<string, string | undefined>): Period | undefined {
+function periodOf(groups: Groups): Period | undefined {
   const quarter = Number(groups.quarter ?? groups.quartal);
   const quarterYear = groups.quarterYear ?? groups.quartalYear;
   if (quarter && quarterYear) return months(quarterYear, quarter * 3 - 2, quarter * 3);
-  if (groups.fromDay && groups.fromMonth && groups.toDay && groups.toMonth) {
-    return {
-      periodStart: `${groups.fromYear}-${pad(groups.fromMonth)}-${pad(groups.fromDay)}`,
-      periodEnd: `${groups.toYear}-${pad(groups.toMonth)}-${pad(groups.toDay)}`,
-    };
-  }
-  if (groups.month && groups.monthYear) return month(groups.monthYear, monthNumber(groups.month));
-  if (groups.numberedMonth && groups.numberedYear) return month(groups.numberedYear, Number(groups.numberedMonth));
+  const days = allOf(groups, ['fromDay', 'fromMonth', 'toDay', 'toMonth']);
+  if (days) return daysOf(groups, days);
+  const named = allOf(groups, ['month', 'monthYear']);
+  if (named) return month(named[1], monthNumber(named[0]));
+  const numbered = allOf(groups, ['numberedMonth', 'numberedYear']);
+  if (numbered) return month(numbered[1], Number(numbered[0]));
   return groups.isoYear ? month(groups.isoYear, Number(groups.isoMonth)) : undefined;
+}
+
+/** From one date to another; the years as they were matched. */
+function daysOf(
+  groups: Groups,
+  [fromDay, fromMonth, toDay, toMonth]: readonly [string, string, string, string],
+): Period {
+  return {
+    periodStart: `${groups.fromYear}-${pad(fromMonth)}-${pad(fromDay)}`,
+    periodEnd: `${groups.toYear}-${pad(toMonth)}-${pad(toDay)}`,
+  };
+}
+
+/** The named groups of a match. */
+type Groups = Record<string, string | undefined>;
+
+/** The values of the groups `names`, in their order, where every one of them matched something. */
+function allOf<const N extends readonly string[]>(groups: Groups, names: N): { [K in keyof N]: string } | undefined {
+  const values = names.map((name) => groups[name]);
+  return values.every(Boolean) ? (values as { [K in keyof N]: string }) : undefined;
 }
 
 /** A row that holds nothing but a month, or the month the title names in its own row or the next. */
@@ -150,12 +170,22 @@ export function readPaymentTerms(rows: string[]): string | undefined {
 function wrapped(rows: string[], i: number, first: string): string {
   const terms = [first];
   for (let j = i + 1; j < rows.length && terms.length <= MAX_WRAPPED; j++) {
-    const [last, next] = [terms.at(-1)!, rows[j]!];
-    if (/[.!?]$/.test(last) || cells(next).length > 1 || KEY_VALUE.test(next) || next.endsWith(':')) break;
-    if (!/^\p{Ll}/u.test(next) && !/[,;%]$/.test(last)) break;
+    const next = rows[j]!;
+    if (!goesOnInto(terms.at(-1)!, next)) break;
     terms.push(next);
   }
   return terms.join(' ');
+}
+
+/** Whether the sentence goes on from `last` into the row `next`: not past its end, and not into a row of its own. */
+function goesOnInto(last: string, next: string): boolean {
+  if (/[.!?]$/.test(last) || isRowOfItsOwn(next)) return false;
+  return /^\p{Ll}/u.test(next) || /[,;%]$/.test(last);
+}
+
+/** A row with cells, with a label and its value, or with a label alone. */
+function isRowOfItsOwn(row: string): boolean {
+  return cells(row).length > 1 || KEY_VALUE.test(row) || row.endsWith(':');
 }
 
 // What the page is searched for. The functions above use these patterns only when a page is read, so they may stand
