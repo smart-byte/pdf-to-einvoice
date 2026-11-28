@@ -6,6 +6,7 @@ import type { Invoice, InvoiceDraft } from '../domain/model.js';
 import { inspectPdf, readEmbeddedXml, repairForPdfA, type PdfInfo } from '../pdf/file.js';
 import { extractText } from '../pdf/text.js';
 import { messageOf } from '../util/errors.js';
+import { isObject } from '../util/objects.js';
 import { message, warning } from './messages.js';
 import { toUbl } from './ubl.js';
 
@@ -203,7 +204,7 @@ function addOrderReference(xml: unknown, orderReference: string | undefined): vo
 /** A UBL credit note states the due date (BT-9) with the payment means, right after their code. The library leaves it out. */
 function addCreditNoteDueDate(xml: unknown, dueDate: string | undefined): void {
   const means = childAt(xml, 'CreditNote')?.['cac:PaymentMeans'];
-  if (!dueDate || !Array.isArray(means) || !isElement(means[0])) return;
+  if (!dueDate || !Array.isArray(means) || !isObject(means[0])) return;
   const { 'cbc:PaymentMeansCode': code, ...rest } = means[0];
   means[0] = { 'cbc:PaymentMeansCode': code, 'cbc:PaymentDueDate': dueDate, ...rest };
 }
@@ -213,16 +214,12 @@ type Element = Record<string, unknown>;
 
 /** Follows element names down from a node, where each is there. */
 function childAt(node: unknown, ...path: string[]): Element | undefined {
-  let at = isElement(node) ? node : undefined;
+  let at = isObject(node) ? node : undefined;
   for (const name of path) {
     const next = at?.[name];
-    at = isElement(next) ? next : undefined;
+    at = isObject(next) ? next : undefined;
   }
   return at;
-}
-
-function isElement(node: unknown): node is Element {
-  return typeof node === 'object' && node !== null;
 }
 
 /** The XML is the binding part: a value that was given but did not make it there must not go unnoticed. */

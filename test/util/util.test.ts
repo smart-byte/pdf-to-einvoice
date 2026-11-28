@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { messageOf } from '../../src/util/errors.js';
 import { isMalformedNumber, isNegative, isNumber, twoDigits } from '../../src/util/numbers.js';
-import { valueAt } from '../../src/util/objects.js';
+import { isObject, valueAt } from '../../src/util/objects.js';
 import { escapeRegExp } from '../../src/util/regexp.js';
 import { cells, COLUMN_GAP, rowOf } from '../../src/util/rows.js';
 
@@ -25,6 +25,11 @@ describe('the helpers every layer may use', () => {
 
   it('writes a month or a day with two digits', () => {
     expect([twoDigits(3), twoDigits('3'), twoDigits(10), twoDigits('31')]).toEqual(['03', '03', '10', '31']);
+  });
+
+  it('tells an object, also a list, from null and from what is no object', () => {
+    expect([{}, [], { a: 1 }].every(isObject)).toBe(true);
+    expect([null, undefined, 'x', 1].some(isObject)).toBe(false);
   });
 
   it('reads a value at a path of keys and indices, and nothing where the path leads nowhere', () => {

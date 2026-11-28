@@ -7,6 +7,7 @@ import { NOTE_CATEGORIES, readItems, readVatNote } from './guess/items.js';
 import { believed, countryOfVatId, EU, type Found, ISSUER_OR_BANK, readParties } from './guess/parties.js';
 import { findCurrency, readTotals, type ReadTotals } from './guess/totals.js';
 import { after, anyOf, DATE, findIban, SEPARATOR, toIsoDate, vatIdsIn } from './guess/values.js';
+import { isObject } from '../util/objects.js';
 import { cells, rowOf } from '../util/rows.js';
 
 // Known limit: patterns for German, English and French invoices, no model. A value is believed for what it fits to, not
@@ -174,7 +175,7 @@ function firstAfter(searched: string, label: RegExp, value: RegExp): string | un
 function prune<T extends object>(object: T): T {
   if (Array.isArray(object)) return object.map((item) => prune(item)) as T;
   const entries = Object.entries(object)
-    .map(([k, v]) => [k, v && typeof v === 'object' ? prune(v) : v] as const)
+    .map(([k, v]) => [k, isObject(v) ? prune(v) : v] as const)
     .filter(
       ([, v]) =>
         v !== undefined && !(typeof v === 'object' && !Array.isArray(v) && Object.keys(v as object).length === 0),

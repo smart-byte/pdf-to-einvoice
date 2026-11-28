@@ -1,5 +1,5 @@
 import { isMalformedNumber, isNegative, isNumber } from '../util/numbers.js';
-import { valueAt } from '../util/objects.js';
+import { isObject, valueAt } from '../util/objects.js';
 import { checkAdjustments } from './adjustments.js';
 import { tryCalculate, type Totals } from './calculate.js';
 import type { Finding } from './finding.js';
@@ -123,7 +123,7 @@ function isEmptyObject(value: unknown): boolean {
 function clean(value: unknown): unknown {
   if (typeof value === 'string') return value.trim() || undefined;
   if (Array.isArray(value)) return value.map((item) => clean(item) ?? {});
-  if (value && typeof value === 'object') {
+  if (isObject(value)) {
     const entries = Object.entries(value)
       .map(([key, item]) => [key, clean(item)] as const)
       .filter(([, item]) => item !== undefined);
